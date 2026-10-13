@@ -128,6 +128,7 @@ struct FigureCore {
     uploads: u64,
     readbacks: u64,
     png_encodes: u64,
+    preparation: Option<Value>,
     target: Option<RenderTarget>,
 }
 
@@ -507,9 +508,35 @@ impl FigureCore {
                 uploads: 0,
                 readbacks: 0,
                 png_encodes: 0,
+                preparation: None,
                 target: None,
             })
         })
+    }
+    fn prepare(&mut self, py: Python<'_>) -> PyResult<String> {
+        let report = py.detach(|| {
+            let start = std::time::Instant::now();
+            self.renderer.ensure_target_format(wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?;
+            let device = self.renderer.device().clone();
+            let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+            let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let mut stages = Vec::new();
+            let prepared = pollster::block_on(self.renderer.prewarm_all_observed(&mut |event| {
+                stages.push(json!({"scope":event.scope,"stage":event.stage,"phase":format!("{:?}",event.phase)}));
+            })).map_err(runtime);
+            self.renderer.wait_idle();
+            let validation = pollster::block_on(validation.pop());
+            let oom = pollster::block_on(oom.pop());
+            if let Some(error) = oom { return Err(PyMemoryError::new_err(format!("GPU preparation allocation failed: {error}"))); }
+            if let Some(error) = validation { return Err(runtime(format!("GPU preparation failed: {error}"))); }
+            prepared?;
+            // Execute the current document, not just create pipeline handles. No PNG encoding.
+            let _ = self.render(1.0)?;
+            Ok(json!({"backend":"native","ready":true,"elapsed_ms":start.elapsed().as_secs_f64()*1000.,
+                "target_format":"Rgba8Unorm","stages":stages,"persistent_cache_supported":false}))
+        })?;
+        self.preparation = Some(report.clone());
+        Ok(report.to_string())
     }
     fn upload_column(&mut self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
         if let Ok(data) = array.extract::<PyReadonlyArray1<'_, f64>>() {
@@ -812,7 +839,7 @@ impl FigureCore {
         });
         json!({"adapter": self.adapter_info, "revision": self.revision, "column_uploads": self.uploads, "rgba_readbacks": self.readbacks, "png_encodes": self.png_encodes, "columns": self.columns.len(),
             "pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
-            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes, "allocation_mode": "resident"}).to_string()
+            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes, "allocation_mode": "resident", "preparation": self.preparation}).to_string()
     }
 }
 
@@ -856,6 +883,9 @@ impl NativeFigure {
     }
     fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.lock()?.fit(py, padding)
+    }
+    fn prepare_json(&self, py: Python<'_>) -> PyResult<String> {
+        self.lock()?.prepare(py)
     }
     fn set_range(&self, axis: &str, min: f64, max: f64) -> PyResult<()> {
         self.lock()?.set_range(axis, min, max)

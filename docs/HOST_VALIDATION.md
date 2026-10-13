@@ -114,4 +114,36 @@ connected for asynchronous exports. Default released notebook snapshots require
 reexecuting the Figure cell after reload, or opting into retained snapshots.
 PyPI publication is not part of this change.
 
+## Explicit preparation follow-up
+
+The preparation update was built and installed into the same separate wheel
+environment. The full suite passed **20 tests**, including native repeated
+`prepare()`, GPU-free manual widget request/error handling, and both automatic
+and deferred initialization in real JupyterLab. Additional deferred-view closure
+and pre-initialization input checks were verified with the installed wheel.
+
+Native CLI preparation completed 82 observed start/finish events in approximately
+**1.03 seconds** on llvmpipe. This measures the preparation call plus current
+document RGBA execution after constructor initialization; it is not hardware
+startup performance or proof of cross-process cache restoration. Native prepare
+preserves settings/revision and 2 resident column uploads, adds one completed
+RGBA readback per call, and performs 0 PNG encodes.
+
+The manual notebook test observes **0 browser adapter requests** before
+`await fig.prepare_async()`. After preparation it displays and edits the real
+canvas, with 800,000 initial binary bytes / 2 uploads / 0 PNG exports before
+explicit saves. Preparation returns stages and elapsed time. Browser transfer
+snapshots are released on ready; creating/discarding an unprepared additional
+view does not request an adapter. Automatic mode remains covered separately.
+
+The wheel includes `figgy.prepare`, both preparation APIs, and local JS/WASM.
+The sdist includes `docs/PREPARATION.md`; strict twine checks pass. Automatic CI
+remains paused (`workflow_dispatch` only).
+
+**No persistent shader cache was saved or restored.** Renderer 0.16.1 exposes
+prewarming but no public pipeline-cache injection. Reports explicitly return
+`persistent_cache_supported=False`. See `PREPARATION.md` for this boundary and
+remaining target-format/first-use costs. Windows/macOS hardware preparation was
+not executed.
+
 ![Installed-wheel JupyterLab WebGPU output](images/notebook-webgpu.png)

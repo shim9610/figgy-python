@@ -1,5 +1,6 @@
 """Kernel document/transfer policy is testable without any GPU initialization."""
 import json
+import asyncio
 import numpy as np
 import pytest
 from figgy import subplots
@@ -41,3 +42,30 @@ def test_native_notebook_fallback_is_explicit():
     with pytest.raises(RuntimeError, match='asynchronous'):
         fig.to_png()
     fig.close()
+
+def test_manual_preparation_requires_a_mounted_view_and_propagates_result():
+    fig, ax = subplots(backend='webgpu')
+    ax.plot([0, 1], [1, 0])
+    widget = fig.widget(auto_prepare=False)
+    assert not widget.auto_prepare
+    with pytest.raises(RuntimeError, match='asynchronous'):
+        fig.prepare()
+    async def check():
+        with pytest.raises(RuntimeError, match='prepare_async'):
+            await fig.to_png_async()
+        with pytest.raises(asyncio.TimeoutError):
+            await fig.prepare_async(timeout=.01)
+        widget._command(widget, {'action':'mounted','client':'test-view'}, [])
+        expected = {'backend':'webgpu','ready':True,'persistent_cache_supported':False}
+        def send(message, **kwargs):
+            assert message['action'] == 'prepare' and message['client'] == 'test-view'
+            widget._command(widget, {'action':'result','id':message['id'],'result':expected}, [])
+        widget.send = send
+        assert await fig.prepare_async() == expected
+        assert not widget._pending
+        fig.close()
+        with pytest.raises(RuntimeError, match='closed'):
+            await widget.request('prepare', timeout=.01)
+        with pytest.raises(RuntimeError, match='closed'):
+            await fig.prepare_async(timeout=.01)
+    asyncio.run(check())

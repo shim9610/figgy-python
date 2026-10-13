@@ -17,17 +17,23 @@ const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
 const ids = ['chart_title','axis_title_bottom','axis_title_left','legend','axis_bottom','axis_left','tick_labels_bottom','tick_labels_left','data_area','colorbar'];
-export async function render({model,el}) {
+export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor';
   root.innerHTML=`<div class="figgy-toolbar"><strong>Browser WebGPU</strong><button data-fit>Fit</button><label><input type="checkbox" data-area> Edit plot area</label><button data-copy>Copy Python</button><button data-save>Save PNG</button><span data-status>Initializing WebGPU…</span></div><div class="figgy-body"><div class="figgy-stage"><canvas></canvas></div><div class="figgy-properties"><label>Object <select data-target></select></label><div data-fields></div><details><summary>SSOT settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div><div class="figgy-error" role="alert"></div>`;
   el.append(root);
   const canvas=root.querySelector('canvas'), select=root.querySelector('[data-target]'), fields=root.querySelector('[data-fields]');
   const error=root.querySelector('.figgy-error'), status=root.querySelector('[data-status]');
+  const controls=[...root.querySelectorAll('button,input,select,textarea')];
+  controls.forEach(control=>control.disabled=true);
   const client=crypto.randomUUID();
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
-  let inputAt=null,busy=0;
+  let inputAt=null,busy=0,startInit;
+  const requested=new Promise(resolve=>{startInit=resolve;});
+  let initializedResolve,initializedReject;
+  const initialized=new Promise((resolve,reject)=>{initializedResolve=resolve;initializedReject=reject;});
+  initialized.catch(()=>{});
   const fail=e=>{error.textContent=String(e?.message ?? e);};
   const enqueue=(fn,propagate=false)=>{
     const operation=queue.then(async()=>{if(disposed)throw Error('Widget disposed');busy++;try{return await fn();}finally{busy--;}});
@@ -85,6 +91,7 @@ export async function render({model,el}) {
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
+    if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
     catch(e){fail(e);model.send({action:'rejected',revision,settings:snapshot(),error:String(e)});}
   }});}
@@ -97,9 +104,16 @@ export async function render({model,el}) {
       else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
       properties();idle();
     });
-    else if(message.action==='barrier' || message.action==='export'){
+    else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
       // Do not block the serialized queue while waiting for an ack processed by it.
-      (async()=>{try{await queue;await flush();const data=message.action==='export'?await exporting(message.scale):null;model.send({action:'stats',info:stats});model.send({action:'result',id:message.id},{},data?[data]:[]);}catch(e){model.send({action:'result',id:message.id,error:String(e)});}})();
+      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;await queue;await flush();let result=null;
+        if(message.action==='prepare')result=await enqueue(async()=>{
+          const start=performance.now(),stages=[];status.textContent='Preparing GPU shaders…';
+          try{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent=`Preparing GPU: ${event.stage}`;});await chart.first_frame_ready();dirty=true;
+            return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
+          }finally{status.textContent='Browser GPU · resident data';}
+        },true);
+        const data=message.action==='export'?await exporting(message.scale):null;model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);}catch(e){model.send({action:'result',id:message.id,error:String(e)});}})();
     }
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
@@ -117,17 +131,22 @@ export async function render({model,el}) {
   canvas.addEventListener('pointermove',e=>{if(!pointer || !chart)return;const next=position(e),old=pointer;pointer=next;inputAt=performance.now();enqueue(()=>{chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;});});
   function release(){if(!pointer)return;pointer=null;enqueue(()=>{chart.on_release();commit();});}
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
-  canvas.addEventListener('wheel',e=>{e.preventDefault();inputAt=performance.now();enqueue(()=>{
+  canvas.addEventListener('wheel',e=>{e.preventDefault();if(!chart)return;inputAt=performance.now();enqueue(()=>{
     const s=snapshot(),factor=Math.exp(e.deltaY*0.001);for(const key of Object.values(side)){const a=s.config[key];if(a.scale==='Linear'){const mid=(a.min+a.max)/2,half=(a.max-a.min)*factor/2;a.min=mid-half;a.max=mid+half;}}
     install(s);commit();
   });},{passive:false});
-  try{
+  model.send({action:'mounted',client});
+  (async()=>{try{
+    if(!model.get('auto_prepare')){status.textContent='GPU not prepared · run await fig.prepare_async()';await requested;}
+    if(disposed)return;
+    await enqueue(async()=>{
     if(!navigator.gpu)throw Error('WebGPU is unavailable. Use a supported browser/secure origin; kernel PNG fallback requires an explicit native Figure.widget(backend="png").');
     if(!kernelModule && !model.get('wasm').byteLength)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
     const module=await loadKernel(model);if(disposed)return;
     canvas.width=local.config.chart_area.width;canvas.height=local.config.chart_area.height;
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
     chart=await module.FiggyChart.create(canvas);chart.set_pool_auto_growth(true);
+    if(disposed)return;
     const manifest=model.get('manifest'),buffers=model.get('columns');
     if(manifest.length!==buffers.length)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
     for(let i=0;i<manifest.length;i++){
@@ -141,9 +160,12 @@ export async function render({model,el}) {
     }
     chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
     await chart.first_frame_ready();properties();observer.observe(canvas);resize();status.textContent='Browser GPU · resident data';
+    if(disposed)return;
+    controls.forEach(control=>control.disabled=false);
     root.figgy={stats,snapshot:()=>clone(local),flush,resize,pick:(x,y,distance)=>enqueue(()=>chart.pick_data(x,y,distance),true)};
-    model.send({action:'ready',client,info:stats});raf=requestAnimationFrame(frame);
-  }catch(e){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}
-  return ()=>{disposed=true;cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);const owned=chart;chart=null;queue.finally(()=>owned?.free()).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+    model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
+    },true);
+  }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
+  return ()=>{disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(()=>{chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

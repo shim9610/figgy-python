@@ -71,6 +71,39 @@ run_events()                    # 모든 현재 창이 닫힐 때까지 실행
 연 뒤 같은 이벤트 루프에서 처리할 수 있습니다. `fig.close()`로 native 자원을 해제합니다.
 Qt/Tk의 외부 루프나 `%gui qt`에 자동 통합하지 않습니다.
 
+## 명시적 GPU 준비
+
+그리기 전에 준비 시간을 따로 처리하려면 Figure의 사전 준비 API를 사용합니다.
+
+```python
+fig, ax = plt.subplots(backend="native")
+ax.plot(x, y)
+report = fig.prepare()          # resident 파이프라인 준비 + 현재 차트 1회 실행
+print(report["elapsed_ms"])
+fig.show()
+```
+
+Jupyter에서는 위젯을 먼저 표시한 뒤 명시적으로 GPU 준비를 시작할 수 있습니다.
+
+```python
+fig, ax = figgy.subplots(backend="webgpu")
+ax.plot(x, y)
+display(fig.widget(auto_prepare=False))  # 아직 브라우저 GPU를 초기화하지 않음
+report = await fig.prepare_async()      # 초기화·바이너리 업로드·사전 준비
+```
+
+이 준비는 현재 Figure/브라우저 뷰의 GPU 리소스를 유지하는 방식입니다. PNG를
+생성하지 않습니다. Native는 완료 확인을 위해 현재 차트를 RGBA로 한 번 읽으며,
+일반 표시 프레임의 readback 경로에는 변화가 없습니다. 기본 Jupyter 표시는 이전처럼
+자동 초기화합니다. 위젯을 생성한 뒤에는 데이터 추가가 잠기므로 시리즈를 먼저 만듭니다.
+
+**pip 설치 때 GPU 셰이더를 미리 컴파일하거나 캐시 파일을 저장하는 기능은 아닙니다.**
+renderer 0.16.1에는 영속 파이프라인 캐시를 연결하는 공개 API가 없습니다.
+준비 후에도 surface 포맷 변경, 새 스타일/데이터 종류, 드라이버 내부의 지연 컴파일은
+추가 준비 비용을 만들 수 있습니다. `python -m figgy.prepare --json`은 로컬 GPU 준비
+진단용이며, 종료 후 다음 프로세스의 컴파일 생략을 보장하지 않습니다. 자세한 범위는
+[GPU 준비 문서](docs/PREPARATION.md)를 참고하세요.
+
 ## Jupyter
 
 ```bash

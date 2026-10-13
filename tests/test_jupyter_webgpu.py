@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 
 @pytest.mark.skipif(os.environ.get('FIGGY_TEST_JUPYTER')!='1',reason='set FIGGY_TEST_JUPYTER=1 for real JupyterLab/WebGPU integration')
-def test_jupyter_webgpu_binary_edit_sync_export(tmp_path):
+@pytest.mark.parametrize('auto_prepare', [True, False])
+def test_jupyter_webgpu_binary_edit_sync_export(tmp_path, auto_prepare):
     pytest.importorskip('playwright');nbformat=pytest.importorskip('nbformat')
     from playwright.sync_api import sync_playwright
     from jupyter_client import BlockingKernelClient
@@ -23,7 +24,7 @@ x = np.linspace(0, 10, 100_000, dtype=np.float32)
 ax.plot(x, np.sin(x), id="signal")
 ax.set_title("WASM title")
 widget = fig.widget()
-display(widget)'''
+display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_prepare={auto_prepare!r})')
     nbformat.write(nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell(source)],metadata={'kernelspec':{'display_name':'Python 3','language':'python','name':'python3'}}),tmp_path/'check.ipynb')
     env=dict(os.environ,JUPYTER_RUNTIME_DIR=str(runtime))
     log=open(tmp_path/'server.log','w')
@@ -45,12 +46,13 @@ display(widget)'''
             context=browser.new_context(viewport={'width':1500,'height':1000},permissions=['clipboard-read','clipboard-write'],accept_downloads=True)
             context.route('https://**/*',lambda route:route.abort())
             page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+            page.add_init_script('''if(navigator.gpu){window.figgyAdapterRequests=0;const original=navigator.gpu.requestAdapter.bind(navigator.gpu);navigator.gpu.requestAdapter=(...args)=>{window.figgyAdapterRequests++;return original(...args);};}''')
             page.goto(base+'/lab/workspaces/'+uuid.uuid4().hex+'/tree/check.ipynb')
             page.locator('.jp-CodeCell .cm-content').filter(has_text='kernel GPU forbidden').wait_for(timeout=45000)
             page.wait_for_function('!!window.jupyterapp')
             page.evaluate('''async()=>{const app=window.jupyterapp;await app.restored;const panel=app.shell.currentWidget;await panel.context.ready;await panel.sessionContext.ready;await app.commands.execute('notebook:run-all-cells');}''')
             try:
-                page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes('resident')",timeout=30000)
+                page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes(" + ("'resident'" if auto_prepare else "'not prepared'") + ")",timeout=30000)
             except Exception:
                 page.screenshot(path=str(tmp_path/'failed.png'))
                 raise AssertionError(str(page.locator('.jp-OutputArea').all_text_contents()) + str(errors))
@@ -59,12 +61,26 @@ display(widget)'''
             def execute(code):
                 id=client.execute(code);messages=[]
                 while True:
-                    message=client.get_iopub_msg(timeout=30)
+                    message=client.get_iopub_msg(timeout=180)
                     if message.get('parent_header',{}).get('msg_id')!=id:continue
                     if message['msg_type']=='error':raise AssertionError(message['content']['evalue'])
                     if message['msg_type']=='stream':messages.append(message['content']['text'])
                     if message['msg_type']=='status' and message['content']['execution_state']=='idle':return ''.join(messages)
+            if not auto_prepare:
+                assert page.evaluate('window.figgyAdapterRequests') == 0
+                assert page.locator('[data-fit]').is_disabled()
+                page.locator('.figgy-editor canvas').dispatch_event('wheel', {'deltaY':10})
+                assert page.locator('.figgy-error').inner_text() == ''
+                # Settings can change while GPU preparation is deferred.
+                execute("ax.set_title('Deferred title')")
+            report=json.loads(execute("import json; print(json.dumps(await fig.prepare_async()))"))
+            assert report['ready'] and report['backend']=='webgpu' and report['stages']
+            assert report['persistent_cache_supported'] is False and report['elapsed_ms'] > 0
+            page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes('resident')")
+            assert page.evaluate('window.figgyAdapterRequests') >= 1
             root="document.querySelector('.figgy-editor').figgy"
+            if not auto_prepare:
+                assert page.evaluate(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('')") == 'Deferred title'
             stats=page.evaluate(root+'.stats')
             assert stats['binary_upload_bytes']==800000 and stats['column_uploads']==2 and stats['png_exports']==0
             assert 'True' in execute("print(widget.status == 'ready' and not fig._native.columns and not widget.columns)")
@@ -102,6 +118,15 @@ display(widget)'''
             (tmp_path/'browser-stats.json').write_text(json.dumps(final,indent=2))
             page.screenshot(path=str(tmp_path/'webgpu.png'));assert not errors
             assert page.locator('.figgy-error').inner_text()==''
+            if not auto_prepare:
+                count=page.evaluate('window.figgyAdapterRequests')
+                # Display messages from a direct kernel client have no notebook
+                # cell parent. Execute this new output through JupyterLab itself.
+                page.evaluate('''async()=>{const app=window.jupyterapp,panel=app.shell.currentWidget;panel.content.model.sharedModel.insertCell(1,{cell_type:'code',source:"other, other_ax = figgy.subplots(backend='webgpu'); other_ax.plot([0, 1], [1, 0]); other_widget = other.widget(auto_prepare=False); display(other_widget)",metadata:{}});panel.content.activeCellIndex=1;await app.commands.execute('notebook:run-cell');}''')
+                page.wait_for_function("document.querySelectorAll('.figgy-editor').length === 2")
+                execute("other.close()")
+                page.wait_for_function("document.querySelectorAll('.figgy-editor').length === 1")
+                assert page.evaluate('window.figgyAdapterRequests') == count
             browser.close()
     finally:
         if client:client.stop_channels()

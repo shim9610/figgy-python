@@ -324,7 +324,12 @@ class Figure:
         self._changed()
         return self
 
-    def widget(self, *, backend=None):
+    def widget(self, *, backend=None, auto_prepare=True):
+        """Create a browser view; auto_prepare=False defers GPU initialization.
+
+        Display the returned widget, then await prepare_async(). Repeated calls
+        reuse the same widget and its original auto_prepare choice.
+        """
         if backend == "png":
             if self.backend != "native":
                 raise RuntimeError("PNG fallback requires a native kernel GPU")
@@ -337,9 +342,35 @@ class Figure:
             existing = next((w for w in self._widgets if isinstance(w, FigureWidget)), None)
             if existing is not None:
                 return existing
-            widget = FigureWidget(self)
+            widget = FigureWidget(self, auto_prepare=auto_prepare)
         self._widgets.add(widget)
         return widget
+
+    def prepare(self):
+        """Prewarm native GPU pipelines and execute the current document once.
+
+        This explicit operation releases the GIL, performs one completed RGBA
+        readback, and does not encode PNG. Preparation is specific to this GPU,
+        renderer and target format; future surface/format changes may compile.
+        """
+        if self.backend != "native":
+            raise RuntimeError("Browser GPU preparation is asynchronous: await fig.prepare_async()")
+        with self._lock:
+            self._require_open()
+            return json.loads(self._native.prepare_json())
+
+    async def prepare_async(self, *, timeout=180):
+        """Prepare a mounted browser GPU, or call native prepare().
+
+        Browser reports include initialization/upload time if deferred and a
+        separate prewarm_ms. No PNG is generated. This is process/view-local
+        preparation, not a persistent shader cache or install-time compilation.
+        """
+        if self.backend == "native":
+            return self.prepare()
+        with self._lock:
+            self._require_open()
+        return await self.widget().request("prepare", timeout=timeout)
 
     async def sync(self, *, timeout=30):
         """Await pending browser edits; settings getters return accepted revisions."""

@@ -59,17 +59,19 @@ class FigureWidget(anywidget.AnyWidget):
     wasm_js = traitlets.Unicode().tag(sync=True)
     status = traitlets.Unicode("initializing").tag(sync=True)
     browser_info = traitlets.Dict().tag(sync=True)
+    auto_prepare = traitlets.Bool(True).tag(sync=True)
 
-    def __init__(self, figure):
+    def __init__(self, figure, *, auto_prepare=True):
         self.figure = figure
         self._handling = False
         self._pending = {}
         self._clients = {}
         self._ready_event = asyncio.Event()
+        self._mounted_event = asyncio.Event()
         self._closed = False
         manifest, buffers = figure._native.payload()
         assets = Path(__file__).with_name("assets")
-        super().__init__(manifest=manifest, columns=buffers,
+        super().__init__(auto_prepare=auto_prepare, manifest=manifest, columns=buffers,
                          wasm=(assets / "figgy_bg.wasm").read_bytes(),
                          wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"))
         self.refresh()
@@ -81,7 +83,10 @@ class FigureWidget(anywidget.AnyWidget):
 
     def _command(self, widget, content, buffers):
         action = content.get("action")
-        if action == "ready":
+        if action == "mounted":
+            self._clients[content["client"]] = True
+            self._mounted_event.set()
+        elif action == "ready":
             self.status = "ready"
             self._clients[content.get("client")] = True
             self._ready_event.set()
@@ -120,6 +125,8 @@ class FigureWidget(anywidget.AnyWidget):
             if not future.done():
                 if content.get("error"):
                     future.set_exception(RuntimeError(content["error"]))
+                elif expected_action == "prepare":
+                    future.set_result(content["result"])
                 elif expected_action == "export" and not buffers:
                     future.set_exception(RuntimeError("Browser PNG export returned no binary buffer"))
                 else:
@@ -128,7 +135,11 @@ class FigureWidget(anywidget.AnyWidget):
             self.browser_info = content["info"]
 
     async def request(self, action, *, timeout, **kwargs):
-        if self.status == "initializing":
+        if action == "prepare":
+            await asyncio.wait_for(self._mounted_event.wait(), timeout)
+        elif self.status == "initializing":
+            if not self.auto_prepare:
+                raise RuntimeError("Browser GPU is not prepared; await fig.prepare_async() first")
             await asyncio.wait_for(self._ready_event.wait(), timeout)
         if self._closed:
             raise RuntimeError("Figure widget closed")
@@ -147,6 +158,7 @@ class FigureWidget(anywidget.AnyWidget):
     def close(self):
         self._closed = True
         self._ready_event.set()
+        self._mounted_event.set()
         for future, _ in self._pending.values():
             if not future.done():
                 future.set_exception(RuntimeError("Figure widget closed"))

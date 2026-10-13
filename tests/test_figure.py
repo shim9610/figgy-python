@@ -47,6 +47,28 @@ def test_exported_python_replays_layout_and_style(plot):
         assert np.array_equal(image, restored.render_rgba())
 
 
+def test_explicit_prepare_reuses_resident_data_and_preserves_document(plot):
+    fig, ax = plot
+    ax.plot(np.arange(64, dtype=np.float32), id="signal")
+    settings, revision = fig.get_settings(), fig.revision
+    before = fig.info
+    report = fig.prepare()
+    assert report["ready"] and report["backend"] == "native"
+    assert report["elapsed_ms"] > 0 and report["stages"]
+    assert report["persistent_cache_supported"] is False
+    assert fig.info["preparation"] == report
+    assert fig.info["column_uploads"] == before["column_uploads"] == 2
+    assert fig.info["rgba_readbacks"] == before["rgba_readbacks"] + 1
+    assert fig.info["png_encodes"] == before["png_encodes"] == 0
+    assert fig.get_settings() == settings and fig.revision == revision
+    second = fig.prepare()
+    assert second["ready"] and fig.info["column_uploads"] == 2
+    assert fig.info["rgba_readbacks"] == before["rgba_readbacks"] + 2
+    fig.close()
+    with pytest.raises(RuntimeError, match="closed"):
+        fig.prepare()
+
+
 def test_bad_settings_and_stale_editor_commands_are_atomic(plot):
     fig, ax = plot
     ax.plot([0, 1, 2], [0, 1, 0])
