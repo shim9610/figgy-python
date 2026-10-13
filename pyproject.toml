@@ -1,0 +1,27 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "figgy-python"
+version = "0.1.0"
+description = "NumPy-first Python plotting with the native Rust figgy renderer"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT OR Apache-2.0"
+dependencies = ["numpy>=1.26"]
+classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Python :: 3", "Programming Language :: Rust"]
+
+[project.optional-dependencies]
+notebook = ["anywidget>=0.9,<1"]
+desktop = ["PySide6>=6.8,<7"]
+benchmark = ["matplotlib>=3.8", "psutil>=5.9", "pillow>=10", "pyqtgraph>=0.13"]
+test = ["pytest>=8", "pillow>=10", "anywidget>=0.9,<1"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "figgy._native"
+include = ["python/figgy/*.js", "python/figgy/*.css", "python/figgy/licenses/*.txt", "THIRD_PARTY_NOTICES.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

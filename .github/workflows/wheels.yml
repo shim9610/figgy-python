@@ -1,0 +1,72 @@
+name: Build Python wheels
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-15, macos-15-intel]
+        python: ['3.11', '3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.99.0'
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --locked --out dist -i python
+          manylinux: auto
+          rust-toolchain: '1.99.0'
+      - name: Check package metadata
+        run: |
+          python -m pip install twine
+          python -m twine check --strict dist/*
+      - name: Install wheel and verify Python imports
+        shell: bash
+        run: |
+          python -m pip install dist/*.whl
+          python -c "import figgy; import figgy.pyplot; print(figgy.__version__)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.python }}
+          path: dist/*
+
+  linux-functional:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.99.0'
+          components: rustfmt
+      - name: Install software Vulkan and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers
+          python -m venv .venv
+          .venv/bin/python -m pip install maturin pytest pillow anywidget
+      - name: Build and run native integration tests
+        env:
+          VIRTUAL_ENV: ${{ github.workspace }}/.venv
+          WGPU_BACKEND: vulkan
+          XDG_RUNTIME_DIR: /tmp
+        run: |
+          cargo fmt --check
+          .venv/bin/maturin develop --release --locked
+          .venv/bin/python -m pytest -q tests/test_figure.py

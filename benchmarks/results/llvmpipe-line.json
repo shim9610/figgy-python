@@ -1,0 +1,1178 @@
+{
+  "method": "isolated workers; identical float64 arrays; completed RGBA readback at 960x600; no figgy downsampling; medians of repeated calls; PNG includes render and encoding",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "processor": "",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "cpu_quota": "400000 100000",
+  "versions": {
+    "figgy-python": "0.1.0",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pyqtgraph": "0.14.0",
+    "PySide6": "6.12.0",
+    "psutil": "7.2.2"
+  },
+  "environment": {
+    "WGPU_BACKEND": "vulkan",
+    "VK_DRIVER_FILES": "/workspace/.figgy-tools/mesa/lvp_icd.json",
+    "QT_QPA_PLATFORM": null,
+    "LP_NUM_THREADS": null
+  },
+  "rows": [
+    {
+      "backend": "figgy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.08136608500035436,
+      "register_and_fit_s": 0.08846252700004698,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.10787645600021278,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.2777050680006141,
+      "redraw_samples_s": [
+        0.07363506699994105,
+        0.07378355999981068,
+        0.09035344699987036
+      ],
+      "redraw_median_s": 0.07378355999981068,
+      "view_change_samples_s": [
+        0.08379151300005105,
+        0.08333030899984806,
+        0.0793067169997812
+      ],
+      "view_change_median_s": 0.08333030899984806,
+      "style_change_samples_s": [
+        0.07784300599996641,
+        0.07871486599970012,
+        0.075081561999923
+      ],
+      "style_change_median_s": 0.07784300599996641,
+      "png_s": 0.10634772699995665,
+      "png_bytes": 98936,
+      "peak_rss_mb": 226.4765625,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 1600000,
+      "known_gpu_bytes": 17605072
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.008768727999722614,
+      "register_and_fit_s": 0.004317663999700017,
+      "first_draw_s": 0.0320113500001753,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.04509774199959793,
+      "redraw_samples_s": [
+        0.022832710000329826,
+        0.02038055799994254,
+        0.02740994900022997
+      ],
+      "redraw_median_s": 0.022832710000329826,
+      "view_change_samples_s": [
+        0.02912820900019142,
+        0.02459238599976743,
+        0.019193426999663643
+      ],
+      "view_change_median_s": 0.02459238599976743,
+      "style_change_samples_s": [
+        0.01942651699982889,
+        0.023631451999790443,
+        0.02036467800007813
+      ],
+      "style_change_median_s": 0.02036467800007813,
+      "png_s": 0.04650332100027299,
+      "png_bytes": 72091,
+      "peak_rss_mb": 77.98828125
+    },
+    {
+      "backend": "matplotlib-unsimplified",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": false,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.008957311000358459,
+      "register_and_fit_s": 0.0041185240002050705,
+      "first_draw_s": 0.03812549099984608,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.05120132600040961,
+      "redraw_samples_s": [
+        0.02846065499988981,
+        0.02898606500002643,
+        0.028169796999918617
+      ],
+      "redraw_median_s": 0.02846065499988981,
+      "view_change_samples_s": [
+        0.02888955000025817,
+        0.02878205800016076,
+        0.02998353600014525
+      ],
+      "view_change_median_s": 0.02888955000025817,
+      "style_change_samples_s": [
+        0.04099525199990239,
+        0.0375684129999172,
+        0.03445277700029692
+      ],
+      "style_change_median_s": 0.0375684129999172,
+      "png_s": 0.05916239000043788,
+      "png_bytes": 69042,
+      "peak_rss_mb": 78.08984375
+    },
+    {
+      "backend": "pyqtgraph-default",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.027015140000003157,
+      "register_and_fit_s": 0.06093509399988761,
+      "auto_downsample": false,
+      "use_opengl": false,
+      "antialias": false,
+      "first_draw_s": 0.04558883399977276,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.4999999999999,
+        478.5
+      ],
+      "first_frame_total_s": 0.13353906799966353,
+      "redraw_samples_s": [
+        0.04432609500008766,
+        0.045301931999802036,
+        0.04468974100018386
+      ],
+      "redraw_median_s": 0.04468974100018386,
+      "view_change_samples_s": [
+        0.0477000990003944,
+        0.04945378700040237,
+        0.04718809899986809
+      ],
+      "view_change_median_s": 0.0477000990003944,
+      "style_change_samples_s": [
+        0.045105046000117,
+        0.04657558799999606,
+        0.04634742400003233
+      ],
+      "style_change_median_s": 0.04634742400003233,
+      "png_s": 0.07222311099985745,
+      "png_bytes": 13932,
+      "peak_rss_mb": 132.47265625
+    },
+    {
+      "backend": "figgy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.056416407999677176,
+      "register_and_fit_s": 0.1510857569996915,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.5900094580001678,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.7975116229995365,
+      "redraw_samples_s": [
+        0.5129107940001632,
+        0.4740535640003145,
+        0.46681497400004446
+      ],
+      "redraw_median_s": 0.4740535640003145,
+      "view_change_samples_s": [
+        0.4670732469999166,
+        0.46525511200024994,
+        0.4633181839999452
+      ],
+      "view_change_median_s": 0.46525511200024994,
+      "style_change_samples_s": [
+        0.48344242099983603,
+        0.49771586199995,
+        0.5074327209999865
+      ],
+      "style_change_median_s": 0.49771586199995,
+      "png_s": 0.5433952620001037,
+      "png_bytes": 99301,
+      "peak_rss_mb": 293.8203125,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 16000000,
+      "known_gpu_bytes": 25993680
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.008401646000038454,
+      "register_and_fit_s": 0.0399479610000526,
+      "first_draw_s": 0.06989102500028821,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.11824063200037926,
+      "redraw_samples_s": [
+        0.05707829599987235,
+        0.05780845299977955,
+        0.058240461999957915
+      ],
+      "redraw_median_s": 0.05780845299977955,
+      "view_change_samples_s": [
+        0.0629063500000484,
+        0.05388389099971391,
+        0.05473223599983612
+      ],
+      "view_change_median_s": 0.05473223599983612,
+      "style_change_samples_s": [
+        0.05554536999989068,
+        0.05332605199964746,
+        0.05763066599956801
+      ],
+      "style_change_median_s": 0.05554536999989068,
+      "png_s": 0.08304183299969736,
+      "png_bytes": 71484,
+      "peak_rss_mb": 136.625
+    },
+    {
+      "backend": "matplotlib-unsimplified",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": false,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.008935077999922214,
+      "register_and_fit_s": 0.028584390000105486,
+      "first_draw_s": 0.1791583879994505,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.2166778559994782,
+      "redraw_samples_s": [
+        0.16011034100029065,
+        0.15577108499928727,
+        0.16626689000077022
+      ],
+      "redraw_median_s": 0.16011034100029065,
+      "view_change_samples_s": [
+        0.17015306900066207,
+        0.15088518600077805,
+        0.15971983300005377
+      ],
+      "view_change_median_s": 0.15971983300005377,
+      "style_change_samples_s": [
+        0.1557257969998318,
+        0.1543052090000856,
+        0.15426701299929846
+      ],
+      "style_change_median_s": 0.1543052090000856,
+      "png_s": 0.19306357100049354,
+      "png_bytes": 68677,
+      "peak_rss_mb": 140.93359375
+    },
+    {
+      "backend": "pyqtgraph-default",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.029003499999816995,
+      "register_and_fit_s": 0.5732978149999326,
+      "auto_downsample": false,
+      "use_opengl": false,
+      "antialias": false,
+      "first_draw_s": 0.43419052800072677,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.4999999999999,
+        478.5
+      ],
+      "first_frame_total_s": 1.0364918430004764,
+      "redraw_samples_s": [
+        0.4296121019997372,
+        0.4409300280003663,
+        0.41744908900000155
+      ],
+      "redraw_median_s": 0.4296121019997372,
+      "view_change_samples_s": [
+        0.42025941500014596,
+        0.4299513579999257,
+        0.42619790699973237
+      ],
+      "view_change_median_s": 0.42619790699973237,
+      "style_change_samples_s": [
+        0.4251054030000887,
+        0.4508065079999142,
+        0.454669918000036
+      ],
+      "style_change_median_s": 0.4508065079999142,
+      "png_s": 0.4977173320003203,
+      "png_bytes": 13929,
+      "peak_rss_mb": 173.9609375
+    },
+    {
+      "backend": "figgy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.06259034099912242,
+      "register_and_fit_s": 0.47918435400060844,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 2.854360366000037,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 3.396135060999768,
+      "redraw_samples_s": [
+        2.4338441859999875,
+        2.461109189000126,
+        2.3798196159996223
+      ],
+      "redraw_median_s": 2.4338441859999875,
+      "view_change_samples_s": [
+        2.728591822999988,
+        2.5667107379995286,
+        2.772162350999679
+      ],
+      "view_change_median_s": 2.728591822999988,
+      "style_change_samples_s": [
+        2.9021761009998954,
+        2.654668168000171,
+        2.0573892800002795
+      ],
+      "style_change_median_s": 2.654668168000171,
+      "png_s": 2.433590233999894,
+      "png_bytes": 106396,
+      "peak_rss_mb": 470.98046875,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 80000000,
+      "known_gpu_bytes": 89216464
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.01485876599963376,
+      "register_and_fit_s": 0.20506804799970269,
+      "first_draw_s": 0.235282986999664,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.45520980099900044,
+      "redraw_samples_s": [
+        0.22839605100034532,
+        0.23634850500002358,
+        0.23139374400034285
+      ],
+      "redraw_median_s": 0.23139374400034285,
+      "view_change_samples_s": [
+        0.22454885099978128,
+        0.22439671299980546,
+        0.22311396900022373
+      ],
+      "view_change_median_s": 0.22439671299980546,
+      "style_change_samples_s": [
+        0.22623390500029927,
+        0.25027047300045524,
+        0.2528581509996002
+      ],
+      "style_change_median_s": 0.25027047300045524,
+      "png_s": 0.27618412599986186,
+      "png_bytes": 71143,
+      "peak_rss_mb": 401.4453125
+    },
+    {
+      "backend": "matplotlib-unsimplified",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": false,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.011131119999845396,
+      "register_and_fit_s": 0.16186583200033056,
+      "first_draw_s": 0.7438341930001116,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.9168311450002875,
+      "redraw_samples_s": [
+        0.7389093560004767,
+        0.7439509789992371,
+        0.7233547939995333
+      ],
+      "redraw_median_s": 0.7389093560004767,
+      "view_change_samples_s": [
+        0.7094630969995706,
+        0.7550360739996904,
+        0.7781708969996544
+      ],
+      "view_change_median_s": 0.7550360739996904,
+      "style_change_samples_s": [
+        0.7320624789999783,
+        0.7146151659999305,
+        0.6959069429994997
+      ],
+      "style_change_median_s": 0.7146151659999305,
+      "png_s": 0.7329668590000438,
+      "png_bytes": 68615,
+      "peak_rss_mb": 419.06640625
+    },
+    {
+      "backend": "pyqtgraph-default",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.03269549200012989,
+      "register_and_fit_s": 2.759154024000054,
+      "auto_downsample": false,
+      "use_opengl": false,
+      "antialias": false,
+      "first_draw_s": 1.9464704619995246,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.4999999999999,
+        478.5
+      ],
+      "first_frame_total_s": 4.7383199779997085,
+      "redraw_samples_s": [
+        2.1126878579998447,
+        2.119006320000153,
+        2.1617537080001057
+      ],
+      "redraw_median_s": 2.119006320000153,
+      "view_change_samples_s": [
+        1.9535820969995257,
+        1.9888206019995778,
+        1.998015864000081
+      ],
+      "view_change_median_s": 1.9888206019995778,
+      "style_change_samples_s": [
+        2.1096840039999734,
+        2.0402927999994063,
+        1.9485832819991629
+      ],
+      "style_change_median_s": 2.0402927999994063,
+      "png_s": 1.9337100089996966,
+      "png_bytes": 13928,
+      "peak_rss_mb": 353.94921875
+    },
+    {
+      "backend": "figgy",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.08527752000009059,
+      "register_and_fit_s": 0.08817169299982197,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.12811715899988485,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.3015663719997974,
+      "redraw_samples_s": [
+        0.1038751099995352,
+        0.10253162900062307,
+        0.1034679269996559
+      ],
+      "redraw_median_s": 0.1034679269996559,
+      "view_change_samples_s": [
+        0.10272086399982072,
+        0.09482679200027633,
+        0.09700518799945712
+      ],
+      "view_change_median_s": 0.09700518799945712,
+      "style_change_samples_s": [
+        0.11549845500030642,
+        0.11349695999979303,
+        0.10302042999956029
+      ],
+      "style_change_median_s": 0.11349695999979303,
+      "png_s": 0.13080393899963383,
+      "png_bytes": 118841,
+      "peak_rss_mb": 230.4609375,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 1600000,
+      "known_gpu_bytes": 17605072
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.0075201499994363985,
+      "register_and_fit_s": 0.0044353700004649,
+      "first_draw_s": 0.1240548289997605,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.1360103489996618,
+      "redraw_samples_s": [
+        0.10129694199986261,
+        0.10385064399997646,
+        0.10293725900010031
+      ],
+      "redraw_median_s": 0.10293725900010031,
+      "view_change_samples_s": [
+        0.11523977200067748,
+        0.10784237100051541,
+        0.11107744700075273
+      ],
+      "view_change_median_s": 0.11107744700075273,
+      "style_change_samples_s": [
+        0.1136865160005982,
+        0.11916006800038303,
+        0.10853038099958212
+      ],
+      "style_change_median_s": 0.1136865160005982,
+      "png_s": 0.1307961369993791,
+      "png_bytes": 49703,
+      "peak_rss_mb": 119.5546875
+    },
+    {
+      "backend": "matplotlib-unsimplified",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": false,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.008077032000073814,
+      "register_and_fit_s": 0.0040102220000335365,
+      "first_draw_s": 0.24704493600074784,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.2591321900008552,
+      "redraw_samples_s": [
+        0.2558556980002322,
+        0.25897791300030804,
+        0.2881423889994039
+      ],
+      "redraw_median_s": 0.25897791300030804,
+      "view_change_samples_s": [
+        0.23724288100038393,
+        0.24145797999972274,
+        0.2347498050003196
+      ],
+      "view_change_median_s": 0.23724288100038393,
+      "style_change_samples_s": [
+        0.2322965920002389,
+        0.22217243500017503,
+        0.2211834789995919
+      ],
+      "style_change_median_s": 0.22217243500017503,
+      "png_s": 0.24731713100027264,
+      "png_bytes": 45475,
+      "peak_rss_mb": 167.91796875
+    },
+    {
+      "backend": "pyqtgraph-default",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.030767031000323186,
+      "register_and_fit_s": 0.07832234000034077,
+      "auto_downsample": false,
+      "use_opengl": false,
+      "antialias": false,
+      "first_draw_s": 0.08440418600002886,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.4999999999999,
+        478.5
+      ],
+      "first_frame_total_s": 0.19349355700069282,
+      "redraw_samples_s": [
+        0.0830252030000338,
+        0.08336810699984198,
+        0.08134889999928419
+      ],
+      "redraw_median_s": 0.0830252030000338,
+      "view_change_samples_s": [
+        0.09083390599971608,
+        0.09348556299937627,
+        0.08945765499993286
+      ],
+      "view_change_median_s": 0.09083390599971608,
+      "style_change_samples_s": [
+        0.08805257200037886,
+        0.08921546199962904,
+        0.09171889600020222
+      ],
+      "style_change_median_s": 0.08921546199962904,
+      "png_s": 0.10410609500013379,
+      "png_bytes": 13520,
+      "peak_rss_mb": 135.8984375
+    },
+    {
+      "backend": "figgy",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.05589728399991145,
+      "register_and_fit_s": 0.15454422399943724,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.6763318769999387,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.8867733849992874,
+      "redraw_samples_s": [
+        0.6500467620007839,
+        0.6670876700000008,
+        0.6334491909992721
+      ],
+      "redraw_median_s": 0.6500467620007839,
+      "view_change_samples_s": [
+        0.607396405000145,
+        0.6474811719999707,
+        0.6547302380004112
+      ],
+      "view_change_median_s": 0.6474811719999707,
+      "style_change_samples_s": [
+        0.6409273620001841,
+        0.6231758859994443,
+        0.5995440919996327
+      ],
+      "style_change_median_s": 0.6231758859994443,
+      "png_s": 0.6549401250003939,
+      "png_bytes": 122822,
+      "peak_rss_mb": 410.68359375,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 16000000,
+      "known_gpu_bytes": 25993680
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.007982573999470333,
+      "register_and_fit_s": 0.026189234999947075,
+      "first_draw_s": 0.19804590199964878,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.23221771099906618,
+      "redraw_samples_s": [
+        0.17686882599991804,
+        0.17471895200014842,
+        0.17563488900032098
+      ],
+      "redraw_median_s": 0.17563488900032098,
+      "view_change_samples_s": [
+        0.1992077690001679,
+        0.1879066290002811,
+        0.19174872199982929
+      ],
+      "view_change_median_s": 0.19174872199982929,
+      "style_change_samples_s": [
+        0.19026078499973664,
+        0.18757549699967058,
+        0.18648678600038693
+      ],
+      "style_change_median_s": 0.18757549699967058,
+      "png_s": 0.2156881760001852,
+      "png_bytes": 48787,
+      "peak_rss_mb": 181.07421875
+    },
+    {
+      "backend": "matplotlib-unsimplified",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": false,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.007837457000277936,
+      "register_and_fit_s": 0.030935384000258637,
+      "first_draw_s": 2.9565729579999243,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 2.995345799000461,
+      "redraw_samples_s": [
+        2.559529490999921,
+        2.695699321000575,
+        3.0275876369996695
+      ],
+      "redraw_median_s": 2.695699321000575,
+      "view_change_samples_s": [
+        2.8139870979994157,
+        2.6102259420003975,
+        2.599361118000161
+      ],
+      "view_change_median_s": 2.6102259420003975,
+      "style_change_samples_s": [
+        2.730366918999607,
+        2.891615946999991,
+        2.7850430620001134
+      ],
+      "style_change_median_s": 2.7850430620001134,
+      "png_s": 2.795840034000321,
+      "png_bytes": 45817,
+      "peak_rss_mb": 983.1640625
+    },
+    {
+      "backend": "pyqtgraph-default",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.03137936999974045,
+      "register_and_fit_s": 0.6943221800001993,
+      "auto_downsample": false,
+      "use_opengl": false,
+      "antialias": false,
+      "first_draw_s": 0.6530472750000627,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.4999999999999,
+        478.5
+      ],
+      "first_frame_total_s": 1.3787488250000024,
+      "redraw_samples_s": [
+        0.6401059780000651,
+        0.6686307549998673,
+        0.6133670600002006
+      ],
+      "redraw_median_s": 0.6401059780000651,
+      "view_change_samples_s": [
+        0.630861071000254,
+        0.6234567829997104,
+        0.6157818199999383
+      ],
+      "view_change_median_s": 0.6234567829997104,
+      "style_change_samples_s": [
+        0.6309634649996951,
+        0.6552000619994942,
+        0.6444176129998596
+      ],
+      "style_change_median_s": 0.6444176129998596,
+      "png_s": 0.6424390009997296,
+      "png_bytes": 14063,
+      "peak_rss_mb": 176.88671875
+    },
+    {
+      "backend": "figgy",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.05936055999973178,
+      "register_and_fit_s": 0.43084483300026477,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 4.509982635000597,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 5.0001880280005935,
+      "redraw_samples_s": [
+        4.756362782999531,
+        4.889286847999756,
+        4.488590153000587
+      ],
+      "redraw_median_s": 4.756362782999531,
+      "view_change_samples_s": [
+        5.124164130999816,
+        4.484156098999847,
+        4.473752224000236
+      ],
+      "view_change_median_s": 4.484156098999847,
+      "style_change_samples_s": [
+        4.6929254859996945,
+        5.014738961999683,
+        4.782503510999959
+      ],
+      "style_change_median_s": 4.782503510999959,
+      "png_s": 4.547367969000334,
+      "png_bytes": 142623,
+      "peak_rss_mb": 2276.46484375,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 80000000,
+      "known_gpu_bytes": 89216464
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.009239865000381542,
+      "register_and_fit_s": 0.21557289399970614,
+      "first_draw_s": 0.6561964200000148,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.8810091790001024,
+      "redraw_samples_s": [
+        0.43321677800031466,
+        0.38696307499958493,
+        0.38986106399988785
+      ],
+      "redraw_median_s": 0.38986106399988785,
+      "view_change_samples_s": [
+        0.4375089969998953,
+        0.44429043699983595,
+        0.4207422620002035
+      ],
+      "view_change_median_s": 0.4375089969998953,
+      "style_change_samples_s": [
+        0.39998640100020566,
+        0.44516737400044804,
+        0.4279878440001994
+      ],
+      "style_change_median_s": 0.4279878440001994,
+      "png_s": 0.4225617290003356,
+      "png_bytes": 48889,
+      "peak_rss_mb": 402.27734375
+    },
+    {
+      "backend": "matplotlib-unsimplified",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 5000000,
+      "status": "error",
+      "returncode": 1,
+      "error": "Traceback (most recent call last):\n  File \"/workspace/figgy-python/benchmarks/compare.py\", line 282, in <module>\n    main()\n  File \"/workspace/figgy-python/benchmarks/compare.py\", line 229, in main\n    worker(args); return\n    ^^^^^^^^^^^^\n  File \"/workspace/figgy-python/benchmarks/compare.py\", line 171, in worker\n    row[\"first_draw_s\"], pixels = timed(draw)\n                                  ^^^^^^^^^^^\n  File \"/workspace/figgy-python/benchmarks/compare.py\", line 33, in timed\n    result = callback()\n             ^^^^^^^^^^\n  File \"/workspace/figgy-python/benchmarks/compare.py\", line 116, in draw\n    canvas.draw()\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/backends/backend_agg.py\", line 438, in draw\n    self.figure.draw(self.renderer)\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/artist.py\", line 94, in draw_wrapper\n    result = draw(artist, renderer, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/artist.py\", line 71, in draw_wrapper\n    return draw(artist, renderer)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/figure.py\", line 3282, in draw\n    mimage._draw_list_compositing_images(\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/image.py\", line 133, in _draw_list_compositing_images\n    a.draw(renderer)\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/artist.py\", line 71, in draw_wrapper\n    return draw(artist, renderer)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/axes/_base.py\", line 3372, in draw\n    mimage._draw_list_compositing_images(\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/image.py\", line 133, in _draw_list_compositing_images\n    a.draw(renderer)\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/artist.py\", line 71, in draw_wrapper\n    return draw(artist, renderer)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/lines.py\", line 845, in draw\n    renderer.draw_path(gc, tpath, affine.frozen())\n  File \"/workspace/.figgy-tools/venv/lib/python3.12/site-packages/matplotlib/backends/backend_agg.py\", line 173, in draw_path\n    raise OverflowError(msg) from None\nOverflowError: Exceeded cell block limit in Agg, however for the following reasons:\n\n- path.should_simplify is False\n\nwe cannot automatically split up this path to draw.\n\nPlease manually simplify your path.\n"
+    },
+    {
+      "backend": "pyqtgraph-default",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 3,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.029566994000560953,
+      "register_and_fit_s": 3.73621753200041,
+      "auto_downsample": false,
+      "use_opengl": false,
+      "antialias": false,
+      "first_draw_s": 3.0231733929995244,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.4999999999999,
+        478.5
+      ],
+      "first_frame_total_s": 6.788957919000495,
+      "redraw_samples_s": [
+        2.9838705409993054,
+        2.9724593529999765,
+        2.976843020999695
+      ],
+      "redraw_median_s": 2.976843020999695,
+      "view_change_samples_s": [
+        3.0169340310003463,
+        3.140743830000247,
+        3.0891797229996882
+      ],
+      "view_change_median_s": 3.0891797229996882,
+      "style_change_samples_s": [
+        3.138406114000645,
+        3.1869480719997227,
+        3.1393934980005724
+      ],
+      "style_change_median_s": 3.1393934980005724,
+      "png_s": 3.221878213999844,
+      "png_bytes": 14089,
+      "peak_rss_mb": 357.84765625
+    }
+  ],
+  "reference_plot_areas_px": {
+    "line": [
+      70.0,
+      62.0,
+      860.0,
+      478.0
+    ]
+  },
+  "reference_colorbar_areas_px": {}
+}
