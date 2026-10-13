@@ -1,8 +1,7 @@
 name: Build Python wheels
 
 on:
-  push:
-  pull_request:
+  # Automatic CI is paused while the new hosts are being stabilized.
   workflow_dispatch:
 
 permissions:
