@@ -16,6 +16,7 @@ classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Pytho
 notebook = ["anywidget>=0.9,<1"]
 desktop = ["PySide6>=6.8,<7"]
 benchmark = ["matplotlib>=3.8", "psutil>=5.9", "pillow>=10", "pyqtgraph>=0.13"]
+benchmark-gpu = ["fastplotlib>=0.7", "vispy>=0.17", "PySide6>=6.8,<7", "PyOpenGL>=3.1"]
 test = ["pytest>=8", "pillow>=10", "anywidget>=0.9,<1"]
 
 [tool.maturin]

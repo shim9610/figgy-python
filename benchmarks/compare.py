@@ -25,7 +25,30 @@ import time
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent
-BACKENDS = ["figgy", "matplotlib-default", "matplotlib-unsimplified", "pyqtgraph-default", "pyqtgraph"]
+BACKENDS = ["figgy", "matplotlib-default", "matplotlib-unsimplified", "pyqtgraph-default", "pyqtgraph",
+            "pyqtgraph-opengl", "fastplotlib", "vispy", "vispy-aa"]
+
+
+def run_worker(command, timeout):
+    # Kill the entire worker tree on Windows too: a venv launcher can spawn a
+    # second python.exe, which subprocess.run(timeout=...) alone leaves alive.
+    import psutil
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, encoding="utf-8", errors="replace") as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                children = psutil.Process(process.pid).children(recursive=True)
+            except psutil.NoSuchProcess:
+                children = []
+            for child in reversed(children):
+                try: child.kill()
+                except psutil.NoSuchProcess: pass
+            process.kill()
+            process.communicate()
+            raise
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def timed(callback):
@@ -65,7 +88,11 @@ def worker(args):
     row["line_width_pixels"] = 2.5
     row["scatter_marker_diameter_pixels"] = 5.0
 
-    if args.worker == "figgy":
+    cleanup = lambda: None
+    if args.worker in ("fastplotlib", "vispy", "vispy-aa", "pyqtgraph-opengl"):
+        from gpu_backends import SETUPS
+        draw, view, style, save_png, cleanup = SETUPS[args.worker](args, x, y, row)
+    elif args.worker == "figgy":
         import figgy
         row["initialize_s"], (fig, ax) = timed(figgy.subplots)
         def register():
@@ -120,7 +147,7 @@ def worker(args):
         def style(i): artist.set_color("#d62728" if i % 2 else "#1f77b4")
         def save_png():
             out = io.BytesIO(); canvas.print_png(out); return out.getvalue()
-    else:
+    elif args.worker.startswith("pyqtgraph"):
         if args.kind != "line":
             raise ValueError("pyqtgraph comparison currently covers lines only")
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -174,7 +201,7 @@ def worker(args):
         row["plot_area_px"] = [bounds[0] + 2, bounds[1] + 2, bounds[2] - 4, bounds[3] - 4]
     elif args.worker.startswith("matplotlib"):
         row["plot_area_px"] = args.plot_area
-    else:
+    elif args.worker in ("pyqtgraph-default", "pyqtgraph"):
         rect = plot.getViewBox().sceneBoundingRect()
         row["plot_area_px"] = [rect.x(), rect.y(), rect.width(), rect.height()]
     row["first_frame_total_s"] = row["initialize_s"] + row["register_and_fit_s"] + row["first_draw_s"]
@@ -198,12 +225,26 @@ def worker(args):
     row["png_bytes"] = len(png)
     row["peak_rss_mb"] = max(rss[0], process.memory_info().rss) / 1024**2
     stop.set(); sampler.join()
+    # Outside the timed/RSS interval, verify that editing did not silently
+    # remove the data (some APIs require positions again for a color update).
+    final_pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGBA"))
+    final_crop = final_pixels[100:500, 100:800, :3].astype(np.int16)
+    if not np.any(final_crop.max(axis=2) - final_crop.min(axis=2) > 25):
+        raise AssertionError("no colored data after view/style edits")
+    row["data_visible_after_edits"] = True
+    if args.kind != "heatmap":
+        style(1)
+        red = draw()[100:500, 100:800, :3].astype(np.int16)
+        if not np.any((red[:, :, 0] > red[:, :, 1] + 25) & (red[:, :, 0] > red[:, :, 2] + 25)):
+            raise AssertionError("style edit did not render red data")
+        row["style_render_validated"] = True
     if args.worker == "figgy":
         row["column_uploads_after_redraws"] = fig.info["column_uploads"]
         row["allocation_mode"] = fig.info["allocation_mode"]
         row["pool_used_bytes"] = fig.info["pool_used_bytes"]
         row["known_gpu_bytes"] = fig.info["known_gpu_bytes"]
         fig.close()
+    cleanup()
     print(json.dumps(row), flush=True)
 
 
@@ -212,7 +253,8 @@ def main():
     parser.add_argument("--sizes", type=int, nargs="+", default=[100_000, 1_000_000, 5_000_000])
     parser.add_argument("--kinds", nargs="+", choices=["line", "scatter", "heatmap"], default=["line", "scatter"])
     parser.add_argument("--signals", nargs="+", choices=["smooth", "noisy"], default=["smooth", "noisy"])
-    parser.add_argument("--backends", nargs="+", choices=BACKENDS, default=BACKENDS)
+    parser.add_argument("--backends", nargs="+", choices=BACKENDS,
+                        default=["figgy", "matplotlib-default", "matplotlib-unsimplified", "pyqtgraph-opengl", "fastplotlib", "vispy"])
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--output", type=Path, default=ROOT / "results" / "latest.json")
@@ -235,7 +277,7 @@ def main():
               "python": sys.version, "platform": platform.platform(), "processor": platform.processor(),
               "cpu_affinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
               "cpu_quota": Path("/sys/fs/cgroup/cpu.max").read_text().strip() if Path("/sys/fs/cgroup/cpu.max").exists() else None,
-              "versions": {name: version(name) for name in ["figgy-python", "numpy", "matplotlib", "pyqtgraph", "PySide6", "psutil"]},
+              "versions": {name: version(name) for name in ["figgy-python", "numpy", "matplotlib", "pyqtgraph", "PySide6", "psutil", "fastplotlib", "pygfx", "wgpu", "vispy"]},
               "environment": {key: os.environ.get(key) for key in ["WGPU_BACKEND", "VK_DRIVER_FILES", "QT_QPA_PLATFORM", "LP_NUM_THREADS"]}, "rows": []}
     # Query the renderer's own layout once, outside worker timing/RSS.
     import figgy
@@ -256,6 +298,7 @@ def main():
             for size in args.sizes:
                 for backend in args.backends:
                     if backend.startswith("pyqtgraph") and kind != "line": continue
+                    if backend in ("fastplotlib", "vispy", "vispy-aa") and kind == "heatmap": continue
                     if backend == "matplotlib-unsimplified" and kind != "line": continue
                     command = [sys.executable, str(Path(__file__).resolve()), "--worker", backend, "--kind", kind,
                                "--signal", signal, "--size", str(size), "--repeats", str(args.repeats)]
@@ -263,7 +306,7 @@ def main():
                     if kind in colorbars: command += ["--colorbar-area", *map(str, colorbars[kind])]
                     if args.images: command += ["--images", args.images]
                     try:
-                        result = subprocess.run(command, capture_output=True, text=True, timeout=args.timeout)
+                        result = run_worker(command, args.timeout)
                         if result.returncode != 0:
                             row = {"backend": backend, "kind": kind, "signal": signal, "size": size, "status": "error", "returncode": result.returncode, "error": result.stderr[-4000:] or f"worker exited with code {result.returncode}"}
                         else: row = json.loads(result.stdout.strip().splitlines()[-1])

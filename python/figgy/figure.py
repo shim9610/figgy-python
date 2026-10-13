@@ -537,6 +537,35 @@ class Axes:
     def set_ylabel(self, text, **kwargs):
         return self.figure.update("axis_title_left", text=text, **kwargs)
 
+    def _set_scale(self, axis, scale):
+        scales = {"linear": "Linear", "log": "Logarithmic"}
+        if scale not in scales:
+            raise ValueError("scale must be 'linear' or 'log'")
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            keys = ("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")
+            if scale == "log" and any(state["config"][key]["min"] <= 0 for key in keys):
+                raise ValueError(f"log scale requires positive bounds; call set_{axis}lim first")
+            for key in keys:
+                node = state["config"][key]
+                node["scale"] = scales[scale]
+                node["major_spacing"] = 1.0 if scale == "log" else (node["max"] - node["min"]) / 5
+            self.figure.apply_settings(state)
+
+    def set_xscale(self, scale):
+        """Choose linear/log scaling; logarithmic bounds must already be positive."""
+        return self._set_scale("x", scale)
+
+    def set_yscale(self, scale):
+        """Choose linear/log scaling; logarithmic bounds must already be positive."""
+        return self._set_scale("y", scale)
+
+    def get_xscale(self):
+        return "log" if self.figure.get_settings()["config"]["bottom_x"]["scale"] == "Logarithmic" else "linear"
+
+    def get_yscale(self):
+        return "log" if self.figure.get_settings()["config"]["left_y"]["scale"] == "Logarithmic" else "linear"
+
     def set_xlim(self, left, right):
         with self.figure._lock:
             self.figure._require_open()

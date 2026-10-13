@@ -1,0 +1,9 @@
+.........s                                                               [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_figure.py:138: device binding limit too large for bounded CI failure test
+9 passed, 1 skipped in 5.39s
+
+Final source validation after log-axis API and benchmark changes:
+11 passed, 1 skipped in 5.11s
+Skipped: tests/test_figure.py:169, device binding limit too large for bounded CI failure test.
+python -m compileall -q python benchmarks: passed.

@@ -1,0 +1,16 @@
+{
+  "status": "ok",
+  "quickstart_png": "images/windows-rtx4070ti/quickstart.png",
+  "canvas_width": 960,
+  "canvas_height": 600,
+  "edited": true,
+  "adapter": {
+    "backend": "Vulkan",
+    "device_type": "DiscreteGpu",
+    "driver": "NVIDIA",
+    "initial_pool_capacity_bytes": 8388608,
+    "maximum_column_pool_bytes": 2147483644,
+    "name": "NVIDIA GeForce RTX 4070 Ti"
+  },
+  "screenshot": "images/windows-rtx4070ti/desktop-smoke.png"
+}

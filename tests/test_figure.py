@@ -127,6 +127,37 @@ def test_resident_pool_grows_without_changing_modes():
         assert fig.render_rgba().shape == (600, 960, 4)
 
 
+def test_log_axes_render_and_pick_in_native_coordinates(plot):
+    fig, ax = plot
+    ax.scatter([1, 10, 100], [1, 10, 100], s=100, id="samples")
+    ax.set_xlim(.5, 200)
+    ax.set_ylim(.5, 200)
+    linear = fig.render_rgba().copy()
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    assert ax.get_xscale() == ax.get_yscale() == "log"
+    assert not np.array_equal(linear, fig.render_rgba())
+    x, y, w, h = json_bounds(fig, "data_area")["rect"]
+    assert fig.select(x + w / 2, y + h / 2) == "samples"
+    assert fig.info["column_uploads"] == 2
+    ax.set_xscale("linear")
+    ax.set_yscale("linear")
+    assert ax.get_xscale() == ax.get_yscale() == "linear"
+
+
+def test_invalid_scale_changes_preserve_settings(plot):
+    fig, ax = plot
+    ax.plot([-1, 1], [-1, 1])
+    before, revision = fig.get_settings(), fig.revision
+    with pytest.raises(ValueError, match="positive bounds"):
+        ax.set_xscale("log")
+    with pytest.raises(ValueError, match="positive bounds"):
+        ax.set_yscale("log")
+    with pytest.raises(ValueError, match="scale must"):
+        ax.set_xscale("symlog")
+    assert fig.get_settings() == before and fig.revision == revision
+
+
 def test_device_limit_error_preserves_existing_plot(plot):
     fig, ax = plot
     ax.plot([0, 1, 2], [0, 1, 0])

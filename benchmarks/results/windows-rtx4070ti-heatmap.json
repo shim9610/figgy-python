@@ -1,0 +1,353 @@
+{
+  "method": "isolated workers; identical float64 arrays; completed RGBA readback at 960x600; no figgy downsampling; medians of repeated calls; PNG includes render and encoding",
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "cpu_affinity": null,
+  "cpu_quota": null,
+  "versions": {
+    "figgy-python": "0.1.0",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pyqtgraph": "0.14.0",
+    "PySide6": "6.12.0",
+    "psutil": "7.2.2"
+  },
+  "environment": {
+    "WGPU_BACKEND": null,
+    "VK_DRIVER_FILES": null,
+    "QT_QPA_PLATFORM": null,
+    "LP_NUM_THREADS": null
+  },
+  "rows": [
+    {
+      "backend": "figgy",
+      "kind": "heatmap",
+      "signal": "smooth",
+      "size": 99856,
+      "input_bytes": 801376,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.3976551000014297,
+      "register_and_fit_s": 0.023591199998918455,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.005517899997357745,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        753.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.4267641999977059,
+      "redraw_samples_s": [
+        0.0013419999995676335,
+        0.001089599998522317,
+        0.0010194999995292164,
+        0.001039300001139054,
+        0.0010163999977521598
+      ],
+      "redraw_median_s": 0.001039300001139054,
+      "view_change_samples_s": [
+        0.003028200000699144,
+        0.0028609000000869855,
+        0.0029556999979831744,
+        0.0028246000001672655,
+        0.0032379000003857072
+      ],
+      "view_change_median_s": 0.0029556999979831744,
+      "png_s": 0.023101700000552228,
+      "png_bytes": 126582,
+      "peak_rss_mb": 200.16015625,
+      "column_uploads_after_redraws": 318,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 814080,
+      "known_gpu_bytes": 17607820
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "heatmap",
+      "signal": "smooth",
+      "size": 99856,
+      "input_bytes": 801376,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.005972099999780767,
+      "register_and_fit_s": 0.007181499997386709,
+      "first_draw_s": 0.043687899997166824,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        753.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.0568414999943343,
+      "redraw_samples_s": [
+        0.03114409999761847,
+        0.03208660000018426,
+        0.03343999999924563,
+        0.031672199998865835,
+        0.03218550000019604
+      ],
+      "redraw_median_s": 0.03208660000018426,
+      "view_change_samples_s": [
+        0.03293109999867738,
+        0.03531160000056843,
+        0.029292299997905502,
+        0.029670899999473477,
+        0.030530500000168104
+      ],
+      "view_change_median_s": 0.030530500000168104,
+      "png_s": 0.05030640000040876,
+      "png_bytes": 113391,
+      "peak_rss_mb": 103.265625
+    },
+    {
+      "backend": "figgy",
+      "kind": "heatmap",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 8008000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.39177810000182944,
+      "register_and_fit_s": 0.08245109999916167,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.005139400000189198,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        753.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.4793686000011803,
+      "redraw_samples_s": [
+        0.0014831000007689,
+        0.001152200002252357,
+        0.0011009000008925796,
+        0.001348999998299405,
+        0.0013432999985525385
+      ],
+      "redraw_median_s": 0.0013432999985525385,
+      "view_change_samples_s": [
+        0.0031448999980057124,
+        0.0031815000002097804,
+        0.0028683000018645544,
+        0.0033065999996324535,
+        0.004102099999727216
+      ],
+      "view_change_median_s": 0.0031815000002097804,
+      "png_s": 0.05924159999995027,
+      "png_bytes": 251144,
+      "peak_rss_mb": 206.4765625,
+      "column_uploads_after_redraws": 1002,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 8208384,
+      "known_gpu_bytes": 17613292
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "heatmap",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 8008000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.006055199999536853,
+      "register_and_fit_s": 0.009601399997336557,
+      "first_draw_s": 0.0640735000015411,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        753.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.07973009999841452,
+      "redraw_samples_s": [
+        0.052545300000929274,
+        0.05170630000066012,
+        0.05380489999879501,
+        0.05436290000216104,
+        0.05497119999927236
+      ],
+      "redraw_median_s": 0.05380489999879501,
+      "view_change_samples_s": [
+        0.05295349999869359,
+        0.05117600000085076,
+        0.05040079999889713,
+        0.05205719999867142,
+        0.05265540000254987
+      ],
+      "view_change_median_s": 0.05205719999867142,
+      "png_s": 0.0859647999968729,
+      "png_bytes": 217181,
+      "peak_rss_mb": 151.41796875
+    },
+    {
+      "backend": "figgy",
+      "kind": "heatmap",
+      "signal": "smooth",
+      "size": 4000000,
+      "input_bytes": 32016000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.4047051999987161,
+      "register_and_fit_s": 0.25780849999864586,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.005763600001955638,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        753.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.6682772999993176,
+      "redraw_samples_s": [
+        0.00163809999867226,
+        0.0014025000018591527,
+        0.00131139999939478,
+        0.0011554999982763547,
+        0.0011716000008163974
+      ],
+      "redraw_median_s": 0.00131139999939478,
+      "view_change_samples_s": [
+        0.003379799996764632,
+        0.0032076999996206723,
+        0.0032497000029252376,
+        0.0031061999980011024,
+        0.003278299998783041
+      ],
+      "view_change_median_s": 0.0032497000029252376,
+      "png_s": 0.05902550000246265,
+      "png_bytes": 246508,
+      "peak_rss_mb": 235.19921875,
+      "column_uploads_after_redraws": 2002,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 32288256,
+      "known_gpu_bytes": 42787116
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "heatmap",
+      "signal": "smooth",
+      "size": 4000000,
+      "input_bytes": 32016000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.005996600000798935,
+      "register_and_fit_s": 0.01782660000026226,
+      "first_draw_s": 0.1307083000028797,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        753.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.1545315000039409,
+      "redraw_samples_s": [
+        0.11961709999741288,
+        0.12338929999896209,
+        0.12384540000130073,
+        0.1190682000014931,
+        0.12476969999988796
+      ],
+      "redraw_median_s": 0.12338929999896209,
+      "view_change_samples_s": [
+        0.11933460000000196,
+        0.1211038000001281,
+        0.12210140000024694,
+        0.12103040000147303,
+        0.12099329999909969
+      ],
+      "view_change_median_s": 0.12103040000147303,
+      "png_s": 0.1525885000010021,
+      "png_bytes": 208518,
+      "peak_rss_mb": 385.5546875
+    }
+  ],
+  "reference_plot_areas_px": {
+    "heatmap": [
+      70.0,
+      62.0,
+      753.0,
+      478.0
+    ]
+  },
+  "reference_colorbar_areas_px": {
+    "heatmap": [
+      877.0,
+      121.75,
+      18.0,
+      358.5
+    ]
+  },
+  "machine": {
+    "measured_date_local": "2026-10-14",
+    "timezone": "Asia/Seoul",
+    "source_commit": "ff4bf0cf2d2f8457434abc211c71201e30a09101",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+    "physical_cores": 16,
+    "logical_processors": 24,
+    "system_memory_bytes": 68475002880,
+    "gpu": "NVIDIA GeForce RTX 4070 Ti",
+    "gpu_memory_mib": 12282,
+    "gpu_driver_version": "617.14",
+    "graphics_backend": "Vulkan",
+    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]"
+  }
+}

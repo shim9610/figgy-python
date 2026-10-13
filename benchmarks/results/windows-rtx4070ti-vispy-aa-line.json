@@ -1,0 +1,398 @@
+{
+  "method": "isolated workers; identical float64 arrays; completed RGBA readback at 960x600; no figgy downsampling; medians of repeated calls; PNG includes render and encoding",
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "cpu_affinity": null,
+  "cpu_quota": null,
+  "versions": {
+    "figgy-python": "0.1.0",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pyqtgraph": "0.14.0",
+    "PySide6": "6.12.0",
+    "psutil": "7.2.2",
+    "fastplotlib": "0.7.0",
+    "pygfx": "0.17.0",
+    "wgpu": "0.32.0",
+    "vispy": "0.17.0"
+  },
+  "environment": {
+    "WGPU_BACKEND": null,
+    "VK_DRIVER_FILES": null,
+    "QT_QPA_PLATFORM": null,
+    "LP_NUM_THREADS": null
+  },
+  "rows": [
+    {
+      "backend": "vispy-aa",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.39935960000002524,
+      "register_and_fit_s": 0.002989199998410186,
+      "adapter": {
+        "vendor": "NVIDIA Corporation",
+        "renderer": "NVIDIA GeForce RTX 4070 Ti/PCIe/SSE2",
+        "version": "4.6.0 NVIDIA 617.14"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.39019290000214824,
+      "first_frame_total_s": 0.7925417000005837,
+      "redraw_samples_s": [
+        0.0053047999972477555,
+        0.005170299999008421,
+        0.004932700001518242,
+        0.004982099999324419,
+        0.005365500001062173
+      ],
+      "redraw_median_s": 0.005170299999008421,
+      "view_change_samples_s": [
+        0.006299100001342595,
+        0.007312999998248415,
+        0.007350699997914489,
+        0.007365600002231076,
+        0.007824899999832269
+      ],
+      "view_change_median_s": 0.007350699997914489,
+      "style_change_samples_s": [
+        0.005578500000410713,
+        0.005082700001366902,
+        0.005010299999412382,
+        0.0051591000010375865,
+        0.005334099998435704
+      ],
+      "style_change_median_s": 0.0051591000010375865,
+      "png_s": 0.02150419999816222,
+      "png_bytes": 73582,
+      "peak_rss_mb": 194.34375,
+      "antialias": true
+    },
+    {
+      "backend": "vispy-aa",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.43820769999729237,
+      "register_and_fit_s": 0.012792800000170246,
+      "adapter": {
+        "vendor": "NVIDIA Corporation",
+        "renderer": "NVIDIA GeForce RTX 4070 Ti/PCIe/SSE2",
+        "version": "4.6.0 NVIDIA 617.14"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.4091348999972979,
+      "first_frame_total_s": 0.8601353999947605,
+      "redraw_samples_s": [
+        0.016335699998307973,
+        0.0166458000021521,
+        0.0158495000032417,
+        0.015805699997144984,
+        0.016216299998632167
+      ],
+      "redraw_median_s": 0.016216299998632167,
+      "view_change_samples_s": [
+        0.017868500002805376,
+        0.018867900002078386,
+        0.019204399999580346,
+        0.021677799999451963,
+        0.02125520000117831
+      ],
+      "view_change_median_s": 0.019204399999580346,
+      "style_change_samples_s": [
+        0.017531000001326902,
+        0.019439199997577816,
+        0.018852000001061242,
+        0.01765510000041104,
+        0.017035000000760192
+      ],
+      "style_change_median_s": 0.01765510000041104,
+      "png_s": 0.031023200001072837,
+      "png_bytes": 44024,
+      "peak_rss_mb": 227.88671875,
+      "antialias": true
+    },
+    {
+      "backend": "vispy-aa",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.4118664000015997,
+      "register_and_fit_s": 0.050350699999398785,
+      "adapter": {
+        "vendor": "NVIDIA Corporation",
+        "renderer": "NVIDIA GeForce RTX 4070 Ti/PCIe/SSE2",
+        "version": "4.6.0 NVIDIA 617.14"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.4052975999984483,
+      "first_frame_total_s": 0.8675146999994467,
+      "redraw_samples_s": [
+        0.0463302999996813,
+        0.04506989999936195,
+        0.0463662000001932,
+        0.04505860000062967,
+        0.04580329999953392
+      ],
+      "redraw_median_s": 0.04580329999953392,
+      "view_change_samples_s": [
+        0.046847400000842754,
+        0.047899699999106815,
+        0.04891380000117351,
+        0.04849409999951604,
+        0.04869989999860991
+      ],
+      "view_change_median_s": 0.04849409999951604,
+      "style_change_samples_s": [
+        0.04668350000065402,
+        0.04676050000125542,
+        0.045964199998707045,
+        0.0468405999999959,
+        0.04632130000027246
+      ],
+      "style_change_median_s": 0.04668350000065402,
+      "png_s": 0.0599794000008842,
+      "png_bytes": 51163,
+      "peak_rss_mb": 350.6875,
+      "antialias": true
+    },
+    {
+      "backend": "vispy-aa",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.41541010000219103,
+      "register_and_fit_s": 0.003076399996643886,
+      "adapter": {
+        "vendor": "NVIDIA Corporation",
+        "renderer": "NVIDIA GeForce RTX 4070 Ti/PCIe/SSE2",
+        "version": "4.6.0 NVIDIA 617.14"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.38647969999874476,
+      "first_frame_total_s": 0.8049661999975797,
+      "redraw_samples_s": [
+        0.010933099998510443,
+        0.010665200003131758,
+        0.010253500000544591,
+        0.01074019999941811,
+        0.010670799998479197
+      ],
+      "redraw_median_s": 0.010670799998479197,
+      "view_change_samples_s": [
+        0.013071700002910802,
+        0.014145900000585243,
+        0.01489930000025197,
+        0.015502799997193506,
+        0.01410329999998794
+      ],
+      "view_change_median_s": 0.014145900000585243,
+      "style_change_samples_s": [
+        0.011915600000065751,
+        0.012331699999776902,
+        0.01166440000088187,
+        0.012238899998919806,
+        0.01163270000324701
+      ],
+      "style_change_median_s": 0.011915600000065751,
+      "png_s": 0.026772999997774605,
+      "png_bytes": 72011,
+      "peak_rss_mb": 197.18359375,
+      "antialias": true
+    },
+    {
+      "backend": "vispy-aa",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.41214559999934863,
+      "register_and_fit_s": 0.01241200000004028,
+      "adapter": {
+        "vendor": "NVIDIA Corporation",
+        "renderer": "NVIDIA GeForce RTX 4070 Ti/PCIe/SSE2",
+        "version": "4.6.0 NVIDIA 617.14"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.4031245999976818,
+      "first_frame_total_s": 0.8276821999970707,
+      "redraw_samples_s": [
+        0.06680190000042785,
+        0.06152180000208318,
+        0.06363229999988107,
+        0.06614770000305725,
+        0.0649673999978404
+      ],
+      "redraw_median_s": 0.0649673999978404,
+      "view_change_samples_s": [
+        0.06784530000004452,
+        0.06826720000026398,
+        0.06901529999959166,
+        0.06603539999923669,
+        0.06922770000164746
+      ],
+      "view_change_median_s": 0.06826720000026398,
+      "style_change_samples_s": [
+        0.06648929999937536,
+        0.06675800000084564,
+        0.06487679999918328,
+        0.06282409999766969,
+        0.06385800000134623
+      ],
+      "style_change_median_s": 0.06487679999918328,
+      "png_s": 0.0836942000023555,
+      "png_bytes": 81462,
+      "peak_rss_mb": 229.70703125,
+      "antialias": true
+    },
+    {
+      "backend": "vispy-aa",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.408558200000698,
+      "register_and_fit_s": 0.048681199998100055,
+      "adapter": {
+        "vendor": "NVIDIA Corporation",
+        "renderer": "NVIDIA GeForce RTX 4070 Ti/PCIe/SSE2",
+        "version": "4.6.0 NVIDIA 617.14"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.6364237000016146,
+      "first_frame_total_s": 1.0936631000004127,
+      "redraw_samples_s": [
+        0.3381941999978153,
+        0.33634779999920283,
+        0.33716160000039963,
+        0.33631830000012997,
+        0.3367103999989922
+      ],
+      "redraw_median_s": 0.3367103999989922,
+      "view_change_samples_s": [
+        0.3374151999996684,
+        0.3447541000023193,
+        0.33940199999778997,
+        0.34138869999878807,
+        0.3378059000024223
+      ],
+      "view_change_median_s": 0.33940199999778997,
+      "style_change_samples_s": [
+        0.33820859999832464,
+        0.3408225000021048,
+        0.3395173999997496,
+        0.3400493000008282,
+        0.33759760000248207
+      ],
+      "style_change_median_s": 0.3395173999997496,
+      "png_s": 0.3573316000001796,
+      "png_bytes": 86107,
+      "peak_rss_mb": 352.2578125,
+      "antialias": true
+    }
+  ],
+  "reference_plot_areas_px": {
+    "line": [
+      70.0,
+      62.0,
+      860.0,
+      478.0
+    ]
+  },
+  "reference_colorbar_areas_px": {},
+  "configuration_note": "VisPy OpenGL line smoothing enabled; supplementary run, separate from AA-off default comparison."
+}

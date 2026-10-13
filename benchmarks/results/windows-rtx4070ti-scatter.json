@@ -1,0 +1,394 @@
+{
+  "method": "isolated workers; identical float64 arrays; completed RGBA readback at 960x600; no figgy downsampling; medians of repeated calls; PNG includes render and encoding",
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "cpu_affinity": null,
+  "cpu_quota": null,
+  "versions": {
+    "figgy-python": "0.1.0",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pyqtgraph": "0.14.0",
+    "PySide6": "6.12.0",
+    "psutil": "7.2.2"
+  },
+  "environment": {
+    "WGPU_BACKEND": null,
+    "VK_DRIVER_FILES": null,
+    "QT_QPA_PLATFORM": null,
+    "LP_NUM_THREADS": null
+  },
+  "rows": [
+    {
+      "backend": "figgy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.4004361000006611,
+      "register_and_fit_s": 0.0084513000001607,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.00444479999714531,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.4133321999979671,
+      "redraw_samples_s": [
+        0.0014250000022002496,
+        0.0012781000004906673,
+        0.0012284999975236133,
+        0.0013381000026129186,
+        0.0013075999995635357
+      ],
+      "redraw_median_s": 0.0013075999995635357,
+      "view_change_samples_s": [
+        0.002887000002374407,
+        0.002825199997460004,
+        0.0027579999987210613,
+        0.0027340000015101396,
+        0.002703400001337286
+      ],
+      "view_change_median_s": 0.0027579999987210613,
+      "style_change_samples_s": [
+        0.0013892000024497975,
+        0.0028429000012692995,
+        0.0031042000009620097,
+        0.0031302000024879817,
+        0.002991399996972177
+      ],
+      "style_change_median_s": 0.002991399996972177,
+      "png_s": 0.03264130000025034,
+      "png_bytes": 254637,
+      "peak_rss_mb": 196.359375,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 1600000,
+      "known_gpu_bytes": 17605072
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.008274399999208981,
+      "register_and_fit_s": 0.0031817999988561496,
+      "first_draw_s": 0.055920599999808474,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.0673767999978736,
+      "redraw_samples_s": [
+        0.04077099999994971,
+        0.037401500001578825,
+        0.03669579999768757,
+        0.03699110000161454,
+        0.036571799999364885
+      ],
+      "redraw_median_s": 0.03699110000161454,
+      "view_change_samples_s": [
+        0.03975680000075954,
+        0.03637279999747989,
+        0.036361200000101235,
+        0.03708130000086385,
+        0.0370054999984859
+      ],
+      "view_change_median_s": 0.0370054999984859,
+      "style_change_samples_s": [
+        0.03719519999867771,
+        0.03872649999902933,
+        0.03776039999866043,
+        0.03791160000037053,
+        0.03748519999862765
+      ],
+      "style_change_median_s": 0.03776039999866043,
+      "png_s": 0.05442319999929168,
+      "png_bytes": 68187,
+      "peak_rss_mb": 76.35546875
+    },
+    {
+      "backend": "figgy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.413450299998658,
+      "register_and_fit_s": 0.019123099998978432,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.00681329999861191,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.43938669999624835,
+      "redraw_samples_s": [
+        0.0026849999994738027,
+        0.002493800002412172,
+        0.002370300000620773,
+        0.0026252999996358994,
+        0.002563199999713106
+      ],
+      "redraw_median_s": 0.002563199999713106,
+      "view_change_samples_s": [
+        0.004598300001816824,
+        0.004272099999070633,
+        0.004207399997540051,
+        0.0049169000012625474,
+        0.004219299997203052
+      ],
+      "view_change_median_s": 0.004272099999070633,
+      "style_change_samples_s": [
+        0.0027005999982065987,
+        0.004613200002495432,
+        0.0042971000002580695,
+        0.004223600000841543,
+        0.004539100002148189
+      ],
+      "style_change_median_s": 0.0042971000002580695,
+      "png_s": 0.03717229999892879,
+      "png_bytes": 278738,
+      "peak_rss_mb": 210.07421875,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 16000000,
+      "known_gpu_bytes": 25993680
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.007356999998592073,
+      "register_and_fit_s": 0.024953300002380274,
+      "first_draw_s": 0.28526050000073155,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.3175708000017039,
+      "redraw_samples_s": [
+        0.27812140000241925,
+        0.2801818000007188,
+        0.28201110000009066,
+        0.281919499997457,
+        0.2783333000006678
+      ],
+      "redraw_median_s": 0.2801818000007188,
+      "view_change_samples_s": [
+        0.27911260000109905,
+        0.2808961000009731,
+        0.27789060000213794,
+        0.27939669999977923,
+        0.281871899998805
+      ],
+      "view_change_median_s": 0.27939669999977923,
+      "style_change_samples_s": [
+        0.27949550000266754,
+        0.2800513000001956,
+        0.27993420000348124,
+        0.2822292999990168,
+        0.2810165999981109
+      ],
+      "style_change_median_s": 0.2800513000001956,
+      "png_s": 0.2942602999974042,
+      "png_bytes": 56232,
+      "peak_rss_mb": 126.18359375
+    },
+    {
+      "backend": "figgy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.5832527000020491,
+      "register_and_fit_s": 0.06339090000255965,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.012801799999579089,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.6594454000041878,
+      "redraw_samples_s": [
+        0.009000600002764259,
+        0.009442100003070664,
+        0.009456900002987823,
+        0.00939719999951194,
+        0.008844300002238015
+      ],
+      "redraw_median_s": 0.00939719999951194,
+      "view_change_samples_s": [
+        0.011758399999962421,
+        0.01054689999727998,
+        0.01058289999855333,
+        0.01123369999913848,
+        0.011104500001238193
+      ],
+      "view_change_median_s": 0.011104500001238193,
+      "style_change_samples_s": [
+        0.011403200001950609,
+        0.0123368999993545,
+        0.01169350000054692,
+        0.012058499996783212,
+        0.011916499999642838
+      ],
+      "style_change_median_s": 0.011916499999642838,
+      "png_s": 0.04658480000216514,
+      "png_bytes": 300420,
+      "peak_rss_mb": 270.890625,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 80000000,
+      "known_gpu_bytes": 89216464
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.007033999998384388,
+      "register_and_fit_s": 0.11650270000245655,
+      "first_draw_s": 1.3575075000007928,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 1.4810442000016337,
+      "redraw_samples_s": [
+        1.3450775999990583,
+        1.353270600000542,
+        1.3503463000015472,
+        1.3730987000017194,
+        1.3662891000021773
+      ],
+      "redraw_median_s": 1.353270600000542,
+      "view_change_samples_s": [
+        1.3476564000011422,
+        1.3470802000010735,
+        1.3548779000011564,
+        1.355662800000573,
+        1.348710199999914
+      ],
+      "view_change_median_s": 1.348710199999914,
+      "style_change_samples_s": [
+        1.3838125999973272,
+        1.3454602999991039,
+        1.3469216000012239,
+        1.3455247999991116,
+        1.338382099998853
+      ],
+      "style_change_median_s": 1.3455247999991116,
+      "png_s": 1.3521483000004082,
+      "png_bytes": 51939,
+      "peak_rss_mb": 398.9765625
+    }
+  ],
+  "reference_plot_areas_px": {
+    "scatter": [
+      70.0,
+      62.0,
+      860.0,
+      478.0
+    ]
+  },
+  "reference_colorbar_areas_px": {},
+  "machine": {
+    "measured_date_local": "2026-10-14",
+    "timezone": "Asia/Seoul",
+    "source_commit": "ff4bf0cf2d2f8457434abc211c71201e30a09101",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700KF",
+    "physical_cores": 16,
+    "logical_processors": 24,
+    "system_memory_bytes": 68475002880,
+    "gpu": "NVIDIA GeForce RTX 4070 Ti",
+    "gpu_memory_mib": 12282,
+    "gpu_driver_version": "617.14",
+    "graphics_backend": "Vulkan",
+    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]"
+  }
+}

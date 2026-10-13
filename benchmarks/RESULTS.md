@@ -1,5 +1,12 @@
 # Python 바인딩 구현·벤치마크 결과
 
+Windows/RTX 4070 Ti의 실제 GPU 측정은 [Windows 벤치마크](WINDOWS_RESULTS.md)에 별도로 기록했습니다.
+
+fastplotlib·VisPy·실제 pyqtgraph OpenGL 경로를 포함한 후속 결과는 [Windows GPU 비교](WINDOWS_GPU_RESULTS.md)를 참고합니다.
+
+보고용 비교 차트도 Figgy로 렌더합니다. 한 패널씩 그린 결과를 이미지로 배치하며,
+SVG는 Figgy가 렌더한 PNG를 내장한 형식입니다.
+
 현재 구현은 figgy-renderer 0.16.1을 재사용하는 Python 0.1 알파입니다.
 matplotlib 형태의 plot/scatter/imshow API, NumPy 직접 staging 업로드, 동일 설정 경로를
 쓰는 데스크톱·Jupyter 내부 편집, Python 설정 코드 복사, PNG 저장을 구현했습니다.
@@ -43,8 +50,9 @@ matplotlib **기본 단순화 설정은 이보다 빠릅니다**. 매끄러운 �
 이를 timeout/메모리 부족/속도 수치로 바꾸지 않고 원문 오류를 JSON에 보존했습니다.
 기본 matplotlib와 Figgy, pyqtgraph는 같은 입력을 완료했습니다.
 
-소프트웨어 Vulkan 결과이므로 물리 GPU의 성능 차이는 아직 확인하지 못했습니다.
-같은 스크립트를 실제 Windows/DX12, Linux/Vulkan, macOS/Metal에서 실행해야 합니다.
+이 문서의 측정은 소프트웨어 Vulkan 결과입니다. 물리 GPU에서 같은 스크립트를 실행한
+Windows/RTX 4070 Ti/Vulkan 결과는 [Windows 벤치마크](WINDOWS_RESULTS.md)를 참고합니다.
+Windows/DX12와 macOS/Metal 측정은 별도로 필요합니다.
 
 ## line
 
@@ -109,7 +117,8 @@ matplotlib **기본 단순화 설정은 이보다 빠릅니다**. 매끄러운 �
 - QtWebEngine 데스크톱 창도 headless/offscreen 환경에서 실행하고 화면 확인.
 - Linux CPython 3.12 / glibc 2.35 이상 wheel 생성 및 twine check --strict 통과.
 - Windows/macOS와 Python 3.11~3.14 wheel CI를 구성했으나 원격 실행은 아직 없음.
-- PyPI 게시, 실제 Windows/macOS GUI, 물리 GPU 검증은 아직 수행하지 않음.
+- Windows 실제 Qt GUI와 물리 GPU 검증은 [별도 결과](WINDOWS_RESULTS.md)에 기록함.
+- PyPI 게시와 실제 macOS GUI 검증은 아직 수행하지 않음.
   upstream renderer가 macOS/Metal을 실험적 지원으로 명시함.
 
 한 패널의 plot/scatter/imshow가 현재 고수준 Python API입니다. 다중 패널과

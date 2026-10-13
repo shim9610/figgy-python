@@ -25,8 +25,9 @@ python examples/quickstart.py
 Windows PowerShell에서는 활성화 명령을 `.venv\Scripts\Activate.ps1`로 바꿉니다.
 Windows는 MSVC Build Tools의 C++ 개발 도구, macOS는 Xcode Command Line Tools,
 Linux는 C/C++ 빌드 도구가 필요합니다. 렌더링에는 사용할 수 있는 그래픽 드라이버
-(Windows/DX12, Linux/Vulkan, macOS/Metal)가 필요합니다. macOS/Metal은 upstream에서
-실험적 지원입니다. 현재 실제 실행 검증은 Linux에서 완료했습니다.
+(Windows/Vulkan·DX12, Linux/Vulkan, macOS/Metal)가 필요합니다. macOS/Metal은 upstream에서
+실험적 지원입니다. 실제 실행 검증은 Linux와 Windows에서 완료했으며,
+Windows/RTX 4070 Ti의 Vulkan 실행 결과는 [Windows 벤치마크](benchmarks/WINDOWS_RESULTS.md)에 기록했습니다.
 
 예제는 `signal.png`를 저장하고 객체를 선택·편집할 수 있는 창을 엽니다.
 노트북을 실행할 환경이 없다면 아래 명령으로 JupyterLab을 설치하고 예제를 엽니다.
@@ -101,6 +102,8 @@ fig.close()            # native resources와 연결된 UI 해제
 - `figsize`는 inch, `dpi`는 논리 캔버스 해상도입니다. `linewidth`, `markersize`, `fontsize`는
   point, scatter의 `s`는 point²이며 native pixel/radius로 변환합니다.
 - 제목·축 제목·범례·축 범위·그리드, 선/점 스타일, renderer 색상표.
+- `set_xscale('log')`, `set_yscale('log')`와 선형 축 복원. 로그 축으로 바꾸기 전에
+  `set_xlim`/`set_ylim`으로 양수 범위를 설정합니다.
 - SSOT 전체 설정 읽기·교체, 안정적인 대상 ID 편집, 배치 이동·크기 조정.
 - PNG bytes, `savefig`, 완료된 RGBA readback.
 - anywidget 노트북 내부 편집과 QtWebEngine 데스크톱 창.
@@ -158,10 +161,10 @@ native RGBA 벤치마크에 추가됩니다. 이는 GPU surface 직접 표시의
 벤치마크는 초기화, 데이터 등록/fit, 첫 draw, 반복 draw, 축/스타일 편집, PNG 저장,
 worker 전체 peak RSS를 분리합니다. 입력 생성과 import는 타이밍에서 제외하며 각
 백엔드를 독립 프로세스에서 실행합니다. matplotlib 기본 단순화와 단순화 해제 결과를
-분리하고, pyqtgraph 기본 QPainter와 AA 설정도 구분합니다. 실패/timeout 행을 보존합니다.
+분리하고, pyqtgraph OpenGL 표시와 QPainter/AA 설정도 구분합니다. 실패/timeout 행을 보존합니다.
 
 ```bash
-python -m pip install '.[benchmark]'
+python -m pip install '.[benchmark,benchmark-gpu]'
 python benchmarks/compare.py --sizes 100000 1000000 5000000 \
   --kinds line scatter --signals smooth noisy --repeats 3 \
   --output benchmarks/results/my-machine.json
@@ -171,6 +174,14 @@ python benchmarks/compare.py --sizes 100000 1000000 5000000 \
 Vulkan, CPU quota 4 cores**이며 물리 GPU 성능을 입증하지 않습니다. 같은 스크립트를
 Windows/DX12, macOS/Metal, Linux/Vulkan의 실제 하드웨어에서 실행할 수 있습니다.
 렌더러가 macOS/Metal을 실험적 지원으로 명시하므로 해당 검증은 별도로 필요합니다.
+
+기본 비교에는 fastplotlib, VisPy와 `useOpenGL=True`의 실제 pyqtgraph OpenGL 렌더를
+포함합니다. GPU 좌표 정밀도와 AA 방식은 라이브러리마다 다르며, Windows의 확장 비교는
+[GPU 라이브러리 벤치마크](benchmarks/WINDOWS_GPU_RESULTS.md)에 기록했습니다.
+
+`benchmarks/plot_results.py`는 결과 JSON의 비교 그래프도 Figgy로 렌더합니다.
+현재 한 패널 API로 네 차트를 각각 그린 뒤 완성된 이미지를 배치하며, PNG와
+PNG를 내장한 SVG를 저장합니다. 그래프를 그리는 데 matplotlib를 사용하지 않습니다.
 
 ## 검증과 wheel
 

@@ -1,0 +1,77 @@
+{
+  "chart_renderer": "figgy / native figgy-renderer",
+  "figgy_python_version": "0.1.0",
+  "composition": "Pillow pastes completed Figgy RGBA pixels and encodes PNG; no chart drawing",
+  "svg": "embedded PNG, not vector export",
+  "subtitle": "CPU Vulkan / llvmpipe, 4-core CPU quota, 960 x 600 RGBA readback",
+  "panels": [
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "successful_rows": 12,
+      "failed_rows": 0,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "comparison-line-smooth.png"
+    },
+    {
+      "kind": "line",
+      "signal": "noisy",
+      "successful_rows": 11,
+      "failed_rows": 1,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "comparison-line-noisy.png"
+    },
+    {
+      "kind": "scatter",
+      "signal": "noisy",
+      "successful_rows": 6,
+      "failed_rows": 0,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "comparison-scatter-noisy.png"
+    },
+    {
+      "kind": "heatmap",
+      "signal": "smooth",
+      "successful_rows": 6,
+      "failed_rows": 0,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "NVIDIA GeForce RTX 4070 Ti"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "comparison-heatmap-smooth.png"
+    }
+  ]
+}
