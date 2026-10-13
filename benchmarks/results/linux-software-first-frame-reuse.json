@@ -1,0 +1,2340 @@
+{
+  "metric": "completed first RGBA; initialize + registration/fit + render/readback",
+  "os": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "python": "3.12.14",
+  "figgy_version": "0.2.0",
+  "repeats": 5,
+  "following_per_process": 3,
+  "input_dtype": "float64",
+  "size_px": [
+    960,
+    600
+  ],
+  "explicit_prepare": false,
+  "automatic_downsampling": false,
+  "driver_cache_cleared": false,
+  "import_and_input_creation_timed": false,
+  "modes": "shared retains context after close; reset calls release_gpu after each close",
+  "runs": [
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07493204699858325,
+          "register_and_fit_s": 0.09145378600078402,
+          "first_draw_s": 0.11360972599868546,
+          "first_frame_total_s": 0.27999555899805273,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002842879985109903,
+          "register_and_fit_s": 0.0106374169990886,
+          "first_draw_s": 0.06682368800102267,
+          "first_frame_total_s": 0.07774539299862226,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.000265539998508757,
+          "register_and_fit_s": 0.011420160000852775,
+          "first_draw_s": 0.0642862780005089,
+          "first_frame_total_s": 0.07597197799987043,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00033128900031442754,
+          "register_and_fit_s": 0.011886492000485305,
+          "first_draw_s": 0.06339643500177772,
+          "first_frame_total_s": 0.07561421600257745,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07553802500115125,
+          "register_and_fit_s": 0.0909446100013156,
+          "first_draw_s": 0.10194539300209726,
+          "first_frame_total_s": 0.2684280280045641,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03708126399942557,
+          "register_and_fit_s": 0.09570130900101503,
+          "first_draw_s": 0.10365103599906433,
+          "first_frame_total_s": 0.23643360899950494,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03364966899971478,
+          "register_and_fit_s": 0.10116695599936065,
+          "first_draw_s": 0.11386826499801828,
+          "first_frame_total_s": 0.2486848899970937,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.032425106001028325,
+          "register_and_fit_s": 0.08356042599916691,
+          "first_draw_s": 0.11473029099943233,
+          "first_frame_total_s": 0.23071582299962756,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.09715707099894644,
+          "register_and_fit_s": 0.09020563300146023,
+          "first_draw_s": 0.12220386199987843,
+          "first_frame_total_s": 0.3095665660002851,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03580471299937926,
+          "register_and_fit_s": 0.08987942599924281,
+          "first_draw_s": 0.11915238299843622,
+          "first_frame_total_s": 0.2448365219970583,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03474552300031064,
+          "register_and_fit_s": 0.08743905300070764,
+          "first_draw_s": 0.09955904099842883,
+          "first_frame_total_s": 0.2217436169994471,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03604742900279234,
+          "register_and_fit_s": 0.08654558800117229,
+          "first_draw_s": 0.1177390499979083,
+          "first_frame_total_s": 0.24033206700187293,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07911622100073146,
+          "register_and_fit_s": 0.09315627900286927,
+          "first_draw_s": 0.11196732899770723,
+          "first_frame_total_s": 0.28423982900130795,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00028821399973821826,
+          "register_and_fit_s": 0.008485934002237627,
+          "first_draw_s": 0.089561277996836,
+          "first_frame_total_s": 0.09833542599881184,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002886239999497775,
+          "register_and_fit_s": 0.012460083999030758,
+          "first_draw_s": 0.08048226200116915,
+          "first_frame_total_s": 0.09323097000014968,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002672419977898244,
+          "register_and_fit_s": 0.010926025999651756,
+          "first_draw_s": 0.08640468600060558,
+          "first_frame_total_s": 0.09759795399804716,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.08194766800079378,
+          "register_and_fit_s": 0.0898092009992979,
+          "first_draw_s": 0.10750931299844524,
+          "first_frame_total_s": 0.2792661819985369,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002691449990379624,
+          "register_and_fit_s": 0.010313343998859636,
+          "first_draw_s": 0.07622938100030296,
+          "first_frame_total_s": 0.08681186999820056,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002954440024041105,
+          "register_and_fit_s": 0.012652935001824517,
+          "first_draw_s": 0.09442053599923383,
+          "first_frame_total_s": 0.10736891500346246,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00029560500115621835,
+          "register_and_fit_s": 0.010813387001689989,
+          "first_draw_s": 0.08841263300200808,
+          "first_frame_total_s": 0.09952162500485429,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.08893118999912986,
+          "register_and_fit_s": 0.08706962699943688,
+          "first_draw_s": 0.1113273940027284,
+          "first_frame_total_s": 0.28732821100129513,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03412313200169592,
+          "register_and_fit_s": 0.08749494699804927,
+          "first_draw_s": 0.10493175299779978,
+          "first_frame_total_s": 0.22654983199754497,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03811170600238256,
+          "register_and_fit_s": 0.09159265400012373,
+          "first_draw_s": 0.09749892000036198,
+          "first_frame_total_s": 0.22720328000286827,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03260870200028876,
+          "register_and_fit_s": 0.08851653499732492,
+          "first_draw_s": 0.09466112399968551,
+          "first_frame_total_s": 0.2157863609972992,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.08420362700053374,
+          "register_and_fit_s": 0.08875447000173153,
+          "first_draw_s": 0.10592454400102724,
+          "first_frame_total_s": 0.2788826410032925,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03668798000217066,
+          "register_and_fit_s": 0.08929210900168982,
+          "first_draw_s": 0.11875635100295767,
+          "first_frame_total_s": 0.24473644000681816,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.035130697000568034,
+          "register_and_fit_s": 0.08353386499948101,
+          "first_draw_s": 0.11264380400098162,
+          "first_frame_total_s": 0.23130836600103066,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03175752300012391,
+          "register_and_fit_s": 0.07807460600088234,
+          "first_draw_s": 0.1124493409988645,
+          "first_frame_total_s": 0.22228146999987075,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07905178600049112,
+          "register_and_fit_s": 0.08666044499841519,
+          "first_draw_s": 0.11047539100036374,
+          "first_frame_total_s": 0.27618762199927005,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00026697199791669846,
+          "register_and_fit_s": 0.011224719000892946,
+          "first_draw_s": 0.0829767469986109,
+          "first_frame_total_s": 0.09446843799742055,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002715779992286116,
+          "register_and_fit_s": 0.008267488999990746,
+          "first_draw_s": 0.08592208800109802,
+          "first_frame_total_s": 0.09446115500031738,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00031875999775365926,
+          "register_and_fit_s": 0.0077656030007347,
+          "first_draw_s": 0.08557346499947016,
+          "first_frame_total_s": 0.09365782799795852,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.08430374799718265,
+          "register_and_fit_s": 0.0886934990012378,
+          "first_draw_s": 0.10768813699905877,
+          "first_frame_total_s": 0.2806853839974792,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00027921999935642816,
+          "register_and_fit_s": 0.00791049300096347,
+          "first_draw_s": 0.08361240399972303,
+          "first_frame_total_s": 0.09180211700004293,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00027280100039206445,
+          "register_and_fit_s": 0.0075938059999316465,
+          "first_draw_s": 0.08722129300076631,
+          "first_frame_total_s": 0.09508790000109002,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0003367460012668744,
+          "register_and_fit_s": 0.007548196997959167,
+          "first_draw_s": 0.08535683800073457,
+          "first_frame_total_s": 0.09324178099996061,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.08039443699817639,
+          "register_and_fit_s": 0.09728560599978664,
+          "first_draw_s": 0.12276152699996601,
+          "first_frame_total_s": 0.30044156999792904,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03866508999999496,
+          "register_and_fit_s": 0.11280281300059869,
+          "first_draw_s": 0.10406380399945192,
+          "first_frame_total_s": 0.25553170700004557,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0333475150000595,
+          "register_and_fit_s": 0.08657690300242393,
+          "first_draw_s": 0.11525033099678694,
+          "first_frame_total_s": 0.23517474899927038,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03598555400094483,
+          "register_and_fit_s": 0.0849178819989902,
+          "first_draw_s": 0.11066806700182497,
+          "first_frame_total_s": 0.23157150300176,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "e8fd63c86fb322fe09836f75fa2b8f5f5c6240cb086b87dfc6b74d07f93bee67",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06598922700140974,
+          "register_and_fit_s": 0.16146031799871707,
+          "first_draw_s": 0.5997446059991489,
+          "first_frame_total_s": 0.8271941509992757,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00026482800240046345,
+          "register_and_fit_s": 0.07647721799730789,
+          "first_draw_s": 0.60377410199726,
+          "first_frame_total_s": 0.6805161479969684,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002782890005619265,
+          "register_and_fit_s": 0.06858817499960423,
+          "first_draw_s": 0.5615857699995104,
+          "first_frame_total_s": 0.6304522339996765,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00028352699882816523,
+          "register_and_fit_s": 0.06779144599931897,
+          "first_draw_s": 0.5923828900013177,
+          "first_frame_total_s": 0.6604578629994649,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06239590999757638,
+          "register_and_fit_s": 0.15668390000064392,
+          "first_draw_s": 0.6025665909983218,
+          "first_frame_total_s": 0.8216464009965421,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03385141000035219,
+          "register_and_fit_s": 0.15187294800125528,
+          "first_draw_s": 0.6057060550010647,
+          "first_frame_total_s": 0.7914304130026721,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03821216000142158,
+          "register_and_fit_s": 0.16329421100090258,
+          "first_draw_s": 0.5703207509977801,
+          "first_frame_total_s": 0.7718271220001043,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03335539600084303,
+          "register_and_fit_s": 0.1506734510003298,
+          "first_draw_s": 0.5664911950007081,
+          "first_frame_total_s": 0.7505200420018809,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06861795600343612,
+          "register_and_fit_s": 0.1418060539981525,
+          "first_draw_s": 0.5637155059994257,
+          "first_frame_total_s": 0.7741395160010143,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.033577588001207914,
+          "register_and_fit_s": 0.14348959299968556,
+          "first_draw_s": 0.5973385630022676,
+          "first_frame_total_s": 0.7744057440031611,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.035517186999641126,
+          "register_and_fit_s": 0.15006988199820626,
+          "first_draw_s": 0.5233029279988841,
+          "first_frame_total_s": 0.7088899969967315,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03789056900131982,
+          "register_and_fit_s": 0.15627728500112426,
+          "first_draw_s": 0.6057922840009269,
+          "first_frame_total_s": 0.799960138003371,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07487989199944423,
+          "register_and_fit_s": 0.1509925199970894,
+          "first_draw_s": 0.5264837710019492,
+          "first_frame_total_s": 0.7523561829984828,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00031740799749968573,
+          "register_and_fit_s": 0.0719754509991617,
+          "first_draw_s": 0.46147389500038116,
+          "first_frame_total_s": 0.5337667539970425,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.000306490997900255,
+          "register_and_fit_s": 0.06628116600040812,
+          "first_draw_s": 0.45753694900122355,
+          "first_frame_total_s": 0.5241246059995319,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0004934930002491456,
+          "register_and_fit_s": 0.05416373300249688,
+          "first_draw_s": 0.4623932729991793,
+          "first_frame_total_s": 0.5170504990019253,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06372147499860148,
+          "register_and_fit_s": 0.15011781299836002,
+          "first_draw_s": 0.49434781899981317,
+          "first_frame_total_s": 0.7081871069967747,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00027114800104754977,
+          "register_and_fit_s": 0.06848773199817515,
+          "first_draw_s": 0.42724383200038574,
+          "first_frame_total_s": 0.49600271199960844,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002873519988497719,
+          "register_and_fit_s": 0.06693934799841372,
+          "first_draw_s": 0.4364728479995392,
+          "first_frame_total_s": 0.5036995479968027,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0003514679992804304,
+          "register_and_fit_s": 0.06744500399872777,
+          "first_draw_s": 0.4369850079965545,
+          "first_frame_total_s": 0.5047814799945627,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06676389899803326,
+          "register_and_fit_s": 0.15520684399962192,
+          "first_draw_s": 0.5878685520001454,
+          "first_frame_total_s": 0.8098392949978006,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03297617000134778,
+          "register_and_fit_s": 0.1506076990008296,
+          "first_draw_s": 0.6008830600003421,
+          "first_frame_total_s": 0.7844669290025195,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0331691100000171,
+          "register_and_fit_s": 0.1598076209993451,
+          "first_draw_s": 0.5769152749999193,
+          "first_frame_total_s": 0.7698920059992815,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.030650757002149476,
+          "register_and_fit_s": 0.15670539799975813,
+          "first_draw_s": 0.5159097789983207,
+          "first_frame_total_s": 0.7032659340002283,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07901994299754733,
+          "register_and_fit_s": 0.14799662199948216,
+          "first_draw_s": 0.5857626220022212,
+          "first_frame_total_s": 0.8127791869992507,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03219078499751049,
+          "register_and_fit_s": 0.14332640300199273,
+          "first_draw_s": 0.6676271899996209,
+          "first_frame_total_s": 0.8431443779991241,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.030775433999224333,
+          "register_and_fit_s": 0.16038071299772128,
+          "first_draw_s": 0.5899307229992701,
+          "first_frame_total_s": 0.7810868699962157,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02913056599936681,
+          "register_and_fit_s": 0.13544421000187867,
+          "first_draw_s": 0.5948582640012319,
+          "first_frame_total_s": 0.7594330400024774,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0695260499996948,
+          "register_and_fit_s": 0.1464090400004352,
+          "first_draw_s": 0.5911295879996032,
+          "first_frame_total_s": 0.8070646779997332,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002642270010255743,
+          "register_and_fit_s": 0.0573028910002904,
+          "first_draw_s": 0.6092187380018004,
+          "first_frame_total_s": 0.6667858560031164,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00026614099988364615,
+          "register_and_fit_s": 0.06604108100145822,
+          "first_draw_s": 0.5532995149987983,
+          "first_frame_total_s": 0.6196067370001401,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002895860015996732,
+          "register_and_fit_s": 0.056485441000404535,
+          "first_draw_s": 0.5408234559981793,
+          "first_frame_total_s": 0.5975984830001835,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06052819500109763,
+          "register_and_fit_s": 0.15775304099952336,
+          "first_draw_s": 0.5786503790004645,
+          "first_frame_total_s": 0.7969316150010854,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002920199985965155,
+          "register_and_fit_s": 0.0714389940003457,
+          "first_draw_s": 0.5617292850001832,
+          "first_frame_total_s": 0.6334602989991254,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002659700003277976,
+          "register_and_fit_s": 0.06657266999900457,
+          "first_draw_s": 0.5638401719988906,
+          "first_frame_total_s": 0.630678811998223,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00029702700339839794,
+          "register_and_fit_s": 0.06060059399897,
+          "first_draw_s": 0.597123517,
+          "first_frame_total_s": 0.6580211380023684,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07525865099887596,
+          "register_and_fit_s": 0.1431908279992058,
+          "first_draw_s": 0.5057526740019966,
+          "first_frame_total_s": 0.7242021530000784,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03517803399881814,
+          "register_and_fit_s": 0.14302571000007447,
+          "first_draw_s": 0.5294092900003307,
+          "first_frame_total_s": 0.7076130339992233,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.031600467998941895,
+          "register_and_fit_s": 0.15473924600155442,
+          "first_draw_s": 0.562106273999234,
+          "first_frame_total_s": 0.7484459879997303,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03355952700076159,
+          "register_and_fit_s": 0.1429455789984786,
+          "first_draw_s": 0.5691202790003445,
+          "first_frame_total_s": 0.7456253849995846,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "09438bf71801bd8e125d52ba9b7248585d8fee0c3baaf641d588b62e72dd33ca",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05888345000130357,
+          "register_and_fit_s": 0.41272336700058077,
+          "first_draw_s": 2.884966178000468,
+          "first_frame_total_s": 3.3565729950023524,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002637170000525657,
+          "register_and_fit_s": 0.30493698899954325,
+          "first_draw_s": 2.807670533999044,
+          "first_frame_total_s": 3.11287123999864,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00027088799834018573,
+          "register_and_fit_s": 0.3543985759970383,
+          "first_draw_s": 2.962111189997813,
+          "first_frame_total_s": 3.3167806539931917,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00026951499967253767,
+          "register_and_fit_s": 0.3259473830003117,
+          "first_draw_s": 2.8015229440024996,
+          "first_frame_total_s": 3.127739842002484,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05617375400106539,
+          "register_and_fit_s": 0.44200712900055805,
+          "first_draw_s": 3.052617335000832,
+          "first_frame_total_s": 3.5507982180024555,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.036145910002232995,
+          "register_and_fit_s": 0.41516941000008956,
+          "first_draw_s": 2.261656333001156,
+          "first_frame_total_s": 2.7129716530034784,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03250557499995921,
+          "register_and_fit_s": 0.47227004500018666,
+          "first_draw_s": 2.885296312000719,
+          "first_frame_total_s": 3.3900719320008648,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03287931999875582,
+          "register_and_fit_s": 0.41868304000308854,
+          "first_draw_s": 2.8279580660018837,
+          "first_frame_total_s": 3.279520426003728,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05649817899757181,
+          "register_and_fit_s": 0.4111779340018984,
+          "first_draw_s": 2.342020534000767,
+          "first_frame_total_s": 2.809696647000237,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.032420581999758724,
+          "register_and_fit_s": 0.4575753939971037,
+          "first_draw_s": 3.0160330280014023,
+          "first_frame_total_s": 3.5060290039982647,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03271520799899008,
+          "register_and_fit_s": 0.4370971169992117,
+          "first_draw_s": 2.909027226996841,
+          "first_frame_total_s": 3.3788395519950427,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.037733920999016846,
+          "register_and_fit_s": 0.4879881339984422,
+          "first_draw_s": 3.0215176259989676,
+          "first_frame_total_s": 3.5472396809964266,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0586489259985683,
+          "register_and_fit_s": 0.4646932889991149,
+          "first_draw_s": 2.9387175390002085,
+          "first_frame_total_s": 3.4620597539978917,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.000264047001110157,
+          "register_and_fit_s": 0.33817261799777043,
+          "first_draw_s": 2.916740091997781,
+          "first_frame_total_s": 3.2551767569966614,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00028549900162033737,
+          "register_and_fit_s": 0.3232854750021943,
+          "first_draw_s": 3.0013993669999763,
+          "first_frame_total_s": 3.324970341003791,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0003841879988613073,
+          "register_and_fit_s": 0.29194576000008965,
+          "first_draw_s": 2.9244605010026135,
+          "first_frame_total_s": 3.2167904490015644,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05910980800035759,
+          "register_and_fit_s": 0.42668210199917667,
+          "first_draw_s": 2.899505016001058,
+          "first_frame_total_s": 3.385296926000592,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00028046200168319046,
+          "register_and_fit_s": 0.35282182800074224,
+          "first_draw_s": 2.241174015998695,
+          "first_frame_total_s": 2.5942763060011202,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0003820349993475247,
+          "register_and_fit_s": 0.26867457200205536,
+          "first_draw_s": 2.0977984070013918,
+          "first_frame_total_s": 2.3668550140027946,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00036299599742051214,
+          "register_and_fit_s": 0.32902760899742134,
+          "first_draw_s": 2.126508729001216,
+          "first_frame_total_s": 2.455899333996058,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06156809299864108,
+          "register_and_fit_s": 0.4523743239988107,
+          "first_draw_s": 2.9119790549993922,
+          "first_frame_total_s": 3.425921471996844,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.036111379999056226,
+          "register_and_fit_s": 0.44039288600106374,
+          "first_draw_s": 2.9567966690010508,
+          "first_frame_total_s": 3.4333009350011707,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.034414601999742445,
+          "register_and_fit_s": 0.433577552998031,
+          "first_draw_s": 2.8473827419984445,
+          "first_frame_total_s": 3.315374896996218,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.033929252000234555,
+          "register_and_fit_s": 0.4013703029995668,
+          "first_draw_s": 2.855776430998958,
+          "first_frame_total_s": 3.2910759859987593,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05644616700010374,
+          "register_and_fit_s": 0.46643000099720666,
+          "first_draw_s": 2.205590868998115,
+          "first_frame_total_s": 2.7284670369954256,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03615446700132452,
+          "register_and_fit_s": 0.4567488280008547,
+          "first_draw_s": 2.283435768000345,
+          "first_frame_total_s": 2.776339063002524,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03244450900092488,
+          "register_and_fit_s": 0.42663637299847323,
+          "first_draw_s": 2.5209416069992585,
+          "first_frame_total_s": 2.9800224889986566,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.036787977998756105,
+          "register_and_fit_s": 0.4508347219998541,
+          "first_draw_s": 2.8140632229988114,
+          "first_frame_total_s": 3.3016859229974216,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.055246381998586,
+          "register_and_fit_s": 0.40896307900038664,
+          "first_draw_s": 2.8135635549988365,
+          "first_frame_total_s": 3.277773015997809,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002931709968834184,
+          "register_and_fit_s": 0.31711794800139614,
+          "first_draw_s": 3.087542671000847,
+          "first_frame_total_s": 3.4049537899991265,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00029102799817337655,
+          "register_and_fit_s": 0.35968182200304,
+          "first_draw_s": 2.641757362001954,
+          "first_frame_total_s": 3.0017302120031673,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002897459999076091,
+          "register_and_fit_s": 0.3232020619980176,
+          "first_draw_s": 2.144717490999028,
+          "first_frame_total_s": 2.4682092989969533,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05667188100051135,
+          "register_and_fit_s": 0.43365230899871676,
+          "first_draw_s": 2.906906069998513,
+          "first_frame_total_s": 3.397230259997741,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00027304999821353704,
+          "register_and_fit_s": 0.3177669339966087,
+          "first_draw_s": 2.9396758650000265,
+          "first_frame_total_s": 3.257715848994849,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002634759985085111,
+          "register_and_fit_s": 0.3311657099984586,
+          "first_draw_s": 2.728725865999877,
+          "first_frame_total_s": 3.060155051996844,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00027208999745198525,
+          "register_and_fit_s": 0.3426562320019002,
+          "first_draw_s": 2.207708071000525,
+          "first_frame_total_s": 2.550636392999877,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07760492600209545,
+          "register_and_fit_s": 0.45904954700017697,
+          "first_draw_s": 2.620867060999444,
+          "first_frame_total_s": 3.1575215340017166,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.037377890999778174,
+          "register_and_fit_s": 0.4605932609993033,
+          "first_draw_s": 2.8522711420009728,
+          "first_frame_total_s": 3.3502422940000542,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.032714680000935914,
+          "register_and_fit_s": 0.44544093800141127,
+          "first_draw_s": 2.896493446001841,
+          "first_frame_total_s": 3.3746490640041884,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.03215498700228636,
+          "register_and_fit_s": 0.42366694399970584,
+          "first_draw_s": 2.9468920870021975,
+          "first_frame_total_s": 3.4027140180041897,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "ceadec57bb8c7cecab8b71cb53be0ec98d37d2fd90f580d4a85a52d6715e345a",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    }
+  ],
+  "summary": [
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.08117105249948509,
+          "register_and_fit_s": 0.09000741700037906,
+          "first_draw_s": 0.11090139250154607,
+          "first_frame_total_s": 0.280340471497766
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.0002842879985109903,
+          "register_and_fit_s": 0.0106374169990886,
+          "first_draw_s": 0.08535683800073457,
+          "first_frame_total_s": 0.09365782799795852
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.035130697000568034,
+          "register_and_fit_s": 0.08749494699804927,
+          "first_draw_s": 0.1124493409988645,
+          "first_frame_total_s": 0.23157150300176
+        }
+      },
+      "shared_vs_process_first_speedup": 2.993241221693467,
+      "shared_vs_reset_following_speedup": 2.472526941440577,
+      "paired_following_speedups": [
+        3.112116009404259,
+        2.4624703403790793,
+        2.276387990916494,
+        2.4487141407518624,
+        2.5222035280446833
+      ],
+      "paired_following_speedup_median": 2.4624703403790793
+    },
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.06769092750073469,
+          "register_and_fit_s": 0.1505551664977247,
+          "first_draw_s": 0.5822065005013428,
+          "first_frame_total_s": 0.8019981465004093
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.0002873519988497719,
+          "register_and_fit_s": 0.06693934799841372,
+          "first_draw_s": 0.5532995149987983,
+          "first_frame_total_s": 0.6196067370001401
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.03335539600084303,
+          "register_and_fit_s": 0.1506734510003298,
+          "first_draw_s": 0.5769152749999193,
+          "first_frame_total_s": 0.7698920059992815
+        }
+      },
+      "shared_vs_process_first_speedup": 1.2943664079305,
+      "shared_vs_reset_following_speedup": 1.2425494430979813,
+      "paired_following_speedups": [
+        1.1686243214591416,
+        1.4775222058623454,
+        1.5284746811092402,
+        1.2606171356010272,
+        1.1770672703209364
+      ],
+      "paired_following_speedup_median": 1.2606171356010272
+    },
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.057660403499539825,
+          "register_and_fit_s": 0.4378297189996374,
+          "first_draw_s": 2.892235597000763,
+          "first_frame_total_s": 3.3709349605014722
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.00028046200168319046,
+          "register_and_fit_s": 0.3259473830003117,
+          "first_draw_s": 2.8015229440024996,
+          "first_frame_total_s": 3.11287123999864
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.033929252000234555,
+          "register_and_fit_s": 0.44039288600106374,
+          "first_draw_s": 2.855776430998958,
+          "first_frame_total_s": 3.3502422940000542
+        }
+      },
+      "shared_vs_process_first_speedup": 1.0829021506533452,
+      "shared_vs_reset_following_speedup": 1.076254697255489,
+      "paired_following_speedups": [
+        1.0485272406492956,
+        1.077062557805017,
+        1.3499636777056676,
+        0.9927682631444669,
+        1.102770613470101
+      ],
+      "paired_following_speedup_median": 1.077062557805017
+    }
+  ],
+  "cross_process_reset_shared_pixels_identical": true,
+  "implementation_git_commit": "cb252ebc9bb82e40fda1b4060d06e6789b38b562"
+}

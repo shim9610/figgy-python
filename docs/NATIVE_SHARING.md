@@ -73,3 +73,8 @@ Jupyter remains a separate browser GPU domain, with one upstream `FiggyChart`
 device/pool per view. Native global sharing does not share kernel/browser memory
 or alter notebook binary transfers. Disk shader-cache persistence is also
 separate and remains unsupported by the current renderer API.
+
+The [first-frame experiment](../benchmarks/FIRST_FRAME_REUSE_RESULTS.md) measures
+new Figures without explicit preparation, including upload/fit and completed
+RGBA readback. It separates process-first, reset-following and shared-following
+costs; constructor timing alone is not treated as first-frame performance.
