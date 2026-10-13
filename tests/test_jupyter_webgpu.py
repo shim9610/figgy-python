@@ -1,0 +1,111 @@
+"""Real JupyterLab/comm/WASM/WebGPU integration. Opt in with FIGGY_TEST_JUPYTER=1."""
+import json,os,shutil,socket,subprocess,sys,time,urllib.request,uuid,io
+from pathlib import Path
+import numpy as np
+import pytest
+
+@pytest.mark.skipif(os.environ.get('FIGGY_TEST_JUPYTER')!='1',reason='set FIGGY_TEST_JUPYTER=1 for real JupyterLab/WebGPU integration')
+def test_jupyter_webgpu_binary_edit_sync_export(tmp_path):
+    pytest.importorskip('playwright');nbformat=pytest.importorskip('nbformat')
+    from playwright.sync_api import sync_playwright
+    from jupyter_client import BlockingKernelClient
+    from PIL import Image
+    runtime=tmp_path/'runtime';runtime.mkdir()
+    with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+    source='''import importlib
+import numpy as np
+import figgy
+# Prove that Figure creation never initializes the kernel's native GPU.
+module = importlib.import_module("figgy.figure")
+module.NativeFigure = lambda *a: (_ for _ in ()).throw(RuntimeError("kernel GPU forbidden"))
+fig, ax = figgy.subplots(backend="webgpu")
+x = np.linspace(0, 10, 100_000, dtype=np.float32)
+ax.plot(x, np.sin(x), id="signal")
+ax.set_title("WASM title")
+widget = fig.widget()
+display(widget)'''
+    nbformat.write(nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell(source)],metadata={'kernelspec':{'display_name':'Python 3','language':'python','name':'python3'}}),tmp_path/'check.ipynb')
+    env=dict(os.environ,JUPYTER_RUNTIME_DIR=str(runtime))
+    log=open(tmp_path/'server.log','w')
+    server=subprocess.Popen([sys.executable,'-m','jupyterlab','--no-browser','--expose-app-in-browser','--ip=127.0.0.1',f'--port={port}',f'--ServerApp.root_dir={tmp_path}',"--IdentityProvider.token="],env=env,stdout=log,stderr=subprocess.STDOUT)
+    base=f'http://127.0.0.1:{port}'
+    client=None
+    try:
+        deadline=time.monotonic()+40
+        while True:
+            try:urllib.request.urlopen(base+'/api/status',timeout=1).close();break
+            except Exception:
+                if time.monotonic()>deadline:raise RuntimeError((tmp_path/'server.log').read_text())
+                time.sleep(.1)
+        with sync_playwright() as p:
+            browser_env=dict(os.environ)
+            if os.environ.get('FIGGY_BROWSER_VK_DRIVER'):
+                browser_env['VK_DRIVER_FILES']=os.environ['FIGGY_BROWSER_VK_DRIVER']
+            browser=p.chromium.launch(headless=os.environ.get('FIGGY_TEST_HEADFUL')!='1',env=browser_env,executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),args=['--no-sandbox','--enable-unsafe-webgpu','--use-angle=vulkan','--enable-features=Vulkan','--disable-vulkan-surface'])
+            context=browser.new_context(viewport={'width':1500,'height':1000},permissions=['clipboard-read','clipboard-write'],accept_downloads=True)
+            context.route('https://**/*',lambda route:route.abort())
+            page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+            page.goto(base+'/lab/workspaces/'+uuid.uuid4().hex+'/tree/check.ipynb')
+            page.locator('.jp-CodeCell .cm-content').filter(has_text='kernel GPU forbidden').wait_for(timeout=45000)
+            page.wait_for_function('!!window.jupyterapp')
+            page.evaluate('''async()=>{const app=window.jupyterapp;await app.restored;const panel=app.shell.currentWidget;await panel.context.ready;await panel.sessionContext.ready;await app.commands.execute('notebook:run-all-cells');}''')
+            try:
+                page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes('resident')",timeout=30000)
+            except Exception:
+                page.screenshot(path=str(tmp_path/'failed.png'))
+                raise AssertionError(str(page.locator('.jp-OutputArea').all_text_contents()) + str(errors))
+            with urllib.request.urlopen(base+'/api/sessions') as response:session=next(s for s in json.load(response) if s['path']=='check.ipynb')
+            client=BlockingKernelClient(connection_file=str(runtime/f"kernel-{session['kernel']['id']}.json"));client.load_connection_file();client.start_channels()
+            def execute(code):
+                id=client.execute(code);messages=[]
+                while True:
+                    message=client.get_iopub_msg(timeout=30)
+                    if message.get('parent_header',{}).get('msg_id')!=id:continue
+                    if message['msg_type']=='error':raise AssertionError(message['content']['evalue'])
+                    if message['msg_type']=='stream':messages.append(message['content']['text'])
+                    if message['msg_type']=='status' and message['content']['execution_state']=='idle':return ''.join(messages)
+            root="document.querySelector('.figgy-editor').figgy"
+            stats=page.evaluate(root+'.stats')
+            assert stats['binary_upload_bytes']==800000 and stats['column_uploads']==2 and stats['png_exports']==0
+            assert 'True' in execute("print(widget.status == 'ready' and not fig._native.columns and not widget.columns)")
+            page.locator('[data-fields] input[type=text]').fill('WebGPU edited title');page.locator('[data-fields] input[type=text]').press('Tab')
+            page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'WebGPU edited title'")
+            assert 'WebGPU edited title' in execute("await fig.sync(); print(fig.to_code())")
+            # GPU picker and layout/drag stay inside the browser. The kernel has no GPU.
+            canvas=page.locator('.figgy-editor canvas');rect=canvas.bounding_box()
+            page.mouse.move(rect['x']+rect['width']/2,rect['y']+12);page.mouse.down()
+            page.mouse.move(rect['x']+rect['width']/2+20,rect['y']+18,steps=4);page.mouse.up()
+            page.wait_for_function(root+'.snapshot().config.chart_title.offset_x > 0')
+            execute("await fig.sync(); assert fig.get_settings()['config']['chart_title']['offset_x'] > 0")
+            page.locator('[data-target]').select_option('signal');page.locator('[data-fields] input[type=color]').fill('#ff0000');page.locator('[data-fields] input[type=color]').dispatch_event('change')
+            execute("await fig.sync(); assert fig.get_settings()['series'][0]['render_type']['Line']['line']['line_color']['r'] == 1")
+            # Inspect the actual composited canvas, not only export output.
+            page.evaluate('()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')
+            canvas_pixels=np.asarray(Image.open(io.BytesIO(canvas.screenshot())).convert('RGB'))
+            assert np.count_nonzero((canvas_pixels[:,:,0]>150)&(canvas_pixels[:,:,1]<100)&(canvas_pixels[:,:,2]<100))>100
+            # Initial picker hit at a real line point, through the actual browser GPU API.
+            picked=page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy,c=f.snapshot().config;return await f.pick(100,100,10000);}''')
+            assert picked is not None
+            page.locator('[data-copy]').click();page.wait_for_function("document.querySelector('.figgy-editor [data-code]').value.includes('fig.apply_settings')")
+            copied=page.evaluate('navigator.clipboard.readText()');assert 'fig.apply_settings' in copied
+            execute('exec('+repr(copied)+')')
+            assert page.evaluate(root+'.stats.png_exports')==0
+            assert page.evaluate(root+'.stats.column_uploads')==2
+            with page.expect_download() as download:page.locator('[data-save]').click()
+            download.value.save_as(tmp_path/'download.png');assert Image.open(tmp_path/'download.png').size==(960,600)
+            path=tmp_path/'kernel-export.png';execute(f"await fig.savefig_async({str(path)!r})")
+            assert Image.open(path).size==(960,600)
+            # A Python edit updates browser state without replaying the columns.
+            execute("ax.set_title('Python title')")
+            page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'Python title'")
+            final=page.evaluate(root+'.stats');assert final['column_uploads']==2 and final['png_exports']==2
+            (tmp_path/'browser-stats.json').write_text(json.dumps(final,indent=2))
+            page.screenshot(path=str(tmp_path/'webgpu.png'));assert not errors
+            assert page.locator('.figgy-error').inner_text()==''
+            browser.close()
+    finally:
+        if client:client.stop_channels()
+        server.terminate()
+        try:server.wait(timeout=15)
+        except subprocess.TimeoutExpired:server.kill();server.wait()
+        log.close()

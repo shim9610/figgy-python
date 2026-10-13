@@ -98,7 +98,7 @@ def json_bounds(fig, target):
 def test_widget_command_updates_native_state_and_png(plot):
     fig, ax = plot
     ax.scatter([0, 1, 2], [0, 1, 0], id="points")
-    widget = fig.widget()
+    widget = fig.widget(backend="png")
     before = widget.image
     widget._command(widget, {"action": "update", "target": "points", "properties": {"color": "red"}, "revision": fig.revision, "request_id": 3}, [])
     assert widget.state["last_request"] == 3

@@ -27,7 +27,7 @@ PANEL_SIZE = (960, 600)
 
 def header(subtitle):
     """Use native Figgy text for the overview heading too."""
-    with figgy.Figure(figsize=(16, 1.25), dpi=120) as fig:
+    with figgy.Figure(backend="native", figsize=(16, 1.25), dpi=120) as fig:
         ax = fig.axes[0]
         ax.set_title("Figgy Python vs Python plotting libraries", fontsize=20)
         ax.set_xlabel(subtitle, fontsize=12)
@@ -52,7 +52,7 @@ def header(subtitle):
 def panel(rows, kind, signal, title):
     matching = [row for row in rows if row["kind"] == kind and row["signal"] == signal]
     successful = [row for row in matching if row["status"] == "ok"]
-    with figgy.Figure(figsize=(8, 5), dpi=120) as fig:
+    with figgy.Figure(backend="native", figsize=(8, 5), dpi=120) as fig:
         ax = fig.axes[0]
         for backend, color in COLORS.items():
             # A failure breaks the line: never connect across a missing result.

@@ -1,5 +1,6 @@
 //! Python owns data input and UI; renderer models own accepted chart settings.
 use numpy::PyReadonlyArray1;
+use pyo3::sync::MutexExt;
 use pyo3::{
     exceptions::{PyMemoryError, PyRuntimeError, PyValueError},
     prelude::*,
@@ -21,7 +22,10 @@ use renderer::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 fn runtime(e: impl std::fmt::Display) -> PyErr {
     PyRuntimeError::new_err(e.to_string())
@@ -109,8 +113,9 @@ impl<T: Number> HiLoColumnSource for BorrowedColumn<'_, T> {
     }
 }
 
-#[pyclass(module = "figgy._native")]
-struct NativeFigure {
+struct FigureCore {
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
     renderer: Renderer,
     chart: Chart,
     chart_id: ChartId,
@@ -121,6 +126,8 @@ struct NativeFigure {
     adapter_info: Value,
     revision: u64,
     uploads: u64,
+    readbacks: u64,
+    png_encodes: u64,
     target: Option<RenderTarget>,
 }
 
@@ -136,8 +143,9 @@ struct RenderTarget {
     readback: wgpu::Buffer,
 }
 
-impl NativeFigure {
+impl FigureCore {
     fn render(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
+        self.readbacks += 1;
         let device = Arc::clone(self.renderer.device());
         let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
         let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
@@ -165,6 +173,9 @@ impl NativeFigure {
         rendered
     }
     fn render_inner(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
+        self.renderer
+            .ensure_target_format(wgpu::TextureFormat::Rgba8Unorm)
+            .map_err(runtime)?;
         if scale != 1.0 {
             return pollster::block_on(self.renderer.export_panel_rgba_with_clear_async(
                 &self.chart,
@@ -410,10 +421,7 @@ fn validate_config(config: &Config) -> PyResult<()> {
     Ok(())
 }
 
-#[pymethods]
-impl NativeFigure {
-    #[new]
-    #[pyo3(signature = (width=960, height=600, pool_bytes=8388608))]
+impl FigureCore {
     fn new(py: Python<'_>, width: u32, height: u32, pool_bytes: u64) -> PyResult<Self> {
         py.detach(move || {
             let instance = create_instance();
@@ -483,6 +491,8 @@ impl NativeFigure {
             add!(ColorBarLabelElement);
             add!(ColorBarTitleElement);
             Ok(Self {
+                instance,
+                adapter,
                 renderer,
                 chart,
                 chart_id,
@@ -495,6 +505,8 @@ impl NativeFigure {
                     "initial_pool_capacity_bytes": capacity, "maximum_column_pool_bytes": available.max_storage_buffer_binding_size}),
                 revision: 0,
                 uploads: 0,
+                readbacks: 0,
+                png_encodes: 0,
                 target: None,
             })
         })
@@ -671,7 +683,6 @@ impl NativeFigure {
         }
         self.commit_config(next.config().clone())
     }
-    #[pyo3(signature = (scale=1.0))]
     fn render_rgba<'py>(
         &mut self,
         py: Python<'py>,
@@ -683,11 +694,11 @@ impl NativeFigure {
         let image = py.detach(|| self.render(scale))?;
         Ok((image.width, image.height, PyBytes::new(py, &image.rgba)))
     }
-    #[pyo3(signature = (scale=1.0))]
     fn render_png<'py>(&mut self, py: Python<'py>, scale: f32) -> PyResult<Bound<'py, PyBytes>> {
         if !scale.is_finite() || !(0.25..=8.0).contains(&scale) {
             return Err(invalid("scale must be 0.25..8"));
         }
+        self.png_encodes += 1;
         let bytes = py.detach(|| {
             let image = self.render(scale)?;
             encode_png(&image).map_err(runtime)
@@ -730,7 +741,6 @@ impl NativeFigure {
             })
             .map(|h| format!("{h:?}")))
     }
-    #[pyo3(signature = (target, dx, dy, handle=None))]
     fn drag(&mut self, target: &str, dx: f32, dy: f32, handle: Option<&str>) -> PyResult<bool> {
         if !dx.is_finite() || !dy.is_finite() {
             return Err(invalid("drag must be finite"));
@@ -800,19 +810,108 @@ impl NativeFigure {
             u64::from(t.width) * u64::from(t.height) * 4
                 + u64::from(t.row_bytes) * u64::from(t.height)
         });
-        json!({"adapter": self.adapter_info, "revision": self.revision, "column_uploads": self.uploads, "columns": self.columns.len(),
+        json!({"adapter": self.adapter_info, "revision": self.revision, "column_uploads": self.uploads, "rgba_readbacks": self.readbacks, "png_encodes": self.png_encodes, "columns": self.columns.len(),
             "pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
             "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes, "allocation_mode": "resident"}).to_string()
     }
+}
+
+mod desktop;
+mod notebook;
+
+#[pyclass(module = "figgy._native")]
+struct NativeFigure {
+    core: Arc<Mutex<FigureCore>>,
+}
+
+impl NativeFigure {
+    fn lock(&self) -> PyResult<std::sync::MutexGuard<'_, FigureCore>> {
+        Python::attach(|py| self.core.lock_py_attached(py))
+            .map_err(|_| runtime("native Figure lock poisoned"))
+    }
+}
+#[pymethods]
+impl NativeFigure {
+    #[new]
+    #[pyo3(signature=(width=960, height=600, pool_bytes=8388608))]
+    fn new(py: Python<'_>, width: u32, height: u32, pool_bytes: u64) -> PyResult<Self> {
+        Ok(Self {
+            core: Arc::new(Mutex::new(FigureCore::new(py, width, height, pool_bytes)?)),
+        })
+    }
+    fn upload_column(&self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.lock()?.upload_column(id, array)
+    }
+    fn remove_column(&self, id: &str) -> PyResult<()> {
+        self.lock()?.remove_column(id)
+    }
+    fn settings_json(&self) -> PyResult<String> {
+        self.lock()?.settings_json()
+    }
+    fn add_series(&self, json: &str) -> PyResult<()> {
+        self.lock()?.add_series(json)
+    }
+    fn apply_settings(&self, json: &str) -> PyResult<()> {
+        self.lock()?.apply_settings(json)
+    }
+    fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
+        self.lock()?.fit(py, padding)
+    }
+    fn set_range(&self, axis: &str, min: f64, max: f64) -> PyResult<()> {
+        self.lock()?.set_range(axis, min, max)
+    }
+    fn bounds_json(&self, target: &str) -> PyResult<String> {
+        self.lock()?.bounds_json(target)
+    }
+    fn resize_handle(&self, target: &str, x: f32, y: f32) -> PyResult<Option<String>> {
+        self.lock()?.resize_handle(target, x, y)
+    }
+    #[pyo3(signature=(target, dx, dy, handle=None))]
+    fn drag(&self, target: &str, dx: f32, dy: f32, handle: Option<&str>) -> PyResult<bool> {
+        self.lock()?.drag(target, dx, dy, handle)
+    }
+    fn pick_json(&self, py: Python<'_>, x: f32, y: f32) -> PyResult<String> {
+        self.lock()?.pick_json(py, x, y)
+    }
+    fn clear_data_selection(&self) -> PyResult<()> {
+        self.lock()?.clear_data_selection()
+    }
+    #[pyo3(signature=(scale=1.0))]
+    fn render_rgba<'py>(
+        &self,
+        py: Python<'py>,
+        scale: f32,
+    ) -> PyResult<(u32, u32, Bound<'py, PyBytes>)> {
+        self.lock()?.render_rgba(py, scale)
+    }
+    #[pyo3(signature=(scale=1.0))]
+    fn render_png<'py>(&self, py: Python<'py>, scale: f32) -> PyResult<Bound<'py, PyBytes>> {
+        self.lock()?.render_png(py, scale)
+    }
+    fn hit_test(&self, x: f32, y: f32) -> PyResult<Option<String>> {
+        Ok(self.lock()?.hit_test(x, y))
+    }
+    fn info_json(&self) -> PyResult<String> {
+        Ok(self.lock()?.info_json())
+    }
     #[getter]
-    fn revision(&self) -> u64 {
-        self.revision
+    fn revision(&self) -> PyResult<u64> {
+        Ok(self.lock()?.revision)
+    }
+    #[pyo3(signature=(block=true))]
+    fn show(&self, py: Python<'_>, block: bool) -> PyResult<desktop::WindowHandle> {
+        let core = self.core.clone();
+        py.detach(move || desktop::show(core, block))
     }
 }
 
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NativeFigure>()?;
+    m.add_class::<notebook::NotebookFigure>()?;
+    m.add_class::<desktop::WindowHandle>()?;
+    m.add_function(wrap_pyfunction!(desktop::poll_events, m)?)?;
+    m.add_function(wrap_pyfunction!(desktop::run_events, m)?)?;
     m.add_function(wrap_pyfunction!(default_colorbar_json, m)?)?;
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
     Ok(())

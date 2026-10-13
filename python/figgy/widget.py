@@ -9,7 +9,7 @@ except ImportError as exc:
 from .editor import EditorSession
 
 
-class FigureWidget(anywidget.AnyWidget):
+class PNGFigureWidget(anywidget.AnyWidget):
     _esm = Path(__file__).with_name("editor.js")
     _css = Path(__file__).with_name("editor.css")
     state = traitlets.Dict().tag(sync=True)
@@ -41,5 +41,115 @@ class FigureWidget(anywidget.AnyWidget):
             self._handling = False
 
     def close(self):
+        self.figure._widgets.discard(self)
+        super().close()
+
+import asyncio
+import json
+import uuid
+
+class FigureWidget(anywidget.AnyWidget):
+    """Browser WebGPU host. Comm carries assets, binary columns and settings only."""
+    _esm = Path(__file__).with_name("webgpu.js")
+    _css = Path(__file__).with_name("editor.css")
+    state = traitlets.Dict().tag(sync=True)
+    manifest = traitlets.List().tag(sync=True)
+    columns = traitlets.List(traitlets.Bytes()).tag(sync=True)
+    wasm = traitlets.Bytes().tag(sync=True)
+    wasm_js = traitlets.Unicode().tag(sync=True)
+    status = traitlets.Unicode("initializing").tag(sync=True)
+    browser_info = traitlets.Dict().tag(sync=True)
+
+    def __init__(self, figure):
+        self.figure = figure
+        self._handling = False
+        self._pending = {}
+        self._clients = {}
+        self._ready_event = asyncio.Event()
+        self._closed = False
+        manifest, buffers = figure._native.payload()
+        assets = Path(__file__).with_name("assets")
+        super().__init__(manifest=manifest, columns=buffers,
+                         wasm=(assets / "figgy_bg.wasm").read_bytes(),
+                         wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"))
+        self.refresh()
+        self.on_msg(self._command)
+
+    def refresh(self):
+        if not self._handling:
+            self.state = {"settings": self.figure.get_settings(), "revision": self.figure.revision}
+
+    def _command(self, widget, content, buffers):
+        action = content.get("action")
+        if action == "ready":
+            self.status = "ready"
+            self._clients[content.get("client")] = True
+            self._ready_event.set()
+            self.browser_info = content.get("info", {})
+            self.figure._native.acknowledged()
+            if not self.figure._native.retain:
+                with self.hold_sync():
+                    self.columns = []
+                    self.wasm = b""
+                    self.wasm_js = ""
+        elif action == "failed":
+            self.status = "WebGPU error: " + str(content.get("error"))
+            self._ready_event.set()
+        elif action == "unmounted":
+            self._clients.pop(content.get("client"), None)
+        elif action == "edit":
+            self._handling = True
+            error = ""
+            try:
+                self.figure.apply_settings(content["settings"], expected_revision=content["revision"])
+            except Exception as exc:
+                error = str(exc)
+            finally:
+                self._handling = False
+            self.refresh()
+            self.send({"action": "ack", "client": content.get("client"), "sequence": content["sequence"], "state": self.state, "error": error})
+        elif action == "rejected":
+            if content["revision"] == self.figure.revision:
+                self.figure.apply_settings(content["settings"], expected_revision=content["revision"])
+            self.browser_info = dict(self.browser_info, settings_error=content["error"])
+        elif action == "result":
+            pending = self._pending.pop(content.get("id"), None)
+            if pending is None:
+                return
+            future, expected_action = pending
+            if not future.done():
+                if content.get("error"):
+                    future.set_exception(RuntimeError(content["error"]))
+                elif expected_action == "export" and not buffers:
+                    future.set_exception(RuntimeError("Browser PNG export returned no binary buffer"))
+                else:
+                    future.set_result(bytes(buffers[0]) if buffers else self.figure.get_settings())
+        elif action == "stats":
+            self.browser_info = content["info"]
+
+    async def request(self, action, *, timeout, **kwargs):
+        if self.status == "initializing":
+            await asyncio.wait_for(self._ready_event.wait(), timeout)
+        if self._closed:
+            raise RuntimeError("Figure widget closed")
+        if self.status.startswith("WebGPU error"):
+            raise RuntimeError(self.status)
+        loop = asyncio.get_running_loop()
+        id = uuid.uuid4().hex
+        future = loop.create_future()
+        self._pending[id] = (future, action)
+        self.send({"action": action, "id": id, "client": next(reversed(self._clients), None), **kwargs})
+        try:
+            return await asyncio.wait_for(future, timeout)
+        finally:
+            self._pending.pop(id, None)
+
+    def close(self):
+        self._closed = True
+        self._ready_event.set()
+        for future, _ in self._pending.values():
+            if not future.done():
+                future.set_exception(RuntimeError("Figure widget closed"))
+        self._pending.clear()
         self.figure._widgets.discard(self)
         super().close()

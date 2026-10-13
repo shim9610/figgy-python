@@ -1,8 +1,8 @@
-// Shared UI for anywidget and the desktop QWebChannel transport.
+// Explicit kernel-PNG fallback for environments without browser WebGPU.
 // Geometry, data picking and accepted settings belong to the Rust renderer.
 export function render({ model, el }) {
   const root = document.createElement("div"); root.className = "figgy-editor";
-  root.innerHTML = `<div class="figgy-toolbar"><button data-fit>Fit</button>
+  root.innerHTML = `<div class="figgy-toolbar"><strong>Kernel PNG fallback</strong><button data-fit>Fit</button>
     <label><input type="checkbox" data-area> Edit plot area</label>
     <button data-copy>Copy Python</button><button data-save>Save PNG</button>
     <span data-status></span></div><div class="figgy-body">

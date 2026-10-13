@@ -1,0 +1,42 @@
+{
+  "metric": "surface frame submission rate; not monitor FPS or GPU completion/readback",
+  "os": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "version": "0.2.0",
+  "points": 100000,
+  "measured_frames": 60,
+  "elapsed_seconds": 3.3985696990002907,
+  "submitted_frames_per_second": 17.654485655435977,
+  "host": {
+    "column_uploads": 2,
+    "host": "winit-wgpu",
+    "last_input_to_submit_ms": 0.0,
+    "png_encodes": 0,
+    "revision": 2,
+    "rgba_readbacks": 0,
+    "scale_factor": 1.0,
+    "surface_frames": 66,
+    "surface_size": [
+      1270,
+      600
+    ]
+  },
+  "renderer": {
+    "adapter": {
+      "backend": "Vulkan",
+      "device_type": "Cpu",
+      "driver": "llvmpipe",
+      "initial_pool_capacity_bytes": 8388608,
+      "maximum_column_pool_bytes": 134217728,
+      "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+    },
+    "allocation_mode": "resident",
+    "column_uploads": 2,
+    "columns": 2,
+    "known_gpu_bytes": 12997072,
+    "png_encodes": 0,
+    "pool_capacity_bytes": 8388608,
+    "pool_used_bytes": 1600000,
+    "revision": 2,
+    "rgba_readbacks": 0
+  }
+}

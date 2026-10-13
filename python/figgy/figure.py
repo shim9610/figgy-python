@@ -83,7 +83,7 @@ class Figure:
     Rendering, initialization, GPU fitting and picking release the GIL.
     """
 
-    def __init__(self, figsize=(8, 5), dpi=120, *, pool_bytes=8 * 1024**2):
+    def __init__(self, figsize=(8, 5), dpi=120, *, pool_bytes=8 * 1024**2, backend="auto", retain_notebook_data=False):
         if not math.isfinite(float(dpi)) or dpi <= 0:
             raise ValueError("dpi must be positive and finite")
         figsize = tuple(map(float, figsize))
@@ -92,7 +92,21 @@ class Figure:
         width, height = (round(v * float(dpi)) for v in figsize)
         self.dpi = float(dpi)
         self._lock = threading.RLock()
-        self._native = NativeFigure(width, height, pool_bytes)
+        if backend == "auto":
+            try:
+                from IPython import get_ipython
+                shell = get_ipython()
+                backend = "webgpu" if shell is not None and getattr(shell, "kernel", None) is not None else "native"
+            except ImportError:
+                backend = "native"
+        if backend not in ("native", "webgpu"):
+            raise ValueError("backend must be auto/native/webgpu")
+        self.backend = backend
+        if backend == "webgpu":
+            from .notebook import NotebookData
+            self._native = NotebookData(width, height, pool_bytes, retain_notebook_data)
+        else:
+            self._native = NativeFigure(width, height, pool_bytes)
         self._default_config = copy.deepcopy(self.get_settings()["config"])
         self._widgets = weakref.WeakSet()
         self._windows = []
@@ -114,7 +128,11 @@ class Figure:
     def info(self):
         with self._lock:
             self._require_open()
-            return json.loads(self._native.info_json())
+            info = json.loads(self._native.info_json())
+            if self.backend == "webgpu":
+                info["transfer_snapshot_bytes"] = sum(len(v[1]) for v in self._native.columns.values())
+                info["browser"] = [dict(w.browser_info, status=w.status) for w in self._widgets]
+            return info
 
     def get_settings(self):
         with self._lock:
@@ -229,12 +247,16 @@ class Figure:
         """Synchronously render and read back a (height, width, 4) uint8 array."""
         with self._lock:
             self._require_open()
+            if self.backend != "native":
+                raise RuntimeError("render_rgba requires a native GPU; use browser export via await fig.to_png_async()")
             w, h, data = self._native.render_rgba(float(scale))
             return np.frombuffer(data, dtype=np.uint8).reshape(h, w, 4)
 
     def to_png(self, *, scale=1.0):
         with self._lock:
             self._require_open()
+            if self.backend != "native":
+                raise RuntimeError("Browser export is asynchronous: await fig.to_png_async() or await fig.savefig_async(path)")
             return self._native.render_png(float(scale))
 
     def savefig(self, filename, *, dpi=None, scale=None):
@@ -302,11 +324,46 @@ class Figure:
         self._changed()
         return self
 
-    def widget(self):
-        from .widget import FigureWidget
-        widget = FigureWidget(self)
+    def widget(self, *, backend=None):
+        if backend == "png":
+            if self.backend != "native":
+                raise RuntimeError("PNG fallback requires a native kernel GPU")
+            from .widget import PNGFigureWidget
+            widget = PNGFigureWidget(self)
+        else:
+            if self.backend != "webgpu":
+                raise RuntimeError("Create Figure(backend='webgpu') for browser rendering, or explicitly use widget(backend='png') for kernel PNG fallback")
+            from .widget import FigureWidget
+            existing = next((w for w in self._widgets if isinstance(w, FigureWidget)), None)
+            if existing is not None:
+                return existing
+            widget = FigureWidget(self)
         self._widgets.add(widget)
         return widget
+
+    async def sync(self, *, timeout=30):
+        """Await pending browser edits; settings getters return accepted revisions."""
+        if self.backend == "webgpu":
+            await self.widget().request("barrier", timeout=timeout)
+        return self.get_settings()
+
+    async def to_png_async(self, *, scale=1.0, timeout=60):
+        if self.backend == "native":
+            return self.to_png(scale=scale)
+        return await self.widget().request("export", scale=float(scale), timeout=timeout)
+
+    async def savefig_async(self, filename, *, dpi=None, scale=None, timeout=60):
+        if dpi is not None and scale is not None:
+            raise ValueError("choose dpi or scale, not both")
+        value = float(dpi) / self.dpi if dpi is not None else (1.0 if scale is None else float(scale))
+        data = await self.to_png_async(scale=value, timeout=timeout)
+        if hasattr(filename, "write"):
+            filename.write(data)
+        else:
+            path = Path(filename)
+            if path.suffix.lower() != ".png":
+                raise ValueError("savefig currently supports .png")
+            path.write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
         # Keep a live widget referenced; Jupyter displays the model once per output.
@@ -323,6 +380,9 @@ class Figure:
             for window in list(self._windows):
                 window.close()
             self._windows.clear()
+            if threading.current_thread() is threading.main_thread() and self.backend == "native":
+                from .desktop import poll_events
+                poll_events()
             self._native = None
 
     def __enter__(self):

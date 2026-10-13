@@ -12,3 +12,18 @@ The font notices are shipped in `figgy/licenses/LICENSE-LiberationSans.txt` and
 native extension.
 The desktop extra uses PySide6/Qt; retain the licenses supplied by those packages.
 The notebook extra uses anywidget and ipywidgets under their respective licenses.
+
+## Packaged browser kernel
+
+Generated JS/WASM assets use upstream `figgy` web package 0.13.1 and
+`figgy-renderer` 0.16.1 at commit
+`84aa2783caa97d679c72b5c079fb4aea8bf1040e`, under MIT OR Apache-2.0.
+Rebuild path and asset hashes are documented in `docs/HOSTS.md` and
+`python/figgy/assets/provenance.json`. The same bundled font licenses apply.
+
+## Desktop UI fonts
+
+The native egui UI embeds `epaint_default_fonts 0.36.2`'s Hack Regular,
+Ubuntu Light, Noto Emoji Regular and emoji-icon-font. Their complete font
+license texts are included as `python/figgy/licenses/LICENSE-Egui-*.txt`
+(Hack/Bitstream terms, Ubuntu Font Licence, SIL OFL and icon-font MIT).
