@@ -8,9 +8,12 @@ vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
 
 `Figure(backend="native")` uploads NumPy columns through the original borrowed
 f32/f64 → hi/lo staging path. `NativeFigure` and the desktop host share one
-`Arc<Mutex<FigureCore>>`; window views are weak references to that core. The
-figure retains its resident column pool, registered chart, device, queue and GPU
-picking resources across close/reopen. The native host retains no CPU array copy.
+`Arc<Mutex<FigureCore>>`; window views are weak references to that document.
+All native Figures in this process now share one GPU instance/adapter,
+device/queue, renderer, resident column pool and pipeline/picking resources.
+Each Figure owns its chart registration, settings, columns and export target.
+The native host retains no CPU array copy. See [native sharing](NATIVE_SHARING.md)
+for ownership, capacity, synchronization and explicit release behavior.
 
 The host uses winit 0.30.13, egui 0.36.2 and wgpu 30. The upstream
 [`WindowedRenderer` and winit example](https://github.com/shim9610/figgy/blob/84aa2783caa97d679c72b5c079fb4aea8bf1040e/crates/renderer/examples/winit_simple.rs)
@@ -27,7 +30,10 @@ submits and presents. It performs no RGBA mapping, PNG encoding, QWebChannel,
 JavaScript or image transfer. GPU picking reads a small result on explicit picks;
 it does not read the whole frame. PNG export alone uses renderer readback.
 
-The panel edits title/axis/legend text and font/color, axes and series styles.
+The panel edits title/axis/legend text, font size/family and color, axes and series
+styles, plus tick-label font size/family/color. The font entry is a family name,
+not a TTF path. Native uses renderer system/registered fonts; a missing family
+falls back to the bundled font.
 Chrome/series selection, renderer drag/resize policies, wheel zoom, Copy Python
 and Save PNG are available; full SSOT JSON covers additional renderer fields.
 Copy Python is a self-contained `json.loads` + `fig.apply_settings` snapshot.
@@ -47,15 +53,25 @@ macOS. `show()` runs until **all currently open Figgy windows** close, and retur
 a closed handle. `show(block=False)` creates/pumps the initial window and returns;
 call `poll_events()` frequently or use `run_events()`. A worker thread cannot own
 the winit event loop. Python mutations and Rust frames lock the same core. The GIL
-is released during each event-loop pump and native rendering. PyO3 mutex waits
-use `MutexExt::lock_py_attached` so concurrent callers cannot deadlock the GIL. The blocking loop
+is released during each event-loop pump and native rendering. Operations acquire
+the Figure document lock then the global renderer lock; renderer error scopes,
+preparation, recording and submission are serialized across Figures. PyO3 mutex
+waits use `MutexExt::lock_py_attached` so concurrent callers cannot deadlock the
+GIL. The blocking loop
 checks Python signals between pumps. Each window can close independently.
 `fig.close()` requests window closure, pumps on the main thread, and drops the
-figure core. `WindowHandle.close()` requests closure; event pumping completes it.
+figure core and collects its retired chart/columns, retaining the global context.
+`WindowHandle.close()` requests closure; event pumping completes it. Closing just
+a window retains its Figure data.
 The process keeps one reusable main-thread winit loop for close/reopen. These
 APIs do not integrate automatically with a foreign Qt/Tk event loop or `%gui qt`.
 
 Native `fig.info` counts `column_uploads`, `rgba_readbacks`, `png_encodes`.
+These counters and `columns`/`figure_column_bytes` are per Figure. The
+`gpu_context_id`, `gpu_sharing="process"`, `active_figures`, `pool_capacity_bytes`
+and `pool_used_bytes` describe the shared context. `known_gpu_bytes` includes
+shared renderer resources plus this Figure's export target; do not sum it across
+Figures as independent VRAM. Window info also exposes context/Figure ids.
 `window.info_json()` additionally counts surface frames and reports the last
 input-to-submission time. That time ends at CPU queue submission, not monitor
 presentation or completed GPU execution. `benchmarks/ui_surface.py` measures
@@ -78,7 +94,9 @@ float64 NumPy snapshots cross anywidget as binary buffers, then typed arrays
 enter wasm-bindgen and upload into a separate browser GPU pool. They are not JSON
 number arrays or base64. f64 uses upstream hi/lo registration. Upstream's initial
 browser pool is 16 MiB and grows on allocation failure; `pool_bytes` currently
-controls only the native initial pool. No automatic stream/downsample/chunk
+controls only the initial shared native pool. Browser views still have separate
+`FiggyChart` devices/pools; this native sharing change does not alter that host.
+No automatic stream/downsample/chunk
 transition is called by either host.
 
 The kernel, browser JS, WASM linear memory and GPU are different memory domains.
@@ -89,6 +107,10 @@ do not change the chart. After successful browser upload, default snapshots and
 widget buffer traits are cleared. JS input buffers become collectible; freed WASM
 input allocations do not shrink the WASM linear memory's reserved capacity.
 Browser GPU resources remain until the widget view is disposed.
+The browser font-family entry uses fonts available to the WASM renderer; it
+cannot scan the user's system fonts. Without a registered family, renderer
+fallback remains in effect. This change adds family editing, not custom-font
+upload.
 
 Data topology is sealed once a widget is displayed. Create a new Figure for new
 source data. A released model cannot supply columns to a new view after reload.

@@ -84,7 +84,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             stats=page.evaluate(root+'.stats')
             assert stats['binary_upload_bytes']==800000 and stats['column_uploads']==2 and stats['png_exports']==0
             assert 'True' in execute("print(widget.status == 'ready' and not fig._native.columns and not widget.columns)")
-            page.locator('[data-fields] input[type=text]').fill('WebGPU edited title');page.locator('[data-fields] input[type=text]').press('Tab')
+            page.locator('[data-fields] input[data-property=text]').fill('WebGPU edited title');page.locator('[data-fields] input[data-property=text]').press('Tab')
             page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'WebGPU edited title'")
             assert 'WebGPU edited title' in execute("await fig.sync(); print(fig.to_code())")
             # GPU picker and layout/drag stay inside the browser. The kernel has no GPU.

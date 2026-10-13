@@ -114,22 +114,57 @@ impl<T: Number> HiLoColumnSource for BorrowedColumn<'_, T> {
 }
 
 struct FigureCore {
-    instance: wgpu::Instance,
-    adapter: wgpu::Adapter,
-    renderer: Renderer,
+    gpu: Arc<gpu::GpuContext>,
+    figure_id: u64,
     chart: Chart,
     chart_id: ChartId,
     series: Vec<SeriesConfig>,
     hitmap: HitMap,
     elements: Vec<(String, HitId)>,
     columns: HashMap<String, (usize, f64, f64)>,
-    adapter_info: Value,
     revision: u64,
     uploads: u64,
     readbacks: u64,
     png_encodes: u64,
     preparation: Option<Value>,
     target: Option<RenderTarget>,
+}
+
+/// An operation holds the document lock, then the shared renderer lock.
+/// Both guards outlive GPU recording, readback and error scopes.
+struct FigureAccess<'a> {
+    context: &'a gpu::GpuContext,
+    renderer: &'a mut Renderer,
+    data: &'a mut FigureCore,
+}
+impl<'a> FigureAccess<'a> {
+    fn new(
+        context: &'a gpu::GpuContext,
+        data: &'a mut FigureCore,
+        renderer: &'a mut Renderer,
+    ) -> Self {
+        Self {
+            context,
+            renderer,
+            data,
+        }
+    }
+    fn gpu_series(&self, series: &[SeriesConfig]) -> Vec<SeriesConfig> {
+        gpu::series(self.data.figure_id, series)
+    }
+}
+impl Drop for FigureCore {
+    fn drop(&mut self) {
+        // Do not wait for a GPU lock from Python GC/finalization. The next
+        // renderer operation drains this small ownership record before use.
+        self.gpu.retire(
+            self.chart_id,
+            self.columns
+                .keys()
+                .map(|id| gpu::column_id(self.figure_id, id))
+                .collect(),
+        );
+    }
 }
 
 /// Display-sized target and rasterized axes survive redraws. This is a host
@@ -144,9 +179,9 @@ struct RenderTarget {
     readback: wgpu::Buffer,
 }
 
-impl FigureCore {
+impl FigureAccess<'_> {
     fn render(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
-        self.readbacks += 1;
+        self.data.readbacks += 1;
         let device = Arc::clone(self.renderer.device());
         let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
         let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
@@ -155,21 +190,21 @@ impl FigureCore {
         let validation = pollster::block_on(validation.pop());
         let oom = pollster::block_on(oom.pop());
         if let Some(error) = oom {
-            self.target = None;
+            self.data.target = None;
             return Err(PyMemoryError::new_err(format!(
                 "render allocation failed on {}: {error}",
-                self.adapter_info["name"]
+                self.context.adapter_info["name"]
             )));
         }
         if let Some(error) = validation {
-            self.target = None;
+            self.data.target = None;
             return Err(runtime(format!(
                 "GPU render failed on {}: {error}",
-                self.adapter_info["name"]
+                self.context.adapter_info["name"]
             )));
         }
         if rendered.is_err() {
-            self.target = None;
+            self.data.target = None;
         }
         rendered
     }
@@ -179,15 +214,16 @@ impl FigureCore {
             .map_err(runtime)?;
         if scale != 1.0 {
             return pollster::block_on(self.renderer.export_panel_rgba_with_clear_async(
-                &self.chart,
-                &self.series,
+                &Chart::new(gpu::config(self.data.figure_id, self.data.chart.config())),
+                &gpu::series(self.data.figure_id, &self.data.series),
                 scale,
                 Color::WHITE,
             ))
             .map_err(runtime);
         }
-        let rect = self.chart.config().chart_area.0;
+        let rect = self.data.chart.config().chart_area.0;
         if self
+            .data
             .target
             .as_ref()
             .is_none_or(|t| t.width != rect.width || t.height != rect.height)
@@ -217,29 +253,29 @@ impl FigureCore {
             });
             let view = self
                 .renderer
-                .create_chart_view(&self.chart, rect)
+                .create_chart_view(&self.data.chart, rect)
                 .map_err(runtime)?;
-            self.target = Some(RenderTarget {
+            self.data.target = Some(RenderTarget {
                 width: rect.width,
                 height: rect.height,
                 row_bytes,
-                revision: self.revision,
+                revision: self.data.revision,
                 texture,
                 view,
                 readback,
             });
         }
-        let target = self.target.as_mut().unwrap();
-        if target.revision != self.revision {
+        let target = self.data.target.as_mut().unwrap();
+        if target.revision != self.data.revision {
             self.renderer
-                .refresh_axis(&mut target.view, &self.chart, rect)
+                .refresh_axis(&mut target.view, &self.data.chart, rect)
                 .map_err(runtime)?;
-            target.revision = self.revision;
+            target.revision = self.data.revision;
         }
         let prepared = self
             .renderer
             .prepare_registered(&[renderer::RegisteredChartDrawItem {
-                chart_id: self.chart_id,
+                chart_id: self.data.chart_id,
                 view: &target.view,
             }])
             .map_err(runtime)?;
@@ -313,7 +349,7 @@ impl FigureCore {
         })
     }
     fn upload<T: Number>(&mut self, id: &str, values: &[T]) -> PyResult<()> {
-        if self.columns.contains_key(id) {
+        if self.data.columns.contains_key(id) {
             return Err(invalid(format!("column already exists: {id}")));
         }
         if values.is_empty() {
@@ -331,15 +367,18 @@ impl FigureCore {
             return Err(invalid("data has no finite values"));
         }
         let source = BorrowedColumn { values, min, max };
-        if let Err(error) = self.renderer.add_hilo_column(id.to_owned(), &source) {
+        if let Err(error) = self
+            .renderer
+            .add_hilo_column(gpu::column_id(self.data.figure_id, id), &source)
+        {
             let message = format!(
                 "upload failed: column={id:?}, values={}, requested_gpu_bytes={}, pool_used_bytes={}, pool_capacity_bytes={}, adapter_column_pool_limit_bytes={}, adapter={}; {error}",
                 values.len(),
                 (values.len() as u64).saturating_mul(8),
                 self.renderer.pool().used_bytes(),
                 self.renderer.pool().capacity(),
-                self.adapter_info["maximum_column_pool_bytes"],
-                self.adapter_info["name"]
+                self.context.adapter_info["maximum_column_pool_bytes"],
+                self.context.adapter_info["name"]
             );
             return Err(match error {
                 renderer::FiggyError::Pool(
@@ -353,12 +392,15 @@ impl FigureCore {
                 _ => runtime(message),
             });
         }
-        self.columns.insert(id.to_owned(), (values.len(), min, max));
-        self.uploads += 1;
+        self.data
+            .columns
+            .insert(id.to_owned(), (values.len(), min, max));
+        self.data.uploads += 1;
         Ok(())
     }
     fn element(&self, target: &str) -> PyResult<HitId> {
-        self.elements
+        self.data
+            .elements
             .iter()
             .find(|(name, _)| name == target)
             .map(|(_, id)| *id)
@@ -367,18 +409,21 @@ impl FigureCore {
     fn commit_config(&mut self, config: Config) -> PyResult<()> {
         validate_config(&config)?;
         self.renderer
-            .set_chart_config(self.chart_id, config.clone())
+            .set_chart_config(
+                self.data.chart_id,
+                gpu::config(self.data.figure_id, &config),
+            )
             .map_err(invalid)?;
-        self.chart = Chart::new(config);
-        self.revision += 1;
+        self.data.chart = Chart::new(config);
+        self.data.revision += 1;
         Ok(())
     }
     fn snapshot(&self) -> Settings {
         Settings {
             schema_version: 1,
             renderer_version: "0.16.1".into(),
-            config: self.chart.config().clone(),
-            series: self.series.clone(),
+            config: self.data.chart.config().clone(),
+            series: self.data.series.clone(),
         }
     }
 }
@@ -425,29 +470,9 @@ fn validate_config(config: &Config) -> PyResult<()> {
 impl FigureCore {
     fn new(py: Python<'_>, width: u32, height: u32, pool_bytes: u64) -> PyResult<Self> {
         py.detach(move || {
-            let instance = create_instance();
-            let adapter = request_adapter(&instance).map_err(runtime)?;
-            let info = adapter.get_info();
-            let available = adapter.limits();
-            let mut limits = wgpu::Limits::default();
-            limits.max_storage_buffer_binding_size = available.max_storage_buffer_binding_size;
-            limits.max_buffer_size = available.max_buffer_size;
-            let capacity = pool_bytes.min(available.max_storage_buffer_binding_size as u64);
-            let (device, queue) =
-                pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-                    label: Some("figgy Python device"),
-                    required_limits: limits,
-                    ..Default::default()
-                }))
-                .map_err(runtime)?;
-            let mut renderer = Renderer::try_new(
-                RendererDevice::new(Arc::new(device), Arc::new(queue)),
-                wgpu::TextureFormat::Rgba8Unorm,
-                capacity,
-            )
-            .map_err(runtime)?;
-            renderer.set_pool_growth_policy(renderer::GrowthPolicy::OnAllocFailure);
-            let _ = renderer.set_memory_budget(None);
+            let gpu = gpu::context(pool_bytes)?;
+            let figure_id = gpu::figure_id()?;
+            let mut renderer = gpu::lock(&gpu)?;
             let mut config = default::default_config();
             config.chart_area = ChartArea(Rect {
                 x: 0,
@@ -492,18 +517,14 @@ impl FigureCore {
             add!(ColorBarLabelElement);
             add!(ColorBarTitleElement);
             Ok(Self {
-                instance,
-                adapter,
-                renderer,
+                gpu: Arc::clone(&gpu),
+                figure_id,
                 chart,
                 chart_id,
                 series: Vec::new(),
                 hitmap,
                 elements,
                 columns: HashMap::new(),
-                adapter_info: json!({"name": info.name, "backend": format!("{:?}", info.backend),
-                    "device_type": format!("{:?}", info.device_type), "driver": info.driver,
-                    "initial_pool_capacity_bytes": capacity, "maximum_column_pool_bytes": available.max_storage_buffer_binding_size}),
                 revision: 0,
                 uploads: 0,
                 readbacks: 0,
@@ -513,6 +534,9 @@ impl FigureCore {
             })
         })
     }
+}
+
+impl FigureAccess<'_> {
     fn prepare(&mut self, py: Python<'_>) -> PyResult<String> {
         let report = py.detach(|| {
             let start = std::time::Instant::now();
@@ -535,7 +559,7 @@ impl FigureCore {
             Ok(json!({"backend":"native","ready":true,"elapsed_ms":start.elapsed().as_secs_f64()*1000.,
                 "target_format":"Rgba8Unorm","stages":stages,"persistent_cache_supported":false}))
         })?;
-        self.preparation = Some(report.clone());
+        self.data.preparation = Some(report.clone());
         Ok(report.to_string())
     }
     fn upload_column(&mut self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
@@ -558,8 +582,10 @@ impl FigureCore {
         }
     }
     fn remove_column(&mut self, id: &str) -> PyResult<()> {
-        self.renderer.remove_column(id).map_err(runtime)?;
-        self.columns.remove(id);
+        self.renderer
+            .remove_column(&gpu::column_id(self.data.figure_id, id))
+            .map_err(runtime)?;
+        self.data.columns.remove(id);
         Ok(())
     }
     fn settings_json(&self) -> PyResult<String> {
@@ -567,16 +593,21 @@ impl FigureCore {
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let cfg: SeriesConfig = parse(json)?;
-        if self.series.iter().any(|s| s.series_id == cfg.series_id) {
+        if self
+            .data
+            .series
+            .iter()
+            .any(|s| s.series_id == cfg.series_id)
+        {
             return Err(invalid("series IDs must be unique"));
         }
-        let mut next = self.series.clone();
+        let mut next = self.data.series.clone();
         next.push(cfg);
         self.renderer
-            .set_chart_series(self.chart_id, next.clone())
+            .set_chart_series(self.data.chart_id, gpu::series(self.data.figure_id, &next))
             .map_err(invalid)?;
-        self.series = next;
-        self.revision += 1;
+        self.data.series = next;
+        self.data.revision += 1;
         Ok(())
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
@@ -586,8 +617,8 @@ impl FigureCore {
         }
         validate_config(&next.config)?;
         // Settings cannot introduce, remove or silently reconnect source arrays.
-        if next.series.len() != self.series.len()
-            || next.series.iter().zip(&self.series).any(|(a, b)| {
+        if next.series.len() != self.data.series.len()
+            || next.series.iter().zip(&self.data.series).any(|(a, b)| {
                 a.series_id != b.series_id || a.x_column != b.x_column || a.y_column != b.y_column
             })
         {
@@ -595,7 +626,7 @@ impl FigureCore {
                 "settings must address the same ordered series and source columns",
             ));
         }
-        let old = self.series.clone();
+        let old = self.data.series.clone();
         let series_changed = next.series != old;
         if series_changed {
             renderer::legend::update_legend_symbols_preserving_text(
@@ -603,28 +634,31 @@ impl FigureCore {
                 &next.series,
             );
         }
-        if next.config == *self.chart.config() && !series_changed {
+        if next.config == *self.data.chart.config() && !series_changed {
             return Ok(());
         }
         if series_changed {
             self.renderer
-                .set_chart_series(self.chart_id, next.series.clone())
+                .set_chart_series(
+                    self.data.chart_id,
+                    gpu::series(self.data.figure_id, &next.series),
+                )
                 .map_err(invalid)?;
         }
-        if let Err(e) = self
-            .renderer
-            .set_chart_config(self.chart_id, next.config.clone())
-        {
+        if let Err(e) = self.renderer.set_chart_config(
+            self.data.chart_id,
+            gpu::config(self.data.figure_id, &next.config),
+        ) {
             if series_changed {
                 self.renderer
-                    .set_chart_series(self.chart_id, old)
+                    .set_chart_series(self.data.chart_id, gpu::series(self.data.figure_id, &old))
                     .map_err(runtime)?;
             }
             return Err(invalid(e));
         }
-        self.chart = Chart::new(next.config);
-        self.series = next.series;
-        self.revision += 1;
+        self.data.chart = Chart::new(next.config);
+        self.data.series = next.series;
+        self.data.revision += 1;
         Ok(())
     }
     fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
@@ -635,12 +669,12 @@ impl FigureCore {
             pollster::block_on(self.renderer.ensure_errorbar_extent_engine()).map_err(runtime)?;
             let token = self
                 .renderer
-                .begin_fit_commit(self.chart_id)
+                .begin_fit_commit(self.data.chart_id)
                 .map_err(runtime)?;
             let mut x = renderer::chart::FitExtent::EMPTY;
             let mut y = renderer::chart::FitExtent::EMPTY;
             let mut jobs = Vec::new();
-            for series in &self.series {
+            for series in &gpu::series(self.data.figure_id, &self.data.series) {
                 if let Some(job) = self
                     .renderer
                     .begin_series_fit_extent(series)
@@ -689,20 +723,23 @@ impl FigureCore {
                 .commit_auto_fit_all_if_current(&token, &x, &y, padding)
                 .map_err(runtime)
         })?;
-        self.chart = Chart::new(
-            self.renderer
-                .chart_config(self.chart_id)
-                .map_err(runtime)?
-                .clone(),
-        );
-        self.revision += 1;
+        let mut next = self
+            .renderer
+            .chart_config(self.data.chart_id)
+            .map_err(runtime)?
+            .clone();
+        // Fitting changes axes only; keep the local document's selection ids.
+        next.picked_data = self.data.chart.config().picked_data.clone();
+        next.picked_points = self.data.chart.config().picked_points.clone();
+        self.data.chart = Chart::new(next);
+        self.data.revision += 1;
         Ok(())
     }
     fn set_range(&mut self, axis: &str, min: f64, max: f64) -> PyResult<()> {
         if !min.is_finite() || !max.is_finite() || min >= max {
             return Err(invalid("range must be finite and increasing"));
         }
-        let mut next = Chart::new(self.chart.config().clone());
+        let mut next = Chart::new(self.data.chart.config().clone());
         match axis {
             "x" => next.set_x_range(min, max),
             "y" => next.set_y_range(min, max),
@@ -725,7 +762,7 @@ impl FigureCore {
         if !scale.is_finite() || !(0.25..=8.0).contains(&scale) {
             return Err(invalid("scale must be 0.25..8"));
         }
-        self.png_encodes += 1;
+        self.data.png_encodes += 1;
         let bytes = py.detach(|| {
             let image = self.render(scale)?;
             encode_png(&image).map_err(runtime)
@@ -733,20 +770,21 @@ impl FigureCore {
         Ok(PyBytes::new(py, &bytes))
     }
     fn hit_test(&self, x: f32, y: f32) -> Option<String> {
-        self.hitmap
+        self.data
+            .hitmap
             .hit_test(
-                self.chart.config(),
-                &CpuTextMeasure::for_style(&self.chart.config().draw_style),
+                self.data.chart.config(),
+                &CpuTextMeasure::for_style(&self.data.chart.config().draw_style),
                 x,
                 y,
             )
-            .and_then(|id| self.hitmap.get(id))
+            .and_then(|id| self.data.hitmap.get(id))
             .map(|el| el.element_id())
     }
     fn bounds_json(&self, target: &str) -> PyResult<String> {
         let id = self.element(target)?;
-        let measure = CpuTextMeasure::for_style(&self.chart.config().draw_style);
-        let value = self.hitmap.selection_box(id, self.chart.config(), &measure).map(|b| json!({
+        let measure = CpuTextMeasure::for_style(&self.data.chart.config().draw_style);
+        let value = self.data.hitmap.selection_box(id, self.data.chart.config(), &measure).map(|b| json!({
             "rect": [b.rect.x, b.rect.y, b.rect.width, b.rect.height],
             "handles": b.handles.iter().map(|r| vec![r.x, r.y, r.width, r.height]).collect::<Vec<_>>()
         }));
@@ -755,13 +793,14 @@ impl FigureCore {
     fn resize_handle(&self, target: &str, x: f32, y: f32) -> PyResult<Option<String>> {
         let id = self.element(target)?;
         Ok(self
+            .data
             .hitmap
             .get(id)
             .and_then(|e| e.as_resizable())
             .and_then(|e| {
                 e.hit_resize_handle(
-                    self.chart.config(),
-                    &CpuTextMeasure::for_style(&self.chart.config().draw_style),
+                    self.data.chart.config(),
+                    &CpuTextMeasure::for_style(&self.data.chart.config().draw_style),
                     x,
                     y,
                 )
@@ -773,8 +812,8 @@ impl FigureCore {
             return Err(invalid("drag must be finite"));
         }
         let id = self.element(target)?;
-        let el = self.hitmap.get(id).unwrap();
-        let mut cfg = self.chart.config().clone();
+        let el = self.data.hitmap.get(id).unwrap();
+        let mut cfg = self.data.chart.config().clone();
         let result = if let Some(handle) = handle {
             let h: ResizeHandle = ALL_HANDLES
                 .into_iter()
@@ -800,32 +839,38 @@ impl FigureCore {
             self.renderer.enable_gpu_picking().map_err(runtime)?;
             let request = GpuPickRequest {
                 canvas_position_px: [x, y],
-                display_panel_px: self.chart.config().chart_area.0,
+                display_panel_px: self.data.chart.config().chart_area.0,
                 display_scale: 1.0,
                 max_distance_px: 6.0,
             };
             let ticket = self
                 .renderer
-                .pick_chart_data(self.chart_id, request)
+                .pick_chart_data(self.data.chart_id, request)
                 .map_err(runtime)?;
             self.renderer.wait_idle();
             pollster::block_on(ticket.resolve()).map_err(runtime)
         })?;
-        let mut cfg = self.chart.config().clone();
+        let picked = picked.map(|p| {
+            let mut reference = p.to_ref();
+            gpu::local_selection(self.data.figure_id, &mut reference);
+            (p.distance_px(), reference)
+        });
+        let mut cfg = self.data.chart.config().clone();
         cfg.picked_data = picked
             .as_ref()
             .map(|p| renderer::config::DataSelectionsConfig {
-                refs: vec![p.to_ref()],
+                refs: vec![p.1.clone()],
                 ..Default::default()
             });
-        if cfg != *self.chart.config() {
+        if cfg != *self.data.chart.config() {
             self.commit_config(cfg)?;
         }
-        let value = picked.map(|p| json!({"target": p.series_id(), "distance_px": p.distance_px(), "identity": p.to_ref()}));
+        let value =
+            picked.map(|p| json!({"target":p.1.series_id(), "distance_px":p.0, "identity":p.1}));
         serde_json::to_string(&value).map_err(runtime)
     }
     fn clear_data_selection(&mut self) -> PyResult<()> {
-        let mut cfg = self.chart.config().clone();
+        let mut cfg = self.data.chart.config().clone();
         if cfg.picked_data.is_some() {
             cfg.picked_data = None;
             self.commit_config(cfg)?;
@@ -833,17 +878,18 @@ impl FigureCore {
         Ok(())
     }
     fn info_json(&self) -> String {
-        let host_bytes = self.target.as_ref().map_or(0, |t| {
+        let host_bytes = self.data.target.as_ref().map_or(0, |t| {
             u64::from(t.width) * u64::from(t.height) * 4
                 + u64::from(t.row_bytes) * u64::from(t.height)
         });
-        json!({"adapter": self.adapter_info, "revision": self.revision, "column_uploads": self.uploads, "rgba_readbacks": self.readbacks, "png_encodes": self.png_encodes, "columns": self.columns.len(),
+        json!({"adapter": self.context.adapter_info, "gpu_context_id":self.context.id,"figure_id":self.data.figure_id,"gpu_sharing":"process","active_figures":self.renderer.chart_order().len(),"figure_column_bytes":self.data.columns.values().map(|v|v.0 as u64 * 8).sum::<u64>(), "revision": self.data.revision, "column_uploads": self.data.uploads, "rgba_readbacks": self.data.readbacks, "png_encodes": self.data.png_encodes, "columns": self.data.columns.len(),
             "pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
-            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes, "allocation_mode": "resident", "preparation": self.preparation}).to_string()
+            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes, "allocation_mode": "resident", "preparation": self.data.preparation}).to_string()
     }
 }
 
 mod desktop;
+mod gpu;
 mod notebook;
 
 #[pyclass(module = "figgy._native")]
@@ -856,6 +902,12 @@ impl NativeFigure {
         Python::attach(|py| self.core.lock_py_attached(py))
             .map_err(|_| runtime("native Figure lock poisoned"))
     }
+    fn with<R>(&self, operation: impl FnOnce(&mut FigureAccess<'_>) -> PyResult<R>) -> PyResult<R> {
+        let mut data = self.lock()?;
+        let gpu = Arc::clone(&data.gpu);
+        let mut renderer = gpu::lock(&gpu)?;
+        operation(&mut FigureAccess::new(&gpu, &mut data, &mut renderer))
+    }
 }
 #[pymethods]
 impl NativeFigure {
@@ -867,44 +919,44 @@ impl NativeFigure {
         })
     }
     fn upload_column(&self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.lock()?.upload_column(id, array)
+        self.with(|core| core.upload_column(id, array))
     }
     fn remove_column(&self, id: &str) -> PyResult<()> {
-        self.lock()?.remove_column(id)
+        self.with(|core| core.remove_column(id))
     }
     fn settings_json(&self) -> PyResult<String> {
-        self.lock()?.settings_json()
+        self.with(|core| core.settings_json())
     }
     fn add_series(&self, json: &str) -> PyResult<()> {
-        self.lock()?.add_series(json)
+        self.with(|core| core.add_series(json))
     }
     fn apply_settings(&self, json: &str) -> PyResult<()> {
-        self.lock()?.apply_settings(json)
+        self.with(|core| core.apply_settings(json))
     }
     fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
-        self.lock()?.fit(py, padding)
+        self.with(|core| core.fit(py, padding))
     }
     fn prepare_json(&self, py: Python<'_>) -> PyResult<String> {
-        self.lock()?.prepare(py)
+        self.with(|core| core.prepare(py))
     }
     fn set_range(&self, axis: &str, min: f64, max: f64) -> PyResult<()> {
-        self.lock()?.set_range(axis, min, max)
+        self.with(|core| core.set_range(axis, min, max))
     }
     fn bounds_json(&self, target: &str) -> PyResult<String> {
-        self.lock()?.bounds_json(target)
+        self.with(|core| core.bounds_json(target))
     }
     fn resize_handle(&self, target: &str, x: f32, y: f32) -> PyResult<Option<String>> {
-        self.lock()?.resize_handle(target, x, y)
+        self.with(|core| core.resize_handle(target, x, y))
     }
     #[pyo3(signature=(target, dx, dy, handle=None))]
     fn drag(&self, target: &str, dx: f32, dy: f32, handle: Option<&str>) -> PyResult<bool> {
-        self.lock()?.drag(target, dx, dy, handle)
+        self.with(|core| core.drag(target, dx, dy, handle))
     }
     fn pick_json(&self, py: Python<'_>, x: f32, y: f32) -> PyResult<String> {
-        self.lock()?.pick_json(py, x, y)
+        self.with(|core| core.pick_json(py, x, y))
     }
     fn clear_data_selection(&self) -> PyResult<()> {
-        self.lock()?.clear_data_selection()
+        self.with(|core| core.clear_data_selection())
     }
     #[pyo3(signature=(scale=1.0))]
     fn render_rgba<'py>(
@@ -912,17 +964,17 @@ impl NativeFigure {
         py: Python<'py>,
         scale: f32,
     ) -> PyResult<(u32, u32, Bound<'py, PyBytes>)> {
-        self.lock()?.render_rgba(py, scale)
+        self.with(|core| core.render_rgba(py, scale))
     }
     #[pyo3(signature=(scale=1.0))]
     fn render_png<'py>(&self, py: Python<'py>, scale: f32) -> PyResult<Bound<'py, PyBytes>> {
-        self.lock()?.render_png(py, scale)
+        self.with(|core| core.render_png(py, scale))
     }
     fn hit_test(&self, x: f32, y: f32) -> PyResult<Option<String>> {
-        Ok(self.lock()?.hit_test(x, y))
+        self.with(|core| Ok(core.hit_test(x, y)))
     }
     fn info_json(&self) -> PyResult<String> {
-        Ok(self.lock()?.info_json())
+        self.with(|core| Ok(core.info_json()))
     }
     #[getter]
     fn revision(&self) -> PyResult<u64> {
@@ -938,6 +990,8 @@ impl NativeFigure {
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NativeFigure>()?;
+    m.add_function(wrap_pyfunction!(gpu::release_gpu, m)?)?;
+    m.add_function(wrap_pyfunction!(gpu::collect_gpu, m)?)?;
     m.add_class::<notebook::NotebookFigure>()?;
     m.add_class::<desktop::WindowHandle>()?;
     m.add_function(wrap_pyfunction!(desktop::poll_events, m)?)?;

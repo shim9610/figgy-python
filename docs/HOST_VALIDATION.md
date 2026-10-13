@@ -146,4 +146,45 @@ prewarming but no public pipeline-cache injection. Reports explicitly return
 remaining target-format/first-use costs. Windows/macOS hardware preparation was
 not executed.
 
+## Native global sharing follow-up
+
+All native Figures now share one device, renderer and resident pool. The installed
+wheel suite passes **25 tests**. Checks cover same-id line/heatmap isolation,
+selection identities and scaled PNG/SSOT replay, close/GC cleanup, sequential
+context and prewarm reuse, explicit release refusal/reset, four concurrent Figure
+constructors/renderers, and a second Figure's failure halfway through upload
+without modifying the first Figure's pixels/settings or leaving orphan columns.
+
+The X11 test opens two independent Figures with the same `signal` id, verifies
+their common context id, forces pool growth while the first surface remains
+alive, and closes one Figure while the other keeps rendering. The original
+selection/drag/text/resize/reopen/clipboard/PNG assertions remain. Normal surface
+edits still perform no RGBA readback/PNG encoding. The font family input is edited
+through real X11 input and its SSOT is checked. Native tests compare actual pixels
+after size/color changes and after switching to an installed DejaVu Serif family,
+then replay those settings on a second shared Figure.
+
+Real JupyterLab automatic/manual preparation tests continue to pass after adding
+font-family inputs. Browser GPU ownership and the binary transfer policy are
+unchanged; these tests do not claim native/browser memory sharing.
+
+`benchmarks/results/linux-software-shared-context.json` records eight Figures,
+each with two 100,000-value float32 columns, in one context. The first constructor
+took **88.46 ms** and the median of seven subsequent constructors was **0.30 ms**.
+The shared pool used **12,800,000 bytes** with 16 MiB capacity; 16 independent column
+uploads occurred. Prewarm emitted 80 stage events initially and 2 subsequently,
+showing installed groups were reused. Preparation timings include current-chart
+execution/readback and cannot be interpreted as shader compilation alone.
+
+These are single-run **llvmpipe software-GPU** observations with the existing
+driver cache/environment, not a cold-driver benchmark, UI FPS, Windows hardware
+result or guaranteed acceleration factor. Reproduce with
+`python benchmarks/shared_context.py --output benchmarks/results/shared-context.json`.
+Report charts, when generated, continue to use Figgy.
+
+Release/locked wheel/sdist builds and strict twine metadata checks passed. All
+shared resources remain native-process local. Windows/macOS hardware behavior,
+different surface formats and physical VRAM pressure remain unverified here.
+Automatic CI is still disabled; pipeline disk-cache persistence remains absent.
+
 ![Installed-wheel JupyterLab WebGPU output](images/notebook-webgpu.png)

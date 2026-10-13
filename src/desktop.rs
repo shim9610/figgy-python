@@ -57,6 +57,7 @@ struct SurfaceWindow {
     styles: Vec<renderer::ChartStyle>,
     last_revision: u64,
     last_scale: f32,
+    last_pool_generation: u32,
     selected: Option<String>,
     handle: Option<String>,
     dragging: bool,
@@ -77,8 +78,11 @@ impl SurfaceWindow {
         core: &Arc<Mutex<FigureCore>>,
         control: Arc<Control>,
     ) -> PyResult<Self> {
-        let c = core.lock().map_err(runtime)?;
-        let rect = c.chart.config().chart_area.0;
+        let mut data = core.lock().map_err(runtime)?;
+        let gpu = Arc::clone(&data.gpu);
+        let mut renderer = gpu::lock(&gpu)?;
+        let c = FigureAccess::new(&gpu, &mut data, &mut renderer);
+        let rect = c.data.chart.config().chart_area.0;
         let window = Arc::new(
             event_loop
                 .create_window(
@@ -92,8 +96,12 @@ impl SurfaceWindow {
                 .map_err(runtime)?,
         );
         let size = window.inner_size();
-        let surface = c.instance.create_surface(window.clone()).map_err(runtime)?;
-        let caps = surface.get_capabilities(&c.adapter);
+        let surface = c
+            .context
+            .instance
+            .create_surface(window.clone())
+            .map_err(runtime)?;
+        let caps = surface.get_capabilities(&c.context.adapter);
         let format = caps.formats.iter().copied().find(|f| !f.is_srgb()).or(caps.formats.first().copied()).ok_or_else(|| runtime("the Figure GPU cannot present to this window; create it on a compatible adapter"))?;
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -130,6 +138,7 @@ impl SurfaceWindow {
             styles: vec![],
             last_revision: u64::MAX,
             last_scale: 0.,
+            last_pool_generation: 0,
             selected: None,
             handle: None,
             dragging: false,
@@ -152,26 +161,34 @@ impl SurfaceWindow {
         self.config.width = w;
         self.config.height = h;
         if let Some(core) = self.core.upgrade() {
-            let c = core.lock().unwrap();
+            let mut data = core.lock().unwrap();
+            let gpu = Arc::clone(&data.gpu);
+            let Ok(mut renderer) = gpu::lock(&gpu) else {
+                return;
+            };
+            let c = FigureAccess::new(&gpu, &mut data, &mut renderer);
             self.surface.configure(c.renderer.device(), &self.config);
         }
         self.last_scale = 0.;
         self.window.request_redraw();
     }
-    fn display(&self, c: &FigureCore) -> (Config, Rect, f32) {
+    fn display(&self, c: &FigureAccess<'_>) -> (Config, Rect, f32) {
         let width = self
             .config
             .width
             .saturating_sub((310. * self.window.scale_factor()) as u32)
             .max(1);
-        renderer::display_config_for_surface(c.chart.config(), (width, self.config.height))
+        renderer::display_config_for_surface(c.data.chart.config(), (width, self.config.height))
     }
     fn pointer(&mut self, event: &WindowEvent) -> PyResult<()> {
         let input_received = Instant::now();
         let Some(core) = self.core.upgrade() else {
             return Ok(());
         };
-        let mut c = core.lock().map_err(runtime)?;
+        let mut data = core.lock().map_err(runtime)?;
+        let gpu = Arc::clone(&data.gpu);
+        let mut renderer = gpu::lock(&gpu)?;
+        let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
         let (display, panel, scale) = self.display(&c);
         self.panel = panel;
         self.scale = scale;
@@ -203,19 +220,20 @@ impl SurfaceWindow {
                     .selected
                     .as_deref()
                     .and_then(|t| c.element(t).ok())
-                    .and_then(|id| c.hitmap.get(id))
+                    .and_then(|id| c.data.hitmap.get(id))
                     .and_then(|e| e.as_resizable())
                     .and_then(|e| e.hit_resize_handle(&display, &measure, x, y))
                     .map(|h| format!("{h:?}"));
                 if self.handle.is_none() {
                     self.selected = c
+                        .data
                         .hitmap
                         .hit_test(&display, &measure, x, y)
-                        .and_then(|id| c.hitmap.get(id))
+                        .and_then(|id| c.data.hitmap.get(id))
                         .map(|e| e.element_id());
                     if self.selected.as_deref() == Some("data_area") && !self.edit_area {
                         c.renderer.enable_gpu_picking().map_err(runtime)?;
-                        let id = c.chart_id;
+                        let id = c.data.chart_id;
                         let ticket = c
                             .renderer
                             .pick_chart_data(
@@ -230,10 +248,15 @@ impl SurfaceWindow {
                             .map_err(runtime)?;
                         c.renderer.wait_idle();
                         let picked = pollster::block_on(ticket.resolve()).map_err(runtime)?;
+                        let picked = picked.map(|p| {
+                            let mut reference = p.to_ref();
+                            gpu::local_selection(c.data.figure_id, &mut reference);
+                            reference
+                        });
                         self.selected = picked.as_ref().map(|p| p.series_id().to_string());
-                        let mut cfg = c.chart.config().clone();
+                        let mut cfg = c.data.chart.config().clone();
                         cfg.picked_data = picked.map(|p| renderer::config::DataSelectionsConfig {
-                            refs: vec![p.to_ref()],
+                            refs: vec![p],
                             ..Default::default()
                         });
                         c.commit_config(cfg)?;
@@ -243,7 +266,7 @@ impl SurfaceWindow {
                     .selected
                     .as_deref()
                     .and_then(|t| c.element(t).ok())
-                    .and_then(|id| c.hitmap.get(id))
+                    .and_then(|id| c.data.hitmap.get(id))
                     .is_some_and(|e| e.as_draggable().is_some());
                 self.last_revision = u64::MAX;
                 self.last_input = Some(input_received);
@@ -263,7 +286,7 @@ impl SurfaceWindow {
                     MouseScrollDelta::PixelDelta(p) => p.y as f32 / 40.,
                 };
                 let factor = (-dy as f64 * 0.1).exp();
-                let mut cfg = c.chart.config().clone();
+                let mut cfg = c.data.chart.config().clone();
                 for axis in [
                     &mut cfg.bottom_x,
                     &mut cfg.top_x,
@@ -290,7 +313,10 @@ impl SurfaceWindow {
             self.control.close.store(true, Ordering::Release);
             return Ok(());
         };
-        let mut c = core.lock().map_err(runtime)?;
+        let mut data = core.lock().map_err(runtime)?;
+        let gpu = Arc::clone(&data.gpu);
+        let mut renderer = gpu::lock(&gpu)?;
+        let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
         c.renderer
             .ensure_target_format(self.config.format)
             .map_err(runtime)?;
@@ -318,7 +344,7 @@ impl SurfaceWindow {
                     ui.horizontal(|ui| {
                         ui.add(egui::TextEdit::singleline(&mut self.save_path).desired_width(170.));
                         if ui.button("Save PNG").clicked() {
-                            c.png_encodes += 1;
+                            c.data.png_encodes += 1;
                             match c
                                 .render(1.)
                                 .and_then(|r| encode_png(&r).map_err(runtime))
@@ -336,10 +362,10 @@ impl SurfaceWindow {
                     egui::ComboBox::from_id_salt("target")
                         .selected_text(self.selected.as_deref().unwrap_or("Select an object"))
                         .show_ui(ui, |ui| {
-                            for (id, _) in &c.elements {
+                            for (id, _) in &c.data.elements {
                                 ui.selectable_value(&mut self.selected, Some(id.clone()), id);
                             }
-                            for s in &c.series {
+                            for s in &c.data.series {
                                 ui.selectable_value(
                                     &mut self.selected,
                                     Some(s.series_id.clone()),
@@ -384,6 +410,18 @@ impl SurfaceWindow {
                             }
                             changed |= number(ui, node, "font_size");
                             changed |= color(ui, node, "color");
+                            changed |= string(ui, node, "font");
+                        } else if target.starts_with("tick_labels_") {
+                            let key = match target.as_str() {
+                                "tick_labels_bottom" => "bottom_x",
+                                "tick_labels_top" => "top_x",
+                                "tick_labels_left" => "left_y",
+                                _ => "right_y",
+                            };
+                            let style = &mut config[key]["label_style"];
+                            changed |= number(ui, style, "font_size");
+                            changed |= color(ui, style, "color");
+                            changed |= string(ui, style, "label_font");
                         } else if let Some(s) = state["series"]
                             .as_array_mut()
                             .unwrap()
@@ -465,13 +503,16 @@ impl SurfaceWindow {
                     .map_err(runtime)?,
             );
         }
-        if c.revision != self.last_revision || scale != self.last_scale {
+        if c.data.revision != self.last_revision
+            || scale != self.last_scale
+            || self.last_pool_generation != c.renderer.pool().generation()
+        {
             let boxes = self
                 .selected
                 .as_deref()
                 .and_then(|t| c.element(t).ok())
                 .and_then(|id| {
-                    c.hitmap.selection_box(
+                    c.data.hitmap.selection_box(
                         id,
                         &display,
                         &CpuTextMeasure::for_style(&display.draw_style),
@@ -487,7 +528,7 @@ impl SurfaceWindow {
                     &boxes,
                 )
                 .map_err(runtime)?;
-            let specs = c.series.clone();
+            let specs = c.gpu_series(&c.data.series);
             self.styles = specs
                 .iter()
                 .map(|s| {
@@ -496,10 +537,11 @@ impl SurfaceWindow {
                         .map_err(runtime)
                 })
                 .collect::<PyResult<Vec<_>>>()?;
-            self.last_revision = c.revision;
+            self.last_revision = c.data.revision;
             self.last_scale = scale;
+            self.last_pool_generation = c.renderer.pool().generation();
         }
-        let specs = c.series.clone();
+        let specs = c.gpu_series(&c.data.series);
         let series = specs
             .iter()
             .zip(&self.styles)
@@ -509,7 +551,7 @@ impl SurfaceWindow {
             .renderer
             .prepare(&[renderer::ChartDrawItem {
                 view: self.view.as_ref().unwrap(),
-                chart_config: &display,
+                chart_config: &gpu::config(c.data.figure_id, &display),
                 series: &series,
             }])
             .map_err(runtime)?;
@@ -585,7 +627,7 @@ impl SurfaceWindow {
         if let Some(start) = self.last_input.take() {
             self.latency_ms = start.elapsed().as_secs_f64() * 1000.;
         }
-        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.uploads,"rgba_readbacks":c.readbacks,"png_encodes":c.png_encodes,"revision":c.revision});
+        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }
@@ -598,6 +640,21 @@ fn number(ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
             ui.label(key);
             ui.add(egui::DragValue::new(&mut value).speed(0.1))
                 .changed()
+        })
+        .inner;
+    if changed {
+        node[key] = json!(value);
+    }
+    changed
+}
+fn string(ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
+    let Some(mut value) = node[key].as_str().map(str::to_owned) else {
+        return false;
+    };
+    let changed = ui
+        .horizontal(|ui| {
+            ui.label(key);
+            ui.text_edit_singleline(&mut value).changed()
         })
         .inner;
     if changed {

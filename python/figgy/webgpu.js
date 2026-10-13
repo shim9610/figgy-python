@@ -75,12 +75,13 @@ export function render({model,el}) {
     if(path){const find=s=>path.reduce((n,k)=>n[k],s.config),rich=find(local);
       field('text',text(rich),'text',(s,v)=>find(s).segments=segments(v));
       field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
+      field('font',rich.font,'text',(s,v)=>find(s).font=v);
     }else if(series){const kind=Object.keys(series.render_type)[0],style=series.render_type[kind];const find=s=>s.series.find(v=>v.series_id===target).render_type[kind];
       if(style.line){color('color',style.line.line_color,s=>find(s).line.line_color);field('line_width',style.line.line_width,'number',(s,v)=>find(s).line.line_width=v);}
       if(style.scatter){color('color',style.scatter.point_color,s=>find(s).scatter.point_color);field('point_size',style.scatter.point_size,'number',(s,v)=>find(s).scatter.point_size=v);}
       if(style.matrix){field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);}
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>s.config[key][name]=v);color('color',cfg[key].line_color,s=>s.config[key].line_color);
-    }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);}
+    }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>s.config[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>s.config[key].label_style.label_font=v);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
   function resize(){if(!chart || disposed)return;const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;const width=Math.max(1,Math.round(rect.width*dpr)),height=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;enqueue(()=>{chart.resize(width,height);dirty=true;});}}

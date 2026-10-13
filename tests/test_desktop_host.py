@@ -3,14 +3,15 @@ import json,os,shutil,subprocess,time
 from pathlib import Path
 import numpy as np
 import pytest
-from figgy import subplots
+from figgy import subplots, release_gpu
 from figgy.desktop import poll_events
 
 def test_surface_drag_resize_reopen_and_no_png(tmp_path):
     tool = shutil.which('xdotool')
     if not os.environ.get('DISPLAY') or not tool:
         pytest.skip('requires X11 display and xdotool; run under Xvfb for software-GPU validation')
-    fig, ax = subplots(backend='native')
+    release_gpu()
+    fig, ax = subplots(backend='native', pool_bytes=4096)
     ax.plot(np.arange(32,dtype=np.float32),np.arange(32,dtype=np.float32),id='signal')
     ax.set_title('Editable title')
     handle = fig.show(block=False)
@@ -34,6 +35,10 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
     xdo('mousemove','--window',wid,1040,142);xdo('click',1);pump()
     xdo('key','ctrl+a');xdo('type','Rust edited');pump()
     assert 'Rust edited' in fig.to_code()
+    # Family input follows title text, size and color in the native panel.
+    xdo('mousemove','--window',wid,1080,208);xdo('click',1);pump()
+    xdo('key','ctrl+a');xdo('type','DejaVu Serif');pump()
+    assert fig.get_settings()['config']['chart_title']['text']['font']=='DejaVu Serif'
     xdo('windowsize',wid,1350,680);pump()
     info=json.loads(handle.info_json())
     assert info['surface_size']==[1350,680]
@@ -56,7 +61,13 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
     handle=fig.show(block=False);pump()
     assert json.loads(handle.info_json())['column_uploads']==2
     assert json.loads(handle.info_json())['png_encodes']==2
-    # A second Figure shares the event host while keeping its own GPU resources.
-    other,other_ax=subplots(backend='native');other_ax.scatter([0,1],[1,0]);second=other.show(block=False);pump()
+    # Independent Figure documents share the same device/renderer/pool.
+    capacity=fig.info['pool_capacity_bytes']
+    other,other_ax=subplots(backend='native');other_ax.scatter(np.arange(4000,dtype=np.float32),np.arange(4000,dtype=np.float32),id='signal');second=other.show(block=False);pump()
     assert json.loads(second.info_json())['surface_frames']>0
-    second.close();other.close();handle.close();pump();fig.close()
+    assert fig.info['gpu_context_id']==other.info['gpu_context_id']==json.loads(second.info_json())['gpu_context_id']
+    assert fig.info['pool_capacity_bytes'] > capacity
+    other.close();pump()
+    assert json.loads(handle.info_json())['surface_frames']>0 and not handle.closed
+    assert fig.info['columns']==2 and fig.info['active_figures']==1
+    handle.close();pump();fig.close()

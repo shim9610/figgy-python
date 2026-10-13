@@ -1,0 +1,39 @@
+{
+  "metric": "first vs subsequent native Figure construction, not render FPS",
+  "adapter": {
+    "backend": "Vulkan",
+    "device_type": "Cpu",
+    "driver": "llvmpipe",
+    "initial_pool_capacity_bytes": 8388608,
+    "maximum_column_pool_bytes": 134217728,
+    "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
+  },
+  "figures": 8,
+  "points_per_figure": 100000,
+  "context_ids": [
+    1
+  ],
+  "constructor_ms": [
+    88.45997900061775,
+    0.3682240021589678,
+    0.2969269989989698,
+    0.43357200047466904,
+    0.26631099899532273,
+    0.2417639989289455,
+    0.2883140004996676,
+    0.38189399856491946
+  ],
+  "first_constructor_ms": 88.45997900061775,
+  "subsequent_constructor_median_ms": 0.2969269989989698,
+  "prewarm_stage_events": [
+    80,
+    2
+  ],
+  "initial_preparation_ms": 1006.709624,
+  "subsequent_preparation_ms": 96.97134,
+  "shared_pool_capacity_bytes": 16777216,
+  "shared_pool_used_bytes": 12800000,
+  "total_column_uploads": 16,
+  "no_cpu_source_retention": true,
+  "persistent_cache_supported": false
+}

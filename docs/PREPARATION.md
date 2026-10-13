@@ -26,6 +26,10 @@ current document render prepares its own views/styles/atlases. It uses
 pipelines. Egui is initialized by the window host. New style variants, target
 formats/sample counts, and driver work on first use can still cause delays.
 `ready=True` means this operation completed, not a promise of zero future work.
+Native Figures share one process-local renderer, so installed pipeline groups
+also benefit subsequently created Figures. Per-Figure views/styles and target
+formats can still require work. `fig.close()` retains that context for reuse;
+`figgy.release_gpu()` explicitly releases it after all native Figures close.
 
 ## Jupyter
 

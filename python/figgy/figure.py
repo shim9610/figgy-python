@@ -215,6 +215,11 @@ class Figure:
                         rich["segments"] = _segments(value)
                     elif key in ("color", "fontsize", "font"):
                         field = {"color": "color", "fontsize": "font_size", "font": "font"}[key]
+                        if key == "font":
+                            if not isinstance(value, str):
+                                raise ValueError("font must be a font family name")
+                            if rich is None and "label_font" in node:
+                                field = "label_font"
                         if key == "fontsize":
                             value = float(value) * self.dpi / 72
                             if not math.isfinite(value) or value <= 0:
@@ -415,6 +420,9 @@ class Figure:
                 from .desktop import poll_events
                 poll_events()
             self._native = None
+            if self.backend == "native":
+                from ._native import collect_gpu
+                collect_gpu()
 
     def __enter__(self):
         return self

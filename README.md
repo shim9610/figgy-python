@@ -49,10 +49,15 @@ plt.show()
 ```
 
 Rust가 창·이벤트 루프·surface·입력과 선택을 관리합니다. 기존 Figure의 장치와
-상주 열을 공유하므로 창을 다시 열 때 데이터를 재업로드하지 않습니다. 일반 프레임은
+상주 열을 공유하므로 창을 다시 열 때 데이터를 재업로드하지 않습니다. 서로 다른
+native Figure도 프로세스의 하나의 GPU 장치·renderer·column pool을 공유합니다.
+각 Figure의 설정과 데이터는 독립적이며, 같은 시리즈 ID를 써도 충돌하지 않습니다.
+일반 프레임은
 surface에 직접 그리며 RGBA readback·PNG 인코딩·JS 이미지 전달을 수행하지 않습니다.
 
-속성 패널에서 제목·축·범례·시리즈를 편집하고, 객체를 선택·드래그할 수 있습니다.
+속성 패널에서 제목·축·범례의 글씨 크기·색·폰트 이름, 눈금 글씨 속성, 시리즈 색과
+스타일을 편집하고 객체를 선택·드래그할 수 있습니다. 폰트는 native에서 설치된
+family 이름을 사용하며, 없는 이름은 renderer 기본 폰트로 대체됩니다.
 Edit plot area는 이동/크기 조정, 마우스 휠은 줌입니다. **Copy Python**은 현재 SSOT를
 `fig.apply_settings(...)` 코드로 복사하며, **Save PNG**는 입력한 경로에 저장합니다.
 추가 renderer 속성은 Full SSOT JSON에서 편집할 수 있습니다.
@@ -70,6 +75,18 @@ run_events()                    # 모든 현재 창이 닫힐 때까지 실행
 이벤트 펌프와 native GPU 작업은 GIL을 해제합니다. 여러 Figure를 각각 비차단 모드로
 연 뒤 같은 이벤트 루프에서 처리할 수 있습니다. `fig.close()`로 native 자원을 해제합니다.
 Qt/Tk의 외부 루프나 `%gui qt`에 자동 통합하지 않습니다.
+
+첫 native Figure의 `pool_bytes`가 공유 pool의 초기 크기를 정합니다. 이후 Figure의
+할당도 같은 pool을 사용하므로 합계 데이터가 adapter의 한 storage buffer 한도를
+넘으면 `MemoryError`가 납니다. 활성 데이터를 자동으로 버리거나 스트림으로 바꾸지
+않습니다. `fig.close()`는 해당 데이터 공간을 반납하지만 공유 pool 용량·파이프라인은
+다음 Figure를 위해 유지합니다. 모든 native Figure를 닫은 뒤 `figgy.release_gpu()`로
+공유 자원까지 해제할 수 있습니다. Jupyter의 브라우저 pool은 여전히 뷰별로 독립적입니다.
+
+```python
+ax.set_title("Title", color="red", fontsize=20, font="DejaVu Serif")
+fig.update("tick_labels_bottom", fontsize=12, font="DejaVu Serif", color="blue")
+```
 
 ## 명시적 GPU 준비
 
