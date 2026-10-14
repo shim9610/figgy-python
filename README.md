@@ -23,33 +23,92 @@ Click a chart to open the Python example that generates it. All data is
 synthetic; every image is actual native Figgy output. Each example exports a PNG
 and can open the same chart for interactive editing with `--show`.
 
-**Pies, donuts and procedural materials**
+**Scientific plots**
 
-| Pie | Raised ceramic donut |
-| --- | --- |
-| [![Pie with labeled and exploded slices](docs/images/gallery/pie-chart.png)](examples/pie_chart.py) | [![Raised ceramic donut with rounded corners](docs/images/gallery/donut-chart.png)](examples/donut_chart.py) |
-| **Wood** | **Pearl** |
-| [![Procedural wood material](docs/images/gallery/material-wood.png)](examples/material_textures.py) | [![Procedural pearl material](docs/images/gallery/material-pearl.png)](examples/material_textures.py) |
-| **Paper** | **Hatch** |
-| [![Procedural paper material](docs/images/gallery/material-paper.png)](examples/material_textures.py) | [![Procedural hatch material](docs/images/gallery/material-hatch.png)](examples/material_textures.py) |
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <strong>Signals and references</strong><br>
+      <a href="examples/line_signals.py"><img src="docs/images/gallery/line-signals.png" alt="Damped oscillation and reference envelopes" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Populations and markers</strong><br>
+      <a href="examples/scatter_clusters.py"><img src="docs/images/gallery/scatter-clusters.png" alt="Three synthetic scatter populations" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Interpolated heatmap</strong><br>
+      <a href="examples/heatmap_field.py"><img src="docs/images/gallery/heatmap-field.png" alt="Signed interference field" width="100%"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <strong>Logarithmic axes</strong><br>
+      <a href="examples/log_scales.py"><img src="docs/images/gallery/log-scales.png" alt="Power laws on logarithmic X and Y axes" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Correlation matrix</strong><br>
+      <a href="examples/correlation_matrix.py"><img src="docs/images/gallery/correlation-matrix.png" alt="Twelve-channel correlation matrix" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Spectrogram</strong><br>
+      <a href="examples/spectrogram.py"><img src="docs/images/gallery/spectrogram.png" alt="NumPy short-time spectrum of a chirp" width="100%"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <strong>Parametric curves</strong><br>
+      <a href="examples/parametric_curves.py"><img src="docs/images/gallery/parametric-curves.png" alt="Layered parametric traces" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Lines and measurements</strong><br>
+      <a href="examples/line_markers.py"><img src="docs/images/gallery/line-markers.png" alt="Model curve and measured markers" width="100%"></a>
+    </td>
+    <td width="33%"></td>
+  </tr>
+</table>
 
 **Draw styles**
 
-| Sketch / handwriting | Constellation | Milkyway / lines only |
-| --- | --- | --- |
-| [![Hand-drawn curves and Comic Neue lettering](docs/images/gallery/sketch-style.png)](examples/sketch_style.py) | [![Stars at source samples joined by lines](docs/images/gallery/constellation-style.png)](examples/constellation_style.py) | [![Line-only star chains and nebula ribbons](docs/images/gallery/milkyway-style.png)](examples/milkyway_style.py) |
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <strong>Sketch / handwriting</strong><br>
+      <a href="examples/sketch_style.py"><img src="docs/images/gallery/sketch-style.png" alt="Hand-drawn curves and Comic Neue lettering" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Constellation</strong><br>
+      <a href="examples/constellation_style.py"><img src="docs/images/gallery/constellation-style.png" alt="Stars at source samples joined by lines" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Milkyway / lines only</strong><br>
+      <a href="examples/milkyway_style.py"><img src="docs/images/gallery/milkyway-style.png" alt="Line-only star chains and nebula ribbons" width="100%"></a>
+    </td>
+  </tr>
+</table>
 
-**Scientific plots**
+**Pies, donuts and procedural materials**
 
-| Signals and references | Populations and markers |
-| --- | --- |
-| [![Damped oscillation and reference envelopes](docs/images/gallery/line-signals.png)](examples/line_signals.py) | [![Three synthetic scatter populations](docs/images/gallery/scatter-clusters.png)](examples/scatter_clusters.py) |
-| **Parametric curves** | **Logarithmic axes** |
-| [![Layered parametric traces](docs/images/gallery/parametric-curves.png)](examples/parametric_curves.py) | [![Power laws on logarithmic X and Y axes](docs/images/gallery/log-scales.png)](examples/log_scales.py) |
-| **Lines and measurements** | **Interpolated heatmap** |
-| [![Model curve and measured markers](docs/images/gallery/line-markers.png)](examples/line_markers.py) | [![Signed interference field](docs/images/gallery/heatmap-field.png)](examples/heatmap_field.py) |
-| **Correlation matrix** | **Spectrogram** |
-| [![Twelve-channel correlation matrix](docs/images/gallery/correlation-matrix.png)](examples/correlation_matrix.py) | [![NumPy short-time spectrum of a chirp](docs/images/gallery/spectrogram.png)](examples/spectrogram.py) |
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <strong>Pie</strong><br>
+      <a href="examples/pie_chart.py"><img src="docs/images/gallery/pie-chart.png" alt="Pie with labeled and exploded slices" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Raised ceramic donut</strong><br>
+      <a href="examples/donut_chart.py"><img src="docs/images/gallery/donut-chart.png" alt="Raised ceramic donut with rounded corners" width="100%"></a>
+    </td>
+    <td width="33%" align="center">
+      <strong>Procedural materials</strong><br>
+      <a href="docs/images/gallery/material-paper.png">Paper</a> ·
+      <a href="docs/images/gallery/material-wood.png">Wood</a> ·
+      <a href="docs/images/gallery/material-hatch.png">Hatch</a> ·
+      <a href="docs/images/gallery/material-pearl.png">Pearl</a><br><br>
+      <a href="examples/material_textures.py">Python recipes</a> ·
+      <a href="docs/CHART_TYPES.md">Material API</a>
+    </td>
+  </tr>
+</table>
 
 ```bash
 python examples/heatmap_field.py                  # Export output/gallery/heatmap-field.png
