@@ -152,6 +152,15 @@ also passed the revised smoke checker. The corrected Windows wheel jobs still
 require a new Actions run; the free-threaded GIL warning is expected and unrelated
 to the asset failure. These checks do not claim Windows GPU/UI validation.
 
+The next run at `03996da` successfully built and smoke-tested **all 74 wheel
+combinations** and the sdist. Its final Linux UI job exposed a missing
+`libxkbcommon-x11.so.0` on the runner. This is a dynamically loaded X11 runtime
+dependency; offscreen GPU rendering and import can succeed without it. The X11
+jobs now install `libxkbcommon0`/`libxkbcommon-x11-0`, probe the libraries before
+winit initialization, and allocate a 1600×1000 Xvfb screen for expanded editors.
+See [repository setup](REPOSITORY_SETUP.md) for the staged PR/CodeQL workflows and
+the distinction between executed software-GPU tests and pending GitHub runs.
+
 To test the repair in GitHub, choose **Run workflow** on **main** after pulling
 the fix. **Re-run jobs** retains that run's original commit and workflow.
 Automatic triggers and publication remain disabled.

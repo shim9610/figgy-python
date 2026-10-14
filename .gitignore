@@ -1,6 +1,10 @@
 /target/
 /dist/
 /output/
+/ci-results/
+/.ci/
+/.build-python/
+/.wheel-test/
 __pycache__/
 *.pyc
 *.pyo

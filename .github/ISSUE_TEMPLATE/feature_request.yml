@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a plotting, editing or integration improvement.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Explain what you are trying to do and the current limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Give an API or interaction example, including the target backend.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Data size and compatibility needs
+      description: Mention OS, Python/browser versions, data sizes and performance needs.
+

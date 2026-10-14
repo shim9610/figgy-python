@@ -1,0 +1,5 @@
+name: figgyplot source
+paths-ignore:
+  # Generated, pinned upstream artifacts are verified by provenance hashes.
+  - python/figgyplot/assets/**
+

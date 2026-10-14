@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible figgyplot failure.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "For security reports, use SECURITY.md and the private reporting channel."
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Describe the failure and what should happen.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Paste runnable Python code with synthetic data. Remove secrets and private datasets.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include commit/version, OS/architecture, Python and NumPy, backend, GPU/driver, and browser/Jupyter versions when applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message and logs
+      description: Include the full exception and relevant logs, with credentials removed.
+      render: text
+  - type: textarea
+    id: verification
+    attributes:
+      label: Reproduction details
+      description: Mention repeated runs, input size, resize/DPI, or close/reopen behavior when relevant.
+

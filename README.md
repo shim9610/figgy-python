@@ -155,10 +155,20 @@ Tools. On macOS, use Xcode Command Line Tools. Native desktop rendering uses
 wgpu (Vulkan on Linux, DX12 on Windows, Metal on macOS); Metal support is
 experimental. The native editor does not require Qt or PySide6.
 
+Linux X11 windows additionally need the system keyboard libraries
+`libxkbcommon0` and `libxkbcommon-x11-0` (Debian/Ubuntu package names), plus the
+window system and GPU driver. Minimal/headless Linux images may omit these
+libraries even when offscreen rendering works.
+
 The distribution/import name is **figgyplot**, independent of the unrelated
 `figgy` package on PyPI. The repository name remains `figgy-python`.
 [Platform/Python coverage and release status](docs/DISTRIBUTION.md) distinguish
 configured wheels from executed verification. Wheel CI remains manual only.
+
+Contributions follow the [contributing guide](CONTRIBUTING.md) and
+[code of conduct](CODE_OF_CONDUCT.md). For private vulnerability reports, see
+[the security policy](SECURITY.md). [Repository setup and PR CI rollout](docs/REPOSITORY_SETUP.md)
+describe the prepared security workflows and main-branch check names.
 
 Add notebook support with `python -m pip install ".[notebook]"`. The WASM assets
 are included in the package; normal installation does not require a WASM build.

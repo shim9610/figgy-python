@@ -1,0 +1,37 @@
+version: 2
+# Regular update PRs stay paused during stabilization. Setting the limit to 3
+# after PR CI is enabled activates them. Security alerts/updates are independent
+# repository settings; this file does not enable those switches.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      rust-dependencies:
+        patterns: ["*"]
+    # Renderer/host versions must move together in a reviewed compatibility PR.
+    ignore:
+      - dependency-name: figgy-renderer
+      - dependency-name: figgy-model
+      - dependency-name: wgpu
+      - dependency-name: egui*
+      - dependency-name: winit
+

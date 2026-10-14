@@ -1,0 +1,99 @@
+name: PR tests
+
+on:
+  workflow_dispatch:
+  # Enable after stabilization; do not add paths filters to required checks.
+  # pull_request:
+  #   branches: [main]
+  # merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: PR / Workflow and assets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PyO3/maturin-action
+          ref: e83996d129638aa358a18fbd1dfb82f0b0fb5d3b
+          path: .ci/maturin-action
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: bash scripts/ci-preflight.sh
+
+  integration:
+    name: PR / Linux integration
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: '4'
+      WGPU_BACKEND: vulkan
+      FIGGY_TEST_JUPYTER: '1'
+      FIGGY_TEST_HEADFUL: '1'
+      FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PyO3/maturin-action
+          ref: e83996d129638aa358a18fbd1dfb82f0b0fb5d3b
+          path: .ci/maturin-action
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: '1.99.0'
+          components: rustfmt
+      - name: Install native software-GPU and X11 runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl
+      - name: Build and install the exact PR wheel
+        run: |
+          uv python install 3.12
+          uv venv .venv --python 3.12
+          uv pip install --python .venv/bin/python 'maturin>=1.15,<2'
+          .venv/bin/python -m maturin build --release --locked --compatibility linux --out dist -i .venv/bin/python
+          for wheel in dist/*.whl; do
+            uv pip install --python .venv/bin/python --only-binary=:all: "${wheel}[test]"
+          done
+          uv pip install --python .venv/bin/python --only-binary=:all: 'PyYAML>=6,<7' 'playwright>=1.50,<2' 'jupyterlab>=4,<5' 'nbformat>=5,<6' 'ipykernel>=6'
+          .venv/bin/python scripts/check_installed.py
+          .venv/bin/python scripts/check_x11_runtime.py
+      - name: Install Chromium and select software GPU drivers
+        run: |
+          .venv/bin/python -m playwright install --with-deps chromium
+          .venv/bin/python scripts/ci_gpu_env.py
+      - name: Test native surface, editing and real JupyterLab WebGPU
+        run: |
+          cargo fmt --check
+          xvfb-run -a -s '-screen 0 1600x1000x24' bash <<'SCRIPT'
+            set -euo pipefail
+            openbox > /tmp/figgyplot-openbox.log 2>&1 &
+            wm_pid=$!
+            trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
+            .venv/bin/python -m pytest -q --basetemp=ci-results --junitxml=ci-results/junit.xml
+          SCRIPT
+      - name: Save integration results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-linux-integration-results
+          path: ci-results
+          retention-days: 5
+          if-no-files-found: ignore
+
