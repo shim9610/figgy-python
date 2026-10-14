@@ -56,7 +56,7 @@ repeat the implementation.
 
 [PR tests](.github/workflows/pr-tests.yml) and
 [CodeQL](.github/workflows/codeql.yml) are prepared for automatic PR execution,
-but remain manual until stabilization. Follow the rollout document to activate
+and run automatically on pull requests to main. Follow the rollout document for
 them after the wheel matrix is green. Fork PRs use read-only test permissions;
 no publication or privileged `pull_request_target` workflow is used.
 
