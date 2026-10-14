@@ -73,7 +73,7 @@ and can open the same chart for interactive editing with `--show`.
   <tr>
     <td width="33%" align="center">
       <strong>Sketch / handwriting</strong><br>
-      <a href="examples/sketch_style.py"><img src="docs/images/gallery/sketch-style.png" alt="Hand-drawn curves and Comic Neue lettering" width="100%"></a>
+      <a href="examples/sketch_style.py"><img src="docs/images/gallery/sketch-style.png" alt="Hand-drawn curves and Comic Neue lettering on warm ivory paper" width="100%"></a>
     </td>
     <td width="33%" align="center">
       <strong>Constellation</strong><br>

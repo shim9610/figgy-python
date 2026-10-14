@@ -14,7 +14,13 @@ def make_figure():
     ax.set_xlim(-0.3, 12.3)
     ax.set_ylim(0, 1250)
     ax.legend()
-    fig.configure(config={"legend": {"corner": "TopLeft"}})
+    # Warm ivory keeps the sketch strokes and handwriting on a paper-like canvas.
+    paper = "#faf6e8"
+    fig.set_facecolor(paper)
+    fig.configure(config={"legend": {
+        "corner": "TopLeft",
+        "bg_color": dict(zip("rgba", (250/255, 246/255, 232/255, 1))),
+    }})
     fig.set_draw_style("sketch", amplitude_px=1.5, wavelength_px=64, seed=7)
     return fig
 

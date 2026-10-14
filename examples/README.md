@@ -23,7 +23,7 @@ not mockups or upstream Rust screenshots.
 | [![Pie](../docs/images/gallery/pie-chart.png)](pie_chart.py) | [pie_chart.py](pie_chart.py) | Bounded category values, outside labels and exploded slices |
 | [![Donut](../docs/images/gallery/donut-chart.png)](donut_chart.py) | [donut_chart.py](donut_chart.py) | Ceramic, tilt, depth, rounded corners, bevel and shadow |
 | [![Wood](../docs/images/gallery/material-wood.png)](material_textures.py) | [material_textures.py](material_textures.py) | Procedural paper/wood/hatch/pearl; choose `--material` |
-| [![Sketch](../docs/images/gallery/sketch-style.png)](sketch_style.py) | [sketch_style.py](sketch_style.py) | Deterministic path wobble and bundled Comic Neue handwriting |
+| [![Sketch](../docs/images/gallery/sketch-style.png)](sketch_style.py) | [sketch_style.py](sketch_style.py) | Warm ivory canvas, deterministic path wobble and bundled Comic Neue handwriting |
 | [![Constellation](../docs/images/gallery/constellation-style.png)](constellation_style.py) | [constellation_style.py](constellation_style.py) | Stars at marker-line samples with translucent connections |
 | [![Milkyway](../docs/images/gallery/milkyway-style.png)](milkyway_style.py) | [milkyway_style.py](milkyway_style.py) | Line-only star chains and nebula ribbons; scatter is disabled |
 | [![Damped signal](../docs/images/gallery/line-signals.png)](line_signals.py) | [line_signals.py](line_signals.py) | 100,000 samples, multiple lines and dashed envelopes |

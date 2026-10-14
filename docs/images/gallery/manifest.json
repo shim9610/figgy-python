@@ -191,14 +191,14 @@
       ],
       "adapter": {
         "backend": "Vulkan",
-        "device_type": "IntegratedGpu",
-        "driver": "radv",
+        "device_type": "Cpu",
+        "driver": "llvmpipe",
         "initial_pool_capacity_bytes": 8388608,
-        "maximum_column_pool_bytes": 2147483644,
-        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+        "maximum_column_pool_bytes": 134217728,
+        "name": "llvmpipe (LLVM 19.1.7, 256 bits)"
       },
       "parameters": {},
-      "sha256": "98aa5a4961c1b6a1b0cd3bd10345f28f7097dd86e4ea2ff520b0d78b5ef0bfbf"
+      "sha256": "42ebb436684caa8419b423a55bd2194009bf6e3aa6edccc4339a0b9c732f33a1"
     },
     {
       "source": "examples/constellation_style.py",
