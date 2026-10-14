@@ -219,6 +219,73 @@ def test_successful_testpypi_run_can_be_promoted(successful_run):
     promotion["validate_run"](*successful_run)
 
 
+def test_uploaded_release_with_skipped_installs_can_only_enter_recheck(successful_run):
+    successful_run[1][1]["jobs"] = []
+    assert promotion["validate_run"](*successful_run, require_installs=False)
+    with pytest.raises(ValueError, match="installation must succeed"):
+        promotion["validate_run"](*successful_run)
+
+
+def test_completed_recheck_can_be_promoted(successful_run):
+    successful_run[1][0]["jobs"][0]["name"] = "Verify existing TestPyPI files"
+    assert promotion["validate_run"](*successful_run) is False
+
+
+def test_recheck_with_skipped_installs_is_not_trusted(successful_run):
+    successful_run[1][0]["jobs"][0]["name"] = "Verify existing TestPyPI files"
+    successful_run[1][1]["jobs"] = []
+    with pytest.raises(ValueError, match="installation must succeed"):
+        promotion["validate_run"](*successful_run, require_installs=False)
+
+
+@pytest.fixture
+def package_git(tmp_path):
+    paths = [".github/workflows/publish.yml", ".github/workflows/wheels.yml",
+             "scripts/check_testpypi.py", "docs/PUBLISHING.md", "src/lib.rs",
+             "python/figgyplot/figure.py", "Cargo.toml", "Cargo.lock", "pyproject.toml",
+             "PYPI_README.md", ".gitattributes"]
+    for name in paths:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("original\n")
+
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=tmp_path, text=True).strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Release test")
+    git("config", "user.email", "release-test@example.invalid")
+    git("add", ".")
+    git("commit", "-qm", "original package")
+    return tmp_path, git, git("rev-parse", "HEAD")
+
+
+@pytest.mark.parametrize("name", [".github/workflows/publish.yml", "scripts/check_testpypi.py", "docs/PUBLISHING.md"])
+def test_release_only_repairs_can_reuse_existing_package(package_git, name):
+    root, git, original = package_git
+    (root / name).write_text("fixed verification\n")
+    git("add", "."); git("commit", "-qm", "release repair")
+    promotion["validate_source"](root, original, git("rev-parse", "HEAD"))
+
+
+@pytest.mark.parametrize("name", ["src/lib.rs", "python/figgyplot/figure.py", "Cargo.toml", "Cargo.lock",
+                                  "pyproject.toml", "PYPI_README.md", ".gitattributes", ".github/workflows/wheels.yml"])
+def test_package_or_build_changes_cannot_reuse_tested_release(package_git, name):
+    root, git, original = package_git
+    (root / name).write_text("changed package input\n")
+    git("add", "."); git("commit", "-qm", "package changed")
+    with pytest.raises(ValueError, match="Package inputs changed"):
+        promotion["validate_source"](root, original, git("rev-parse", "HEAD"))
+
+
+def test_unrelated_history_cannot_reuse_tested_release(package_git):
+    root, git, original = package_git
+    git("checkout", "--orphan", "another-history")
+    git("commit", "-qm", "different history")
+    with pytest.raises(ValueError, match="must be an ancestor"):
+        promotion["validate_source"](root, original, git("rev-parse", "HEAD"))
+
+
 @pytest.mark.parametrize("field,value,message", [
     ("head_sha", "b" * 40, "exact main commit"),
     ("head_branch", "unreviewed", "manual publication on main"),

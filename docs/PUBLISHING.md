@@ -3,7 +3,8 @@
 The workflow file is **`.github/workflows/publish.yml`**, named
 **Publish figgyplot (manual only)**. Choose `target=testpypi` to build and test a
 preview, then `target=pypi` to promote that successful run's exact files to the
-production index. The default is TestPyPI. There are no automatic push, PR, tag
+production index. `target=verify-testpypi` checks an already uploaded release
+without rebuilding or uploading it. The default is TestPyPI. There are no automatic push, PR, tag
 or release publication triggers. No API token or password needs to be added to GitHub.
 
 ## Complete the pending Trusted Publisher form
@@ -80,9 +81,9 @@ wrong hashes/versions fail immediately. This changes no production GPU waits.
    nine index installation jobs. Copy its numeric ID from the run URL.
 2. Run `publish.yml` again on **main**, select **target `pypi`**, the same version
    and that **testpypi-run-id**.
-3. The workflow requires the same repository, workflow, main commit, version,
-   successful TestPyPI upload and all expected successful installation jobs.
-   A PR test run, failed run, production-only run, different commit or missing
+3. The workflow requires the same repository, workflow, package inputs, version,
+   successful TestPyPI upload/recheck and all expected successful installation jobs.
+   A PR test run, failed run, production-only run, changed package inputs or missing
    installation is rejected.
 4. It downloads the original release files/manifest, verifies every hash,
    packaged source/asset and all 74 wheel combinations plus one sdist, and
@@ -90,10 +91,37 @@ wrong hashes/versions fail immediately. This changes no production GPU waits.
 5. Nine jobs download from production **PyPI only** and repeat the byte-level
    and import/model/assets installation checks.
 
-Keep main at the tested commit until promotion. If sources or metadata change,
-publish/test a new version first; the old `0.2.0` run cannot promote the newly
-prepared `0.2.1` sources. Artifacts expire after 30 days. Do not upload twice
+Keep package inputs unchanged until promotion. Only the exact publishing
+workflow, release-verification scripts/tests and this release guide may change;
+the verifier checks Git ancestry and the complete diff against a narrow allowlist.
+Changes to Rust/Python code, Cargo inputs, pyproject, the package description,
+Git attributes or wheel-build configuration require a new tested release.
+The old `0.2.0` run cannot promote `0.2.1` sources. Artifacts expire after 30 days. Do not upload twice
 under one version or use `skip-existing` to conceal mixed builds.
+
+## Verify an already uploaded preview
+
+If a successful upload's installation jobs were skipped, do **not** rebuild and
+upload the same version. Run the workflow on **main** with:
+
+- **target:** `verify-testpypi`
+- **version:** the uploaded version, currently `0.2.1`
+- **testpypi-run-id:** the original upload's numeric ID, **`38605305486`** for the
+  first 0.2.1 upload (from its `/actions/runs/38605305486` URL, not the label `#2`).
+
+This path verifies the original immutable files/manifest and runs all nine
+real index installation jobs without an upload or rebuild. It retains the
+original build commit, run ID and file hashes, adding only the verification run
+ID to the manifest. After the whole recheck succeeds, select `target=pypi` and
+enter **the new recheck run ID**, not the original incomplete-verification ID.
+PyPI promotion still rejects missing/failed/skipped installation jobs.
+
+The original 0.2.1 TestPyPI run `38605305486` uploaded successfully but its
+installation matrix was skipped because the downstream job's implicit
+`success()` considered a deliberately skipped ancestor. The installation job
+now explicitly uses `always()`, cancellation handling and success of the selected
+preparation/upload branch. The failed PyPI run `38612755099` had an empty source
+run-ID input and stopped in the gate; it made no production upload.
 
 The Codex connector in this session can prepare/validate workflows and read CI
 results, but has no workflow-dispatch operation. The owner clicks **Run workflow**;
