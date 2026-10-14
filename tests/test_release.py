@@ -1,11 +1,13 @@
 """Release integrity regressions without a GPU, upload token or network."""
 import hashlib
+import importlib.metadata
 import io
 import json
 from pathlib import Path
 import runpy
 import subprocess
 import tarfile
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -16,6 +18,9 @@ pytest.importorskip("packaging")
 ROOT = Path(__file__).resolve().parents[1]
 release = runpy.run_path(str(ROOT / "scripts/prepare_release.py"))
 download = runpy.run_path(str(ROOT / "scripts/check_testpypi.py"))
+with pytest.MonkeyPatch.context() as imports:
+    imports.syspath_prepend(str(ROOT / "scripts"))
+    promotion = runpy.run_path(str(ROOT / "scripts/check_promotion.py"))
 
 
 @pytest.fixture
@@ -152,13 +157,16 @@ def test_index_download_cannot_use_another_build(inputs, monkeypatch):
         download["verify_download"](wheel, manifest, "0.3.0")
 
 
-@pytest.mark.parametrize("corrupt", [False, True])
-def test_download_uses_isolated_test_index_and_never_installs_bad_bytes(inputs, monkeypatch, corrupt):
+@pytest.mark.parametrize("target", ["testpypi", "pypi"])
+@pytest.mark.parametrize("corrupt", [None, "download", "installed"])
+def test_download_uses_isolated_index_and_rejects_bad_bytes(inputs, monkeypatch, corrupt, target):
     manifest = release["prepare"](*inputs)
     wheel = next(inputs[2].glob("*cp312*manylinux*.whl"))
     tag = next(iter(release["parse_wheel_filename"](wheel.name)[3]))
     monkeypatch.setitem(download["main"].__globals__, "sys_tags", lambda: iter([tag]))
-    monkeypatch.setattr(download["main"].__globals__["sys"], "argv", ["check_testpypi.py", str(inputs[3]), "0.2.0"])
+    monkeypatch.setattr(download["main"].__globals__["sys"], "argv", ["check_testpypi.py", str(inputs[3]), "0.2.0", target])
+    installed = inputs[2] / "installed"
+    monkeypatch.setattr(importlib.metadata, "distribution", lambda name: SimpleNamespace(locate_file=lambda path: installed / path))
     calls = []
 
     def run(command, **kwargs):
@@ -167,22 +175,92 @@ def test_download_uses_isolated_test_index_and_never_installs_bad_bytes(inputs, 
             assert "--isolated" in command and "--no-deps" in command
             assert "--only-binary=:all:" in command and "--no-cache-dir" in command
             assert "--extra-index-url" not in command
-            assert command[command.index("--index-url") + 1] == "https://test.pypi.org/simple/"
+            assert command[command.index("--index-url") + 1] == download["INDEXES"][target]
             # Simulate index propagation: two download errors, then one wheel.
             if len(calls) < 3:
                 return subprocess.CompletedProcess(command, 1)
             destination = Path(command[command.index("--dest") + 1]) / wheel.name
-            destination.write_bytes(wheel.read_bytes() + (b"changed" if corrupt else b""))
+            destination.write_bytes(wheel.read_bytes() + (b"changed" if corrupt == "download" else b""))
         else:
             assert "install" in command and "--no-deps" in command
+            assert command[command.index("--index-url") + 1] == download["INDEXES"][target]
+            assert "--only-binary=:all:" in command and "figgyplot==0.2.0" in command
+            with zipfile.ZipFile(wheel) as archive:
+                archive.extractall(installed)
+            if corrupt == "installed":
+                (installed / "figgyplot/_native.so").write_bytes(b"another build")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(download["main"].__globals__["subprocess"], "run", run)
     monkeypatch.setattr(download["main"].__globals__["time"], "sleep", lambda seconds: None)
     if corrupt:
-        with pytest.raises(ValueError, match="SHA-256"):
+        with pytest.raises(ValueError, match="SHA-256" if corrupt == "download" else "Installed package differs"):
             download["main"]()
-        assert len(calls) == 3
+        assert len(calls) == (3 if corrupt == "download" else 4)
     else:
         download["main"]()
         assert len(calls) == 4
+
+
+@pytest.fixture
+def successful_run():
+    installs = {"TestPyPI install / platform-%d / Python 3.12" % i for i in range(9)}
+    run = {"repository": {"full_name": "shim9610/figgy-python"},
+           "head_repository": {"full_name": "shim9610/figgy-python"},
+           "path": ".github/workflows/publish.yml", "event": "workflow_dispatch",
+           "head_branch": "main", "head_sha": "a" * 40,
+           "status": "completed", "conclusion": "success"}
+    pages = [{"jobs": [{"name": "Upload to TestPyPI", "conclusion": "success"}]},
+             {"jobs": [{"name": name, "conclusion": "success"} for name in sorted(installs)]}]
+    return run, pages, "shim9610/figgy-python", "a" * 40, installs
+
+
+def test_successful_testpypi_run_can_be_promoted(successful_run):
+    promotion["validate_run"](*successful_run)
+
+
+@pytest.mark.parametrize("field,value,message", [
+    ("head_sha", "b" * 40, "exact main commit"),
+    ("head_branch", "unreviewed", "manual publication on main"),
+    ("event", "pull_request", "manual publication on main"),
+    ("path", ".github/workflows/pr-tests.yml", "manual publication on main"),
+    ("conclusion", "failure", "completed successfully"),
+    ("status", "in_progress", "completed successfully"),
+    ("head_repository", {"full_name": "someone/figgy-python"}, "manual publication on main"),
+])
+def test_wrong_source_cannot_be_promoted(successful_run, field, value, message):
+    successful_run[0][field] = value
+    with pytest.raises(ValueError, match=message):
+        promotion["validate_run"](*successful_run)
+
+
+@pytest.mark.parametrize("change", ["failed", "missing", "wrong-platform", "production-run"])
+def test_every_real_test_index_install_is_required(successful_run, change):
+    _, pages, _, _, _ = successful_run
+    if change == "failed": pages[1]["jobs"][0]["conclusion"] = "failure"
+    if change == "missing": pages[1]["jobs"].pop()
+    if change == "wrong-platform": pages[1]["jobs"][0]["name"] = "TestPyPI install / unexpected / Python 3.12"
+    if change == "production-run": pages[0]["jobs"][0]["name"] = "Upload to PyPI"
+    with pytest.raises(ValueError, match="installation must succeed|successful TestPyPI upload"):
+        promotion["validate_run"](*successful_run)
+
+
+def test_promotion_uses_exact_verified_files(inputs, monkeypatch):
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    manifest = release["prepare"](*inputs)
+    promotion["validate_files"](inputs[0], inputs[2], manifest, "a" * 40, "123")
+    wheel = next(inputs[2].glob("*.whl"))
+    wheel.write_bytes(wheel.read_bytes() + b"rebuilt")
+    with pytest.raises(ValueError, match="TestPyPI build SHA-256"):
+        promotion["validate_files"](inputs[0], inputs[2], manifest, "a" * 40, "123")
+
+
+@pytest.mark.parametrize("field,value", [("version", "0.3.0"), ("commit", "b" * 40), ("run_id", "456")])
+def test_promotion_manifest_must_match_source(inputs, monkeypatch, field, value):
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    manifest = release["prepare"](*inputs)
+    manifest[field] = value
+    with pytest.raises(ValueError, match="manifest must match"):
+        promotion["validate_files"](inputs[0], inputs[2], manifest, "a" * 40, "123")

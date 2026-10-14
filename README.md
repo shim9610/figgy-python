@@ -137,9 +137,20 @@ draw modes, including the line-only Milkyway restriction.
 
 ## Install
 
-This is a development release; the Python package is not yet on PyPI. Install
-from source with **Python 3.8–3.15**, **Rust 1.99+**, a system C/C++ toolchain and
-an available graphics driver:
+Preview wheels are available on **TestPyPI** for the configured CPython
+3.8–3.15 platforms. Install dependencies from regular PyPI first, then select
+TestPyPI explicitly for figgyplot:
+
+```bash
+python -m pip install numpy anywidget
+python -m pip install --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: figgyplot==0.2.0
+```
+
+A compatible wheel needs no Rust compiler. Regular PyPI publication is still
+pending; `pip install figgyplot` alone does not select TestPyPI.
+
+Alternatively, install from source with **Python 3.8–3.15**, **Rust 1.99+**,
+a system C/C++ toolchain and an available graphics driver:
 
 ```bash
 git clone https://github.com/shim9610/figgy-python.git

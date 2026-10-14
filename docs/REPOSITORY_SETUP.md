@@ -48,7 +48,7 @@ commit is used for both its input-metadata checkout and the actual build.
 | Workflow | Initial trigger | Scope |
 | --- | --- | --- |
 | Build figgyplot wheels | Manual only | 74 platform/Python/ABI wheels, sdist and Linux functional verification |
-| Publish figgyplot to TestPyPI | Manual on main only | Reuses all wheel gates, publishes with OIDC, downloads and checks nine actual TestPyPI installations; see [publisher setup](PUBLISHING.md) |
+| Publish figgyplot | Manual on main only | TestPyPI builds and nine index installs; explicit PyPI promotion of the same verified files with separate OIDC environment; see [publisher setup](PUBLISHING.md) |
 | PR tests | Pull requests to main and manual | Workflow/assets preflight; installed Linux native wheel, X11 editor and real JupyterLab/browser WebGPU tests |
 | CodeQL | Manual; automatic events still paused | Python, Rust and JavaScript security-extended queries, no build; generated upstream assets excluded |
 
@@ -94,7 +94,7 @@ are verified and their event coverage matches the chosen merge workflow.
 The owner has enabled main protection: updates require a pull request and both
 required checks. This change does not modify those rules or enable automatic
 merging. TestPyPI publication is prepared as an explicit manual workflow;
-production PyPI publication remains unconfigured.
+production PyPI promotion is explicit and requires its separate publisher/environment.
 
 ## Executed validation for this preparation
 
