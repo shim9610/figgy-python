@@ -88,6 +88,48 @@ actual import/model execution on AlmaLinux 8. Neither path relabels a wheel that
 requires newer glibc.
 The musl builds disable Rust's default static CRT to produce an importable cdylib.
 
+Both Linux builds and binary-only installation checks run in the same matrix
+image and architecture. In particular, a musllinux wheel is installed inside
+musllinux rather than on the Ubuntu glibc runner. Windows/macOS installation
+checks run directly on their native runners. A prerequisite job validates the
+workflow against the actual `maturin-action@v1` input metadata and exercises
+regressions before starting any of the 74 wheel builds.
+
+### First manual run failures and repair (2026-10-14)
+
+[Run 38560470018](https://github.com/shim9610/figgy-python/actions/runs/38560470018)
+used commit `820bd7f`. All 24 failed Linux job logs were inspected:
+
+- The input `before-script` is unsupported; the action only reads
+  `before-script-linux`. The preparation script was ignored, leaving
+  `/usr/local/bin/python3.x` absent. Ten musl jobs reported an invalid interpreter.
+- The action already adds `--manylinux` from its `manylinux` input. Also passing
+  its alias `--compatibility` supplied two platform tags. Fourteen glibc jobs
+  reported `Expected only one platform tag but found 2`.
+- The following installation step would have tried to load musllinux artifacts
+  on Ubuntu. It now runs in the same explicit container image as the build.
+
+The source distribution succeeded. The other 50 wheel jobs and the functional
+job were cancelled; Windows/macOS builds did not reach a verified result.
+No renderer or plotting API change is required for these workflow errors.
+
+Repair validation covers actionlint, shell syntax, all 74 matrix expansions,
+seven workflow regressions, ten actual interpreter/ABI selections on AlmaLinux 8,
+and failures for a wrong free-threaded ABI, unsupported selector and absent musl
+interpreter. The duplicate-tag error was reproduced directly with maturin 1.15.0.
+Three x86_64 manylinux wheels (3.8, 3.12, 3.15t) were rebuilt on AlmaLinux 8 with
+Zig's glibc 2.28 sysroot, using the repaired single-tag/interpreter arguments.
+Binary-only fresh installs, strict Twine checks, imports, NumPy/model operations
+and packaged JS/WASM checks passed. Python 3.8 exercised the portable-interpreter
+fallback; local 3.15t is `3.15.0rc3`, and importing the extension enables the GIL
+as documented. The previously built, unchanged Python 3.12 musllinux wheel also
+passed strict metadata and binary-only installation/model/assets checks on Alpine.
+These are GPU-free checks, not new UI/hardware validation or a full Actions run.
+
+To test the repair in GitHub, choose **Run workflow** on **main** after pulling
+the fix. **Re-run jobs** on the old run retains commit `820bd7f` and the broken
+workflow. Automatic triggers and publication remain disabled.
+
 ## Release gates
 
 - [ ] Confirm ownership/registration of `figgyplot` on PyPI/TestPyPI.
