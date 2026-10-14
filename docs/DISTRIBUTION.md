@@ -137,6 +137,21 @@ in a fresh repository with both tools, alongside the seven regressions. Actual
 Xvfb/child-shell execution also verified success and propagation of a nonzero
 child exit code. These checks do not mark the skipped platform builds as passed.
 
+[Run 38564193205](https://github.com/shim9610/figgy-python/actions/runs/38564193205),
+using `0c11307`, passed preflight and multiple Linux/macOS builds. Its inspected
+Windows x86_64/ARM64 failures occurred after successful build and installation:
+Git's `core.autocrlf=true` converted the upstream `figgy.js` from 151,571 LF bytes
+to 155,281 CRLF bytes, breaking its recorded SHA-256. `.gitattributes` now disables
+text conversion for the content-addressed asset directory. Hashes are checked
+unchanged; mismatches report the file, expected/actual hashes and sizes, and a
+CRLF hint when applicable. A GPU-free source check and Windows-style Git checkout
+regressions run before wheel builds. The full preflight passed eleven tests in a
+fresh repository; an actual maturin sdist from a Windows-style checkout preserved
+both asset hashes and passed strict metadata validation. An installed Linux wheel
+also passed the revised smoke checker. The corrected Windows wheel jobs still
+require a new Actions run; the free-threaded GIL warning is expected and unrelated
+to the asset failure. These checks do not claim Windows GPU/UI validation.
+
 To test the repair in GitHub, choose **Run workflow** on **main** after pulling
 the fix. **Re-run jobs** retains that run's original commit and workflow.
 Automatic triggers and publication remain disabled.

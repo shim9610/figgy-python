@@ -1,5 +1,4 @@
 """Installed-wheel smoke check without requiring a kernel GPU or display."""
-import hashlib
 import importlib.metadata
 import json
 from pathlib import Path
@@ -8,6 +7,7 @@ import sys
 import numpy as np
 import figgyplot
 from figgyplot._native import NativeFigure
+from check_assets import check_assets
 
 
 def main():
@@ -18,9 +18,7 @@ def main():
     assets = root / "assets"
     assert (assets / "figgy_bg.wasm").read_bytes()[:4] == b"\x00asm"
     assert (root / "webgpu.js").is_file()
-    provenance = json.loads((assets / "provenance.json").read_text())
-    for name, record in provenance["assets"].items():
-        assert hashlib.sha256((assets / name).read_bytes()).hexdigest() == record["sha256"]
+    check_assets(assets)
     with figgyplot.Figure(backend="webgpu") as fig:
         fig.axes[0].plot(np.arange(8, dtype=np.float32), id="signal")
         fig.axes[0].set_title("Installed figgyplot")
