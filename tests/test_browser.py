@@ -24,6 +24,11 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
     from playwright.sync_api import sync_playwright
     import figgyplot as figgy
     source = Path(figgy.__file__).parent
+    # Request URLs select fixed responses; they never become filesystem paths.
+    assets = {
+        "/editor.js": ((source / "editor.js").read_bytes(), "text/javascript"),
+        "/editor.css": ((source / "editor.css").read_bytes(), "text/css"),
+    }
     with Figure(figsize=(8, 5), dpi=120, pool_bytes=8 * 1024**2) as fig:
         ax = fig.axes[0]
         ax.plot(np.linspace(0, 10, 1000), np.sin(np.linspace(0, 10, 1000)), id="signal")
@@ -38,9 +43,8 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
             def do_GET(self):
                 if self.path == "/state":
                     data, mime = payload(), "application/json"
-                elif self.path in ("/editor.js", "/editor.css"):
-                    data = (source / self.path[1:]).read_bytes()
-                    mime = "text/javascript" if self.path.endswith(".js") else "text/css"
+                elif self.path in assets:
+                    data, mime = assets[self.path]
                 elif self.path == "/":
                     data = b'''<!doctype html><link rel="stylesheet" href="/editor.css"><div id="editor"></div>
                     <script type="module">
@@ -76,7 +80,10 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
                 page = context.new_page()
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
-                page.goto(f"http://127.0.0.1:{server.server_port}")
+                address = f"http://127.0.0.1:{server.server_port}"
+                for invalid_path in ("/%2e%2e/pyproject.toml", "/editor.js?file=../../pyproject.toml"):
+                    assert context.request.get(address + invalid_path).status == 404
+                page.goto(address)
                 page.locator("[data-fields] input[type=text]").fill("Browser edited title")
                 page.locator("[data-fields] input[type=text]").press("Tab")
                 page.wait_for_function("editorModel.get('state').code.includes('Browser edited title')")
