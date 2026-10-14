@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "figgyplot"
-version = "0.2.0"
-description = "NumPy-first Python plotting with the native Rust figgy renderer"
+version = "0.2.1"
+description = "GPU plotting for NumPy with interactive editing and reusable Python settings"
 readme = "PYPI_README.md"
 requires-python = ">=3.8,<3.16"
 license = "MIT OR Apache-2.0"

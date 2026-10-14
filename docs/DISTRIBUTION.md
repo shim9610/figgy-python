@@ -75,7 +75,8 @@ and reuse through `workflow_call` from the manual publication workflow.
 There are no push, pull-request, tag, release or scheduled triggers. Adding the
 configuration does not run it. [Manual TestPyPI publication](PUBLISHING.md) builds
 and validates the full distribution set before upload and installation checks.
-Production PyPI publication remains unconfigured.
+Manual production PyPI promotion reuses the exact successful TestPyPI artifacts;
+see the separate `pypi` publisher/environment and run-ID setup in that guide.
 
 Each combination builds an interpreter-specific wheel, performs strict metadata
 checks, installs only binary distributions in a fresh venv and verifies imports,
@@ -178,8 +179,9 @@ Automatic triggers remain disabled; TestPyPI publication is a separate manual ac
 - [ ] Install matching artifacts on clean hosts without Rust and ensure `pip`
       selects wheels rather than silently falling back to source builds.
 - [x] Prepare the manual TestPyPI workflow with OIDC and installation checks.
-- [ ] Register the [Trusted Publisher](PUBLISHING.md), execute TestPyPI publication
-      and review the post-upload results before preparing production promotion.
+- [x] Execute TestPyPI 0.2.0 publication and its nine post-upload installation checks.
+- [ ] Register the production [Trusted Publisher](PUBLISHING.md), validate the
+      prepared 0.2.1 preview and promote its verified artifacts to PyPI.
 
 Local build/installation results for this change are recorded in
 [the packaging report](../reports/figgyplot-packaging.json). Configured targets
