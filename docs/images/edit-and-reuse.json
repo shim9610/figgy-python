@@ -1,0 +1,31 @@
+{
+  "frames": 86,
+  "captured_frames": 97,
+  "duration_ms": 14480,
+  "size": [
+    1440,
+    900
+  ],
+  "data": "synthetic; 100,000 samples per series, 3 series per chart",
+  "adapter": "llvmpipe (LLVM 21.1.8, 256 bits)",
+  "input": "actual X11 axis zoom, plot-area resize, Y-title drag, default-legend drag, Copy Python, VS Code Ctrl+V/save and Python terminal execution",
+  "initial_legend": {
+    "corner": "TopRight",
+    "offset_x": 0.0,
+    "offset_y": 0.0
+  },
+  "initial_margins": {
+    "left": 110.0,
+    "bottom": 80.0
+  },
+  "editor": "Visual Studio Code",
+  "paste_verified": true,
+  "compositing": "instruction captions and pointer halo around actual Figgy and VS Code windows",
+  "replay": "three independent datasets; matching axes/legend/series styles; no style re-upload",
+  "distinct_image_hashes": [
+    "0da28774fc4f21373d60e07699e6484665ffb79b98b8626b5bd07d1bddc1f0eb",
+    "445dad4f9d1b4f306d4204e48e1da596414b58b78887f5b84cc508c3f5274064",
+    "30bcc0858815ff8a0db153aeb9f107ca1401aad97706557294091f4e2727d197"
+  ],
+  "code_sha256": "7ff3c1cd6d4b0d18005f44f76b4aabfb8638ef30a5c4116a018783b6d3dabe9e"
+}

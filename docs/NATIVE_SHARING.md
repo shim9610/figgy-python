@@ -4,7 +4,12 @@ The first native Figure creates one process-local GPU instance, adapter, device,
 queue and `figgy-renderer 0.16.1` renderer. Later Figures register independent
 charts in that renderer and allocate their columns in its resident pool.
 There is no renderer source copy and no change to the borrowed f32/f64 → hi/lo
-upload path. Input arrays are not retained in a permanent native CPU cache.
+upload path. Cartesian input arrays are not retained in a permanent native CPU cache.
+
+Pies/donuts share this device/queue but use their own upstream radial renderer
+and immutable frame cache. Their bounded model retains up to 64 category values
+on CPU and uses no Cartesian source columns. Window previews draw to a GPU
+texture without RGBA/PNG transfer; native export uses explicit readback.
 
 Each Figure owns its document, revision, metadata, chart id, column ownership and
 offscreen export target. Window views reference that document weakly. Each window
@@ -18,7 +23,10 @@ This does not merge multiple window swapchains into one render pass.
 Column **and series** ids are namespaced internally per Figure. This includes
 matrix columns, errorbar references, mapped-style index columns and picked-data
 identities. Public SSOT, `get_settings`, Copy Python and picking results keep
-local ids. Two Figures can both use `signal` without overwriting data or renderer
+local ids. Stylized GPU uniforms use local series IDs for their deterministic
+pattern salt, while scratch caches retain the namespaced IDs. Independent
+Figures therefore replay identical stars/handwriting without sharing data.
+Two Figures can both use `signal` without overwriting data or renderer
 scratch-cache entries. Uploading the same NumPy array into another Figure still
 creates a new column; array identity/content deduplication is not implemented.
 

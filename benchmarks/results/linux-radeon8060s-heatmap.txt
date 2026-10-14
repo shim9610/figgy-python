@@ -1,0 +1,6 @@
+figgy                     heatmap smooth    10,000 first=0.119s redraw=0.000s RSS=166MB
+matplotlib-default        heatmap smooth    10,000 first=0.041s redraw=0.017s RSS=101MB
+figgy                     heatmap smooth 1,000,000 first=0.133s redraw=0.000s RSS=161MB
+matplotlib-default        heatmap smooth 1,000,000 first=0.057s redraw=0.029s RSS=189MB
+figgy                     heatmap smooth 4,000,000 first=0.321s redraw=0.000s RSS=205MB
+matplotlib-default        heatmap smooth 4,000,000 first=0.097s redraw=0.063s RSS=423MB

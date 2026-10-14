@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import copy
 import json
-import keyword
 import math
 from pathlib import Path
-import pprint
 import re
 import threading
 import weakref
@@ -84,6 +82,44 @@ class Artist:
         return self.figure.update(self.id, **kwargs)
 
 
+class RadialArtist:
+    """Handle for a bounded pie/donut document; slice indices stay stable."""
+
+    def __init__(self, figure):
+        self.figure = figure
+
+    def set_style(self, **properties):
+        self.figure.set_radial_style(**properties)
+        return self
+
+    def set_slice(self, index, **properties):
+        if "color" in properties:
+            properties["color"] = _color(properties["color"])
+        if "material" in properties:
+            properties.setdefault("style", {})["material"] = _material(properties.pop("material"))
+        self.figure.configure_radial(slices={index: properties})
+        return self
+
+    def set_values(self, values):
+        values = _array(values)
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            slices = state["radial"]["slices"]
+            if values.size != len(slices):
+                raise ValueError("set_values requires the same number of slices")
+            for item, value in zip(slices, values):
+                item["value"] = float(value)
+            interaction = state["radial"]["interaction"]
+            for key in ("selected", "hovered"):
+                target = interaction[key]
+                if target is not None and target["group"] == 0 and slices[target["index"]]["value"] == 0:
+                    interaction[key] = None
+                    if key == "hovered":
+                        interaction["hover_progress"] = 0.0
+            self.figure.apply_settings(state)
+        return self
+
+
 class Figure:
     """One editable chart document, with a persistent native renderer.
 
@@ -116,7 +152,7 @@ class Figure:
             from .notebook import NotebookData
             self._native = NotebookData(width, height, pool_bytes, retain_notebook_data)
         else:
-            self._native = NativeFigure(width, height, pool_bytes)
+            self._native = NativeFigure(width, height, pool_bytes, self.dpi)
         self._default_config = copy.deepcopy(self.get_settings()["config"])
         self._widgets = weakref.WeakSet()
         self._windows = []
@@ -127,6 +163,10 @@ class Figure:
     def _require_open(self):
         if self._native is None:
             raise RuntimeError("Figure is closed")
+
+    def _require_cartesian(self):
+        if self.get_settings().get("radial") is not None:
+            raise ValueError("pie/donut charts have no Cartesian axes; use radial properties or slice selection")
 
     @property
     def revision(self):
@@ -172,6 +212,21 @@ class Figure:
         """Edit a stable series/decorative target using familiar property names."""
         if not isinstance(target, str) or not target:
             raise ValueError("editable target must be a non-empty string")
+        radial_document = self.get_settings().get("radial") is not None
+        if radial_document and target != "chart_title":
+            raise ValueError("use radial properties or set_slice() to edit a pie/donut")
+        if radial_document and target == "chart_title":
+            radial = {}
+            for key, value in properties.items():
+                if key == "text":
+                    radial["title"] = str(value)
+                elif key == "fontsize":
+                    radial["font_size"] = float(value) * self.dpi / 72
+                elif key == "font":
+                    radial["font_family"] = value
+                else:
+                    raise ValueError(f"unsupported radial title property: {key}")
+            return self.configure_radial(**radial)
         with self._lock:
             self._require_open()
             state = self.get_settings()
@@ -289,21 +344,114 @@ class Figure:
                 raise ValueError("savefig currently supports .png")
             path.write_bytes(data)
 
+    def configure(self, *, config=None, series=None, reset=False):
+        """Apply advanced layout/style patches to existing plotted data.
+
+        ``series`` maps stable series IDs to style patches. Source columns and
+        series IDs remain owned by the existing Figure. ``reset`` resets layout
+        to this Figure's defaults before applying the optional patches.
+        """
+        with self._lock:
+            state = self.get_settings()
+            if reset:
+                state["config"] = copy.deepcopy(self._default_config)
+                state.pop("background", None)
+            if config is not None:
+                if "draw_style" in config:
+                    state["config"].pop("draw_style", None)
+                state["config"] = _merge(state["config"], config)
+            if series is not None:
+                existing = {s["series_id"]: s for s in state["series"]}
+                for sid, patch in series.items():
+                    if sid not in existing:
+                        raise ValueError(f"unknown series: {sid}")
+                    if any(k in patch for k in ("series_id", "x_column", "y_column")):
+                        raise ValueError("configure edits styles, not source columns or IDs")
+                    _merge(existing[sid], patch)
+            return self.apply_settings(state)
+
+    def set_facecolor(self, color):
+        """Set the chart background for native and browser rendering/export."""
+        with self._lock:
+            state = self.get_settings()
+            if state.get("radial") is not None:
+                state["radial"]["background"] = _color(color)
+            else:
+                rgba = _color(color)
+                if rgba == _color("white"):
+                    state.pop("background", None)
+                else:
+                    state["background"] = rgba
+            return self.apply_settings(state)
+
+    def set_draw_style(self, mode="precise", **options):
+        """Use precise/sketch/milkyway/constellation with upstream parameters.
+
+        Milkyway accepts line-only series. Constellation requires marker lines.
+        These restrictions also apply to later additions and raw settings edits.
+        """
+        if mode not in ("precise", "sketch", "milkyway", "constellation"):
+            raise ValueError("draw style must be precise, sketch, milkyway or constellation")
+        if self.get_settings().get("radial") is not None:
+            raise ValueError("use set_radial_style(material=...) for pie/donut charts")
+        return self.configure(config={"draw_style": {"mode": mode, **options}})
+
+    def configure_radial(self, *, style=None, slices=None, expected_slices=None, **properties):
+        """Patch an existing pie/donut, preserving its values unless explicitly set.
+
+        ``slices`` maps existing zero-based indices to appearance/label patches.
+        Use the radial artist's ``set_values`` to replace category values.
+        Advanced fields follow the upstream serialized radial model.
+        """
+        with self._lock:
+            state = self.get_settings()
+            if state.get("radial") is None:
+                raise ValueError("create a pie or donut before configuring radial properties")
+            chart = state["radial"]
+            if expected_slices is not None and len(chart["slices"]) != expected_slices:
+                raise ValueError("radial style replay requires the same slice count")
+            if "slices" in properties or "value" in properties:
+                raise ValueError("use set_values to change radial data")
+            _merge(chart, properties)
+            if style is not None:
+                _merge(chart["style"], style)
+            if slices is not None:
+                for index, patch in slices.items():
+                    if isinstance(index, bool) or not isinstance(index, (int, np.integer)) or not 0 <= index < len(chart["slices"]):
+                        raise ValueError("slice index is out of range")
+                    if "value" in patch:
+                        raise ValueError("use set_values to change radial data")
+                    if isinstance(patch.get("style"), dict) and chart["slices"][index]["style"] is None:
+                        chart["slices"][index]["style"] = copy.deepcopy(chart["style"])
+                    _merge(chart["slices"][index], patch)
+            return self.apply_settings(state)
+
+    def set_radial_style(self, *, material=None, **properties):
+        """Edit upstream radial material, texture, camera, corners and outlines."""
+        if material is not None:
+            properties["material"] = _material(material)
+        return self.configure_radial(style=properties)
+
     def to_code(self, variable="fig"):
-        """Executable settings snapshot for a Figure created with the same series IDs."""
-        if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
-            raise ValueError("variable must be a Python identifier")
-        settings = self.get_settings()
-        settings["config"] = _diff(self._default_config, settings["config"])
-        # Canvas dimensions remain explicit so replay does not depend on figsize.
-        settings["config"]["chart_area"] = self.get_settings()["config"]["chart_area"]
-        return f"from figgy import text_segments\n\n{variable}.apply_settings(\n{pprint.pformat(_code_tree(settings), width=100, sort_dicts=False)},\nreset=True,\n)\n"
+        """Readable Python setters for an existing Figure with the same series.
+
+        Font sizes are exported in points, using this Figure's DPI. Recreate the
+        original plot at the same DPI before replaying its settings.
+        """
+        from ._codegen import settings_to_code
+        return settings_to_code(self.get_settings(), self._default_config, self.dpi, variable)
 
     def select(self, x, y, *, edit_area=False):
         with self._lock:
             self._require_open()
             if self.backend != "native":
                 raise RuntimeError("select requires backend='native'; pick data in the WebGPU widget")
+            if self.get_settings().get("radial") is not None:
+                if edit_area:
+                    raise ValueError("radial selection addresses slices, not Cartesian plot-area handles")
+                self._selection = json.loads(self._native.pick_json(float(x), float(y)))
+                self._changed()
+                return self._selection
             hit = self._native.hit_test(float(x), float(y))
             if hit in (None, "data_area") and not edit_area:
                 picked = json.loads(self._native.pick_json(float(x), float(y)))
@@ -316,6 +464,7 @@ class Figure:
     def select_object(self, target):
         with self._lock:
             self._require_open()
+            self._require_cartesian()
             if self.backend != "native":
                 raise RuntimeError("select_object requires backend='native'; select objects in the WebGPU widget")
             if not any(s["series_id"] == target for s in self.get_settings()["series"]):
@@ -326,6 +475,8 @@ class Figure:
     def selection_bounds(self):
         with self._lock:
             self._require_open()
+            if self.get_settings().get("radial") is not None:
+                return None
             if self._selection is None or any(s["series_id"] == self._selection for s in self.get_settings()["series"]):
                 return None
             return json.loads(self._native.bounds_json(self._selection))
@@ -333,6 +484,7 @@ class Figure:
     def drag(self, target, dx, dy, *, handle=None):
         with self._lock:
             self._require_open()
+            self._require_cartesian()
             if self.backend != "native":
                 raise RuntimeError("drag requires backend='native'; drag objects in the WebGPU widget")
             moved = self._native.drag(target, float(dx), float(dy), handle)
@@ -343,6 +495,7 @@ class Figure:
     def fit(self, padding=0.05):
         with self._lock:
             self._require_open()
+            self._require_cartesian()
             self._native.fit(float(padding))
         self._changed()
         return self
@@ -353,6 +506,8 @@ class Figure:
         Display the returned widget, then await prepare_async(). Repeated calls
         reuse the same widget and its original auto_prepare choice.
         """
+        if self.get_settings().get("radial") is not None:
+            raise RuntimeError("Pie/donut editing uses native show(); use to_png() for static notebook output")
         self._require_open()
         if backend not in (None, "webgpu", "png"):
             raise ValueError("widget backend must be webgpu or png")
@@ -428,6 +583,8 @@ class Figure:
             path.write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
+        if self.get_settings().get("radial") is not None:
+            return {"image/png": self.to_png()}
         # Keep a live widget referenced; Jupyter displays the model once per output.
         return self.widget()._repr_mimebundle_(**kwargs)
 
@@ -465,6 +622,8 @@ def _axis_key(side):
 
 
 def _merge(base, patch):
+    if not isinstance(base, dict):
+        base = {}
     for key, value in patch.items():
         base[key] = _merge(base.get(key, {}), value) if isinstance(value, dict) else copy.deepcopy(value)
     return base
@@ -489,19 +648,19 @@ class _CodeExpression:
         return self.expression
 
 
-def _code_tree(value):
+def _code_tree(value, segments_function="text_segments"):
     if isinstance(value, dict):
         result = {}
         for key, current in value.items():
             if key == "segments" and isinstance(current, list):
                 text = "".join(s["text"] for s in current)
                 if current == _segments(text):
-                    result[key] = _CodeExpression(f"text_segments({text!r})")
+                    result[key] = _CodeExpression(f"{segments_function}({text!r})")
                     continue
-            result[key] = _code_tree(current)
+            result[key] = _code_tree(current, segments_function)
         return result
     if isinstance(value, list):
-        return [_code_tree(v) for v in value]
+        return [_code_tree(v, segments_function) for v in value]
     return value
 
 
@@ -517,16 +676,83 @@ def _colormap(value):
         raise ValueError("cmap must be viridis, magma, turbo, gray or RdBu") from None
 
 
+def _material(value):
+    names = {"flat": "Flat", "matte": "Matte", "ceramic": "Ceramic",
+             "brushed_metal": "BrushedMetal", "paper": "Paper", "wood": "Wood",
+             "satin_metal": "SatinMetal", "toon": "Toon", "enamel": "Enamel",
+             "hatch": "Hatch", "pearl": "Pearl"}
+    if not isinstance(value, str) or value.lower().replace("-", "_") not in names:
+        raise ValueError("unknown radial material; choose " + ", ".join(names))
+    return names[value.lower().replace("-", "_")]
+
+
 class Axes:
     def __init__(self, figure):
         self.figure = figure
         self._manual_x = False
         self._manual_y = False
 
+    def set_draw_style(self, mode="precise", **options):
+        return self.figure.set_draw_style(mode, **options)
+
+    def pie(self, values, *, labels=None, colors=None, explode=None, startangle=90,
+            inner_radius=None, material="flat", tilt=0, depth=0,
+            labels_position="outside", label_format="name_percent", **style):
+        """Create a native pie/donut using the upstream bounded radial renderer.
+
+        Values are nonnegative with a positive sum; at most 64 slices. Material
+        does not imply extrusion: choose tilt/depth explicitly for a 3D view.
+        ``startangle=90`` starts at the top; slices proceed clockwise.
+        """
+        fig = self.figure
+        if fig.backend != "native":
+            raise RuntimeError("Pie/donut charts currently require backend='native'")
+        values = _array(values)
+        count = values.size
+        if not 1 <= count <= 64 or not np.isfinite(values).all() or (values < 0).any() or not np.isfinite(values.sum()) or values.sum() <= 0:
+            raise ValueError("pie/donut needs 1..64 finite nonnegative values with a positive finite sum")
+        labels = [f"Slice {i + 1}" for i in range(count)] if labels is None else list(labels)
+        colors = [_COLORS[i % len(_COLORS)] for i in range(count)] if colors is None else list(colors)
+        explode = [0.0] * count if explode is None else list(explode)
+        if not len(labels) == len(colors) == len(explode) == count:
+            raise ValueError("labels, colors and explode must match the number of values")
+        placements = {"none": "None", "inside": "Inside", "outside": "Outside"}
+        formats = {"name": "Name", "value": "Value", "percent": "Percent", "name_percent": "NamePercent",
+                   "name_value": "NameValue", "value_percent": "ValuePercent", "name_value_percent": "NameValuePercent"}
+        if labels_position not in placements or label_format not in formats:
+            raise ValueError("unsupported radial label placement/format")
+        from ._native import default_radial_json
+        chart = json.loads(default_radial_json())
+        title = fig.get_settings()["config"]["chart_title"]["text"]
+        chart.update(title=_text(title), font_size=11 * fig.dpi / 72,
+                     kind="Pie" if inner_radius is None else {"Donut": {"inner_radius": float(inner_radius)}},
+                     start_angle_degrees=-float(startangle), labels=placements[labels_position],
+                     label_format=formats[label_format])
+        chart["style"].update(material=_material(material), tilt_degrees=float(tilt), depth=float(depth), **style)
+        chart["slices"] = [dict(label=str(label), value=float(value), color=_color(color),
+                                explode=float(offset), style=None, labels=None, label_format=None, label_color=None)
+                           for value, label, color, offset in zip(values, labels, colors, explode)]
+        with fig._lock:
+            fig._require_open()
+            fig._native.set_radial(json.dumps(chart, allow_nan=False))
+        fig._changed()
+        return RadialArtist(fig)
+
+    def donut(self, values, *, inner_radius=0.5, **kwargs):
+        """Create a donut; accepts the same labels/material/style options as pie."""
+        return self.pie(values, inner_radius=inner_radius, **kwargs)
+
     def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None):
         fig = self.figure
         with fig._lock:
             fig._require_open()
+            if fig.get_settings().get("radial") is not None:
+                raise ValueError("create a separate Figure for Cartesian series")
+            mode = fig.get_settings()["config"].get("draw_style", {}).get("mode", "precise")
+            if mode == "milkyway" and "Line" not in render_type:
+                raise ValueError("Milkyway supports line-only series; scatter and marker lines are disabled")
+            if mode == "constellation" and "ScatterLine" not in render_type:
+                raise ValueError("Constellation requires line series with markers (plot(..., marker='o'))")
             sid = id if id is not None else f"series_{fig._next_series}"
             if not isinstance(sid, str) or not sid:
                 raise ValueError("series ID must be a non-empty string")
@@ -652,12 +878,15 @@ class Axes:
         return self.figure.update("chart_title", text=text, **kwargs)
 
     def set_xlabel(self, text, **kwargs):
+        self.figure._require_cartesian()
         return self.figure.update("axis_title_bottom", text=text, **kwargs)
 
     def set_ylabel(self, text, **kwargs):
+        self.figure._require_cartesian()
         return self.figure.update("axis_title_left", text=text, **kwargs)
 
     def _set_scale(self, axis, scale):
+        self.figure._require_cartesian()
         scales = {"linear": "Linear", "log": "Logarithmic"}
         if scale not in scales:
             raise ValueError("scale must be 'linear' or 'log'")
@@ -681,12 +910,15 @@ class Axes:
         return self._set_scale("y", scale)
 
     def get_xscale(self):
+        self.figure._require_cartesian()
         return "log" if self.figure.get_settings()["config"]["bottom_x"]["scale"] == "Logarithmic" else "linear"
 
     def get_yscale(self):
+        self.figure._require_cartesian()
         return "log" if self.figure.get_settings()["config"]["left_y"]["scale"] == "Logarithmic" else "linear"
 
     def set_xlim(self, left, right):
+        self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
             self.figure._native.set_range("x", float(left), float(right))
@@ -695,6 +927,7 @@ class Axes:
         return (left, right)
 
     def set_ylim(self, bottom, top):
+        self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
             self.figure._native.set_range("y", float(bottom), float(top))
@@ -703,12 +936,14 @@ class Axes:
         return (bottom, top)
 
     def grid(self, visible=True):
+        self.figure._require_cartesian()
         state = self.figure.get_settings()
         state["config"]["grid"]["show_major_x"] = bool(visible)
         state["config"]["grid"]["show_major_y"] = bool(visible)
         self.figure.apply_settings(state)
 
     def legend(self, visible=True):
+        self.figure._require_cartesian()
         from ._native import rebuild_legend_json
         state = self.figure.get_settings()
         state["config"]["legend"]["content"] = json.loads(rebuild_legend_json(json.dumps(state["series"]), json.dumps(state["config"]["legend"]["content"])))

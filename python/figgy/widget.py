@@ -79,7 +79,7 @@ class FigureWidget(anywidget.AnyWidget):
 
     def refresh(self):
         if not self._handling:
-            self.state = {"settings": self.figure.get_settings(), "revision": self.figure.revision}
+            self.state = {"settings": self.figure.get_settings(), "revision": self.figure.revision, "code": self.figure.to_code()}
 
     def _command(self, widget, content, buffers):
         action = content.get("action")

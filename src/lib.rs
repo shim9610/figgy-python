@@ -35,6 +35,25 @@ fn invalid(e: impl std::fmt::Display) -> PyErr {
 }
 
 fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
+    // Internally tagged serde enums buffer their fields before deserialization;
+    // serde_ignored cannot observe unknown draw-style parameters inside them.
+    if json.contains("\"draw_style\"") {
+        let raw: Value = serde_json::from_str(json).map_err(invalid)?;
+        let style = raw
+            .get("draw_style")
+            .or_else(|| raw.get("config").and_then(|c| c.get("draw_style")));
+        if let Some(style) = style {
+            let parsed: renderer::config::DrawStyle =
+                serde_json::from_value(style.clone()).map_err(invalid)?;
+            if let Some(fields) = style.as_object() {
+                for key in fields.keys() {
+                    if key != "mode" && !draw_style_specs(&parsed).iter().any(|p| p.key == key) {
+                        return Err(invalid(format!("unknown draw-style parameter: {key}")));
+                    }
+                }
+            }
+        }
+    }
     let mut de = serde_json::Deserializer::from_str(json);
     let mut unknown = Vec::new();
     let value = serde_ignored::deserialize(&mut de, |path| unknown.push(path.to_string()))
@@ -56,6 +75,10 @@ struct Settings {
     renderer_version: String,
     config: Config,
     series: Vec<SeriesConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    radial: Option<renderer::radial::RadialChart>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    background: Option<Color>,
 }
 
 trait Number: Copy {
@@ -114,6 +137,9 @@ impl<T: Number> HiLoColumnSource for BorrowedColumn<'_, T> {
 }
 
 struct FigureCore {
+    background: Option<Color>,
+    code_dpi: f64,
+    default_config: Config,
     gpu: Arc<gpu::GpuContext>,
     figure_id: u64,
     chart: Chart,
@@ -126,8 +152,10 @@ struct FigureCore {
     uploads: u64,
     readbacks: u64,
     png_encodes: u64,
+    selection_value_readbacks: u64,
     preparation: Option<Value>,
     target: Option<RenderTarget>,
+    radial: Option<radial::RadialDocument>,
 }
 
 /// An operation holds the document lock, then the shared renderer lock.
@@ -177,6 +205,8 @@ struct RenderTarget {
     texture: wgpu::Texture,
     view: renderer::ChartView,
     readback: wgpu::Buffer,
+    styles: Vec<renderer::ChartStyle>,
+    scale: f32,
 }
 
 impl FigureAccess<'_> {
@@ -209,24 +239,44 @@ impl FigureAccess<'_> {
         rendered
     }
     fn render_inner(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
+        if self.data.radial.is_some() {
+            return self.render_radial(scale);
+        }
         self.renderer
             .ensure_target_format(wgpu::TextureFormat::Rgba8Unorm)
             .map_err(runtime)?;
-        if scale != 1.0 {
+        let styled = !matches!(
+            self.data.chart.config().draw_style,
+            renderer::config::DrawStyle::Precise
+        );
+        if scale != 1.0 && !styled {
             return pollster::block_on(self.renderer.export_panel_rgba_with_clear_async(
                 &Chart::new(gpu::config(self.data.figure_id, self.data.chart.config())),
                 &gpu::series(self.data.figure_id, &self.data.series),
                 scale,
-                Color::WHITE,
+                self.data.background.unwrap_or(Color::WHITE),
             ))
             .map_err(runtime);
         }
-        let rect = self.data.chart.config().chart_area.0;
+        let mut config = gpu::config(self.data.figure_id, self.data.chart.config());
+        if scale != 1.0 {
+            let original = config.chart_area.0;
+            config = config.scaled(scale);
+            config.chart_area.0.width = (original.width as f32 * scale).round().max(1.) as u32;
+            config.chart_area.0.height = (original.height as f32 * scale).round().max(1.) as u32;
+        }
+        let chart = Chart::new(config);
+        let rect = chart.config().chart_area.0;
+        if rect.width > self.renderer.device().limits().max_texture_dimension_2d
+            || rect.height > self.renderer.device().limits().max_texture_dimension_2d
+        {
+            return Err(invalid("export size exceeds the GPU texture limit"));
+        }
         if self
             .data
             .target
             .as_ref()
-            .is_none_or(|t| t.width != rect.width || t.height != rect.height)
+            .is_none_or(|t| t.width != rect.width || t.height != rect.height || t.scale != scale)
         {
             let device = self.renderer.device();
             let row_bytes = (rect.width * 4).div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
@@ -253,7 +303,7 @@ impl FigureAccess<'_> {
             });
             let view = self
                 .renderer
-                .create_chart_view(&self.data.chart, rect)
+                .create_chart_view(&chart, rect)
                 .map_err(runtime)?;
             self.data.target = Some(RenderTarget {
                 width: rect.width,
@@ -263,22 +313,54 @@ impl FigureAccess<'_> {
                 texture,
                 view,
                 readback,
+                styles: Vec::new(),
+                scale,
             });
         }
         let target = self.data.target.as_mut().unwrap();
+        let specs = gpu::series(self.data.figure_id, &self.data.series);
+        if styled && (target.styles.is_empty() || target.revision != self.data.revision) {
+            target.styles = specs
+                .iter()
+                .zip(&self.data.series)
+                .map(|(gpu_spec, local)| {
+                    let mut style_spec = gpu_spec.clone();
+                    // Keep renderer scratch-cache IDs namespaced, but stable user
+                    // IDs own sketch/star patterns across independent Figures.
+                    style_spec.series_id = local.series_id.clone();
+                    self.renderer
+                        .create_style_for_series_scaled(&style_spec, scale)
+                        .map_err(runtime)
+                })
+                .collect::<PyResult<Vec<_>>>()?;
+        }
         if target.revision != self.data.revision {
             self.renderer
-                .refresh_axis(&mut target.view, &self.data.chart, rect)
+                .refresh_axis(&mut target.view, &chart, rect)
                 .map_err(runtime)?;
             target.revision = self.data.revision;
         }
-        let prepared = self
-            .renderer
-            .prepare_registered(&[renderer::RegisteredChartDrawItem {
-                chart_id: self.data.chart_id,
-                view: &target.view,
-            }])
-            .map_err(runtime)?;
+        let drawn = specs
+            .iter()
+            .zip(&target.styles)
+            .map(|(config, style)| renderer::Series { config, style })
+            .collect::<Vec<_>>();
+        let prepared = if styled {
+            self.renderer
+                .prepare(&[renderer::ChartDrawItem {
+                    view: &target.view,
+                    chart_config: chart.config(),
+                    series: &drawn,
+                }])
+                .map_err(runtime)?
+        } else {
+            self.renderer
+                .prepare_registered(&[renderer::RegisteredChartDrawItem {
+                    chart_id: self.data.chart_id,
+                    view: &target.view,
+                }])
+                .map_err(runtime)?
+        };
         let texture_view = target.texture.create_view(&Default::default());
         let mut encoder = self
             .renderer
@@ -291,7 +373,7 @@ impl FigureAccess<'_> {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        load: wgpu::LoadOp::Clear(background_wgpu(self.data.background)),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -413,6 +495,7 @@ impl FigureAccess<'_> {
     }
     fn commit_config(&mut self, config: Config) -> PyResult<()> {
         validate_config(&config)?;
+        validate_draw_style(&config, &self.data.series)?;
         self.renderer
             .set_chart_config(
                 self.data.chart_id,
@@ -429,6 +512,8 @@ impl FigureAccess<'_> {
             renderer_version: "0.16.1".into(),
             config: self.data.chart.config().clone(),
             series: self.data.series.clone(),
+            radial: self.data.radial.as_ref().map(|r| r.chart.clone()),
+            background: self.data.background,
         }
     }
 }
@@ -493,6 +578,91 @@ fn validate_config(config: &Config) -> PyResult<()> {
         .validate()
         .map_err(|e| invalid(format!("invalid layout: {e:?}")))?;
     Ok(())
+}
+
+fn validate_background(color: Option<Color>) -> PyResult<()> {
+    if let Some(c) = color {
+        if [c.r, c.g, c.b, c.a]
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err(invalid("background must be finite RGBA in 0..1"));
+        }
+    }
+    Ok(())
+}
+
+fn background_wgpu(color: Option<Color>) -> wgpu::Color {
+    let c = color.unwrap_or(Color::WHITE);
+    wgpu::Color {
+        r: c.r as f64,
+        g: c.g as f64,
+        b: c.b as f64,
+        a: c.a as f64,
+    }
+}
+
+fn draw_style_specs(
+    style: &renderer::config::DrawStyle,
+) -> &'static [renderer::config::StyleParamSpec] {
+    use renderer::config::*;
+    match style {
+        DrawStyle::Precise => &[],
+        DrawStyle::Sketch(_) => SketchOptions::PARAM_SPECS,
+        DrawStyle::Milkyway(_) => MilkywayOptions::PARAM_SPECS,
+        DrawStyle::Constellation(_) => ConstellationOptions::PARAM_SPECS,
+    }
+}
+
+fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()> {
+    use renderer::{DataRenderType, config::DrawStyle};
+    if matches!(config.draw_style, DrawStyle::Milkyway(_))
+        && series
+            .iter()
+            .any(|s| !matches!(s.render_type, DataRenderType::Line { .. }))
+    {
+        return Err(invalid(
+            "Milkyway supports line-only series; scatter and marker lines are disabled",
+        ));
+    }
+    if matches!(config.draw_style, DrawStyle::Constellation(_))
+        && series
+            .iter()
+            .any(|s| !matches!(s.render_type, DataRenderType::ScatterLine { .. }))
+    {
+        return Err(invalid(
+            "Constellation requires line series with markers (plot(..., marker='o'))",
+        ));
+    }
+    let values = serde_json::to_value(config.draw_style).map_err(invalid)?;
+    for spec in draw_style_specs(&config.draw_style) {
+        let value = values[spec.key]
+            .as_f64()
+            .ok_or_else(|| invalid("invalid draw-style parameter"))?;
+        let maximum = if spec.integer {
+            u32::MAX as f64
+        } else {
+            spec.max
+        };
+        if value < spec.min || value > maximum {
+            return Err(invalid(format!(
+                "draw_style.{} must be in {}..{}",
+                spec.key, spec.min, maximum
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[pyfunction]
+fn draw_style_specs_json() -> PyResult<String> {
+    use renderer::config::*;
+    serde_json::to_string(&json!({
+        "precise": [], "sketch": SketchOptions::PARAM_SPECS,
+        "milkyway": MilkywayOptions::PARAM_SPECS,
+        "constellation": ConstellationOptions::PARAM_SPECS,
+    }))
+    .map_err(runtime)
 }
 
 // serde accepts a finite f64 JSON number that overflows a renderer f32 field.
@@ -567,10 +737,9 @@ impl FigureCore {
                 height,
             });
             config.legend.visible = false;
-            config.left_y.out_margin = 65.0;
             config.right_y.out_margin = 25.0;
-            config.bottom_x.out_margin = 55.0;
             config.top_x.out_margin = 25.0;
+            let default_config = config.clone();
             let chart = Chart::new(config);
             validate_config(chart.config())?;
             let chart_id = renderer
@@ -603,6 +772,9 @@ impl FigureCore {
             add!(ColorBarLabelElement);
             add!(ColorBarTitleElement);
             Ok(Self {
+                background: None,
+                code_dpi: 120.0,
+                default_config,
                 gpu: Arc::clone(&gpu),
                 figure_id,
                 chart,
@@ -615,8 +787,10 @@ impl FigureCore {
                 uploads: 0,
                 readbacks: 0,
                 png_encodes: 0,
+                selection_value_readbacks: 0,
                 preparation: None,
                 target: None,
+                radial: None,
             })
         })
     }
@@ -626,6 +800,12 @@ impl FigureAccess<'_> {
     fn prepare(&mut self, py: Python<'_>) -> PyResult<String> {
         let report = py.detach(|| {
             let start = std::time::Instant::now();
+            if self.data.radial.is_some() {
+                let _ = self.render(1.)?;
+                return Ok(json!({"backend":"native", "ready":true, "elapsed_ms":start.elapsed().as_secs_f64()*1000.,
+                    "target_format":"Rgba8Unorm", "stages":[{"scope":"radial", "stage":"first-frame", "phase":"Ready"}],
+                    "persistent_cache_supported":false}));
+            }
             self.renderer.ensure_target_format(wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?;
             let device = self.renderer.device().clone();
             let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
@@ -678,6 +858,11 @@ impl FigureAccess<'_> {
         serde_json::to_string(&self.snapshot()).map_err(runtime)
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
+        if self.data.radial.is_some() {
+            return Err(invalid(
+                "a pie/donut Figure cannot contain Cartesian series",
+            ));
+        }
         let cfg: SeriesConfig = parse(json)?;
         validate_model_numbers(&cfg, "series")?;
         if self
@@ -690,6 +875,7 @@ impl FigureAccess<'_> {
         }
         let mut next = self.data.series.clone();
         next.push(cfg);
+        validate_draw_style(self.data.chart.config(), &next)?;
         self.renderer
             .set_chart_series(self.data.chart_id, gpu::series(self.data.figure_id, &next))
             .map_err(invalid)?;
@@ -761,6 +947,19 @@ impl FigureAccess<'_> {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&next.config)?;
+        validate_background(next.background)?;
+        validate_draw_style(&next.config, &next.series)?;
+        if next.radial.is_some() != self.data.radial.is_some() {
+            return Err(invalid("settings cannot change the Figure's chart family"));
+        }
+        if let Some(radial) = &next.radial {
+            if !matches!(next.config.draw_style, renderer::config::DrawStyle::Precise) {
+                return Err(invalid(
+                    "pie/donut charts use radial materials, not Cartesian draw styles",
+                ));
+            }
+            radial::validate(radial, next.config.chart_area.0)?;
+        }
         for series in &next.series {
             validate_model_numbers(series, "series")?;
         }
@@ -782,7 +981,12 @@ impl FigureAccess<'_> {
                 &next.series,
             );
         }
-        if next.config == *self.data.chart.config() && !series_changed {
+        let radial_changed = next.radial.as_ref() != self.data.radial.as_ref().map(|r| &r.chart);
+        if next.config == *self.data.chart.config()
+            && !series_changed
+            && !radial_changed
+            && next.background == self.data.background
+        {
             return Ok(());
         }
         if series_changed {
@@ -806,6 +1010,10 @@ impl FigureAccess<'_> {
         }
         self.data.chart = Chart::new(next.config);
         self.data.series = next.series;
+        self.data.background = next.background;
+        if let Some(chart) = next.radial {
+            self.data.radial.as_mut().unwrap().chart = chart;
+        }
         self.data.revision += 1;
         Ok(())
     }
@@ -992,6 +1200,9 @@ impl FigureAccess<'_> {
         }
     }
     fn pick_json(&mut self, py: Python<'_>, x: f32, y: f32) -> PyResult<String> {
+        if self.data.radial.is_some() {
+            return py.detach(|| self.pick_radial(x, y));
+        }
         let picked = py.detach(|| {
             self.renderer.enable_gpu_picking().map_err(runtime)?;
             let request = GpuPickRequest {
@@ -1027,12 +1238,36 @@ impl FigureAccess<'_> {
         serde_json::to_string(&value).map_err(runtime)
     }
     fn clear_data_selection(&mut self) -> PyResult<()> {
+        if let Some(radial) = self.data.radial.as_mut() {
+            if radial.chart.interaction.selected.take().is_some() {
+                self.data.revision += 1;
+            }
+            return Ok(());
+        }
         let mut cfg = self.data.chart.config().clone();
-        if cfg.picked_data.is_some() {
+        if cfg.picked_data.is_some() || cfg.picked_points.is_some() {
             cfg.picked_data = None;
+            cfg.picked_points = None;
             self.commit_config(cfg)?;
         }
         Ok(())
+    }
+    fn selection_details_json(&mut self, py: Python<'_>) -> PyResult<String> {
+        let reference = self
+            .data
+            .chart
+            .config()
+            .picked_data
+            .as_ref()
+            .and_then(|s| s.refs.first())
+            .cloned();
+        let details = reference
+            .map(|r| py.detach(|| self.selection_details(&r)))
+            .transpose()?;
+        serde_json::to_string(&details).map_err(runtime)
+    }
+    fn move_data_selection(&mut self, py: Python<'_>, dx: i32, dy: i32) -> PyResult<bool> {
+        py.detach(|| self.step_selection(dx, dy))
     }
     fn info_json(&self) -> String {
         let host_bytes = self.data.target.as_ref().map_or(0, |t| {
@@ -1040,8 +1275,8 @@ impl FigureAccess<'_> {
                 + u64::from(t.row_bytes) * u64::from(t.height)
         });
         json!({"adapter": self.context.adapter_info, "gpu_context_id":self.context.id,"figure_id":self.data.figure_id,"gpu_sharing":"process","active_figures":self.renderer.chart_order().len(),"figure_column_bytes":self.data.columns.values().map(|v|v.0 as u64 * 8).sum::<u64>(), "revision": self.data.revision, "column_uploads": self.data.uploads, "rgba_readbacks": self.data.readbacks, "png_encodes": self.data.png_encodes, "columns": self.data.columns.len(),
-            "pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
-            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes, "allocation_mode": "resident", "preparation": self.data.preparation}).to_string()
+            "selection_value_readbacks":self.data.selection_value_readbacks,"pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
+            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes + self.data.radial.as_ref().map_or(0, |r| r.gpu_bytes()), "allocation_mode": if self.data.radial.is_some() { "bounded" } else { "resident" }, "preparation": self.data.preparation}).to_string()
     }
 }
 
@@ -1049,6 +1284,8 @@ mod desktop;
 mod editor;
 mod gpu;
 mod notebook;
+mod radial;
+mod selection;
 
 #[pyclass(module = "figgy._native")]
 struct NativeFigure {
@@ -1070,10 +1307,15 @@ impl NativeFigure {
 #[pymethods]
 impl NativeFigure {
     #[new]
-    #[pyo3(signature=(width=960, height=600, pool_bytes=8388608))]
-    fn new(py: Python<'_>, width: u32, height: u32, pool_bytes: u64) -> PyResult<Self> {
+    #[pyo3(signature=(width=960, height=600, pool_bytes=8388608, dpi=120.0))]
+    fn new(py: Python<'_>, width: u32, height: u32, pool_bytes: u64, dpi: f64) -> PyResult<Self> {
+        if !dpi.is_finite() || dpi <= 0.0 {
+            return Err(invalid("dpi must be positive and finite"));
+        }
+        let mut core = FigureCore::new(py, width, height, pool_bytes)?;
+        core.code_dpi = dpi;
         Ok(Self {
-            core: Arc::new(Mutex::new(FigureCore::new(py, width, height, pool_bytes)?)),
+            core: Arc::new(Mutex::new(core)),
         })
     }
     fn upload_column(&self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
@@ -1102,6 +1344,9 @@ impl NativeFigure {
     fn apply_settings(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.apply_settings(json))
     }
+    fn set_radial(&self, json: &str) -> PyResult<()> {
+        self.with(|core| core.set_radial(json))
+    }
     fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.with(|core| core.fit(py, padding))
     }
@@ -1126,6 +1371,12 @@ impl NativeFigure {
     }
     fn clear_data_selection(&self) -> PyResult<()> {
         self.with(|core| core.clear_data_selection())
+    }
+    fn selection_details_json(&self, py: Python<'_>) -> PyResult<String> {
+        self.with(|core| core.selection_details_json(py))
+    }
+    fn move_data_selection(&self, py: Python<'_>, dx: i32, dy: i32) -> PyResult<bool> {
+        self.with(|core| core.move_data_selection(py, dx, dy))
     }
     #[pyo3(signature=(scale=1.0))]
     fn render_rgba<'py>(
@@ -1167,6 +1418,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(desktop::run_events, m)?)?;
     m.add_function(wrap_pyfunction!(default_colorbar_json, m)?)?;
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
+    m.add_function(wrap_pyfunction!(radial::default_radial_json, m)?)?;
+    m.add_function(wrap_pyfunction!(draw_style_specs_json, m)?)?;
     Ok(())
 }
 

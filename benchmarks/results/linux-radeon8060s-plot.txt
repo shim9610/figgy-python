@@ -1,0 +1,1 @@
+Figgy rendered 4 panels: /home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-gpu-comparison.png

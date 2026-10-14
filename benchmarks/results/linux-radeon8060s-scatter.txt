@@ -1,0 +1,13 @@
+Final corrected results; VisPy uses QT_SCALE_FACTOR=0.5.
+figgy                     scatter noisy    100,000 first=0.088112s redraw=0.000468s RSS=166.7MiB
+matplotlib-default        scatter noisy    100,000 first=0.039060s redraw=0.018822s RSS=93.7MiB
+fastplotlib               scatter noisy    100,000 first=0.568373s redraw=0.002207s RSS=246.3MiB
+vispy                     scatter noisy    100,000 first=0.368122s redraw=0.001805s RSS=288.3MiB
+figgy                     scatter noisy  1,000,000 first=0.084099s redraw=0.003645s RSS=170.3MiB
+matplotlib-default        scatter noisy  1,000,000 first=0.153352s redraw=0.122691s RSS=152.2MiB
+fastplotlib               scatter noisy  1,000,000 first=0.612332s redraw=0.004453s RSS=270.9MiB
+vispy                     scatter noisy  1,000,000 first=0.380438s redraw=0.007090s RSS=455.7MiB
+figgy                     scatter noisy  5,000,000 first=0.148876s redraw=0.020572s RSS=231.0MiB
+matplotlib-default        scatter noisy  5,000,000 first=0.673588s redraw=0.583057s RSS=393.7MiB
+fastplotlib               scatter noisy  5,000,000 first=0.816147s redraw=0.022131s RSS=491.8MiB
+vispy                     scatter noisy  5,000,000 first=0.526027s redraw=0.035679s RSS=1187.6MiB

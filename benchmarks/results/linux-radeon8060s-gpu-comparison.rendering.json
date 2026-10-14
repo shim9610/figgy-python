@@ -1,0 +1,82 @@
+{
+  "chart_renderer": "figgy / native figgy-renderer",
+  "figgy_python_version": "0.2.0",
+  "reports": [
+    "linux-radeon8060s-gpu-line.json",
+    "linux-radeon8060s-gpu-scatter.json",
+    "linux-radeon8060s-heatmap.json"
+  ],
+  "composition": "Pillow pastes completed Figgy RGBA pixels and encodes PNG; no chart drawing",
+  "svg": "embedded PNG, not vector export",
+  "subtitle": "Ubuntu 26.04 / Radeon 8060S, Vulkan + OpenGL, 5 repeats, 960 x 600 RGBA",
+  "panels": [
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "successful_rows": 18,
+      "failed_rows": 0,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "linux-radeon8060s-gpu-comparison-line-smooth.png"
+    },
+    {
+      "kind": "line",
+      "signal": "noisy",
+      "successful_rows": 17,
+      "failed_rows": 1,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "linux-radeon8060s-gpu-comparison-line-noisy.png"
+    },
+    {
+      "kind": "scatter",
+      "signal": "noisy",
+      "successful_rows": 12,
+      "failed_rows": 0,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "linux-radeon8060s-gpu-comparison-scatter-noisy.png"
+    },
+    {
+      "kind": "heatmap",
+      "signal": "smooth",
+      "successful_rows": 6,
+      "failed_rows": 0,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "xscale": "log",
+      "yscale": "log",
+      "file": "linux-radeon8060s-gpu-comparison-heatmap-smooth.png"
+    }
+  ]
+}

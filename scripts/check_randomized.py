@@ -138,7 +138,8 @@ def mutate(state, rng):
 def fresh(backend):
     import figgy
 
-    fig, ax = figgy.subplots(backend=backend, figsize=(3, 2.5), dpi=80, pool_bytes=4096)
+    # Reserve enough room for default axis/title bands plus the colorbar.
+    fig, ax = figgy.subplots(backend=backend, figsize=(4, 3), dpi=80, pool_bytes=4096)
     x = np.arange(8, dtype=np.float32)
     ax.plot(x, x / 8, id="line", label="Line")
     ax.scatter(x, x / 16, id="points")

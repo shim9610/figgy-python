@@ -2,6 +2,7 @@
 use super::*;
 #[pyclass(module = "figgy._native")]
 pub struct NotebookFigure {
+    background: Option<Color>,
     chart: Chart,
     series: Vec<SeriesConfig>,
     columns: HashMap<String, renderer::chart::FitExtent>,
@@ -21,12 +22,11 @@ impl NotebookFigure {
             height,
         });
         config.legend.visible = false;
-        config.left_y.out_margin = 65.;
         config.right_y.out_margin = 25.;
-        config.bottom_x.out_margin = 55.;
         config.top_x.out_margin = 25.;
         validate_config(&config)?;
         Ok(Self {
+            background: None,
             chart: Chart::new(config),
             series: vec![],
             columns: HashMap::new(),
@@ -60,6 +60,10 @@ impl NotebookFigure {
             return Err(invalid("unregistered source columns"));
         }
         self.series.push(s);
+        if let Err(error) = validate_draw_style(self.chart.config(), &self.series) {
+            self.series.pop();
+            return Err(error);
+        }
         self.revision += 1;
         Ok(())
     }
@@ -69,6 +73,8 @@ impl NotebookFigure {
             renderer_version: "0.16.1".into(),
             config: self.chart.config().clone(),
             series: self.series.clone(),
+            radial: None,
+            background: self.background,
         })
         .map_err(runtime)
     }
@@ -122,6 +128,13 @@ impl NotebookFigure {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&s.config)?;
+        validate_background(s.background)?;
+        if s.radial.is_some() {
+            return Err(invalid(
+                "pie/donut charts currently require backend='native'",
+            ));
+        }
+        validate_draw_style(&s.config, &s.series)?;
         for series in &s.series {
             validate_model_numbers(series, "series")?;
         }
@@ -140,9 +153,13 @@ impl NotebookFigure {
                 &s.series,
             );
         }
-        if s.series != self.series || s.config != *self.chart.config() {
+        if s.series != self.series
+            || s.config != *self.chart.config()
+            || s.background != self.background
+        {
             self.chart = Chart::new(s.config);
             self.series = s.series;
+            self.background = s.background;
             self.revision += 1;
         }
         Ok(())

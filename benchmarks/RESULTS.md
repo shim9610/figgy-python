@@ -1,62 +1,72 @@
-# Python 바인딩 구현·벤치마크 결과
+# Python bindings and benchmark results
 
-Windows/RTX 4070 Ti의 실제 GPU 측정은 [Windows 벤치마크](WINDOWS_RESULTS.md)에 별도로 기록했습니다.
+For Figgy 0.2.0 measurements on actual Ubuntu/Radeon 8060S hardware, see
+[Linux GPU benchmarks](LINUX_GPU_RESULTS.md). The llvmpipe results below use
+software Vulkan and should be considered separately.
 
-fastplotlib·VisPy·실제 pyqtgraph OpenGL 경로를 포함한 후속 결과는 [Windows GPU 비교](WINDOWS_GPU_RESULTS.md)를 참고합니다.
+Actual Windows/RTX 4070 Ti measurements are recorded in
+[Windows benchmarks](WINDOWS_RESULTS.md). The follow-up
+[Windows GPU comparison](WINDOWS_GPU_RESULTS.md) adds fastplotlib, VisPy and
+actual pyqtgraph OpenGL rendering.
 
-보고용 비교 차트도 Figgy로 렌더합니다. 한 패널씩 그린 결과를 이미지로 배치하며,
-SVG는 Figgy가 렌더한 PNG를 내장한 형식입니다.
+Report charts are rendered with Figgy one panel at a time, then arranged as
+images. SVG embeds the finished PNG.
 
-현재 구현은 figgy-renderer 0.16.1을 재사용하는 Python 0.1 알파입니다.
-matplotlib 형태의 plot/scatter/imshow API, NumPy 직접 staging 업로드, 동일 설정 경로를
-쓰는 데스크톱·Jupyter 내부 편집, Python 설정 코드 복사, PNG 저장을 구현했습니다.
-자동 스트림·다운샘플링·청크 렌더 전환은 없습니다. 작은 상주 풀을 필요에 따라 확장하고,
-디바이스 한도 초과는 용량·열 이름·어댑터를 포함한 MemoryError로 반환합니다.
+The original campaign used Python 0.1 alpha with figgy-renderer 0.16.1:
+matplotlib-like plot/scatter/imshow, NumPy staging uploads, desktop/Jupyter
+editing, Python settings export and PNG output. The current package is 0.2.0;
+see [host validation](../docs/HOST_VALIDATION.md) for subsequent host changes.
+There is no automatic streaming/downsampling/chunk-render transition. A small
+resident pool grows as needed. Exceeding device limits raises `MemoryError`
+with capacity, column and adapter context.
 
-## 실행 조건
+## Conditions
 
-- Python 3.12.14, NumPy 2.5.4, matplotlib 3.11.2, pyqtgraph 0.14.0, PySide6 6.12.0.
-- Linux x86_64, llvmpipe LLVM 19.1.7 **CPU Vulkan**, CPU quota 4 cores. 물리 GPU 없음.
-- 960×600 완료된 RGBA readback. 선 두께 2.5 px, scatter 지름 5 px.
-- 같은 float64 입력. 선은 매끄러운 파형과 고정 seed의 잡음 파형을 분리.
-- matplotlib와 Figgy의 실제 plot 영역을 맞춤. 히트맵은 양쪽에 colorbar를 포함.
-  pyqtgraph plot 영역은 QGraphicsItem 경계 때문에 너비·높이에 0.5 px 차이가 있음.
-- Figgy는 sample count 1 + shader AA. matplotlib는 Agg AA, pyqtgraph 기본 QPainter는
-  AA off / OpenGL off / autoDownsample off. 이미지를 동일한 픽셀로 만드는 비교는 아님.
-- 독립 worker에서 초기화·등록/fit·첫 draw·반복 draw·축/스타일 편집·PNG를 구분.
-  반복 draw는 3회 중앙값. import와 데이터 생성은 시간 합계에서 제외.
-- process는 새로 만들지만 OS/font/Mesa shader cache는 지우지 않음. 완전한 cold-cache
-  측정이나 화면 표시 FPS 측정이 아님. PNG·Jupyter comm·브라우저 표시 지연은 별도.
-- 전체 worker peak RSS에는 입력과 각 라이브러리/드라이버의 메모리가 포함되며,
-  물리 VRAM이나 순수 Rust/Python 객체 메모리 비교가 아님.
+- Python 3.12.14, NumPy 2.5.4, matplotlib 3.11.2, pyqtgraph 0.14.0,
+  PySide6 6.12.0.
+- Linux x86_64, llvmpipe LLVM 19.1.7 **CPU Vulkan**, four-core CPU quota,
+  no physical GPU.
+- Completed 960×600 RGBA readback; line width 2.5 px, scatter diameter 5 px.
+- Identical float64 inputs; separate smooth/noisy line signals with fixed seed.
+- Actual Figgy/matplotlib plot areas matched. Heatmaps include colorbars.
+  pyqtgraph dimensions differ by 0.5 px because of QGraphicsItem boundaries.
+- Figgy uses sample count 1 and shader AA; matplotlib uses Agg AA; pyqtgraph
+  default QPainter uses AA off, OpenGL off and autoDownsample off. Output pixels
+  are not identical across backends.
+- Independent workers separate initialization, registration/fit, first draw,
+  repeated draw, axis/style edits and PNG output. Repeated draw is a median of
+  three runs. Imports/input generation are excluded from totals.
+- Processes are fresh, but OS/font/Mesa caches are not cleared. These are not
+  fully cold-cache or screen-FPS measurements. PNG/Jupyter comm/browser latency
+  are separate costs.
+- Full-worker peak RSS includes input/library/driver memory; it is not physical
+  VRAM or isolated Rust/Python object memory.
 
-## 측정에서 보이는 차이
+## Observations
 
-400만 셀 히트맵 반복 렌더는 Figgy 27.5 ms,
-matplotlib 124.3 ms로 약
-**4.5배** 차이였습니다.
-하지만 첫 결과까지는 Figgy 601 ms,
-matplotlib 180 ms로 matplotlib가 빨랐습니다.
-상주 행렬을 재사용하는 반복 편집·렌더 경로에서 이점이 나타났습니다.
+Repeated four-million-cell heatmaps took 27.5 ms for Figgy and 124.3 ms for
+matplotlib, approximately **4.5×** apart. First output favored matplotlib:
+180 ms versus 601 ms for Figgy. The advantage appears when reusing a resident
+matrix during repeated edits/renders.
 
-100만 점 잡음 선은 Figgy 650 ms,
-matplotlib 단순화 해제 2696 ms로 약
-4.1배 차이였습니다.
-matplotlib **기본 단순화 설정은 이보다 빠릅니다**. 매끄러운 선에서는 기본/단순화 해제
-모두 Figgy보다 빨랐고, 산점도는 대체로 비슷했습니다. Rust라서 모든 작업이 빨라진다는
-결론은 이 결과로 뒷받침되지 않습니다.
+One-million-point noisy lines took 650 ms for Figgy versus 2696 ms for
+matplotlib with simplification disabled, approximately 4.1× apart. Default
+matplotlib simplification is faster than that. For smooth lines, both default
+and unsimplified matplotlib outperformed Figgy; scatter was broadly similar.
+These results do not support a claim that Rust makes every workload faster.
 
-500만 점 잡음 선에서 matplotlib 단순화 해제는 Agg cell block 한도 오류가 발생했습니다.
-이를 timeout/메모리 부족/속도 수치로 바꾸지 않고 원문 오류를 JSON에 보존했습니다.
-기본 matplotlib와 Figgy, pyqtgraph는 같은 입력을 완료했습니다.
+At five million noisy samples, unsimplified matplotlib hit the Agg cell-block
+limit. The original error remains in JSON rather than being labeled a timeout,
+allocation failure or speed result. Default matplotlib, Figgy and pyqtgraph
+completed the same input.
 
-이 문서의 측정은 소프트웨어 Vulkan 결과입니다. 물리 GPU에서 같은 스크립트를 실행한
-Windows/RTX 4070 Ti/Vulkan 결과는 [Windows 벤치마크](WINDOWS_RESULTS.md)를 참고합니다.
-Windows/DX12와 macOS/Metal 측정은 별도로 필요합니다.
+These are software Vulkan measurements. For hardware Vulkan, see the Windows
+and Linux reports linked above. Windows/DX12 and macOS/Metal need separate
+measurements.
 
-## line
+## Line
 
-| 입력 | 백엔드 | 초기화+등록/fit+첫 draw (ms) | 반복 draw (ms) | 축 변경+draw (ms) | Peak RSS (MiB) |
+| Input | Backend | Init + register/fit + first draw (ms) | Repeated draw (ms) | Axis edit + draw (ms) | Peak RSS (MiB) |
 |---|---|---:|---:|---:|---:|
 | 100,000 / smooth | figgy | 277.7 | 73.8 | 83.3 | 226.5 |
 | 100,000 / smooth | matplotlib-default | 45.1 | 22.8 | 24.6 | 78.0 |
@@ -80,12 +90,12 @@ Windows/DX12와 macOS/Metal 측정은 별도로 필요합니다.
 | 1,000,000 / noisy | pyqtgraph-default | 1378.7 | 640.1 | 623.5 | 176.9 |
 | 5,000,000 / noisy | figgy | 5000.2 | 4756.4 | 4484.2 | 2276.5 |
 | 5,000,000 / noisy | matplotlib-default | 881.0 | 389.9 | 437.5 | 402.3 |
-| 5,000,000 / noisy | matplotlib-unsimplified | Agg 오류 | — | — | — |
+| 5,000,000 / noisy | matplotlib-unsimplified | Agg error | — | — | — |
 | 5,000,000 / noisy | pyqtgraph-default | 6789.0 | 2976.8 | 3089.2 | 357.8 |
 
-## scatter
+## Scatter
 
-| 입력 | 백엔드 | 초기화+등록/fit+첫 draw (ms) | 반복 draw (ms) | 축 변경+draw (ms) | Peak RSS (MiB) |
+| Input | Backend | Init + register/fit + first draw (ms) | Repeated draw (ms) | Axis edit + draw (ms) | Peak RSS (MiB) |
 |---|---|---:|---:|---:|---:|
 | 100,000 / noisy | figgy | 307.6 | 52.8 | 51.9 | 172.1 |
 | 100,000 / noisy | matplotlib-default | 65.9 | 44.6 | 43.1 | 78.1 |
@@ -94,9 +104,9 @@ Windows/DX12와 macOS/Metal 측정은 별도로 필요합니다.
 | 5,000,000 / noisy | figgy | 2074.2 | 1603.7 | 1624.1 | 619.5 |
 | 5,000,000 / noisy | matplotlib-default | 1844.0 | 1720.7 | 1603.0 | 401.4 |
 
-## heatmap
+## Heatmap
 
-| 입력 | 백엔드 | 초기화+등록/fit+첫 draw (ms) | 반복 draw (ms) | 축 변경+draw (ms) | Peak RSS (MiB) |
+| Input | Backend | Init + register/fit + first draw (ms) | Repeated draw (ms) | Axis edit + draw (ms) | Peak RSS (MiB) |
 |---|---|---:|---:|---:|---:|
 | 99,856 / smooth | figgy | 296.6 | 24.1 | 26.7 | 158.3 |
 | 99,856 / smooth | matplotlib-default | 70.3 | 40.1 | 39.5 | 104.6 |
@@ -105,27 +115,31 @@ Windows/DX12와 macOS/Metal 측정은 별도로 필요합니다.
 | 4,000,000 / smooth | figgy | 601.1 | 27.5 | 24.4 | 240.3 |
 | 4,000,000 / smooth | matplotlib-default | 179.5 | 124.3 | 126.9 | 407.2 |
 
-## 기능·배포 검증
+## Functional and packaging checks at this checkpoint
 
-- 설치한 release wheel에서 pytest **10건 통과**. source 배열 변경 독립성,
-  업로드 재사용, 설정 코드 재현과 이미지 일치, stale/잘못된 설정 거부,
-  PNG 배율, 행렬 선택, widget 편집, 상주 풀 확장, 실제 디바이스 한도 오류를 확인.
-- Chromium에서 실제 공통 ES module + native renderer를 연결하여 제목 편집,
-  클릭/드래그, 클립보드 코드 복사, PNG 다운로드를 확인.
-- 실제 JupyterLab 4.6.4 + kernel + anywidget에서 제목·색상 편집, Python 복사와
-  PNG 다운로드 확인. 해당 브라우저 실행에서 page error 없음.
-- QtWebEngine 데스크톱 창도 headless/offscreen 환경에서 실행하고 화면 확인.
-- Linux CPython 3.12 / glibc 2.35 이상 wheel 생성 및 twine check --strict 통과.
-- Windows/macOS와 Python 3.11~3.14 wheel CI를 구성했으나 원격 실행은 아직 없음.
-- Windows 실제 Qt GUI와 물리 GPU 검증은 [별도 결과](WINDOWS_RESULTS.md)에 기록함.
-- PyPI 게시와 실제 macOS GUI 검증은 아직 수행하지 않음.
-  upstream renderer가 macOS/Metal을 실험적 지원으로 명시함.
+- Installed release wheel: **10 tests passed**, covering independence from
+  source mutations, upload reuse, settings replay/image equality, stale/invalid
+  settings, PNG scaling, matrix picking, widget editing, pool growth and real
+  device-limit errors.
+- Chromium with the common ES module/native renderer passed title edits,
+  click/drag, clipboard copying and PNG download.
+- Actual JupyterLab 4.6.4/kernel/anywidget passed title/color editing, Python
+  copying and PNG download, with no page errors in that browser run.
+- The historical QtWebEngine desktop host was launched and inspected in a
+  headless/offscreen environment. This predates the current winit host.
+- Built a Linux CPython 3.12 wheel for glibc 2.35 or later; strict twine checks
+  passed.
+- Windows/macOS and Python 3.11–3.14 wheel CI were configured but had not been
+  run remotely at this checkpoint. CI is currently disabled while stabilizing.
+- Actual Windows Qt/hardware checks are in the [separate report](WINDOWS_RESULTS.md).
+- PyPI publication and actual macOS GUI verification have not been performed;
+  upstream describes Metal support as experimental.
 
-한 패널의 plot/scatter/imshow가 현재 고수준 Python API입니다. 다중 패널과
-pie/bar/boxplot/contour 고수준 API는 이후 범위입니다. 원본 데이터 값 드래그 편집은
-없으며 현재 편집은 외형·배치·축 설정을 다룹니다.
+The high-level Python API exposes single-panel plot/scatter/imshow. Multi-panel
+figures and high-level pie/bar/boxplot/contour APIs are future scope. Editing
+changes appearance, layout and axes rather than dragging original data values.
 
-## 재현
+## Reproduce
 
 ```bash
 python -m pip install '.[benchmark]'
@@ -134,5 +148,7 @@ python benchmarks/compare.py --sizes 100000 1000000 5000000   --kinds scatter --
 python benchmarks/compare.py --sizes 100000 1000000 4000000   --kinds heatmap --backends figgy matplotlib-default   --repeats 3 --output benchmarks/results/my-heatmap.json
 ```
 
-[선 원자료](results/llvmpipe-line.json) · [산점도 원자료](results/llvmpipe-scatter.json) ·
-[히트맵 원자료](results/llvmpipe-heatmap.json) · [비교 차트 SVG](results/comparison.svg)
+[Raw line data](results/llvmpipe-line.json) ·
+[Raw scatter data](results/llvmpipe-scatter.json) ·
+[Raw heatmap data](results/llvmpipe-heatmap.json) ·
+[Comparison chart SVG](results/comparison.svg)

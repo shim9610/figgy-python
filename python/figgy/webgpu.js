@@ -28,6 +28,7 @@ export function render({model,el}) {
   const client=crypto.randomUUID();
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
+  let background=clone(local.background ?? null);
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
   let inputAt=null,busy=0,startInit;
   const requested=new Promise(resolve=>{startInit=resolve;});
@@ -39,7 +40,8 @@ export function render({model,el}) {
     const operation=queue.then(async()=>{if(disposed)throw Error('Widget disposed');busy++;try{return await fn();}finally{busy--;}});
     queue=operation.catch(fail);return propagate?operation:queue;
   };
-  function snapshot(){return {schema_version:1,renderer_version:'0.16.1',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};}
+  function snapshot(){return {schema_version:1,renderer_version:'0.16.1',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
+  function clearColor(color){const c=color ?? {r:1,g:1,b:1,a:1};chart.set_clear_color(c.r,c.g,c.b,c.a);background=clone(color ?? null);}
   function checkNumbers(value,path='settings'){
     if(typeof value==='number' && !Number.isFinite(value))throw Error(`${path} must be finite`);
     if(value && typeof value==='object')for(const [key,item] of Object.entries(value)){
@@ -62,21 +64,25 @@ export function render({model,el}) {
     try {
       if(settings.schema_version!==1 || settings.renderer_version!=='0.16.1')throw Error('Unsupported settings/renderer version');
       checkNumbers(settings);
+      const mode=settings.config?.draw_style?.mode;
+      if(mode==='milkyway' && settings.series.some(s=>!s.render_type.Line))throw Error('Milkyway supports line-only series; scatter and marker lines are disabled');
+      if(mode==='constellation' && settings.series.some(s=>!s.render_type.ScatterLine))throw Error('Constellation requires line series with markers');
       if(settings.config?.chart_title?.top_margin < 0)throw Error('config.chart_title.top_margin must be nonnegative; use offset_y to move the title');
       for(const axis of [settings.config?.top_x,settings.config?.bottom_x,settings.config?.left_y,settings.config?.right_y,settings.config?.colorbar?.axis].filter(Boolean)){
         const min=axis.scale==='Logarithmic'?Math.log10(axis.min):axis.min, max=axis.scale==='Logarithmic'?Math.log10(axis.max):axis.max;
         if(![min,max,max-min].every(v=>typeof v==='number' && Number.isFinite(Math.fround(v))))throw Error('Axis bounds/span exceed the f32 hi/lo representation range');
       }
-      chart.set_config(JSON.stringify(settings.config));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));checkNumericConversion(settings,snapshot());
+      chart.set_config(JSON.stringify(settings.config));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));clearColor(settings.background);checkNumericConversion(settings,snapshot());
     }
-    catch(e){chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));throw e;}
+    catch(e){chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));clearColor(old.background);throw e;}
     local=snapshot();dirty=true;error.textContent='';
   }
   function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending};pending=null;stats.kernel_edit_messages++;model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
   function commit(){local=snapshot();pending=clone(local);post();properties();}
   function idle(){if(!inflight && !pending){for(const resolve of barriers.splice(0))resolve();}}
   function flush(){post();return !inflight&&!pending ? Promise.resolve() : new Promise(resolve=>barriers.push(resolve));}
-  function code(){return `import json\nfig.apply_settings(json.loads(${JSON.stringify(JSON.stringify(snapshot()))}))\n`;}
+  let exportedCode=model.get('state').code ?? '';
+  function code(){return exportedCode;}
   function properties(){
     if(!chart)return;
     local=snapshot();
@@ -115,7 +121,7 @@ export function render({model,el}) {
   function frame(){if(disposed)return;if(chart && dirty && !busy){try{chart.frame();dirty=false;stats.surface_frames++;if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}}catch(e){fail(e);}}raf=requestAnimationFrame(frame);}
   async function exporting(scale=1){await flush();return enqueue(async()=>{stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-  function onState(){enqueue(()=>{const state=model.get('state');if(state.revision>revision && !inflight){
+  function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
@@ -125,7 +131,7 @@ export function render({model,el}) {
     if(message.client && message.client!==client)return;
     if(message.action==='ack')enqueue(()=>{
       if(message.sequence!==inflight?.sequence)return;
-      const latest=pending;inflight=null;revision=message.state.revision;
+      const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
       if(message.error){pending=null;install(message.state.settings);fail(message.error);}
       else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
       properties();idle();
@@ -144,7 +150,7 @@ export function render({model,el}) {
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
   select.addEventListener('change',()=>enqueue(()=>{selected=select.value;properties();}));
-  root.querySelector('[data-copy]').addEventListener('click',()=>enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}}));
+  root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{await chart.auto_fit_all(0.05);dirty=true;commit();}));
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
@@ -185,6 +191,7 @@ export function render({model,el}) {
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
     chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
+    clearColor(local.background);
     await chart.first_frame_ready();properties();observer.observe(canvas);resize();status.textContent='Browser GPU · resident data';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);

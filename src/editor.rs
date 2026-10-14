@@ -2,10 +2,13 @@
 use super::*;
 use egui::{Color32, RichText, Stroke};
 
+pub const INSPECTOR_WIDTH: f32 = 320.;
+
 pub(crate) struct Editor {
     pub inspector_open: bool,
     pub error: String,
-    advanced_open: bool,
+    pub advanced_requested: bool,
+    pub picked: Option<Value>,
     save_path: String,
     raw: String,
     notice: String,
@@ -18,7 +21,8 @@ impl Default for Editor {
         Self {
             inspector_open: false,
             error: String::new(),
-            advanced_open: false,
+            advanced_requested: false,
+            picked: None,
             save_path: "figure.png".into(),
             raw: String::new(),
             notice: String::new(),
@@ -171,6 +175,56 @@ impl Editor {
                     if layout.clicked() {
                         *edit_area = true;
                     }
+                    ui.separator();
+                    let visibility = ui.button("Show / hide");
+                    self.controls
+                        .insert("visibility_menu".into(), visibility.rect);
+                    egui::Popup::menu(&visibility)
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                        .show(|ui| {
+                            ui.set_width(210.);
+                            ui.heading("Show / hide");
+                            let mut cfg = c.data.chart.config().clone();
+                            let mut changed = false;
+                            for (key, label, visible) in [
+                                ("chart_title", "Chart title", &mut cfg.chart_title.visible),
+                                ("legend", "Legend", &mut cfg.legend.visible),
+                                (
+                                    "axis_title_bottom",
+                                    "X axis title",
+                                    &mut cfg.bottom_x.title_option.visible,
+                                ),
+                                (
+                                    "axis_title_left",
+                                    "Y axis title",
+                                    &mut cfg.left_y.title_option.visible,
+                                ),
+                                (
+                                    "axis_title_top",
+                                    "Top axis title",
+                                    &mut cfg.top_x.title_option.visible,
+                                ),
+                                (
+                                    "axis_title_right",
+                                    "Right axis title",
+                                    &mut cfg.right_y.title_option.visible,
+                                ),
+                            ] {
+                                let response = ui.checkbox(visible, label);
+                                self.controls.insert(format!("show_{key}"), response.rect);
+                                changed |= response.changed();
+                            }
+                            if changed {
+                                match c.commit_config(cfg) {
+                                    Ok(()) => {
+                                        self.error.clear();
+                                        self.notice = "Visibility updated".into();
+                                    }
+                                    Err(error) => self.error = error.to_string(),
+                                }
+                            }
+                        });
+                    self.draw_style_menu(ui, c);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let save = toolbar_icon(
                             ui,
@@ -231,14 +285,21 @@ impl Editor {
                         );
                         self.controls.insert("copy".into(), copy.rect);
                         if copy.clicked() {
-                            match c
-                                .settings_json()
-                                .and_then(|s| serde_json::to_string(&s).map_err(runtime))
-                            {
-                                Ok(quoted) => {
-                                    ui.ctx().copy_text(format!(
-                                        "import json\nfig.apply_settings(json.loads({quoted}))\n"
-                                    ));
+                            // The exporter is pure Python: it never reacquires the
+                            // Figure/renderer locks already held by this frame.
+                            let code = c.settings_json().and_then(|settings| {
+                                let defaults = serde_json::to_string(&c.data.default_config)
+                                    .map_err(runtime)?;
+                                Python::attach(|py| {
+                                    py.import("figgy._codegen")?
+                                        .getattr("settings_to_code")?
+                                        .call1((settings, defaults, c.data.code_dpi))?
+                                        .extract::<String>()
+                                })
+                            });
+                            match code {
+                                Ok(code) => {
+                                    ui.ctx().copy_text(code);
                                     self.notice = "Python settings copied".into();
                                 }
                                 Err(e) => self.error = e.to_string(),
@@ -259,6 +320,16 @@ impl Editor {
                     });
                 });
             });
+        egui::Panel::top("navigation_help")
+            .exact_size(24.)
+            .frame(egui::Frame::NONE.fill(Color32::from_rgb(248, 249, 251))
+                .inner_margin(egui::Margin::symmetric(18, 3)))
+            .show(root, |ui| {
+                let help = ui.label(RichText::new(
+                    "Ctrl + wheel: Zoom X  ·  Shift + wheel: Zoom Y  ·  Wheel: Zoom XY  ·  Drag plot: Pan  ·  Click: Edit")
+                    .size(12.).color(Color32::from_rgb(105, 116, 131)));
+                self.controls.insert("navigation_help".into(), help.rect);
+            });
         egui::Panel::bottom("status")
             .exact_size(30.)
             .frame(
@@ -272,7 +343,7 @@ impl Editor {
                 } else if !self.notice.is_empty() {
                     self.notice.as_str()
                 } else {
-                    "Click a chart element to edit  ·  Scroll to zoom"
+                    "Click an element to edit  ·  Esc: Clear selection  ·  Arrows: Move selection  ·  F11: Full screen"
                 };
                 ui.label(
                     RichText::new(message)
@@ -285,112 +356,175 @@ impl Editor {
                 );
             });
         if self.inspector_open {
-            egui::Panel::right("inspector")
-                .exact_size(320.)
-                .frame(
+            let mut area = root.max_rect();
+            area.min.y += 82.;
+            area.max.y -= 30.;
+            egui::Area::new(egui::Id::new("inspector"))
+                .order(egui::Order::Foreground)
+                .fixed_pos(egui::pos2(area.right() - INSPECTOR_WIDTH, area.top()))
+                .movable(false)
+                .show(root.ctx(), |ui| {
                     egui::Frame::NONE
                         .fill(Color32::from_rgb(248, 249, 251))
-                        .inner_margin(18),
-                )
-                .show(root, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.heading("Properties");
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let close = ui.small_button("Close");
-                            self.controls.insert("close_properties".into(), close.rect);
-                            if close.clicked() {
-                                self.inspector_open = false;
-                            }
+                        .inner_margin(18)
+                        .show(ui, |ui| {
+                            ui.set_width(INSPECTOR_WIDTH - 36.);
+                            ui.set_height((area.height() - 36.).max(100.));
+                            self.inspector(ui, c, selected);
                         });
-                    });
-                    ui.add_space(8.);
-                    ui.label(RichText::new("OBJECT").size(11.).weak());
-                    let response = egui::ComboBox::from_id_salt("object")
-                        .width(ui.available_width())
-                        .selected_text(
-                            selected
-                                .as_ref()
-                                .map(|id| object_name(id, c.data))
-                                .unwrap_or_else(|| "Choose an element".into()),
-                        )
-                        .show_ui(ui, |ui| {
-                            for (id, _) in &c.data.elements {
-                                ui.selectable_value(
-                                    selected,
-                                    Some(id.clone()),
-                                    object_name(id, c.data),
-                                );
-                            }
-                            for series in &c.data.series {
-                                ui.selectable_value(
-                                    selected,
-                                    Some(series.series_id.clone()),
-                                    object_name(&series.series_id, c.data),
-                                );
-                            }
-                        });
-                    self.controls
-                        .insert("object".into(), response.response.rect);
-                    ui.add_space(10.);
-                    ui.separator();
-                    ui.add_space(6.);
-                    if let Some(target) = selected.as_ref() {
-                        egui::ScrollArea::vertical().show(ui, |ui| self.properties(ui, c, target));
-                    } else {
-                        ui.label(
-                            RichText::new(
-                                "Select a title, axis, legend or data series in the chart.",
-                            )
-                            .weak(),
-                        );
-                    }
-                    ui.add_space(16.);
-                    ui.separator();
-                    let advanced = ui.button("Advanced settings…");
-                    self.controls.insert("advanced".into(), advanced.rect);
-                    if advanced.clicked() {
-                        self.raw = serde_json::to_string_pretty(&c.snapshot()).unwrap();
-                        self.advanced_open = true;
-                    }
                 });
         }
-        let mut advanced = self.advanced_open;
-        egui::Window::new("Advanced chart settings")
-            .open(&mut advanced)
-            .default_width(530.)
-            .show(root.ctx(), |ui| {
-                ui.label("Edit the full configuration. Data and series connections are preserved.");
-                egui::ScrollArea::vertical()
-                    .max_height(380.)
-                    .show(ui, |ui| {
-                        let response = ui.add(
-                            egui::TextEdit::multiline(&mut self.raw)
-                                .code_editor()
-                                .desired_width(f32::INFINITY)
-                                .desired_rows(16),
-                        );
-                        self.controls.insert(
-                            "settings_json".into(),
-                            response.rect.intersect(ui.clip_rect()),
-                        );
-                    });
-                let apply = ui.button("Apply settings");
-                self.controls.insert("apply_settings".into(), apply.rect);
-                if apply.clicked() {
-                    match c.apply_settings(&self.raw) {
-                        Ok(_) => {
-                            self.error.clear();
-                            self.notice = "Settings applied".into();
-                        }
-                        Err(e) => self.error = e.to_string(),
-                    }
-                }
-            });
-        self.advanced_open = advanced;
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(root, |ui| {
                 self.stage = ui.max_rect().shrink(16.);
+            });
+    }
+
+    fn inspector(
+        &mut self,
+        ui: &mut egui::Ui,
+        c: &mut FigureAccess<'_>,
+        selected: &mut Option<String>,
+    ) {
+        ui.horizontal(|ui| {
+            ui.heading("Properties");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let close = ui.small_button("Close");
+                self.controls.insert("close_properties".into(), close.rect);
+                if close.clicked() {
+                    self.inspector_open = false;
+                }
+            });
+        });
+        ui.add_space(8.);
+        ui.label(RichText::new("OBJECT").size(11.).weak());
+        let response = egui::ComboBox::from_id_salt("object")
+            .width(ui.available_width())
+            .selected_text(
+                selected
+                    .as_ref()
+                    .map(|id| object_name(id, c.data))
+                    .unwrap_or_else(|| "Choose an element".into()),
+            )
+            .show_ui(ui, |ui| {
+                let mut elements = c.data.elements.iter().collect::<Vec<_>>();
+                let common = [
+                    "chart_title",
+                    "legend",
+                    "axis_title_bottom",
+                    "axis_title_left",
+                    "data_area",
+                ];
+                elements.sort_by_key(|(id, _)| {
+                    common
+                        .iter()
+                        .position(|name| *name == id)
+                        .unwrap_or(common.len())
+                });
+                for (id, _) in elements {
+                    let response =
+                        ui.selectable_value(selected, Some(id.clone()), object_name(id, c.data));
+                    if response.rect.intersects(ui.clip_rect()) {
+                        self.controls.insert(
+                            format!("object_{id}"),
+                            response.rect.intersect(ui.clip_rect()),
+                        );
+                    }
+                    if response.clicked() {
+                        ui.close();
+                    }
+                }
+                for series in &c.data.series {
+                    ui.selectable_value(
+                        selected,
+                        Some(series.series_id.clone()),
+                        object_name(&series.series_id, c.data),
+                    );
+                }
+            });
+        self.controls
+            .insert("object".into(), response.response.rect);
+        ui.add_space(10.);
+        ui.separator();
+        ui.add_space(6.);
+        if let Some(target) = selected.as_ref() {
+            egui::ScrollArea::vertical()
+                .max_height(
+                    (ui.available_height() - if self.picked.is_some() { 250. } else { 100. })
+                        .max(100.),
+                )
+                .show(ui, |ui| self.properties(ui, c, target));
+        } else {
+            ui.label(
+                RichText::new("Select a title, axis, legend or data series in the chart.").weak(),
+            );
+        }
+        if let Some(picked) = &self.picked {
+            ui.separator();
+            ui.label(RichText::new("SELECTED DATA").size(11.).strong());
+            for key in ["index", "x_index", "y_index", "x", "y", "value"] {
+                if let Some(value) = picked.get(key) {
+                    ui.monospace(format!("{key}: {value}"));
+                }
+            }
+            ui.label(
+                RichText::new("Arrows: move selection · Esc: clear")
+                    .small()
+                    .weak(),
+            );
+        }
+        ui.add_space(16.);
+        ui.separator();
+        let advanced = ui.button("Advanced settings…");
+        self.controls.insert("advanced".into(), advanced.rect);
+        if advanced.clicked() {
+            self.raw = serde_json::to_string_pretty(&c.snapshot()).unwrap();
+            self.advanced_requested = true;
+        }
+    }
+
+    pub fn begin_settings(&mut self, c: &FigureAccess<'_>) {
+        self.raw = serde_json::to_string_pretty(&c.snapshot()).unwrap();
+    }
+
+    pub fn show_settings(&mut self, root: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        self.controls.clear();
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.inner_margin(18))
+            .show(root, |ui| {
+                ui.heading("Advanced chart settings");
+                ui.label("Data and series connections are preserved.");
+                egui::Panel::bottom("settings_actions").show(ui, |ui| {
+                    let apply = ui.button("Apply settings");
+                    self.controls.insert("apply_settings".into(), apply.rect);
+                    if apply.clicked() {
+                        match c.apply_settings(&self.raw) {
+                            Ok(_) => {
+                                self.error.clear();
+                                self.notice = "Settings applied".into();
+                            }
+                            Err(e) => self.error = e.to_string(),
+                        }
+                    }
+                    if !self.error.is_empty() {
+                        ui.colored_label(Color32::DARK_RED, &self.error);
+                    } else {
+                        ui.label(&self.notice);
+                    }
+                });
+                egui::ScrollArea::both().show(ui, |ui| {
+                    let response = ui.add(
+                        egui::TextEdit::multiline(&mut self.raw)
+                            .code_editor()
+                            .desired_width(f32::INFINITY)
+                            .desired_rows(20),
+                    );
+                    self.controls.insert(
+                        "settings_json".into(),
+                        response.rect.intersect(ui.clip_rect()),
+                    );
+                });
             });
     }
 
@@ -399,6 +533,34 @@ impl Editor {
         let mut changed = false;
         let config = state["config"].clone();
         let mut config = config;
+        let visibility = match target {
+            "chart_title" => Some((&mut config["chart_title"], "visible")),
+            "legend" => Some((&mut config["legend"], "visible")),
+            "colorbar" => Some((&mut config["colorbar"], "visible")),
+            _ if target.starts_with("axis_title_") => Some((
+                &mut config[axis_key(target.trim_start_matches("axis_title_"))]["title_option"],
+                "visible",
+            )),
+            _ if target.starts_with("tick_labels_") => Some((
+                &mut config[axis_key(target.trim_start_matches("tick_labels_"))]["label_style"],
+                "visible",
+            )),
+            _ if target.starts_with("axis_") => Some((
+                &mut config[axis_key(target.trim_start_matches("axis_"))],
+                "line_visible",
+            )),
+            _ => None,
+        };
+        if let Some((node, key)) = visibility {
+            if let Some(mut value) = node[key].as_bool() {
+                let response = ui.checkbox(&mut value, "Visible");
+                self.controls.insert("visible".into(), response.rect);
+                if response.changed() {
+                    node[key] = json!(value);
+                    changed = true;
+                }
+            }
+        }
         let rich = match target {
             "chart_title" => Some(&mut config["chart_title"]["text"]),
             "axis_title_bottom" => Some(&mut config["bottom_x"]["title_option"]["text"]),
@@ -409,22 +571,68 @@ impl Editor {
             _ => None,
         };
         if let Some(node) = rich {
-            let mut text = node["segments"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
+            if target == "legend" {
+                let mut labels_changed = false;
+                ui.label("Legend entries");
+                for series in state["series"].as_array_mut().unwrap() {
+                    if !series["label"].is_object() {
+                        continue;
+                    }
+                    let mut text = series["label"]["segments"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
                         .filter_map(|s| s["text"].as_str())
-                        .collect::<String>()
-                })
-                .unwrap_or_default();
-            ui.label("Text");
-            let response =
-                ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
-            self.controls.insert("text".into(), response.rect);
-            if response.changed() {
-                node["segments"] =
-                    serde_json::to_value(renderer::text::rich_segments_from_text(&text)).unwrap();
-                changed = true;
+                        .collect::<String>();
+                    let response =
+                        ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
+                    self.controls.insert(
+                        format!("legend_label_{}", series["series_id"].as_str().unwrap()),
+                        response.rect,
+                    );
+                    if response.changed() {
+                        series["label"]["segments"] =
+                            serde_json::to_value(renderer::text::rich_segments_from_text(&text))
+                                .unwrap();
+                        labels_changed = true;
+                    }
+                }
+                if labels_changed {
+                    let mut content: renderer::text::RichText =
+                        serde_json::from_value(node.clone()).unwrap();
+                    content.segments.clear();
+                    for series in state["series"].as_array().unwrap() {
+                        let series: SeriesConfig = serde_json::from_value(series.clone()).unwrap();
+                        if let Some(label) = &series.label {
+                            renderer::legend::append_legend_entry_rich(
+                                &mut content,
+                                renderer::legend::series_symbol_segments(&series),
+                                label.segments.clone(),
+                            );
+                        }
+                    }
+                    *node = serde_json::to_value(content).unwrap();
+                    changed = true;
+                }
+            } else {
+                let mut text = node["segments"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|s| s["text"].as_str())
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default();
+                ui.label("Text");
+                let response =
+                    ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
+                self.controls.insert("text".into(), response.rect);
+                if response.changed() {
+                    node["segments"] =
+                        serde_json::to_value(renderer::text::rich_segments_from_text(&text))
+                            .unwrap();
+                    changed = true;
+                }
             }
             changed |= text_field(
                 ui,
@@ -667,7 +875,42 @@ fn color(
         .horizontal(|ui| {
             ui.label(label);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.color_edit_button_srgba_unmultiplied(&mut rgba)
+                let mut response = ui.add_sized(
+                    [36., 30.],
+                    egui::Button::new("").fill(Color32::from_rgba_unmultiplied(
+                        rgba[0], rgba[1], rgba[2], rgba[3],
+                    )),
+                );
+                let id = ui.make_persistent_id(("picker", key));
+                let cached = ui
+                    .ctx()
+                    .data_mut(|d| d.get_temp::<([u8; 4], egui::ecolor::Hsva)>(id));
+                let mut hsva = cached
+                    .filter(|p| p.0 == rgba)
+                    .map(|p| p.1)
+                    .unwrap_or_else(|| egui::ecolor::Hsva::from_srgba_unmultiplied(rgba));
+                if let Some(popup) = egui::Popup::menu(&response)
+                    .frame(egui::Frame::popup(ui.style()).inner_margin(26))
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .show(|ui| {
+                        // The SV marker extends by width/12 beyond the square.
+                        // Reserve that space before the hue bar and at its edges.
+                        ui.spacing_mut().slider_width = 250.;
+                        ui.spacing_mut().item_spacing.y = 32.;
+                        if egui::color_picker::color_picker_hsva_2d(
+                            ui,
+                            &mut hsva,
+                            egui::color_picker::Alpha::OnlyBlend,
+                        ) {
+                            rgba = hsva.to_srgba_unmultiplied();
+                            response.mark_changed();
+                        }
+                    })
+                {
+                    controls.insert("color_picker".into(), popup.response.rect);
+                }
+                ui.ctx().data_mut(|d| d.insert_temp(id, (rgba, hsva)));
+                response
             })
             .inner
         })
@@ -795,3 +1038,6 @@ fn toolbar_icon(
     }
     response.on_hover_text(format!("{label}\n{hint}"))
 }
+
+#[path = "radial_editor.rs"]
+mod radial_editor;

@@ -1,0 +1,320 @@
+{
+  "data": "Synthetic; fixed seed 9610 where randomness is used",
+  "rendering": "Native figgy-renderer output; no chart-image compositing",
+  "recipes": [
+    {
+      "source": "examples/line_signals.py",
+      "image": "line-signals.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "9d9eb4d8ff1eb7a8aaf3479344fa4e6c6d141c8c791cb1bffc9630eb83033373"
+    },
+    {
+      "source": "examples/scatter_clusters.py",
+      "image": "scatter-clusters.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "ad283ee741e76a651d00d23a19b8db3fc483bbfca5bfdb2afc343e0ab475fd23"
+    },
+    {
+      "source": "examples/parametric_curves.py",
+      "image": "parametric-curves.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "2b5cb0c446a716670b0e033cc8aa49d4933f023495c99d95cae2b3d8c2821856"
+    },
+    {
+      "source": "examples/log_scales.py",
+      "image": "log-scales.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "3f40f024042c1aac7d4052be898bbcdcac63162a9f7e90f26033b9f7c3b4bb96"
+    },
+    {
+      "source": "examples/line_markers.py",
+      "image": "line-markers.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "0ef6666aee4e029538095f8fe169e0c9440e4dfd78bf018d09c644bb2a8c36a0"
+    },
+    {
+      "source": "examples/heatmap_field.py",
+      "image": "heatmap-field.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "e95a077934fc5fdc73cffda38f44a329ad397450893d238827036bf3169a725f"
+    },
+    {
+      "source": "examples/correlation_matrix.py",
+      "image": "correlation-matrix.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "fcd5240a130ec94e292033e77b7bfc84d9a4eca5164093ff7bd3e0112829bfdd"
+    },
+    {
+      "source": "examples/spectrogram.py",
+      "image": "spectrogram.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "865e5411d58a965a3b0836579673ef4f4517e73ac03bc745e3da9509c49e24e1"
+    },
+    {
+      "source": "examples/pie_chart.py",
+      "image": "pie-chart.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "ff1b881420747ce8bb1f2d2b9cb6a293d41889f13597a291ff42eaba73a80c03"
+    },
+    {
+      "source": "examples/donut_chart.py",
+      "image": "donut-chart.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "7c3d92e3c85ed840afd59f3fb92d105674a98e3e9253402a4adb16e4996aa6ef"
+    },
+    {
+      "source": "examples/sketch_style.py",
+      "image": "sketch-style.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "98aa5a4961c1b6a1b0cd3bd10345f28f7097dd86e4ea2ff520b0d78b5ef0bfbf"
+    },
+    {
+      "source": "examples/constellation_style.py",
+      "image": "constellation-style.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "9ca6c2099a13327fb654929c754ff0c77bbd08001c87847f23e2d72e86369ef4"
+    },
+    {
+      "source": "examples/milkyway_style.py",
+      "image": "milkyway-style.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {},
+      "sha256": "46256f18de1d4ac6508d9826ff7f07f953cbe746add92daf4f0eb6665c3dbb46"
+    },
+    {
+      "source": "examples/material_textures.py",
+      "image": "material-paper.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {
+        "material": "paper"
+      },
+      "sha256": "947561814f99c26613388569523d077ce7473e7f443eea542464dd8a4cf10afd"
+    },
+    {
+      "source": "examples/material_textures.py",
+      "image": "material-wood.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {
+        "material": "wood"
+      },
+      "sha256": "5559236c05c7fc843eb4d8229c232fd75fc521cb2e5dc15e9592715a82b08a27"
+    },
+    {
+      "source": "examples/material_textures.py",
+      "image": "material-hatch.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {
+        "material": "hatch"
+      },
+      "sha256": "1934f6ed2a43ed9f00c477cd669aa622781a651b40bca8f8e505ee9ec4dc3e22"
+    },
+    {
+      "source": "examples/material_textures.py",
+      "image": "material-pearl.png",
+      "canvas": [
+        960,
+        600
+      ],
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "parameters": {
+        "material": "pearl"
+      },
+      "sha256": "4f5a3beb35101bb27854160993c07b6c5b29bc52944eb4b70e4bc418a4e6d3c3"
+    }
+  ]
+}

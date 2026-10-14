@@ -91,7 +91,8 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
                 page.locator("[data-copy]").click()
                 page.wait_for_function("document.querySelector('[data-status]').textContent === 'Python code copied'")
                 copied = page.evaluate("navigator.clipboard.readText()")
-                assert "fig.apply_settings" in copied and "Browser edited title" in copied
+                assert "ax.set_title(" in copied and "Browser edited title" in copied
+                assert "json.loads" not in copied
                 with page.expect_download() as event:
                     page.locator("[data-save]").click()
                 download = event.value

@@ -1,0 +1,250 @@
+//! Radial frames are rendered to a GPU texture embedded in the native egui host.
+//! There is no PNG/RGBA round trip during window interaction.
+use super::*;
+use renderer::radial::{RadialFrame, RadialRenderer};
+
+pub(super) struct RadialSurface {
+    renderer: RadialRenderer,
+    texture: wgpu::Texture,
+    id: egui::TextureId,
+    size: (u32, u32),
+    frame: Arc<RadialFrame>,
+}
+
+impl SurfaceWindow {
+    pub(super) fn frame_radial(&mut self, c: &mut FigureAccess<'_>) -> PyResult<()> {
+        let input = self.input.take_egui_input(&self.window);
+        let ctx = self.ctx.clone();
+        let overlay = self.inspector_overlay();
+        let mut error = None;
+        let output = ctx.run_ui(input, |root| {
+            self.editor.show_radial(root, c, overlay);
+            let (_, panel, scale) = self.display(c);
+            self.panel = panel;
+            self.scale = scale;
+            let dpr = ctx.pixels_per_point();
+            let image_rect = egui::Rect::from_min_size(
+                egui::pos2(panel.x as f32 / dpr, panel.y as f32 / dpr),
+                egui::vec2(panel.width as f32 / dpr, panel.height as f32 / dpr),
+            );
+            let prepared = (|| -> PyResult<()> {
+                let document_size = c.data.chart.config().chart_area.0;
+                let logical_size = (document_size.width, document_size.height);
+                let scale = scale.clamp(0.5, 4.0);
+                let size = (
+                    (logical_size.0 as f32 * scale).round() as u32,
+                    (logical_size.1 as f32 * scale).round() as u32,
+                );
+                if self.radial_surface.as_ref().is_none_or(|s| s.size != size) {
+                    if let Some(old) = self.radial_surface.take() {
+                        self.ui_renderer.free_texture(&old.id);
+                    }
+                    let mut renderer = RadialRenderer::new(
+                        RendererDevice::new(
+                            c.renderer.device().clone(),
+                            c.renderer.queue().clone(),
+                        ),
+                        wgpu::TextureFormat::Rgba8Unorm,
+                    )
+                    .map_err(runtime)?;
+                    let frame = renderer
+                        .prepare(&c.data.radial.as_ref().unwrap().chart, logical_size, scale)
+                        .map_err(runtime)?;
+                    let texture = c
+                        .renderer
+                        .device()
+                        .create_texture(&wgpu::TextureDescriptor {
+                            label: Some("Figgy radial surface texture"),
+                            size: wgpu::Extent3d {
+                                width: size.0,
+                                height: size.1,
+                                depth_or_array_layers: 1,
+                            },
+                            mip_level_count: 1,
+                            sample_count: 1,
+                            dimension: wgpu::TextureDimension::D2,
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                                | wgpu::TextureUsages::TEXTURE_BINDING,
+                            view_formats: &[],
+                        });
+                    let id = self.ui_renderer.register_native_texture(
+                        c.renderer.device(),
+                        &texture.create_view(&Default::default()),
+                        wgpu::FilterMode::Linear,
+                    );
+                    self.radial_surface = Some(RadialSurface {
+                        renderer,
+                        texture,
+                        id,
+                        size,
+                        frame,
+                    });
+                }
+                let surface = self.radial_surface.as_mut().unwrap();
+                surface.frame = surface
+                    .renderer
+                    .prepare(&c.data.radial.as_ref().unwrap().chart, logical_size, scale)
+                    .map_err(runtime)?;
+                root.painter().image(
+                    surface.id,
+                    image_rect,
+                    egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
+                    egui::Color32::WHITE,
+                );
+                let response = root.interact(
+                    image_rect,
+                    egui::Id::new("radial_image"),
+                    egui::Sense::click(),
+                );
+                if response.clicked() {
+                    if let Some(pointer) = response.interact_pointer_pos() {
+                        let position = [
+                            (pointer.x - image_rect.min.x) * logical_size.0 as f32
+                                / image_rect.width(),
+                            (pointer.y - image_rect.min.y) * logical_size.1 as f32
+                                / image_rect.height(),
+                        ];
+                        let picked = surface.frame.hit_test(position);
+                        let mut chart = c.data.radial.as_ref().unwrap().chart.clone();
+                        chart.interaction.selected = if picked == chart.interaction.selected {
+                            None
+                        } else {
+                            picked
+                        };
+                        c.set_radial(&serde_json::to_string(&chart).map_err(runtime)?)?;
+                        self.editor.inspector_open |= picked.is_some();
+                        ctx.request_repaint();
+                    }
+                }
+                Ok(())
+            })();
+            if let Err(e) = prepared {
+                error = Some(e);
+            }
+        });
+        if let Some(error) = error {
+            return Err(error);
+        }
+        self.input
+            .handle_platform_output(&self.window, output.platform_output);
+        let old_size = (self.config.width, self.config.height);
+        self.sync_inspector_size();
+        if old_size != (self.config.width, self.config.height) {
+            self.surface.configure(c.renderer.device(), &self.config);
+        }
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(f)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface.configure(c.renderer.device(), &self.config);
+                self.window.request_redraw();
+                return Ok(());
+            }
+            other => return Err(runtime(format!("surface acquisition: {other:?}"))),
+        };
+        let mut encoder = c
+            .renderer
+            .device()
+            .create_command_encoder(&Default::default());
+        let radial = self.radial_surface.as_ref().unwrap();
+        let radial_view = radial.texture.create_view(&Default::default());
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &radial_view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
+            radial.frame.draw(&mut pass);
+        }
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                self.ui_renderer.update_texture(
+                    c.renderer.device(),
+                    c.renderer.queue(),
+                    *id,
+                    delta,
+                );
+            }
+        }
+        let jobs = ctx.tessellate(output.shapes, output.pixels_per_point);
+        let screen = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: output.pixels_per_point,
+        };
+        let extra = self.ui_renderer.update_buffers(
+            c.renderer.device(),
+            c.renderer.queue(),
+            &mut encoder,
+            &jobs,
+            &screen,
+        );
+        let view = frame.texture.create_view(&Default::default());
+        {
+            let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
+            self.ui_renderer
+                .render(&mut pass.forget_lifetime(), &jobs, &screen);
+        }
+        c.renderer
+            .queue()
+            .submit(extra.into_iter().chain(std::iter::once(encoder.finish())));
+        c.renderer.queue().present(frame);
+        radial.renderer.end_frame();
+        for id in &output.textures_delta.free {
+            self.ui_renderer.free_texture(id);
+        }
+        self.repaint_at = output
+            .viewport_output
+            .get(&egui::ViewportId::ROOT)
+            .filter(|v| v.repaint_delay != Duration::MAX)
+            .and_then(|v| Instant::now().checked_add(v.repaint_delay));
+        self.last_revision = c.data.revision;
+        self.frames += 1;
+        let dpr = output.pixels_per_point;
+        let controls = self
+            .editor
+            .controls
+            .iter()
+            .map(|(name, r)| {
+                (
+                    name.clone(),
+                    json!([
+                        r.min.x * dpr,
+                        r.min.y * dpr,
+                        r.width() * dpr,
+                        r.height() * dpr
+                    ]),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        *self.control.stats.lock().unwrap() = json!({
+            "host":"winit-wgpu", "window_role":"chart", "chart_family":"radial",
+            "controls":controls, "error":self.editor.error, "properties_open":self.editor.inspector_open,
+            "inspector_overlay":self.inspector_overlay(), "selected":c.data.radial.as_ref().unwrap().chart.interaction.selected,
+            "chart_panel":[self.panel.x,self.panel.y,self.panel.width,self.panel.height],
+            "surface_size":[self.config.width,self.config.height], "scale_factor":self.window.scale_factor(),
+            "surface_frames":self.frames, "gpu_context_id":c.context.id, "figure_id":c.data.figure_id,
+            "column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,
+            "revision":c.data.revision,
+        });
+        Ok(())
+    }
+}

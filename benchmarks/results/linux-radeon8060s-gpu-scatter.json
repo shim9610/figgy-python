@@ -1,0 +1,863 @@
+{
+  "method": "isolated workers; identical float64 arrays; completed RGBA readback at 960x600; no figgy downsampling; medians of repeated calls; PNG includes render and encoding",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "processor": "",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "cpu_quota": null,
+  "versions": {
+    "figgy-python": "0.2.0",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pyqtgraph": "0.14.0",
+    "PySide6": "6.12.0",
+    "psutil": "7.2.2",
+    "fastplotlib": "0.7.0",
+    "pygfx": "0.17.0",
+    "wgpu": "0.32.0",
+    "vispy": "0.17.0"
+  },
+  "environment": {
+    "WGPU_BACKEND": "vulkan",
+    "VK_DRIVER_FILES": "/usr/share/vulkan/icd.d/radeon_icd.json",
+    "QT_QPA_PLATFORM": "wayland",
+    "LP_NUM_THREADS": null
+  },
+  "rows": [
+    {
+      "backend": "figgy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.059682252000129665,
+      "register_and_fit_s": 0.007727035999778309,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.020702337000329862,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.08811162500023784,
+      "redraw_samples_s": [
+        0.0018515130013838643,
+        0.0004680380006902851,
+        0.00046448099965346046,
+        0.0004386729997349903,
+        0.0005535190011869418
+      ],
+      "redraw_median_s": 0.0004680380006902851,
+      "view_change_samples_s": [
+        0.0010772510013339343,
+        0.0009193949990731198,
+        0.0008852709997881902,
+        0.0008768349998717895,
+        0.0008535809993190924
+      ],
+      "view_change_median_s": 0.0008852709997881902,
+      "style_change_samples_s": [
+        0.0007906930004537571,
+        0.0010637350005708868,
+        0.0010337389994674595,
+        0.001022869000735227,
+        0.0010285489988746122
+      ],
+      "style_change_median_s": 0.0010285489988746122,
+      "png_s": 0.012944624000738258,
+      "png_bytes": 159133,
+      "peak_rss_mb": 166.67578125,
+      "data_visible_after_edits": true,
+      "style_render_validated": true,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 1600000,
+      "known_gpu_bytes": 17605072
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.011029190000044764,
+      "register_and_fit_s": 0.0027284890002192697,
+      "first_draw_s": 0.02530226599992602,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.039059945000190055,
+      "redraw_samples_s": [
+        0.018822389998604194,
+        0.018616212999404524,
+        0.018777635999867925,
+        0.019417065001107403,
+        0.019399273000090034
+      ],
+      "redraw_median_s": 0.018822389998604194,
+      "view_change_samples_s": [
+        0.018818783999449806,
+        0.01855273399996804,
+        0.019646316000944353,
+        0.0187735879990214,
+        0.018683741000131704
+      ],
+      "view_change_median_s": 0.0187735879990214,
+      "style_change_samples_s": [
+        0.018756165000013425,
+        0.018579904999569408,
+        0.018187509000199498,
+        0.018434001000059652,
+        0.01828989200112119
+      ],
+      "style_change_median_s": 0.018434001000059652,
+      "png_s": 0.03412226299951726,
+      "png_bytes": 73807,
+      "peak_rss_mb": 93.73046875,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "fastplotlib",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.14519001199914783,
+      "register_and_fit_s": 0.00737992500035034,
+      "adapter": {
+        "vendor": "radv",
+        "architecture": "",
+        "device": "Radeon 8060S Graphics (RADV STRIX_HALO)",
+        "description": "Mesa 26.0.8-1ubuntu0.3",
+        "stackgroup_min_size": 4,
+        "stackgroup_max_size": 128,
+        "vendor_id": 4098,
+        "device_id": 5510,
+        "adapter_type": "IntegratedGPU",
+        "backend_type": "Vulkan"
+      },
+      "renderer_pixel_scale": 1.0,
+      "postprocess_antialias": "none",
+      "gpu_coordinate_dtype": "float32 (fastplotlib conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "offscreen canvas force_draw + completed GPU readback",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.41580285400050343,
+      "first_frame_total_s": 0.5683727910000016,
+      "redraw_samples_s": [
+        0.0040140999990398996,
+        0.0022067099998821504,
+        0.0019085999992967118,
+        0.0024783589997241506,
+        0.0014803770009166328
+      ],
+      "redraw_median_s": 0.0022067099998821504,
+      "view_change_samples_s": [
+        0.0021334129996830598,
+        0.0020964729992556386,
+        0.0026667929996619932,
+        0.0022147350009618094,
+        0.0020316410009399988
+      ],
+      "view_change_median_s": 0.0021334129996830598,
+      "style_change_samples_s": [
+        0.0014612710001529194,
+        0.003311491998829297,
+        0.001815876001273864,
+        0.0012395749999996042,
+        0.0012384139990899712
+      ],
+      "style_change_median_s": 0.0014612710001529194,
+      "png_s": 0.016422428001533262,
+      "png_bytes": 26287,
+      "peak_rss_mb": 246.25390625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.10048072900099214,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.005361106999771437,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": 1.0,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.26227984899924195,
+      "first_frame_total_s": 0.3681216850000055,
+      "redraw_samples_s": [
+        0.0029209490003268,
+        0.0019669100001920015,
+        0.0018051770002784906,
+        0.0016110619999381015,
+        0.001583440998729202
+      ],
+      "redraw_median_s": 0.0018051770002784906,
+      "view_change_samples_s": [
+        0.006519771000967012,
+        0.003359672000442515,
+        0.003495336999549181,
+        0.004140627999731805,
+        0.003937266001230455
+      ],
+      "view_change_median_s": 0.003937266001230455,
+      "style_change_samples_s": [
+        0.004174340998361004,
+        0.00398248100100318,
+        0.0041670580012578284,
+        0.003648895000878838,
+        0.004059174998474191
+      ],
+      "style_change_median_s": 0.004059174998474191,
+      "png_s": 0.032958599000266986,
+      "png_bytes": 448910,
+      "peak_rss_mb": 288.30078125,
+      "data_visible_after_edits": true,
+      "style_render_validated": true,
+      "worker_environment_overrides": {
+        "QT_SCALE_FACTOR": "0.5"
+      }
+    },
+    {
+      "backend": "figgy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.05903038900032698,
+      "register_and_fit_s": 0.01736378399982641,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.007704783998633502,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.08409895699878689,
+      "redraw_samples_s": [
+        0.004714955000963528,
+        0.0035675330000231043,
+        0.003754874000151176,
+        0.0036452090007514926,
+        0.0035593169995991047
+      ],
+      "redraw_median_s": 0.0036452090007514926,
+      "view_change_samples_s": [
+        0.004190591000224231,
+        0.004214395999952103,
+        0.004101194001123076,
+        0.004177877999609336,
+        0.00409901999955764
+      ],
+      "view_change_median_s": 0.004177877999609336,
+      "style_change_samples_s": [
+        0.003921966999769211,
+        0.004553974000373273,
+        0.004351674000645289,
+        0.004441893001057906,
+        0.004322659000536078
+      ],
+      "style_change_median_s": 0.004351674000645289,
+      "png_s": 0.014625967998654232,
+      "png_bytes": 135529,
+      "peak_rss_mb": 170.31640625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 16000000,
+      "known_gpu_bytes": 25993680
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.010085971000080463,
+      "register_and_fit_s": 0.013395800000580493,
+      "first_draw_s": 0.12986977100081276,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.15335154200147372,
+      "redraw_samples_s": [
+        0.1231489239999064,
+        0.12454900999910024,
+        0.12231474799955322,
+        0.12198447999980999,
+        0.12269122500038065
+      ],
+      "redraw_median_s": 0.12269122500038065,
+      "view_change_samples_s": [
+        0.12279213399961009,
+        0.12323825100065733,
+        0.12145308300023316,
+        0.121501953999541,
+        0.12212784799885412
+      ],
+      "view_change_median_s": 0.12212784799885412,
+      "style_change_samples_s": [
+        0.12231918699944799,
+        0.12214049199974397,
+        0.12243193900030747,
+        0.12161683900012576,
+        0.12192254299952765
+      ],
+      "style_change_median_s": 0.12214049199974397,
+      "png_s": 0.136507213999721,
+      "png_bytes": 60683,
+      "peak_rss_mb": 152.21875,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "fastplotlib",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.14679839000018546,
+      "register_and_fit_s": 0.04883222799981013,
+      "adapter": {
+        "vendor": "radv",
+        "architecture": "",
+        "device": "Radeon 8060S Graphics (RADV STRIX_HALO)",
+        "description": "Mesa 26.0.8-1ubuntu0.3",
+        "stackgroup_min_size": 4,
+        "stackgroup_max_size": 128,
+        "vendor_id": 4098,
+        "device_id": 5510,
+        "adapter_type": "IntegratedGPU",
+        "backend_type": "Vulkan"
+      },
+      "renderer_pixel_scale": 1.0,
+      "postprocess_antialias": "none",
+      "gpu_coordinate_dtype": "float32 (fastplotlib conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "offscreen canvas force_draw + completed GPU readback",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.4167010389992356,
+      "first_frame_total_s": 0.6123316569992312,
+      "redraw_samples_s": [
+        0.005707798000003095,
+        0.004517093999311328,
+        0.004453434001334244,
+        0.00414460499996494,
+        0.004253941000570194
+      ],
+      "redraw_median_s": 0.004453434001334244,
+      "view_change_samples_s": [
+        0.005014136999307084,
+        0.005995007000819896,
+        0.005579365999437869,
+        0.00482458099941141,
+        0.005472015000123065
+      ],
+      "view_change_median_s": 0.005472015000123065,
+      "style_change_samples_s": [
+        0.004275891000361298,
+        0.004598867999447975,
+        0.005257873999653384,
+        0.004518237001320813,
+        0.004388672999994014
+      ],
+      "style_change_median_s": 0.004518237001320813,
+      "png_s": 0.02210948699939763,
+      "png_bytes": 24488,
+      "peak_rss_mb": 270.921875,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.09689671600062866,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.03131558699897141,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": 1.0,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.25222533700070926,
+      "first_frame_total_s": 0.38043764000030933,
+      "redraw_samples_s": [
+        0.007026922001386993,
+        0.007089900998835219,
+        0.006944658000065829,
+        0.007135005000236561,
+        0.007297099000425078
+      ],
+      "redraw_median_s": 0.007089900998835219,
+      "view_change_samples_s": [
+        0.010263764999763225,
+        0.0088335910004389,
+        0.009300536999944597,
+        0.009332547999292728,
+        0.008322592999320477
+      ],
+      "view_change_median_s": 0.009300536999944597,
+      "style_change_samples_s": [
+        0.03500250400065852,
+        0.03252468499886163,
+        0.032840748001035536,
+        0.033095996999691124,
+        0.0333675760011829
+      ],
+      "style_change_median_s": 0.033095996999691124,
+      "png_s": 0.04259285300031479,
+      "png_bytes": 422089,
+      "peak_rss_mb": 455.68359375,
+      "data_visible_after_edits": true,
+      "style_render_validated": true,
+      "worker_environment_overrides": {
+        "QT_SCALE_FACTOR": "0.5"
+      }
+    },
+    {
+      "backend": "figgy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.06559682799888833,
+      "register_and_fit_s": 0.05859575400063477,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "sample_count": 1,
+      "first_draw_s": 0.02468298399980995,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.14887556599933305,
+      "redraw_samples_s": [
+        0.020664136000050348,
+        0.020571932998791453,
+        0.020155090000116616,
+        0.020106708998355316,
+        0.020618448999812244
+      ],
+      "redraw_median_s": 0.020571932998791453,
+      "view_change_samples_s": [
+        0.022742914999980712,
+        0.02251805299965781,
+        0.020941665999998804,
+        0.021255143999951542,
+        0.021860990000277525
+      ],
+      "view_change_median_s": 0.021860990000277525,
+      "style_change_samples_s": [
+        0.022347252999679768,
+        0.0209754690004047,
+        0.02071093300037319,
+        0.020907221000015852,
+        0.02122228299958806
+      ],
+      "style_change_median_s": 0.0209754690004047,
+      "png_s": 0.031803483001567656,
+      "png_bytes": 125270,
+      "peak_rss_mb": 230.9765625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true,
+      "column_uploads_after_redraws": 2,
+      "allocation_mode": "resident",
+      "pool_used_bytes": 80000000,
+      "known_gpu_bytes": 89216464
+    },
+    {
+      "backend": "matplotlib-default",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "path_simplify": true,
+      "path_simplify_threshold": 0.111111111111,
+      "initialize_s": 0.010968647000481724,
+      "register_and_fit_s": 0.06107272100052796,
+      "first_draw_s": 0.6015465529999346,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_frame_total_s": 0.6735879210009443,
+      "redraw_samples_s": [
+        0.5816015069995046,
+        0.5896521400009078,
+        0.5830567270004394,
+        0.5816415910012438,
+        0.5902350430005754
+      ],
+      "redraw_median_s": 0.5830567270004394,
+      "view_change_samples_s": [
+        0.5811704979987553,
+        0.5865496190017438,
+        0.5781936230014253,
+        0.5837528019983438,
+        0.5861416839998128
+      ],
+      "view_change_median_s": 0.5837528019983438,
+      "style_change_samples_s": [
+        0.5812130379999871,
+        0.5848065789996326,
+        0.5779717969999183,
+        0.5766139200004545,
+        0.5827783539989468
+      ],
+      "style_change_median_s": 0.5812130379999871,
+      "png_s": 0.5904308199988009,
+      "png_bytes": 56246,
+      "peak_rss_mb": 393.6640625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "fastplotlib",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.14268529300170485,
+      "register_and_fit_s": 0.23045647999970242,
+      "adapter": {
+        "vendor": "radv",
+        "architecture": "",
+        "device": "Radeon 8060S Graphics (RADV STRIX_HALO)",
+        "description": "Mesa 26.0.8-1ubuntu0.3",
+        "stackgroup_min_size": 4,
+        "stackgroup_max_size": 128,
+        "vendor_id": 4098,
+        "device_id": 5510,
+        "adapter_type": "IntegratedGPU",
+        "backend_type": "Vulkan"
+      },
+      "renderer_pixel_scale": 1.0,
+      "postprocess_antialias": "none",
+      "gpu_coordinate_dtype": "float32 (fastplotlib conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "offscreen canvas force_draw + completed GPU readback",
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.44300556400048663,
+      "first_frame_total_s": 0.8161473370018939,
+      "redraw_samples_s": [
+        0.02237547599906975,
+        0.022040638001271873,
+        0.022130585999548202,
+        0.022798730000431533,
+        0.021944036001514178
+      ],
+      "redraw_median_s": 0.022130585999548202,
+      "view_change_samples_s": [
+        0.02224437999939255,
+        0.022605887999816332,
+        0.022665370001050178,
+        0.022339377999742283,
+        0.022480964000351378
+      ],
+      "view_change_median_s": 0.022480964000351378,
+      "style_change_samples_s": [
+        0.021861461000298732,
+        0.02181141800065234,
+        0.02143792700007907,
+        0.02138240299973404,
+        0.021472582000569673
+      ],
+      "style_change_median_s": 0.021472582000569673,
+      "png_s": 0.03702101100134314,
+      "png_bytes": 24280,
+      "peak_rss_mb": 491.80078125,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "scatter",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.09543970199956675,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.15217835199837282,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": 1.0,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.2784090469995135,
+      "first_frame_total_s": 0.5260271009974531,
+      "redraw_samples_s": [
+        0.03558524700019916,
+        0.036368687000503996,
+        0.03556326599937165,
+        0.03567860200018913,
+        0.03637412699936249
+      ],
+      "redraw_median_s": 0.03567860200018913,
+      "view_change_samples_s": [
+        0.03985460600051738,
+        0.038733292998585966,
+        0.040186537999034044,
+        0.04051253000034194,
+        0.04019937200064305
+      ],
+      "view_change_median_s": 0.040186537999034044,
+      "style_change_samples_s": [
+        0.1754132899986871,
+        0.18403374099943903,
+        0.16567252599998028,
+        0.16400582999995095,
+        0.16285385899936955
+      ],
+      "style_change_median_s": 0.16567252599998028,
+      "png_s": 0.07113207200018223,
+      "png_bytes": 401622,
+      "peak_rss_mb": 1187.62890625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true,
+      "worker_environment_overrides": {
+        "QT_SCALE_FACTOR": "0.5"
+      }
+    }
+  ],
+  "reference_plot_areas_px": {
+    "scatter": [
+      70.0,
+      62.0,
+      860.0,
+      478.0
+    ]
+  },
+  "reference_colorbar_areas_px": {},
+  "vispy_rerun": {
+    "source": "linux-radeon8060s-vispy-scatter.json",
+    "reason": "Hidden Qt Wayland canvas initially had pixel_scale=2 and clipped the chart. All VisPy rows replaced after validating pixel_scale=1 and complete plot images.",
+    "environment_overrides": {
+      "QT_SCALE_FACTOR": "0.5"
+    }
+  }
+}

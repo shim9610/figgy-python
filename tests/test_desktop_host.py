@@ -70,7 +70,7 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
         initial_width = info()["chart_panel"][2]
         click_rect(info()["decorations"]["chart_title"])
         assert info()["properties_open"] and info()["selected"] == "chart_title"
-        assert info()["chart_panel"][2] < initial_width
+        assert info()["chart_panel"][2] == initial_width
         # With properties already open, dragging does not change the stage.
         before = fig.revision
         x, y = point(info()["decorations"]["chart_title"])
@@ -137,7 +137,10 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
         x, y = point(info()["decorations"]["data_area"])
         xdo("mousemove", "--window", wid, x, y)
         pump()
+        xdo("keydown", "ctrl")
+        pump()
         xdo("click", 4)
+        xdo("keyup", "ctrl")
         pump()
         zoomed = fig.get_settings()["config"]["bottom_x"]
         assert zoomed["max"] - zoomed["min"] < before_axis["max"] - before_axis["min"]
@@ -148,9 +151,11 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
         clip = shutil.which("xclip")
         if clip:
             copied = subprocess.check_output(
-                [clip, "-selection", "clipboard", "-o"], text=True, timeout=5
+                [clip, "-selection", "clipboard", "-o", "-t", "UTF8_STRING"], text=True, timeout=5
             )
-            assert "fig.apply_settings" in copied
+            assert "ax.set_title(" in copied
+            assert "json.loads" not in copied
+            assert copied == fig.to_code()
             exec(copied, {"fig": fig})
         click("close_properties")
         click("save")

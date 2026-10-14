@@ -1,0 +1,4655 @@
+{
+  "metric": "completed first RGBA; initialize + registration/fit + render/readback",
+  "os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "python": "3.14.4",
+  "figgy_version": "0.2.0",
+  "repeats": 5,
+  "following_per_process": 3,
+  "input_dtype": "float64",
+  "size_px": [
+    960,
+    600
+  ],
+  "explicit_prepare": false,
+  "automatic_downsampling": false,
+  "driver_cache_cleared": false,
+  "import_and_input_creation_timed": false,
+  "modes": "shared retains context after close; reset calls release_gpu after each close",
+  "runs": [
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04152328700001817,
+          "register_and_fit_s": 0.008557354000004125,
+          "first_draw_s": 0.005210866000197711,
+          "first_frame_total_s": 0.05529150700022001,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00022126499970909208,
+          "register_and_fit_s": 0.0015500579993386054,
+          "first_draw_s": 0.0021488010006578406,
+          "first_frame_total_s": 0.003920123999705538,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00017175200082419906,
+          "register_and_fit_s": 0.0013691989988728892,
+          "first_draw_s": 0.0009557429984852206,
+          "first_frame_total_s": 0.002496693998182309,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0001684259987086989,
+          "register_and_fit_s": 0.0015076580002642004,
+          "first_draw_s": 0.0017464160009694751,
+          "first_frame_total_s": 0.0034224999999423744,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07738015300128609,
+          "register_and_fit_s": 0.010259696000503027,
+          "first_draw_s": 0.006107015999077703,
+          "first_frame_total_s": 0.09374686500086682,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02504418200078362,
+          "register_and_fit_s": 0.009210549000272295,
+          "first_draw_s": 0.00601592599923606,
+          "first_frame_total_s": 0.040270657000291976,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03292398499979754,
+          "register_and_fit_s": 0.00903964799908863,
+          "first_draw_s": 0.004416906000187737,
+          "first_frame_total_s": 0.046380538999073906,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.021920822999163647,
+          "register_and_fit_s": 0.00749816700044903,
+          "first_draw_s": 0.0030057490002945997,
+          "first_frame_total_s": 0.03242473899990728,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06546250599967607,
+          "register_and_fit_s": 0.010429805999592645,
+          "first_draw_s": 0.005768481998529751,
+          "first_frame_total_s": 0.08166079399779846,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.025852769000266562,
+          "register_and_fit_s": 0.008511957999871811,
+          "first_draw_s": 0.006739322001521941,
+          "first_frame_total_s": 0.041104049001660314,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.027918154000872164,
+          "register_and_fit_s": 0.00808752199918672,
+          "first_draw_s": 0.0023685039996053092,
+          "first_frame_total_s": 0.03837417999966419,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02543023699945479,
+          "register_and_fit_s": 0.007860876999984612,
+          "first_draw_s": 0.0030014599997230107,
+          "first_frame_total_s": 0.036292573999162414,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07259886400061077,
+          "register_and_fit_s": 0.008292235999761033,
+          "first_draw_s": 0.004983409000487882,
+          "first_frame_total_s": 0.08587450900085969,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00022477200036519207,
+          "register_and_fit_s": 0.001983099999051774,
+          "first_draw_s": 0.0009578669996699318,
+          "first_frame_total_s": 0.003165738999086898,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002010670013987692,
+          "register_and_fit_s": 0.0013915200015617302,
+          "first_draw_s": 0.0009216390008077724,
+          "first_frame_total_s": 0.0025142260037682718,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00016813500042189844,
+          "register_and_fit_s": 0.001532365000457503,
+          "first_draw_s": 0.002019107001615339,
+          "first_frame_total_s": 0.0037196070024947403,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07365584599938302,
+          "register_and_fit_s": 0.008497441000145045,
+          "first_draw_s": 0.006707873000777909,
+          "first_frame_total_s": 0.08886116000030597,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00025431699941691477,
+          "register_and_fit_s": 0.0016960619996098103,
+          "first_draw_s": 0.0021492110008694,
+          "first_frame_total_s": 0.004099589999896125,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00019923400031984784,
+          "register_and_fit_s": 0.0015681710010539973,
+          "first_draw_s": 0.0011368430004949914,
+          "first_frame_total_s": 0.0029042480018688366,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00017092099915316794,
+          "register_and_fit_s": 0.001559013999212766,
+          "first_draw_s": 0.0009788269999262411,
+          "first_frame_total_s": 0.002708761998292175,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06882392199986498,
+          "register_and_fit_s": 0.008714057001270703,
+          "first_draw_s": 0.005372088000513031,
+          "first_frame_total_s": 0.08291006700164871,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.024907405999329058,
+          "register_and_fit_s": 0.0076016809998691315,
+          "first_draw_s": 0.004975463998562191,
+          "first_frame_total_s": 0.03748455099776038,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02706527400005143,
+          "register_and_fit_s": 0.008117167999444064,
+          "first_draw_s": 0.0024032780002016807,
+          "first_frame_total_s": 0.037585719999697176,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.023855813000409398,
+          "register_and_fit_s": 0.007557556999017834,
+          "first_draw_s": 0.004784966999068274,
+          "first_frame_total_s": 0.036198336998495506,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07059013399884861,
+          "register_and_fit_s": 0.008780091000517132,
+          "first_draw_s": 0.005021160000978853,
+          "first_frame_total_s": 0.0843913850003446,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.023794176999217598,
+          "register_and_fit_s": 0.008001039999726345,
+          "first_draw_s": 0.005196358000830514,
+          "first_frame_total_s": 0.03699157499977446,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.023567672000353923,
+          "register_and_fit_s": 0.008843319999868982,
+          "first_draw_s": 0.002942549999715993,
+          "first_frame_total_s": 0.0353535419999389,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.024693204000868718,
+          "register_and_fit_s": 0.007684926998990704,
+          "first_draw_s": 0.0030340719986270415,
+          "first_frame_total_s": 0.035412202998486464,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.07095893699988665,
+          "register_and_fit_s": 0.00811844000054407,
+          "first_draw_s": 0.005456546999994316,
+          "first_frame_total_s": 0.08453392400042503,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00026106000041181687,
+          "register_and_fit_s": 0.0017737779999151826,
+          "first_draw_s": 0.0022196339996298775,
+          "first_frame_total_s": 0.004254471999956877,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00022833799994259607,
+          "register_and_fit_s": 0.0016709339997760253,
+          "first_draw_s": 0.0012207899999339134,
+          "first_frame_total_s": 0.0031200619996525347,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002517119992262451,
+          "register_and_fit_s": 0.0016568280007049907,
+          "first_draw_s": 0.00202511899988167,
+          "first_frame_total_s": 0.003933658999812906,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06958754399965983,
+          "register_and_fit_s": 0.008235850000346545,
+          "first_draw_s": 0.0051051469999947585,
+          "first_frame_total_s": 0.08292854100000113,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002221770009782631,
+          "register_and_fit_s": 0.001645587000894011,
+          "first_draw_s": 0.0010357339997426607,
+          "first_frame_total_s": 0.0029034980016149348,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00016418800078099594,
+          "register_and_fit_s": 0.0013923719998274464,
+          "first_draw_s": 0.0009734159993968206,
+          "first_frame_total_s": 0.002529976000005263,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0001666629996179836,
+          "register_and_fit_s": 0.0015408899998874404,
+          "first_draw_s": 0.0019702360004885122,
+          "first_frame_total_s": 0.003677788999993936,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06027234899920586,
+          "register_and_fit_s": 0.008845944999848143,
+          "first_draw_s": 0.006223495000085677,
+          "first_frame_total_s": 0.07534178899913968,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.025024104999829433,
+          "register_and_fit_s": 0.007649090000995784,
+          "first_draw_s": 0.0043118190005770884,
+          "first_frame_total_s": 0.036985014001402305,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.022033735000150045,
+          "register_and_fit_s": 0.007902044000729802,
+          "first_draw_s": 0.0024645730009069666,
+          "first_frame_total_s": 0.032400352001786814,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.023563864999232464,
+          "register_and_fit_s": 0.008407783001530333,
+          "first_draw_s": 0.005081032000816776,
+          "first_frame_total_s": 0.037052680001579574,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "9fb46e2d146e424c023210caf25d4c62f77464e3fac549769eb6fd1c37986bb1",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.052359524999701534,
+          "register_and_fit_s": 0.01829484100016998,
+          "first_draw_s": 0.00981179700102075,
+          "first_frame_total_s": 0.08046616300089227,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002609589992061956,
+          "register_and_fit_s": 0.010940573998595937,
+          "first_draw_s": 0.004499901999224676,
+          "first_frame_total_s": 0.01570143499702681,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00023187500119092874,
+          "register_and_fit_s": 0.010673652999685146,
+          "first_draw_s": 0.004993167000066023,
+          "first_frame_total_s": 0.015898695000942098,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00024368800040974747,
+          "register_and_fit_s": 0.010631273999024415,
+          "first_draw_s": 0.005015067999920575,
+          "first_frame_total_s": 0.015890029999354738,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0403041489989846,
+          "register_and_fit_s": 0.017211447999216034,
+          "first_draw_s": 0.007356469999649562,
+          "first_frame_total_s": 0.0648720669978502,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02456948100007139,
+          "register_and_fit_s": 0.0159166590001405,
+          "first_draw_s": 0.006546119999256916,
+          "first_frame_total_s": 0.047032259999468806,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.020784581000043545,
+          "register_and_fit_s": 0.01656293199994252,
+          "first_draw_s": 0.0076246330008871155,
+          "first_frame_total_s": 0.04497214600087318,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.021240817000943935,
+          "register_and_fit_s": 0.017244479999135365,
+          "first_draw_s": 0.0057836100004351465,
+          "first_frame_total_s": 0.044268907000514446,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04217145199982042,
+          "register_and_fit_s": 0.0174080770011642,
+          "first_draw_s": 0.008518180000464781,
+          "first_frame_total_s": 0.0680977090014494,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.024190038999222452,
+          "register_and_fit_s": 0.016608668000117177,
+          "first_draw_s": 0.005714820999855874,
+          "first_frame_total_s": 0.0465135279991955,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02782727299927501,
+          "register_and_fit_s": 0.016773876999650383,
+          "first_draw_s": 0.007204295001429273,
+          "first_frame_total_s": 0.051805445000354666,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.022569089000171516,
+          "register_and_fit_s": 0.01746173799983808,
+          "first_draw_s": 0.0054878549999557436,
+          "first_frame_total_s": 0.04551868199996534,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05440766699939559,
+          "register_and_fit_s": 0.017618030999074108,
+          "first_draw_s": 0.0075833360006072326,
+          "first_frame_total_s": 0.07960903399907693,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00023067300026013982,
+          "register_and_fit_s": 0.010977193000144325,
+          "first_draw_s": 0.004501725001318846,
+          "first_frame_total_s": 0.01570959100172331,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002517119992262451,
+          "register_and_fit_s": 0.010651130998667213,
+          "first_draw_s": 0.004490163000809844,
+          "first_frame_total_s": 0.015393005998703302,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002508309989934787,
+          "register_and_fit_s": 0.010627036001096712,
+          "first_draw_s": 0.0044904140013386495,
+          "first_frame_total_s": 0.01536828100142884,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05377835699982825,
+          "register_and_fit_s": 0.01681559499957075,
+          "first_draw_s": 0.007269386998814298,
+          "first_frame_total_s": 0.0778633389982133,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00024852600108715706,
+          "register_and_fit_s": 0.011013901999831432,
+          "first_draw_s": 0.004535808999207802,
+          "first_frame_total_s": 0.01579823700012639,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00024529999973310623,
+          "register_and_fit_s": 0.011189311000634916,
+          "first_draw_s": 0.004679108000345877,
+          "first_frame_total_s": 0.0161137190007139,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00025867499971354846,
+          "register_and_fit_s": 0.01065452699913294,
+          "first_draw_s": 0.004591813998558791,
+          "first_frame_total_s": 0.01550501599740528,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.052370265000718064,
+          "register_and_fit_s": 0.017180459999508457,
+          "first_draw_s": 0.008644095998533885,
+          "first_frame_total_s": 0.0781948209987604,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.022524074998727883,
+          "register_and_fit_s": 0.01745494500028144,
+          "first_draw_s": 0.005681828999513527,
+          "first_frame_total_s": 0.04566084899852285,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.020428002000699053,
+          "register_and_fit_s": 0.01703815300061251,
+          "first_draw_s": 0.007101081999280723,
+          "first_frame_total_s": 0.044567237000592286,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.020835256000282243,
+          "register_and_fit_s": 0.016366914000172983,
+          "first_draw_s": 0.005498295000506914,
+          "first_frame_total_s": 0.04270046500096214,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04353493000053277,
+          "register_and_fit_s": 0.02014849800070806,
+          "first_draw_s": 0.013072974999886355,
+          "first_frame_total_s": 0.07675640300112718,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.03796689500086359,
+          "register_and_fit_s": 0.018610372000694042,
+          "first_draw_s": 0.005902814000364742,
+          "first_frame_total_s": 0.06248008100192237,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.024618383000415633,
+          "register_and_fit_s": 0.01684742500037828,
+          "first_draw_s": 0.007205326999610406,
+          "first_frame_total_s": 0.04867113500040432,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02019226999982493,
+          "register_and_fit_s": 0.01674462200026028,
+          "first_draw_s": 0.005725028999222559,
+          "first_frame_total_s": 0.04266192099930777,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04371282400097698,
+          "register_and_fit_s": 0.016545729999052128,
+          "first_draw_s": 0.007944904999021674,
+          "first_frame_total_s": 0.06820345899905078,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00026762199922814034,
+          "register_and_fit_s": 0.010769894000986824,
+          "first_draw_s": 0.00456128699988767,
+          "first_frame_total_s": 0.015598803000102635,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002335480003239354,
+          "register_and_fit_s": 0.010382677999587031,
+          "first_draw_s": 0.004473351998967701,
+          "first_frame_total_s": 0.015089577998878667,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00021437299983517732,
+          "register_and_fit_s": 0.010504124998988118,
+          "first_draw_s": 0.004453093999472912,
+          "first_frame_total_s": 0.015171591998296208,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04682988199965621,
+          "register_and_fit_s": 0.016897980000067037,
+          "first_draw_s": 0.008381804000237025,
+          "first_frame_total_s": 0.07210966599996027,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002223779993073549,
+          "register_and_fit_s": 0.010912120998909813,
+          "first_draw_s": 0.004493859998547123,
+          "first_frame_total_s": 0.01562835899676429,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00020167799993942026,
+          "register_and_fit_s": 0.01049659199998132,
+          "first_draw_s": 0.00444261499978893,
+          "first_frame_total_s": 0.01514088499970967,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002132600002369145,
+          "register_and_fit_s": 0.011021384998457506,
+          "first_draw_s": 0.004545576999589684,
+          "first_frame_total_s": 0.015780221998284105,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04912834400056454,
+          "register_and_fit_s": 0.017489799998656963,
+          "first_draw_s": 0.008145009998770547,
+          "first_frame_total_s": 0.07476315399799205,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02348552800140169,
+          "register_and_fit_s": 0.01693777500076976,
+          "first_draw_s": 0.005457047000163584,
+          "first_frame_total_s": 0.045880350002335035,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02539691399942967,
+          "register_and_fit_s": 0.016657418998875073,
+          "first_draw_s": 0.007186931999967783,
+          "first_frame_total_s": 0.04924126499827253,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.025584365999748115,
+          "register_and_fit_s": 0.017512121999970987,
+          "first_draw_s": 0.005692127999282093,
+          "first_frame_total_s": 0.048788615999001195,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "a1d32e5124f935fa99e7e9ba18078c7006546c0f80932dbd1fefbc31b7c4864c",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.033901487999173696,
+          "register_and_fit_s": 0.057379691999813076,
+          "first_draw_s": 0.0375991349992546,
+          "first_frame_total_s": 0.12888031499824137,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002451600012136623,
+          "register_and_fit_s": 0.050074327999027446,
+          "first_draw_s": 0.03438309099874459,
+          "first_frame_total_s": 0.0847025789989857,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00029347999952733517,
+          "register_and_fit_s": 0.04983622200052196,
+          "first_draw_s": 0.03437552700052038,
+          "first_frame_total_s": 0.08450522900056967,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002849949996743817,
+          "register_and_fit_s": 0.04896118999931787,
+          "first_draw_s": 0.034019640001133666,
+          "first_frame_total_s": 0.08326582500012591,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.045015527999566984,
+          "register_and_fit_s": 0.05856375399889657,
+          "first_draw_s": 0.040640059998622746,
+          "first_frame_total_s": 0.1442193419970863,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.020849312000791542,
+          "register_and_fit_s": 0.056846542000130285,
+          "first_draw_s": 0.03802695699960168,
+          "first_frame_total_s": 0.1157228110005235,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.022877858000356355,
+          "register_and_fit_s": 0.05616056600047159,
+          "first_draw_s": 0.03600486399955116,
+          "first_frame_total_s": 0.11504328800037911,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0204841579998174,
+          "register_and_fit_s": 0.057062657999267685,
+          "first_draw_s": 0.03694632000042475,
+          "first_frame_total_s": 0.11449313599950983,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.041339230998346466,
+          "register_and_fit_s": 0.07309502399948542,
+          "first_draw_s": 0.039340182000159984,
+          "first_frame_total_s": 0.15377443699799187,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02239706599903002,
+          "register_and_fit_s": 0.056268928999998025,
+          "first_draw_s": 0.03818554499957827,
+          "first_frame_total_s": 0.11685153999860631,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.023166058999777306,
+          "register_and_fit_s": 0.06099325200011663,
+          "first_draw_s": 0.03784737099886115,
+          "first_frame_total_s": 0.12200668199875508,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02477050900051836,
+          "register_and_fit_s": 0.05955025500043121,
+          "first_draw_s": 0.03786220800066076,
+          "first_frame_total_s": 0.12218297200161032,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03727306299879274,
+          "register_and_fit_s": 0.06090395399951376,
+          "first_draw_s": 0.03782270400006382,
+          "first_frame_total_s": 0.13599972099837032,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00026959599927067757,
+          "register_and_fit_s": 0.05126880799980427,
+          "first_draw_s": 0.03428146099940932,
+          "first_frame_total_s": 0.08581986499848426,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002776809997158125,
+          "register_and_fit_s": 0.051513618000171846,
+          "first_draw_s": 0.03501226200023666,
+          "first_frame_total_s": 0.08680356100012432,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002847640007530572,
+          "register_and_fit_s": 0.04781766400083143,
+          "first_draw_s": 0.034164872000474134,
+          "first_frame_total_s": 0.08226730000205862,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.047363994000988896,
+          "register_and_fit_s": 0.07624118599960639,
+          "first_draw_s": 0.0394398580010602,
+          "first_frame_total_s": 0.16304503800165548,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0003431429995544022,
+          "register_and_fit_s": 0.06401606200051901,
+          "first_draw_s": 0.03397994500119239,
+          "first_frame_total_s": 0.09833915000126581,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002840529996319674,
+          "register_and_fit_s": 0.05005930999868724,
+          "first_draw_s": 0.03356595900004322,
+          "first_frame_total_s": 0.08390932199836243,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00024327599930984434,
+          "register_and_fit_s": 0.04737776000001759,
+          "first_draw_s": 0.034274718000233406,
+          "first_frame_total_s": 0.08189575399956084,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.036786089000088396,
+          "register_and_fit_s": 0.05873522500041872,
+          "first_draw_s": 0.03885322800124413,
+          "first_frame_total_s": 0.13437454200175125,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.023012681000182056,
+          "register_and_fit_s": 0.05636304600011499,
+          "first_draw_s": 0.03792844300005527,
+          "first_frame_total_s": 0.11730417000035231,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02284297199912544,
+          "register_and_fit_s": 0.05632628600142198,
+          "first_draw_s": 0.03587112300010631,
+          "first_frame_total_s": 0.11504038100065372,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.020168664999800967,
+          "register_and_fit_s": 0.057161022999935085,
+          "first_draw_s": 0.03557562900095945,
+          "first_frame_total_s": 0.1129053170006955,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04501718100073049,
+          "register_and_fit_s": 0.05934557100044913,
+          "first_draw_s": 0.04347752300054708,
+          "first_frame_total_s": 0.1478402750017267,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.04101422100029595,
+          "register_and_fit_s": 0.05747117399914714,
+          "first_draw_s": 0.03832898399923579,
+          "first_frame_total_s": 0.13681437899867888,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.021010626000133925,
+          "register_and_fit_s": 0.05703619800078741,
+          "first_draw_s": 0.035660588000610005,
+          "first_frame_total_s": 0.11370741200153134,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0214586860001873,
+          "register_and_fit_s": 0.05770355999993626,
+          "first_draw_s": 0.036678387001302326,
+          "first_frame_total_s": 0.11584063300142589,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.037947808999888366,
+          "register_and_fit_s": 0.05766597000001639,
+          "first_draw_s": 0.038785791000918834,
+          "first_frame_total_s": 0.1343995700008236,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002814979998220224,
+          "register_and_fit_s": 0.050619992000065395,
+          "first_draw_s": 0.03380087900040962,
+          "first_frame_total_s": 0.08470236900029704,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002402400004939409,
+          "register_and_fit_s": 0.05101054400074645,
+          "first_draw_s": 0.035827911999149364,
+          "first_frame_total_s": 0.08707869600038975,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002741839998634532,
+          "register_and_fit_s": 0.04857569599880662,
+          "first_draw_s": 0.0344691629998124,
+          "first_frame_total_s": 0.08331904299848247,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03726152100171021,
+          "register_and_fit_s": 0.05819532299938146,
+          "first_draw_s": 0.03875245800008997,
+          "first_frame_total_s": 0.13420930200118164,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002869580002879957,
+          "register_and_fit_s": 0.051248310001028585,
+          "first_draw_s": 0.03391880100025446,
+          "first_frame_total_s": 0.08545406900157104,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002898940001614392,
+          "register_and_fit_s": 0.0500359550005669,
+          "first_draw_s": 0.0337174230007804,
+          "first_frame_total_s": 0.08404327200150874,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002554989987402223,
+          "register_and_fit_s": 0.04857272099980037,
+          "first_draw_s": 0.0346630969997932,
+          "first_frame_total_s": 0.08349131699833379,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03987171799963107,
+          "register_and_fit_s": 0.056992486001036013,
+          "first_draw_s": 0.038427138000770356,
+          "first_frame_total_s": 0.13529134200143744,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.021556147999945097,
+          "register_and_fit_s": 0.0562082639989967,
+          "first_draw_s": 0.0376347719993646,
+          "first_frame_total_s": 0.1153991839983064,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.020599573999788845,
+          "register_and_fit_s": 0.05619921799916483,
+          "first_draw_s": 0.03565468799934024,
+          "first_frame_total_s": 0.11245347999829391,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.019688365000547492,
+          "register_and_fit_s": 0.056531231000917614,
+          "first_draw_s": 0.03814320499986934,
+          "first_frame_total_s": 0.11436280100133445,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6865e8e4825dd82b4dc369668cb223c584b7335780955bd98fb1a95afb0f7a59",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06688874100109388,
+          "register_and_fit_s": 0.008269703999758349,
+          "first_draw_s": 0.005305933000272489,
+          "first_frame_total_s": 0.08046437800112471,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00023619300009158906,
+          "register_and_fit_s": 0.001679010001680581,
+          "first_draw_s": 0.0012336740001046564,
+          "first_frame_total_s": 0.0031488770018768264,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00026982700001099147,
+          "register_and_fit_s": 0.001692275000095833,
+          "first_draw_s": 0.0019023989989364054,
+          "first_frame_total_s": 0.00386450099904323,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00020278999909351114,
+          "register_and_fit_s": 0.00156456500008062,
+          "first_draw_s": 0.0011460999994596932,
+          "first_frame_total_s": 0.0029134549986338243,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06218371499926434,
+          "register_and_fit_s": 0.00845463999939966,
+          "first_draw_s": 0.0053441860000020824,
+          "first_frame_total_s": 0.07598254099866608,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02230552500077465,
+          "register_and_fit_s": 0.0076330390002112836,
+          "first_draw_s": 0.004775507999511319,
+          "first_frame_total_s": 0.034714072000497254,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02139495700066618,
+          "register_and_fit_s": 0.00716280699998606,
+          "first_draw_s": 0.002462018999722204,
+          "first_frame_total_s": 0.031019783000374446,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.023136534000514075,
+          "register_and_fit_s": 0.007297931000721292,
+          "first_draw_s": 0.0024579719993198523,
+          "first_frame_total_s": 0.03289243700055522,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05423053500089736,
+          "register_and_fit_s": 0.010284654001225135,
+          "first_draw_s": 0.0070027370002208045,
+          "first_frame_total_s": 0.0715179260023433,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.024960303999250755,
+          "register_and_fit_s": 0.008696475000760984,
+          "first_draw_s": 0.004760501000419026,
+          "first_frame_total_s": 0.038417280000430765,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02470867299962265,
+          "register_and_fit_s": 0.009167017000436317,
+          "first_draw_s": 0.00338509100038209,
+          "first_frame_total_s": 0.03726078100044106,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.026352295999458875,
+          "register_and_fit_s": 0.007733527001619223,
+          "first_draw_s": 0.004763286000525113,
+          "first_frame_total_s": 0.03884910900160321,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06381006599985994,
+          "register_and_fit_s": 0.008689280999533366,
+          "first_draw_s": 0.005790133000118658,
+          "first_frame_total_s": 0.07828947999951197,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00023756600057822652,
+          "register_and_fit_s": 0.0015692739998485195,
+          "first_draw_s": 0.0011424130007071653,
+          "first_frame_total_s": 0.0029492530011339113,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00018444600027578417,
+          "register_and_fit_s": 0.0015295900011551566,
+          "first_draw_s": 0.0012277739988348912,
+          "first_frame_total_s": 0.002941810000265832,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00019467499987513293,
+          "register_and_fit_s": 0.0015302009996958077,
+          "first_draw_s": 0.0010939519997918978,
+          "first_frame_total_s": 0.0028188279993628385,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04580923699904815,
+          "register_and_fit_s": 0.008351576998393284,
+          "first_draw_s": 0.005764614999861806,
+          "first_frame_total_s": 0.05992542899730324,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002355819997319486,
+          "register_and_fit_s": 0.0016510370005562436,
+          "first_draw_s": 0.0011661979988275561,
+          "first_frame_total_s": 0.0030528169991157483,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00019214099847886246,
+          "register_and_fit_s": 0.0015334070012613665,
+          "first_draw_s": 0.0011857839999720454,
+          "first_frame_total_s": 0.0029113319997122744,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002239299992652377,
+          "register_and_fit_s": 0.001634737000131281,
+          "first_draw_s": 0.0011594850002438761,
+          "first_frame_total_s": 0.003018151999640395,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06649825899876305,
+          "register_and_fit_s": 0.008431948999714223,
+          "first_draw_s": 0.006177799999932176,
+          "first_frame_total_s": 0.08110800799840945,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02361881799879484,
+          "register_and_fit_s": 0.008153095001034671,
+          "first_draw_s": 0.004940478000207804,
+          "first_frame_total_s": 0.036712391000037314,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.025083485999857658,
+          "register_and_fit_s": 0.008479015999910189,
+          "first_draw_s": 0.003548457001670613,
+          "first_frame_total_s": 0.03711095900143846,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02571070200065151,
+          "register_and_fit_s": 0.007738256999800797,
+          "first_draw_s": 0.0026220780000585364,
+          "first_frame_total_s": 0.03607103700051084,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06634522199965431,
+          "register_and_fit_s": 0.00826932299969485,
+          "first_draw_s": 0.005453251000290038,
+          "first_frame_total_s": 0.0800677959996392,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02271056400059024,
+          "register_and_fit_s": 0.00769132799905492,
+          "first_draw_s": 0.004476998999962234,
+          "first_frame_total_s": 0.03487889099960739,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02139525700113154,
+          "register_and_fit_s": 0.008078916000158642,
+          "first_draw_s": 0.0023054650009726174,
+          "first_frame_total_s": 0.0317796380022628,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02151522200074396,
+          "register_and_fit_s": 0.007111781998901279,
+          "first_draw_s": 0.0024025769998843316,
+          "first_frame_total_s": 0.03102958099952957,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03903599099976418,
+          "register_and_fit_s": 0.008269623998785391,
+          "first_draw_s": 0.005879731001186883,
+          "first_frame_total_s": 0.053185345999736455,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002212250001321081,
+          "register_and_fit_s": 0.001595633000761154,
+          "first_draw_s": 0.00125578600091103,
+          "first_frame_total_s": 0.003072644001804292,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00016303600023093168,
+          "register_and_fit_s": 0.0014867690006212797,
+          "first_draw_s": 0.001060809998307377,
+          "first_frame_total_s": 0.0027106149991595885,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0001601109997864114,
+          "register_and_fit_s": 0.0014944829999876674,
+          "first_draw_s": 0.0010745959989435505,
+          "first_frame_total_s": 0.0027291899987176294,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0675361960002192,
+          "register_and_fit_s": 0.008303688000523834,
+          "first_draw_s": 0.005258213999695727,
+          "first_frame_total_s": 0.08109809800043877,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00022659499882138334,
+          "register_and_fit_s": 0.0016658249987813178,
+          "first_draw_s": 0.0011495170001580846,
+          "first_frame_total_s": 0.0030419369977607857,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00016815600065456238,
+          "register_and_fit_s": 0.0015378750013042009,
+          "first_draw_s": 0.001078864001101465,
+          "first_frame_total_s": 0.002784895003060228,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00015757500113977585,
+          "register_and_fit_s": 0.00150662699888926,
+          "first_draw_s": 0.001602727001227322,
+          "first_frame_total_s": 0.003266929001256358,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.06946495400006825,
+          "register_and_fit_s": 0.008295191000797786,
+          "first_draw_s": 0.0056024000004981644,
+          "first_frame_total_s": 0.0833625450013642,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.021215219001533114,
+          "register_and_fit_s": 0.007130757001505117,
+          "first_draw_s": 0.004821915999855264,
+          "first_frame_total_s": 0.033167892002893495,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.022365897999407025,
+          "register_and_fit_s": 0.007512993999625905,
+          "first_draw_s": 0.0023677219996898202,
+          "first_frame_total_s": 0.03224661399872275,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0237362790012412,
+          "register_and_fit_s": 0.007448042000760324,
+          "first_draw_s": 0.0023978779991011834,
+          "first_frame_total_s": 0.03358219900110271,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 8388608,
+          "pool_used_bytes": 1600000,
+          "pixel_sha256": "3962ed01034970f1e606efefc24de0abd0ed9775f60ecd9273f90be7207cb497",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05252865200054657,
+          "register_and_fit_s": 0.018843269001081353,
+          "first_draw_s": 0.009683186000984279,
+          "first_frame_total_s": 0.0810551070026122,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00022239700047066435,
+          "register_and_fit_s": 0.011078874000304495,
+          "first_draw_s": 0.006919140998434159,
+          "first_frame_total_s": 0.01822041199920932,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00022608400104218163,
+          "register_and_fit_s": 0.010177080999710597,
+          "first_draw_s": 0.00645140199958405,
+          "first_frame_total_s": 0.01685456700033683,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00022865900064061861,
+          "register_and_fit_s": 0.010113393000210635,
+          "first_draw_s": 0.0062545540004066424,
+          "first_frame_total_s": 0.016596606001257896,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0454256869998062,
+          "register_and_fit_s": 0.018952054000692442,
+          "first_draw_s": 0.010385522999058594,
+          "first_frame_total_s": 0.07476326399955724,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02558884400059469,
+          "register_and_fit_s": 0.017811143001381424,
+          "first_draw_s": 0.008510405999913928,
+          "first_frame_total_s": 0.05191039300189004,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02189054600057716,
+          "register_and_fit_s": 0.016364548999263206,
+          "first_draw_s": 0.007727857000645599,
+          "first_frame_total_s": 0.045982952000485966,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02323658100067405,
+          "register_and_fit_s": 0.01677193399882526,
+          "first_draw_s": 0.008104673999696388,
+          "first_frame_total_s": 0.0481131889991957,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0554889760005608,
+          "register_and_fit_s": 0.019091444999503437,
+          "first_draw_s": 0.010236693999104318,
+          "first_frame_total_s": 0.08481711499916855,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.026760431999719003,
+          "register_and_fit_s": 0.01730578500064439,
+          "first_draw_s": 0.00926250600059575,
+          "first_frame_total_s": 0.053328723000959144,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.026511093999943114,
+          "register_and_fit_s": 0.01616178899894294,
+          "first_draw_s": 0.009381018000567565,
+          "first_frame_total_s": 0.05205390099945362,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.026840140999411233,
+          "register_and_fit_s": 0.018771765999190393,
+          "first_draw_s": 0.007881154999267892,
+          "first_frame_total_s": 0.05349306199786952,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03505221699924732,
+          "register_and_fit_s": 0.01834985400091682,
+          "first_draw_s": 0.010957726999549777,
+          "first_frame_total_s": 0.06435979799971392,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002757680013019126,
+          "register_and_fit_s": 0.011177628999575973,
+          "first_draw_s": 0.0065196300001844065,
+          "first_frame_total_s": 0.01797302700106229,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00021223800104053225,
+          "register_and_fit_s": 0.010829505999936373,
+          "first_draw_s": 0.007357933000093908,
+          "first_frame_total_s": 0.018399677001070813,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00022933999935048632,
+          "register_and_fit_s": 0.010217969000223093,
+          "first_draw_s": 0.006213295000634389,
+          "first_frame_total_s": 0.016660604000207968,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.053256657000019914,
+          "register_and_fit_s": 0.018785340998874744,
+          "first_draw_s": 0.010288339999533491,
+          "first_frame_total_s": 0.08233033799842815,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00024824600041029043,
+          "register_and_fit_s": 0.012943552001161152,
+          "first_draw_s": 0.008190905999072129,
+          "first_frame_total_s": 0.02138270400064357,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002579239990154747,
+          "register_and_fit_s": 0.01050364399998216,
+          "first_draw_s": 0.0063670939998701215,
+          "first_frame_total_s": 0.017128661998867756,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00032999900031427387,
+          "register_and_fit_s": 0.010653344999809633,
+          "first_draw_s": 0.006203688000823604,
+          "first_frame_total_s": 0.01718703200094751,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05415541399997892,
+          "register_and_fit_s": 0.018814364999343525,
+          "first_draw_s": 0.011462632999609923,
+          "first_frame_total_s": 0.08443241199893237,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.025953117001336068,
+          "register_and_fit_s": 0.0179235340001469,
+          "first_draw_s": 0.0077333869994618,
+          "first_frame_total_s": 0.05161003800094477,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.025519704000544152,
+          "register_and_fit_s": 0.01986112799932016,
+          "first_draw_s": 0.009680069000751246,
+          "first_frame_total_s": 0.05506090100061556,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.026042734998554806,
+          "register_and_fit_s": 0.019030089999432676,
+          "first_draw_s": 0.008439041999736219,
+          "first_frame_total_s": 0.0535118669977237,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.054276512000797084,
+          "register_and_fit_s": 0.01909117399918614,
+          "first_draw_s": 0.01002059799975541,
+          "first_frame_total_s": 0.08338828399973863,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02385332800076867,
+          "register_and_fit_s": 0.019030591000046115,
+          "first_draw_s": 0.00848805299938249,
+          "first_frame_total_s": 0.051371972000197275,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.02530768600081501,
+          "register_and_fit_s": 0.0185284290000709,
+          "first_draw_s": 0.010067286000776221,
+          "first_frame_total_s": 0.05390340100166213,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.025470442000369076,
+          "register_and_fit_s": 0.016825695000079577,
+          "first_draw_s": 0.007667634999961592,
+          "first_frame_total_s": 0.049963772000410245,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0544165539995447,
+          "register_and_fit_s": 0.01980963200003316,
+          "first_draw_s": 0.01101580500107957,
+          "first_frame_total_s": 0.08524199100065744,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00025072000062209554,
+          "register_and_fit_s": 0.012153981000665226,
+          "first_draw_s": 0.006948415000806563,
+          "first_frame_total_s": 0.019353116002093884,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002522129998396849,
+          "register_and_fit_s": 0.012167505999968853,
+          "first_draw_s": 0.007047150000289548,
+          "first_frame_total_s": 0.019466869000098086,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00023818699992261827,
+          "register_and_fit_s": 0.011120701999971061,
+          "first_draw_s": 0.0069179179990896955,
+          "first_frame_total_s": 0.018276806998983375,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.05085566299931088,
+          "register_and_fit_s": 0.01766965799833997,
+          "first_draw_s": 0.009797680000701803,
+          "first_frame_total_s": 0.07832300099835265,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00023397900076815858,
+          "register_and_fit_s": 0.010920856999291573,
+          "first_draw_s": 0.0066398159997334005,
+          "first_frame_total_s": 0.017794651999793132,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002411820005363552,
+          "register_and_fit_s": 0.010578774999885354,
+          "first_draw_s": 0.0065285170003335224,
+          "first_frame_total_s": 0.017348474000755232,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00024243500047305133,
+          "register_and_fit_s": 0.010656260999894585,
+          "first_draw_s": 0.006796879999455996,
+          "first_frame_total_s": 0.01769557599982363,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04428158100017754,
+          "register_and_fit_s": 0.017842973000369966,
+          "first_draw_s": 0.011264001001109136,
+          "first_frame_total_s": 0.07338855500165664,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.022187713999301195,
+          "register_and_fit_s": 0.016693986999598565,
+          "first_draw_s": 0.0085910559992044,
+          "first_frame_total_s": 0.04747275699810416,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.025305412000307115,
+          "register_and_fit_s": 0.01780588299880037,
+          "first_draw_s": 0.007864303001042572,
+          "first_frame_total_s": 0.05097559800015006,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.023295671000596485,
+          "register_and_fit_s": 0.017416532999050105,
+          "first_draw_s": 0.007373983999059419,
+          "first_frame_total_s": 0.04808618799870601,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 16777216,
+          "pool_used_bytes": 16000000,
+          "pixel_sha256": "1d8717481199f99cc74e380caaefaf2979f4e20a2f6464bb5ace5ac492547867",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03755536199969356,
+          "register_and_fit_s": 0.060862956999699236,
+          "first_draw_s": 0.04828825799995684,
+          "first_frame_total_s": 0.14670657699934964,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00027629800024442375,
+          "register_and_fit_s": 0.052439855000557145,
+          "first_draw_s": 0.04059533600047871,
+          "first_frame_total_s": 0.09331148900128028,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002295909998792922,
+          "register_and_fit_s": 0.0536844510006631,
+          "first_draw_s": 0.04039301699958742,
+          "first_frame_total_s": 0.09430705900012981,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002937009994639084,
+          "register_and_fit_s": 0.04813438800010772,
+          "first_draw_s": 0.03920816299978469,
+          "first_frame_total_s": 0.08763625199935632,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.037960652998663136,
+          "register_and_fit_s": 0.05745461299920862,
+          "first_draw_s": 0.045345877999352524,
+          "first_frame_total_s": 0.14076114399722428,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02418427900011011,
+          "register_and_fit_s": 0.055921588000273914,
+          "first_draw_s": 0.04351524300000165,
+          "first_frame_total_s": 0.12362111000038567,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.026274491001458955,
+          "register_and_fit_s": 0.05617705599979672,
+          "first_draw_s": 0.04180053700110875,
+          "first_frame_total_s": 0.12425208400236443,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.025068298000405775,
+          "register_and_fit_s": 0.05715144399982819,
+          "first_draw_s": 0.04282659100135788,
+          "first_frame_total_s": 0.12504633300159185,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.033875580000312766,
+          "register_and_fit_s": 0.05769523399976606,
+          "first_draw_s": 0.04412031800166005,
+          "first_frame_total_s": 0.13569113200173888,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.025722784999743453,
+          "register_and_fit_s": 0.055790492000596714,
+          "first_draw_s": 0.050291564999497496,
+          "first_frame_total_s": 0.13180484199983766,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.03648484499899496,
+          "register_and_fit_s": 0.059288242999173235,
+          "first_draw_s": 0.04365933299959579,
+          "first_frame_total_s": 0.13943242099776398,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.023681345001023146,
+          "register_and_fit_s": 0.056376450000243494,
+          "first_draw_s": 0.044227750000572996,
+          "first_frame_total_s": 0.12428554500183964,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.043211071999394335,
+          "register_and_fit_s": 0.057787517998804105,
+          "first_draw_s": 0.04471563500010234,
+          "first_frame_total_s": 0.14571422499830078,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002759480012173299,
+          "register_and_fit_s": 0.049970542999290046,
+          "first_draw_s": 0.03958135299944843,
+          "first_frame_total_s": 0.0898278439999558,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00028593600109161343,
+          "register_and_fit_s": 0.05067900200083386,
+          "first_draw_s": 0.03947379200144496,
+          "first_frame_total_s": 0.09043873000337044,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00023016100021777675,
+          "register_and_fit_s": 0.04820507099975657,
+          "first_draw_s": 0.039272134001294035,
+          "first_frame_total_s": 0.08770736600126838,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.0402451989994006,
+          "register_and_fit_s": 0.06007497899918235,
+          "first_draw_s": 0.045707085000685765,
+          "first_frame_total_s": 0.14602726299926871,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00026743200032797176,
+          "register_and_fit_s": 0.051872580999770435,
+          "first_draw_s": 0.039828668001064216,
+          "first_frame_total_s": 0.09196868100116262,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0002941309994639596,
+          "register_and_fit_s": 0.052948249998735264,
+          "first_draw_s": 0.04302422200089495,
+          "first_frame_total_s": 0.09626660299909418,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.0002880100000766106,
+          "register_and_fit_s": 0.049257404998570564,
+          "first_draw_s": 0.040391412998360465,
+          "first_frame_total_s": 0.08993682799700764,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.04103574200053117,
+          "register_and_fit_s": 0.05903305399988312,
+          "first_draw_s": 0.04642855800011603,
+          "first_frame_total_s": 0.14649735400053032,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02235732199915219,
+          "register_and_fit_s": 0.05690798799878394,
+          "first_draw_s": 0.04467956799999229,
+          "first_frame_total_s": 0.12394487799792842,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.020516168000540347,
+          "register_and_fit_s": 0.056756121999569586,
+          "first_draw_s": 0.041672004999782075,
+          "first_frame_total_s": 0.11894429499989201,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02344848800021282,
+          "register_and_fit_s": 0.05822205299955385,
+          "first_draw_s": 0.0429726850015868,
+          "first_frame_total_s": 0.12464322600135347,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 2
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03495713899974362,
+          "register_and_fit_s": 0.05685610000000452,
+          "first_draw_s": 0.04575128699980269,
+          "first_frame_total_s": 0.13756452599955082,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.022484570999949938,
+          "register_and_fit_s": 0.056608707000123104,
+          "first_draw_s": 0.04543991399987135,
+          "first_frame_total_s": 0.12453319199994439,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.019999378000647994,
+          "register_and_fit_s": 0.05692441800056258,
+          "first_draw_s": 0.04234804299994721,
+          "first_frame_total_s": 0.11927183900115779,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.022912784001164255,
+          "register_and_fit_s": 0.05867362000026333,
+          "first_draw_s": 0.0438929920001101,
+          "first_frame_total_s": 0.12547939600153768,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03442469000037818,
+          "register_and_fit_s": 0.05736676800006535,
+          "first_draw_s": 0.045041436998872086,
+          "first_frame_total_s": 0.1368328949993156,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.0002466329988237703,
+          "register_and_fit_s": 0.05097663100059435,
+          "first_draw_s": 0.04147433400066802,
+          "first_frame_total_s": 0.09269759800008615,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.00028265999935683794,
+          "register_and_fit_s": 0.05047476899926551,
+          "first_draw_s": 0.03969338400020206,
+          "first_frame_total_s": 0.0904508129988244,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00027925399990635924,
+          "register_and_fit_s": 0.048341606998292264,
+          "first_draw_s": 0.03959615100029623,
+          "first_frame_total_s": 0.08821701199849485,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 3
+    },
+    {
+      "mode": "shared",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03741754499969829,
+          "register_and_fit_s": 0.057051526000577724,
+          "first_draw_s": 0.04500093999922683,
+          "first_frame_total_s": 0.13947001099950285,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.00027713899908121675,
+          "register_and_fit_s": 0.05068609500085586,
+          "first_draw_s": 0.040937989000667585,
+          "first_frame_total_s": 0.09190122300060466,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.0003207520003343234,
+          "register_and_fit_s": 0.051270400999783305,
+          "first_draw_s": 0.0400447219999478,
+          "first_frame_total_s": 0.09163587500006543,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.00034612899980857037,
+          "register_and_fit_s": 0.04793922299904807,
+          "first_draw_s": 0.0419284970012086,
+          "first_frame_total_s": 0.09021384900006524,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    },
+    {
+      "mode": "reset",
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "adapter": {
+        "backend": "Vulkan",
+        "device_type": "IntegratedGpu",
+        "driver": "radv",
+        "initial_pool_capacity_bytes": 8388608,
+        "maximum_column_pool_bytes": 2147483644,
+        "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+      },
+      "rows": [
+        {
+          "index": 0,
+          "initialize_s": 0.03923478300021088,
+          "register_and_fit_s": 0.05756501999894681,
+          "first_draw_s": 0.04646087899891427,
+          "first_frame_total_s": 0.14326068199807196,
+          "gpu_context_id": 1,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 1,
+          "initialize_s": 0.02434391799943114,
+          "register_and_fit_s": 0.05652545000157261,
+          "first_draw_s": 0.04463512400070613,
+          "first_frame_total_s": 0.12550449200170988,
+          "gpu_context_id": 2,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 2,
+          "initialize_s": 0.022998112999630393,
+          "register_and_fit_s": 0.056099310000718106,
+          "first_draw_s": 0.042811522998817964,
+          "first_frame_total_s": 0.12190894599916646,
+          "gpu_context_id": 3,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        },
+        {
+          "index": 3,
+          "initialize_s": 0.02122228299958806,
+          "register_and_fit_s": 0.057102091999695404,
+          "first_draw_s": 0.04347049900025013,
+          "first_frame_total_s": 0.12179487399953359,
+          "gpu_context_id": 4,
+          "pool_capacity_bytes": 80000000,
+          "pool_used_bytes": 80000000,
+          "pixel_sha256": "6b634f296846b236f2f1574e112f6f29f0e4424d181a17c79b58370f92271b98",
+          "column_uploads": 2,
+          "rgba_readbacks": 1,
+          "png_encodes": 0
+        }
+      ],
+      "repeat": 4
+    }
+  ],
+  "summary": [
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.07008883899925422,
+          "register_and_fit_s": 0.008635705500637414,
+          "first_draw_s": 0.005414317500253674,
+          "first_frame_total_s": 0.08365996300017287
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.0002010670013987692,
+          "register_and_fit_s": 0.001559013999212766,
+          "first_draw_s": 0.0012207899999339134,
+          "first_frame_total_s": 0.003165738999086898
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.024907405999329058,
+          "register_and_fit_s": 0.008001039999726345,
+          "first_draw_s": 0.0043118190005770884,
+          "first_frame_total_s": 0.03699157499977446
+        }
+      },
+      "shared_vs_process_first_speedup": 26.426677317461458,
+      "shared_vs_reset_following_speedup": 11.684973085413558,
+      "paired_following_speedups": [
+        11.766444704447048,
+        12.12171313261534,
+        12.906800994143639,
+        9.002357093019693,
+        12.738088326849587
+      ],
+      "paired_following_speedup_median": 12.12171313261534
+    },
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.047979113000110374,
+          "register_and_fit_s": 0.017309762500190118,
+          "first_draw_s": 0.008263406999503786,
+          "first_frame_total_s": 0.07575977849955962
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.00024368800040974747,
+          "register_and_fit_s": 0.010673652999685146,
+          "first_draw_s": 0.004501725001318846,
+          "first_frame_total_s": 0.01562835899676429
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.02348552800140169,
+          "register_and_fit_s": 0.01684742500037828,
+          "first_draw_s": 0.0057836100004351465,
+          "first_frame_total_s": 0.045880350002335035
+        }
+      },
+      "shared_vs_process_first_speedup": 4.847583710819862,
+      "shared_vs_reset_following_speedup": 2.9357112932863996,
+      "paired_following_speedups": [
+        2.830211522740952,
+        3.0217312981696867,
+        2.8210259790529624,
+        3.2080440210803296,
+        3.1218003124385887
+      ],
+      "paired_following_speedup_median": 3.0217312981696867
+    },
+    {
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.03890976349975972,
+          "register_and_fit_s": 0.05864948949965765,
+          "first_draw_s": 0.038819509501081484,
+          "first_frame_total_s": 0.13564553149990388
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.0002814979998220224,
+          "register_and_fit_s": 0.05005930999868724,
+          "first_draw_s": 0.034274718000233406,
+          "first_frame_total_s": 0.08450522900056967
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.021556147999945097,
+          "register_and_fit_s": 0.056846542000130285,
+          "first_draw_s": 0.0376347719993646,
+          "first_frame_total_s": 0.1153991839983064
+        }
+      },
+      "shared_vs_process_first_speedup": 1.6051732313392046,
+      "shared_vs_reset_following_speedup": 1.3655863117953146,
+      "paired_following_speedups": [
+        1.3613747854538514,
+        1.4216601482758093,
+        1.3710083487851188,
+        1.3676197533627383,
+        1.3607609303845454
+      ],
+      "paired_following_speedup_median": 1.3676197533627383
+    },
+    {
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 100000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.06507764399975713,
+          "register_and_fit_s": 0.00832763249945856,
+          "first_draw_s": 0.005683507500179985,
+          "first_frame_total_s": 0.07917863799957559
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.00020278999909351114,
+          "register_and_fit_s": 0.00156456500008062,
+          "first_draw_s": 0.0011594850002438761,
+          "first_frame_total_s": 0.0029492530011339113
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.023136534000514075,
+          "register_and_fit_s": 0.00769132799905492,
+          "first_draw_s": 0.00338509100038209,
+          "first_frame_total_s": 0.034714072000497254
+        }
+      },
+      "shared_vs_process_first_speedup": 26.84701447082819,
+      "shared_vs_reset_following_speedup": 11.770462550059488,
+      "paired_following_speedups": [
+        10.445767485027305,
+        13.059062276951689,
+        12.16386418060174,
+        11.644347963020225,
+        10.903543376246407
+      ],
+      "paired_following_speedup_median": 11.644347963020225
+    },
+    {
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 1000000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.05289265450028324,
+          "register_and_fit_s": 0.01882881700021244,
+          "first_draw_s": 0.010336931499296043,
+          "first_frame_total_s": 0.08169272250052018
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.0002411820005363552,
+          "register_and_fit_s": 0.010829505999936373,
+          "first_draw_s": 0.0066398159997334005,
+          "first_frame_total_s": 0.017794651999793132
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.025470442000369076,
+          "register_and_fit_s": 0.01780588299880037,
+          "first_draw_s": 0.008439041999736219,
+          "first_frame_total_s": 0.05161003800094477
+        }
+      },
+      "shared_vs_process_first_speedup": 4.590858112958314,
+      "shared_vs_reset_following_speedup": 2.900311734196586,
+      "paired_following_speedups": [
+        2.8546084273914714,
+        2.967153112150066,
+        3.1135024939020086,
+        2.6544548172314553,
+        2.7174129849847937
+      ],
+      "paired_following_speedup_median": 2.8546084273914714
+    },
+    {
+      "kind": "scatter",
+      "signal": "smooth",
+      "size": 5000000,
+      "process_first": {
+        "samples": 10,
+        "median": {
+          "initialize_s": 0.03775800749917835,
+          "register_and_fit_s": 0.057630126999356435,
+          "first_draw_s": 0.045526481500019145,
+          "first_frame_total_s": 0.14201091299764812
+        }
+      },
+      "shared_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.00027925399990635924,
+          "register_and_fit_s": 0.05067900200083386,
+          "first_draw_s": 0.0400447219999478,
+          "first_frame_total_s": 0.0904508129988244
+        }
+      },
+      "reset_following": {
+        "samples": 15,
+        "median": {
+          "initialize_s": 0.02344848800021282,
+          "register_and_fit_s": 0.056756121999569586,
+          "first_draw_s": 0.04351524300000165,
+          "first_frame_total_s": 0.12428554500183964
+        }
+      },
+      "shared_vs_process_first_speedup": 1.5700346772946512,
+      "shared_vs_reset_following_speedup": 1.3740677488819806,
+      "paired_following_speedups": [
+        1.3315839810536045,
+        1.4673049706046881,
+        1.3476857191891396,
+        1.3768056678668323,
+        1.330362655445582
+      ],
+      "paired_following_speedup_median": 1.3476857191891396
+    }
+  ],
+  "cross_process_reset_shared_pixels_identical": true
+}

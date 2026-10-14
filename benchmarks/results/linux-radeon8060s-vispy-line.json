@@ -1,0 +1,501 @@
+{
+  "method": "isolated workers; identical float64 arrays; completed RGBA readback at 960x600; no figgy downsampling; medians of repeated calls; PNG includes render and encoding",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "processor": "",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "cpu_quota": null,
+  "versions": {
+    "figgy-python": "0.2.0",
+    "numpy": "2.5.4",
+    "matplotlib": "3.11.2",
+    "pyqtgraph": "0.14.0",
+    "PySide6": "6.12.0",
+    "psutil": "7.2.2",
+    "fastplotlib": "0.7.0",
+    "pygfx": "0.17.0",
+    "wgpu": "0.32.0",
+    "vispy": "0.17.0"
+  },
+  "environment": {
+    "WGPU_BACKEND": "vulkan",
+    "VK_DRIVER_FILES": "/usr/share/vulkan/icd.d/radeon_icd.json",
+    "QT_QPA_PLATFORM": "wayland",
+    "LP_NUM_THREADS": null,
+    "QT_SCALE_FACTOR": "0.5",
+    "QT_AUTO_SCREEN_SCALE_FACTOR": "0",
+    "QT_ENABLE_HIGHDPI_SCALING": null,
+    "QT_SCREEN_SCALE_FACTORS": null,
+    "WAYLAND_DISPLAY": "wayland-0"
+  },
+  "rows": [
+    {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.11215251400062698,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.003440373999183066,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": false,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.279834139999366,
+      "first_frame_total_s": 0.39542702799917606,
+      "redraw_samples_s": [
+        0.0026367170012235874,
+        0.001596685000549769,
+        0.0013026639990130207,
+        0.001239885999893886,
+        0.0013533490000554593
+      ],
+      "redraw_median_s": 0.0013533490000554593,
+      "view_change_samples_s": [
+        0.004312629998821649,
+        0.003684772998894914,
+        0.0033910410002135905,
+        0.003312724998977501,
+        0.0034762310006044572
+      ],
+      "view_change_median_s": 0.0034762310006044572,
+      "style_change_samples_s": [
+        0.0014999530012573814,
+        0.001495606000389671,
+        0.0014203640002961038,
+        0.0014628540011472069,
+        0.0014234499994927319
+      ],
+      "style_change_median_s": 0.0014628540011472069,
+      "png_s": 0.013355785000385367,
+      "png_bytes": 16986,
+      "peak_rss_mb": 273.62109375,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.09443175100022927,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.007099779000782291,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": false,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.25269579899941164,
+      "first_frame_total_s": 0.3542273290004232,
+      "redraw_samples_s": [
+        0.002653396999448887,
+        0.0016015040000638692,
+        0.0014083819987718016,
+        0.0014004669992573326,
+        0.0013759409994236194
+      ],
+      "redraw_median_s": 0.0014083819987718016,
+      "view_change_samples_s": [
+        0.004245695001372951,
+        0.003889055999025004,
+        0.005347852000340936,
+        0.0038557329989998834,
+        0.003857706000417238
+      ],
+      "view_change_median_s": 0.003889055999025004,
+      "style_change_samples_s": [
+        0.001656016000197269,
+        0.0017190350008604582,
+        0.0014716299992869608,
+        0.001587518998348969,
+        0.0016707249997125473
+      ],
+      "style_change_median_s": 0.001656016000197269,
+      "png_s": 0.013748150999163045,
+      "png_bytes": 17035,
+      "peak_rss_mb": 294.25390625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.09466508900004555,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.026460989998668083,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": false,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.25446235300114495,
+      "first_frame_total_s": 0.3755884319998586,
+      "redraw_samples_s": [
+        0.0030431289997068234,
+        0.002139865000572172,
+        0.001993218998904922,
+        0.0017897670004458632,
+        0.0017747699985193321
+      ],
+      "redraw_median_s": 0.001993218998904922,
+      "view_change_samples_s": [
+        0.005616727001324762,
+        0.005317344999639317,
+        0.004544395000266377,
+        0.004537782000625157,
+        0.0043230499995843275
+      ],
+      "view_change_median_s": 0.004544395000266377,
+      "style_change_samples_s": [
+        0.00197382300029858,
+        0.0019165849989803974,
+        0.0017841170010797214,
+        0.001886930000182474,
+        0.0018578149993118132
+      ],
+      "style_change_median_s": 0.001886930000182474,
+      "png_s": 0.014035390000572079,
+      "png_bytes": 17395,
+      "peak_rss_mb": 385.2890625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 100000,
+      "input_bytes": 1600000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.0974546420002298,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.0022279290005826624,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": false,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.24464066800101136,
+      "first_frame_total_s": 0.3443232390018238,
+      "redraw_samples_s": [
+        0.002869863999876543,
+        0.0016947990006883629,
+        0.0016514880007889587,
+        0.0014939130014681723,
+        0.001537124000606127
+      ],
+      "redraw_median_s": 0.0016514880007889587,
+      "view_change_samples_s": [
+        0.005930535000516102,
+        0.004250743999364204,
+        0.004059254999447148,
+        0.003532557000653469,
+        0.004218404001221643
+      ],
+      "view_change_median_s": 0.004218404001221643,
+      "style_change_samples_s": [
+        0.00179633999869111,
+        0.001658340999711072,
+        0.0016488530000060564,
+        0.0014849359995423583,
+        0.0016438239999843063
+      ],
+      "style_change_median_s": 0.0016488530000060564,
+      "png_s": 0.013826668000547215,
+      "png_bytes": 16175,
+      "peak_rss_mb": 276.0390625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 1000000,
+      "input_bytes": 16000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.10354256199934753,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.0076967989989498165,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": false,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.24704321600074763,
+      "first_frame_total_s": 0.358282576999045,
+      "redraw_samples_s": [
+        0.005817683999339351,
+        0.005311193999659736,
+        0.0051924299987149425,
+        0.004284798998924089,
+        0.004573299000185216
+      ],
+      "redraw_median_s": 0.0051924299987149425,
+      "view_change_samples_s": [
+        0.009356102000310784,
+        0.00763742700110015,
+        0.008215372001359356,
+        0.008583492000980186,
+        0.008680965000166907
+      ],
+      "view_change_median_s": 0.008583492000980186,
+      "style_change_samples_s": [
+        0.004708172000391642,
+        0.004752224998810561,
+        0.004614497000147821,
+        0.00420924599893624,
+        0.004574912998577929
+      ],
+      "style_change_median_s": 0.004614497000147821,
+      "png_s": 0.017008075999910943,
+      "png_bytes": 16861,
+      "peak_rss_mb": 297.03515625,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    },
+    {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "noisy",
+      "size": 5000000,
+      "input_bytes": 80000000,
+      "repeats": 5,
+      "width": 960,
+      "height": 600,
+      "status": "ok",
+      "line_width_pixels": 2.5,
+      "scatter_marker_diameter_pixels": 5.0,
+      "initialize_s": 0.10582702800093102,
+      "canvas_logical_size": [
+        960,
+        600
+      ],
+      "canvas_physical_size": [
+        960.0,
+        600.0
+      ],
+      "canvas_pixel_scale": 1.0,
+      "register_and_fit_s": 0.02796407999994699,
+      "adapter": {
+        "vendor": "AMD",
+        "renderer": "Radeon 8060S Graphics (radeonsi, strix_halo, ACO, DRM 3.64, 7.0.0-38-generic)",
+        "version": "4.6 (Compatibility Profile) Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_coordinate_dtype": "float32 (timed conversion from supplied float64)",
+      "auto_downsample": false,
+      "render_path": "SceneCanvas.render: draw to framebuffer + RGBA readback",
+      "line_method": "gl",
+      "antialias": false,
+      "plot_area_px": [
+        70.0,
+        62.0,
+        860.0,
+        478.0
+      ],
+      "first_draw_s": 0.2630966310007352,
+      "first_frame_total_s": 0.3968877390016132,
+      "redraw_samples_s": [
+        0.023809014999642386,
+        0.024488369999744464,
+        0.022614344001340214,
+        0.023225471000841935,
+        0.023501237001255504
+      ],
+      "redraw_median_s": 0.023501237001255504,
+      "view_change_samples_s": [
+        0.026647820999642136,
+        0.025192770999638014,
+        0.025097182000536122,
+        0.024978778999866336,
+        0.024964391999674262
+      ],
+      "view_change_median_s": 0.025097182000536122,
+      "style_change_samples_s": [
+        0.022817434999524266,
+        0.023329895999268047,
+        0.022453220999523182,
+        0.02225574099975347,
+        0.02315845500015712
+      ],
+      "style_change_median_s": 0.022817434999524266,
+      "png_s": 0.03517013799864799,
+      "png_bytes": 16880,
+      "peak_rss_mb": 388.296875,
+      "data_visible_after_edits": true,
+      "style_render_validated": true
+    }
+  ],
+  "reference_plot_areas_px": {
+    "line": [
+      70.0,
+      62.0,
+      860.0,
+      478.0
+    ]
+  },
+  "reference_colorbar_areas_px": {}
+}

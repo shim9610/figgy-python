@@ -278,7 +278,8 @@ def main():
               "cpu_affinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
               "cpu_quota": Path("/sys/fs/cgroup/cpu.max").read_text().strip() if Path("/sys/fs/cgroup/cpu.max").exists() else None,
               "versions": {name: version(name) for name in ["figgy-python", "numpy", "matplotlib", "pyqtgraph", "PySide6", "psutil", "fastplotlib", "pygfx", "wgpu", "vispy"]},
-              "environment": {key: os.environ.get(key) for key in ["WGPU_BACKEND", "VK_DRIVER_FILES", "QT_QPA_PLATFORM", "LP_NUM_THREADS"]}, "rows": []}
+              "environment": {key: os.environ.get(key) for key in ["WGPU_BACKEND", "VK_DRIVER_FILES", "QT_QPA_PLATFORM", "LP_NUM_THREADS",
+                              "QT_SCALE_FACTOR", "QT_AUTO_SCREEN_SCALE_FACTOR", "QT_ENABLE_HIGHDPI_SCALING", "QT_SCREEN_SCALE_FACTORS", "WAYLAND_DISPLAY"]}, "rows": []}
     # Query the renderer's own layout once, outside worker timing/RSS.
     import figgy
     areas, colorbars = {}, {}

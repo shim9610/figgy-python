@@ -88,6 +88,18 @@ def vispy(args, x, y, row):
         scene.visuals.GridLines(color=(.85, .85, .85, 1), parent=view.scene)
         return canvas, view
     row['initialize_s'], (canvas, ax) = timed(initialize)
+    row['canvas_logical_size'] = list(canvas.size)
+    row['canvas_physical_size'] = list(canvas.physical_size)
+    row['canvas_pixel_scale'] = canvas.pixel_scale
+    # A hidden Qt Wayland canvas can start at the monitor's native 2x scale.
+    # VisPy's fixed-size FBO then clips the scene while still returning a
+    # 960x600 array, so output shape alone does not validate the comparison.
+    if canvas.pixel_scale != 1:
+        canvas.close()
+        raise RuntimeError(
+            'VisPy benchmark requires canvas pixel_scale=1 for the matched '
+            '960x600 viewport; adjust QT_SCALE_FACTOR for the display scale'
+        )
     points = None
     antialias = args.worker == 'vispy-aa'
     def register():

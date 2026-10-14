@@ -12,7 +12,11 @@ f32/f64 → hi/lo staging path. `NativeFigure` and the desktop host share one
 All native Figures in this process now share one GPU instance/adapter,
 device/queue, renderer, resident column pool and pipeline/picking resources.
 Each Figure owns its chart registration, settings, columns and export target.
-The native host retains no CPU array copy. See [native sharing](NATIVE_SHARING.md)
+Pie/donut Figures additionally own an upstream bounded radial model/renderer.
+They share the device/queue but use no Cartesian source columns. Native radial
+windows paint upstream frames to a GPU texture embedded in egui, without PNG or
+RGBA transfer during redraw. Small category values remain in the radial CPU model.
+Cartesian uploads retain no CPU array copy. See [native sharing](NATIVE_SHARING.md)
 for ownership, capacity, synchronization and explicit release behavior.
 
 The host uses winit 0.30.13, egui 0.36.2 and wgpu 30. The upstream
@@ -38,10 +42,12 @@ not a TTF path. Native uses renderer system/registered fonts; a missing family
 falls back to the bundled font.
 Chrome/series selection, renderer drag/resize policies, wheel zoom, Copy Python
 and Save PNG are available; full SSOT JSON covers additional renderer fields.
-Copy Python is a self-contained `json.loads` + `fig.apply_settings` snapshot.
+Copy Python exports common Python setters and readable `fig.configure(...)`
+patches through the shared Python exporter, preserving advanced settings.
 Save PNG opens a file-path popover; Advanced settings opens the full JSON form.
-Opening/closing properties reflows the surface preview without changing the
-document/export canvas. UI names show labels rather than renderer field keys.
+Opening properties expands a normal window while preserving chart display size
+and aspect ratio; maximized/fullscreen windows use an overlay. The document/export
+canvas remains unchanged. UI names show labels rather than renderer field keys.
 
 ```python
 from figgy.desktop import poll_events, run_events
@@ -71,6 +77,8 @@ The process keeps one reusable main-thread winit loop for close/reopen. These
 APIs do not integrate automatically with a foreign Qt/Tk event loop or `%gui qt`.
 
 Native `fig.info` counts `column_uploads`, `rgba_readbacks`, `png_encodes`.
+For pie/donut Figures, `allocation_mode="bounded"`; their retained radial export
+resources are included in `known_gpu_bytes`. Cartesian figures use `resident`.
 These counters and `columns`/`figure_column_bytes` are per Figure. The
 `gpu_context_id`, `gpu_sharing="process"`, `active_figures`, `pool_capacity_bytes`
 and `pool_used_bytes` describe the shared context. `known_gpu_bytes` includes
@@ -83,6 +91,9 @@ surface submission rate; the existing `compare.py` measures completed RGBA
 readback. Do not compare the two as the same FPS metric.
 
 ## Jupyter
+
+Pie/donut editing currently requires the native host. See
+[chart and style API](CHART_TYPES.md) for static notebook output and style limits.
 
 `backend="auto"` selects `webgpu` inside an IPython kernel and `native` elsewhere.
 Use `Figure(backend="webgpu")` explicitly in shared scripts. Its PyO3

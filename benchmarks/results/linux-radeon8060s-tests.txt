@@ -1,0 +1,8 @@
+s...........s...........s....ss.......s.                                 [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_browser.py:23: could not import 'playwright': No module named 'playwright'
+SKIPPED [1] tests/test_figure.py:191: device binding limit too large for bounded CI failure test
+SKIPPED [1] tests/test_invalid_state.py:116: bound allocation test to software adapter limit
+SKIPPED [2] tests/test_jupyter_webgpu.py:7: set FIGGY_TEST_JUPYTER=1 for real JupyterLab/WebGPU integration
+SKIPPED [1] tests/test_shared_gpu.py:114: bound the allocation failure test to software adapter limits
+34 passed, 6 skipped in 3.15s

@@ -23,6 +23,8 @@ def test_gpu_free_binary_snapshot_release_and_revision(monkeypatch):
     widget._command(widget, {'action':'edit','sequence':1,'revision':old,'settings':settings}, [])
     assert fig.revision > old
     assert 'X' in fig.to_code()
+    assert widget.state['code'] == fig.to_code()
+    assert 'ax.set_title(' in widget.state['code']
     settings['config']['bottom_x']['min'] = 999
     widget._command(widget, {'action':'edit','sequence':2,'revision':old,'settings':settings}, [])
     assert fig.get_settings()['config']['bottom_x']['min'] != 999

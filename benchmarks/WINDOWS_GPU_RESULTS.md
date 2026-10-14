@@ -1,44 +1,72 @@
-# Windows GPU 라이브러리 비교
+# Windows GPU library comparison
 
-2026-10-14 (Asia/Seoul). fastplotlib, VisPy와 실제 pyqtgraph OpenGL 렌더 경로를 추가한 후속 측정입니다.
+2026-10-14 (Asia/Seoul). Follow-up measurements adding fastplotlib, VisPy and
+actual pyqtgraph OpenGL rendering.
 
-## 환경과 방법
+## Environment and method
 
-- Windows 11, Intel Core i7-13700KF, 약 64 GiB RAM, RTX 4070 Ti 12 GiB / NVIDIA 617.14.
-- Python 3.13.1, Figgy 0.1.0, fastplotlib 0.7.0 / pygfx 0.17.0 / wgpu-py 0.32.0, VisPy 0.17.0, pyqtgraph 0.14.0 / PySide6 6.12.0.
-- 960×600 RGBA readback 완료까지 측정, 각 조건을 독립 프로세스에서 실행하고 5회 중앙값을 기록했습니다.
-- 선 2.5 px, 산점도 지름 5 px. 입력은 동일 float64 배열이며 다운샘플링은 사용하지 않았습니다.
-- GPU 좌표는 Figgy가 float64 hi/lo, 경쟁 GPU 라이브러리는 float32입니다. pyqtgraph는 중심을 빼고 float32 VBO로 올립니다.
-- Figgy/fastplotlib는 Vulkan, VisPy/pyqtgraph는 NVIDIA OpenGL 4.6 경로입니다.
-- Figgy는 shader AA, fastplotlib는 기본 pixel_scale=1 / PPAA none / LineMaterial AA off, VisPy 선은 기본 GL AA off, pyqtgraph OpenGL도 AA off입니다. VisPy 산점도는 기본 marker AA 1 px입니다. 같은 픽셀 품질의 비교가 아닙니다.
-- Figgy와 경쟁 라이브러리의 plot viewport를 맞췄습니다. pyqtgraph는 Qt 경계 때문에 0.5 px 차이가 있습니다. 축/그리드 배치와 초기 자동 축 범위는 라이브러리마다 다릅니다.
-- import/입력 생성은 타이밍에서 제외하고, 자료 형식 변환과 등록/fit은 포함했습니다. 초기화·첫 프레임·반복·축 변경·스타일 변경·PNG를 분리했습니다.
-- warm 반복 측정이며 OS/font/driver cache는 비우지 않았습니다. 실제 화면 FPS나 순수 GPU 커널 시간 측정은 아닙니다.
-- peak RSS는 입력·라이브러리·드라이버를 포함한 worker 프로세스 메모리입니다. 실제 VRAM 수치가 아닙니다.
+- Windows 11; Intel Core i7-13700KF; approximately 64 GiB RAM; RTX 4070 Ti
+  12 GiB / NVIDIA 617.14.
+- Python 3.13.1; Figgy 0.1.0; fastplotlib 0.7.0 / pygfx 0.17.0 /
+  wgpu-py 0.32.0; VisPy 0.17.0; pyqtgraph 0.14.0 / PySide6 6.12.0.
+- Completed 960×600 RGBA readback, independent processes per condition and
+  medians of five runs.
+- Lines 2.5 px; scatter diameter 5 px; identical float64 inputs; no downsampling.
+- Figgy GPU coordinates use float64 hi/lo; competing GPU paths use float32.
+  pyqtgraph subtracts the center before uploading a float32 VBO.
+- Figgy/fastplotlib use Vulkan; VisPy/pyqtgraph use NVIDIA OpenGL 4.6.
+- Figgy uses shader AA. fastplotlib uses default pixel_scale=1, PPAA none and
+  LineMaterial AA off. VisPy line GL AA and pyqtgraph OpenGL AA are off; VisPy
+  scatter uses 1 px marker AA. Pixel quality is not identical across backends.
+- Plot viewports are matched, apart from a 0.5 px pyqtgraph difference from Qt
+  boundaries. Axes/grid layout and initial automatic limits differ by library.
+- Imports/input generation are excluded; data conversion and registration/fit
+  are included. Initialization, first frame, repeated rendering, axis/style
+  edits and PNG export are reported separately.
+- Warm repetitions, with OS/font/driver caches intact. These do not measure
+  display FPS or isolated GPU kernel time.
+- Worker peak RSS includes inputs/libraries/drivers, not actual VRAM use.
 
-## 500만 점 반복 RGBA 렌더 (ms)
+## Repeated RGBA rendering at five million samples (ms)
 
-| 작업 | Figgy | fastplotlib | VisPy | pyqtgraph OpenGL | matplotlib 기본 |
+| Workload | Figgy | fastplotlib | VisPy | pyqtgraph OpenGL | matplotlib default |
 |---|---:|---:|---:|---:|---:|
-| 매끄러운 선 | 9.07 | 12.41 | 4.77 | 4.09 | 99.87 |
-| 잡음 선 | 18.52 | 20.49 | 10.96 | 8.71 | 211.00 |
-| 산점도 | 9.11 | 10.37 | 12.24 | — | 1357.62 |
+| Smooth line | 9.07 | 12.41 | 4.77 | 4.09 | 99.87 |
+| Noisy line | 18.52 | 20.49 | 10.96 | 8.71 | 211.00 |
+| Scatter | 9.11 | 10.37 | 12.24 | — | 1357.62 |
 
-500만 점 선은 pyqtgraph OpenGL과 VisPy가 더 빨랐고, 산점도는 Figgy가 가장 빨랐습니다. fastplotlib는 같은 규모에서 Figgy와 가까운 범위였습니다. 첫 프레임과 축/색상 편집 비용은 아래 전체 표로 함께 봐야 합니다.
+pyqtgraph OpenGL and VisPy were faster for five-million-point lines; Figgy was
+fastest for scatter. fastplotlib was close to Figgy at that scale. Consider
+first-frame and axis/color-edit costs in the full table as well.
 
-## 실제 렌더 경로와 검증
+## Rendering paths and validation
 
-- **pyqtgraph:** `pg.setConfigOptions(useOpenGL=True, antialias=False)`. 실제 `GraphicsViewGLWidget` 생성과 `PlotCurveItem.paintGL` 실행을 확인하고, QGraphicsView paint 직후 `glReadPixels`로 GPU 완료를 기다립니다. QImage/QPainter 소프트웨어 export를 대신 측정하지 않습니다.
-- **fastplotlib:** offscreen RenderCanvas의 매 호출을 force draw하여 Figure 전체를 새로 렌더하고 완료된 RGBA를 받습니다. `export_numpy()`만 호출해 이전 프레임을 읽는 경로를 쓰지 않습니다.
-- **VisPy:** `SceneCanvas.render()`에서 framebuffer에 새로 그린 뒤 RGBA readback합니다. 산점도 색상 변경 시 공개 `Markers.set_data(pos=..., face_color=...)` API에 좌표를 함께 전달해야 하므로 그 재전송 비용도 측정에 포함됩니다.
-- 각 성공 worker에서 첫 프레임의 데이터 표시, 편집 후 PNG의 데이터 유지, 별도 빨강 편집의 실제 색상 반영을 검사합니다. 추가 검사 시간/메모리는 타이밍과 peak RSS 측정 뒤에 실행해 수치에서 제외했습니다.
-- VisPy GL AA on 선 결과는 [별도 JSON](results/windows-rtx4070ti-vispy-aa-line.json)에 보존했습니다. 앞선 500만 점 잡음 선 약 337 ms는 이 AA on 설정의 값입니다. 주 표는 기본 AA off입니다.
-- [앞선 QPainter 비교](WINDOWS_RESULTS.md)의 pyqtgraph 행은 useOpenGL=False 기준입니다. OpenGL 결과와 구분합니다.
-- **Plotly:** 이번 목록에서는 제외했습니다. 공식 Kaleido 정적 출력은 Chrome에서 PNG를 내보내는 경로여서, 현재 native RGBA draw/readback과는 직렬화·브라우저·PNG export 비용이 섞입니다. 별도 end-to-end export 비교로 다루는 편이 적절합니다. [공식 문서](https://plotly.com/python/static-image-export/)
+- **pyqtgraph:** `pg.setConfigOptions(useOpenGL=True, antialias=False)`.
+  Actual `GraphicsViewGLWidget` construction and `PlotCurveItem.paintGL`
+  execution are verified. `glReadPixels` immediately after QGraphicsView paint
+  waits for GPU completion. QImage/QPainter software export is not substituted.
+- **fastplotlib:** every offscreen RenderCanvas call forces a full Figure draw
+  and returns completed RGBA, rather than reading an old `export_numpy()` frame.
+- **VisPy:** `SceneCanvas.render()` draws a new framebuffer then reads RGBA.
+  Scatter color changes include resending coordinates through the required
+  `Markers.set_data(pos=..., face_color=...)` public API.
+- Every successful worker checks first-frame data, retained data in edited PNGs
+  and a separate actual red-color edit. These checks occur after timing/peak
+  RSS collection and are excluded from the measurements.
+- VisPy GL AA-on line results remain in
+  [separate JSON](results/windows-rtx4070ti-vispy-aa-line.json). The earlier
+  approximately 337 ms noisy five-million-point result used AA on; the main
+  table uses default AA off.
+- pyqtgraph rows in the [earlier QPainter comparison](WINDOWS_RESULTS.md) use
+  `useOpenGL=False` and are separate from these OpenGL results.
+- **Plotly:** excluded from this campaign. Kaleido static output goes through
+  Chrome/PNG, combining serialization, browser and encoding work with the
+  native draw/readback comparison. It needs a separate end-to-end export study;
+  see [official static export documentation](https://plotly.com/python/static-image-export/).
 
-## 전체 측정
+## All measurements
 
-| 작업 | 신호 | 입력 수 | 백엔드 | 상태 | 첫 프레임 (ms) | 반복 (ms) | 축 변경 (ms) | 색상 변경 (ms) | PNG (ms) | Peak RSS (MiB) |
+| Workload | Signal | Samples | Backend | Status | First frame (ms) | Repeated (ms) | Axis edit (ms) | Color edit (ms) | PNG (ms) | Peak RSS (MiB) |
 |---|---|---:|---|---|---:|---:|---:|---:|---:|---:|
 | line | smooth | 100,000 | figgy | ok | 413.22 | 1.24 | 2.74 | 2.91 | 14.53 | 193.3 |
 | line | smooth | 100,000 | matplotlib-default | ok | 31.70 | 12.37 | 11.68 | 11.61 | 28.70 | 76.4 |
@@ -89,10 +117,12 @@
 | scatter | noisy | 5,000,000 | fastplotlib | ok | 1057.61 | 10.37 | 10.91 | 10.11 | 23.33 | 544.3 |
 | scatter | noisy | 5,000,000 | vispy | ok | 1212.84 | 12.24 | 14.84 | 297.67 | 33.61 | 1410.9 |
 
-총 48개 조건, 성공 47개, 오류 1개, timeout 0개.
-- matplotlib-unsimplified / line / noisy / 5,000,000: error. 원문은 JSON에 보존했습니다.
+Of 48 conditions, 47 succeeded, one errored and none timed out.
 
-## 재현
+- `matplotlib-unsimplified / line / noisy / 5,000,000`: error; original message
+  retained in JSON.
+
+## Reproduce
 
 ```powershell
 $env:RUSTUP_TOOLCHAIN = '1.99.0'
@@ -102,8 +132,13 @@ $env:RUSTUP_TOOLCHAIN = '1.99.0'
 .\.venv\Scripts\python.exe benchmarks/plot_results.py benchmarks/results/windows-rtx4070ti-gpu-line.json benchmarks/results/windows-rtx4070ti-gpu-scatter.json benchmarks/results/windows-rtx4070ti-heatmap.json --output benchmarks/results/windows-rtx4070ti-gpu-comparison --subtitle "Windows 11 / RTX 4070 Ti, Vulkan + OpenGL, 5 repeats, 960 x 600 RGBA"
 ```
 
-비교 차트 자체도 Figgy로 렌더했습니다. 네 패널의 완성 픽셀을 배치하며 SVG는 PNG를 내장합니다. 히트맵 패널은 이전 측정의 Figgy/matplotlib 결과이며 추가 GPU 라이브러리의 히트맵 비교는 이번 범위에 포함하지 않았습니다.
+The comparison chart is also rendered with Figgy. Four completed panels are
+arranged as pixels, and the SVG embeds PNG. The heatmap panel uses the previous
+Figgy/matplotlib campaign; heatmaps from additional GPU libraries were outside
+this run's scope.
 
-[선 JSON](results/windows-rtx4070ti-gpu-line.json) · [산점도 JSON](results/windows-rtx4070ti-gpu-scatter.json) · [차트 렌더 기록](results/windows-rtx4070ti-gpu-comparison.rendering.json)
+[Line JSON](results/windows-rtx4070ti-gpu-line.json) ·
+[Scatter JSON](results/windows-rtx4070ti-gpu-scatter.json) ·
+[Chart rendering record](results/windows-rtx4070ti-gpu-comparison.rendering.json)
 
-![Figgy로 그린 GPU 라이브러리 비교](results/windows-rtx4070ti-gpu-comparison.svg)
+![GPU library comparison rendered with Figgy](results/windows-rtx4070ti-gpu-comparison.svg)

@@ -1,0 +1,142 @@
+{
+  "metric": "surface frame submission rate; not monitor FPS or GPU completion/readback",
+  "os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "version": "0.2.0",
+  "points": 100000,
+  "measured_frames": 120,
+  "elapsed_seconds": 1.210390494999956,
+  "submitted_frames_per_second": 99.14155844391719,
+  "host": {
+    "chart_panel": [
+      16,
+      74,
+      1228,
+      580
+    ],
+    "column_uploads": 2,
+    "controls": {
+      "copy": [
+        1160.0,
+        10.5,
+        36.0,
+        36.0
+      ],
+      "fit": [
+        87.15625,
+        10.5,
+        36.0,
+        36.0
+      ],
+      "layout_mode": [
+        195.15625,
+        10.5,
+        36.0,
+        36.0
+      ],
+      "properties": [
+        1098.0,
+        10.5,
+        36.0,
+        36.0
+      ],
+      "save": [
+        1206.0,
+        10.5,
+        36.0,
+        36.0
+      ],
+      "select_mode": [
+        149.15625,
+        10.5,
+        36.0,
+        36.0
+      ]
+    },
+    "decorations": {
+      "axis_bottom": [
+        81.0,
+        588.1666870117188,
+        1135.0,
+        9.333333015441895
+      ],
+      "axis_left": [
+        80.5,
+        131.0,
+        9.333333015441895,
+        466.0
+      ],
+      "axis_right": [
+        1207.1666259765625,
+        131.0,
+        9.333333015441895,
+        466.0
+      ],
+      "axis_top": [
+        81.0,
+        130.5,
+        1135.0,
+        9.333333015441895
+      ],
+      "data_area": [
+        81.0,
+        131.0,
+        1135.0,
+        466.0
+      ],
+      "tick_labels_bottom": [
+        81.0,
+        601.8333129882812,
+        1135.0,
+        16.0
+      ],
+      "tick_labels_left": [
+        23.781410217285156,
+        131.0,
+        52.38525390625,
+        466.0
+      ]
+    },
+    "error": "",
+    "figure_id": 1,
+    "gpu_context_id": 1,
+    "host": "winit-wgpu",
+    "last_input_to_submit_ms": 0.0,
+    "png_encodes": 0,
+    "pool_used_bytes": 1600000,
+    "properties_open": false,
+    "revision": 1,
+    "rgba_readbacks": 0,
+    "scale_factor": 1.0,
+    "selected": null,
+    "surface_frames": 127,
+    "surface_size": [
+      1260,
+      700
+    ]
+  },
+  "renderer": {
+    "active_figures": 1,
+    "adapter": {
+      "backend": "Vulkan",
+      "device_type": "IntegratedGpu",
+      "driver": "radv",
+      "initial_pool_capacity_bytes": 8388608,
+      "maximum_column_pool_bytes": 2147483644,
+      "name": "Radeon 8060S Graphics (RADV STRIX_HALO)"
+    },
+    "allocation_mode": "resident",
+    "column_uploads": 2,
+    "columns": 2,
+    "figure_column_bytes": 1600000,
+    "figure_id": 1,
+    "gpu_context_id": 1,
+    "gpu_sharing": "process",
+    "known_gpu_bytes": 14086992,
+    "png_encodes": 0,
+    "pool_capacity_bytes": 8388608,
+    "pool_used_bytes": 1600000,
+    "preparation": null,
+    "revision": 1,
+    "rgba_readbacks": 0
+  }
+}

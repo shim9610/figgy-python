@@ -1,5 +1,6 @@
 /target/
 /dist/
+/output/
 __pycache__/
 *.pyc
 *.pyo

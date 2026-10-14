@@ -1,0 +1,37 @@
+Final corrected results; VisPy uses QT_SCALE_FACTOR=0.5.
+figgy                     line    smooth   100,000 first=0.089649s redraw=0.002298s RSS=149.4MiB
+matplotlib-default        line    smooth   100,000 first=0.029975s redraw=0.011688s RSS=92.8MiB
+matplotlib-unsimplified   line    smooth   100,000 first=0.036385s redraw=0.014601s RSS=94.6MiB
+pyqtgraph-opengl          line    smooth   100,000 first=0.082980s redraw=0.010031s RSS=281.4MiB
+fastplotlib               line    smooth   100,000 first=0.553446s redraw=0.001638s RSS=236.6MiB
+vispy                     line    smooth   100,000 first=0.395427s redraw=0.001353s RSS=273.6MiB
+figgy                     line    smooth 1,000,000 first=0.106846s redraw=0.003742s RSS=163.3MiB
+matplotlib-default        line    smooth 1,000,000 first=0.064938s redraw=0.030704s RSS=151.6MiB
+matplotlib-unsimplified   line    smooth 1,000,000 first=0.114697s redraw=0.080313s RSS=156.9MiB
+pyqtgraph-opengl          line    smooth 1,000,000 first=0.073916s redraw=0.009950s RSS=306.0MiB
+fastplotlib               line    smooth 1,000,000 first=0.606790s redraw=0.004881s RSS=261.8MiB
+vispy                     line    smooth 1,000,000 first=0.354227s redraw=0.001408s RSS=294.3MiB
+figgy                     line    smooth 5,000,000 first=0.152808s redraw=0.035949s RSS=224.1MiB
+matplotlib-default        line    smooth 5,000,000 first=0.225766s redraw=0.120298s RSS=412.8MiB
+matplotlib-unsimplified   line    smooth 5,000,000 first=0.547217s redraw=0.393958s RSS=434.6MiB
+pyqtgraph-opengl          line    smooth 5,000,000 first=0.116086s redraw=0.009890s RSS=431.0MiB
+fastplotlib               line    smooth 5,000,000 first=0.807595s redraw=0.042408s RSS=511.1MiB
+vispy                     line    smooth 5,000,000 first=0.375588s redraw=0.001993s RSS=385.3MiB
+figgy                     line    noisy    100,000 first=0.083423s redraw=0.001101s RSS=156.5MiB
+matplotlib-default        line    noisy    100,000 first=0.090995s redraw=0.066794s RSS=135.0MiB
+matplotlib-unsimplified   line    noisy    100,000 first=0.172777s redraw=0.140839s RSS=184.0MiB
+pyqtgraph-opengl          line    noisy    100,000 first=0.073986s redraw=0.010730s RSS=290.1MiB
+fastplotlib               line    noisy    100,000 first=0.574400s redraw=0.002946s RSS=239.4MiB
+vispy                     line    noisy    100,000 first=0.344323s redraw=0.001651s RSS=276.0MiB
+figgy                     line    noisy  1,000,000 first=0.106421s redraw=0.007301s RSS=170.8MiB
+matplotlib-default        line    noisy  1,000,000 first=0.156529s redraw=0.113705s RSS=197.4MiB
+matplotlib-unsimplified   line    noisy  1,000,000 first=1.432348s redraw=1.318693s RSS=999.4MiB
+pyqtgraph-opengl          line    noisy  1,000,000 first=0.085091s redraw=0.009944s RSS=313.2MiB
+fastplotlib               line    noisy  1,000,000 first=0.603401s redraw=0.009065s RSS=264.5MiB
+vispy                     line    noisy  1,000,000 first=0.358283s redraw=0.005192s RSS=297.0MiB
+figgy                     line    noisy  5,000,000 first=0.162558s redraw=0.041296s RSS=231.6MiB
+matplotlib-default        line    noisy  5,000,000 first=0.337346s redraw=0.225908s RSS=399.2MiB
+matplotlib-unsimplified   line    noisy  5,000,000 error
+pyqtgraph-opengl          line    noisy  5,000,000 first=0.157110s redraw=0.018002s RSS=438.4MiB
+fastplotlib               line    noisy  5,000,000 first=0.810351s redraw=0.047395s RSS=507.8MiB
+vispy                     line    noisy  5,000,000 first=0.396888s redraw=0.023501s RSS=388.3MiB

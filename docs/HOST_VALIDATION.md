@@ -221,3 +221,162 @@ chart selection, inspector opening and resize with no PNG/readback or reupload.
 This is a forced scale-factor check, not a physical monitor/DPI transition test.
 
 ![Installed-wheel JupyterLab WebGPU output](images/notebook-webgpu.png)
+
+## Native editor review follow-up (2026-10-14)
+
+The editor review fixes preserve the fitted document aspect ratio and expand a
+normal window horizontally for the inspector. Closing the inspector restores
+the previous chart space. Maximized/fullscreen windows show the inspector as an
+overlay. Toolbar/status controls remain outside the overlay. Advanced JSON now
+opens in a separate native OS window on the same renderer context; invalid
+edits preserve the document and leave both windows usable.
+
+Legend labels are edited as separate entries, preserving their renderer marks
+and separators. Title, legend, axis-title and tick/axis visibility controls can
+restore hidden objects through the object list. The color picker reserves its
+SV marker radius between the square, hue bar and popup boundary.
+
+Native data selection supports Esc, empty-space clicks and repeated-hit toggles.
+Left/right step point indices, up/down choose another point series, and matrix
+arrows step cells in the displayed axis directions. Selected decorations can be
+nudged with arrows. The inspector shows the selected index, X/Y and matrix
+value by reading only those hi/lo samples from GPU storage. No full source
+array is retained on CPU; `selection_value_readbacks` is separate from RGBA and
+PNG counters. F11 toggles fullscreen.
+
+An installed release wheel passed **42 tests, 3 skipped** on a separate X11
+screen with Openbox and llvmpipe (32.26 s). Actual mouse/key tests cover inspector
+open/close dimensions, constant aspect ratio, data selection/navigation/clear,
+visibility restoration, individual legend labels, the black color-picker marker,
+separate settings window identity and atomic rejection/recovery, maximized and
+fullscreen overlays, copy/replay, resize/reopen and identical UI/Python PNGs.
+Screenshots were inspected. The three skips are the optional Playwright editor
+and two opt-in Jupyter/WebGPU tests; browser verification was not rerun here.
+
+The two selected-value tests also pass on the real Radeon 8060S/RADV adapter
+(0.14 s), including source-array mutation, float64 hi/lo reconstruction, bounded
+point/series/cell navigation and zero RGBA/PNG work. UI automation uses software
+Vulkan because this isolated X11 screen has no DRI3 hardware presentation.
+The user's review window runs separately on native Wayland/Radeon Vulkan.
+
+A follow-up visibility review adds an always-available **Show / hide** toolbar
+menu. It restores chart titles, legends and axis titles without a selected
+object or open inspector. The native input test explicitly hides the title,
+clears selection, closes the inspector, and restores it through this menu;
+legend and X-axis-title toggles use the same route.
+
+The extended visibility-menu input test passes (22.27 s). A bounded 20-step
+native UI mutation run also completes: 5 rejected edits preserve state, 2 valid
+edits, 3 resizes and 2 main-window reopenings, with the sentinel Figure unchanged.
+The multi-window driver forces a pointer-motion event when returning to a window
+and waits for the separate settings window to become ready before editing it.
+
+### Readable Python export and axis navigation (2026-10-14)
+
+Copy Python and `Figure.to_code()` now share a GPU-free exporter. Titles, axis
+labels, ranges, scales, grid, legend and common series styles use Python setters;
+advanced styling/layout uses readable `Figure.configure()` patches. Font sizes
+convert renderer pixels to Python points at the Figure's DPI. Replaying the
+user-provided snapshot reproduced its settings exactly in 36 lines, including
+custom offsets. Source arrays are preserved. Native clipboard replay and exact
+RGBA replay passed. Browser widgets use the same exporter after pending edits
+are acknowledged; browser UI integration was not executed in this run.
+
+The installed-wheel full suite passed **56 tests, 3 skipped** (Playwright absent,
+two Jupyter integration tests opt-in). Four replay/selection tests also passed
+on Radeon 8060S Vulkan. The subsequent axis-mapping correction passed **3 actual
+X11 input tests**: Ctrl+wheel zooms X only, Shift+wheel zooms Y only, plain wheel
+zooms both, and dragging pans. Zoom-in/out preserve the data coordinate under
+the physical pointer, including log and inverted axes; the untouched axis stays
+unchanged. Independent windows share the GPU while keeping their documents
+separate. English instructions are displayed above the graph. Two revised
+review windows were launched on Radeon with the current edits preserved.
+
+### Default margins and public README recording (2026-10-14)
+
+The Python hosts had reduced the renderer's left/bottom axis bands from
+110/80 pixels to 65/55 pixels. Restoring the renderer defaults in both native
+and notebook configuration separates the Y-axis title from numeric ticks.
+A raster regression checks a clear gap after the title and native/notebook
+configuration parity. The randomized campaign's valid starting canvas was
+increased from 240×200 to 320×240 to fit the default axes and heatmap colorbar.
+
+The installed-wheel full suite passed **57 tests, 3 skipped** in 44.06 s on
+isolated X11/llvmpipe. Skips remain the absent Playwright dependency and two
+opt-in Jupyter integration tests. The default-layout and Python replay subset
+also passed on Radeon 8060S Vulkan.
+
+The README GIF uses the automatic TopRight legend with zero offsets over a
+late response peak. Actual input adjusts each axis, increases the left margin,
+moves the Y title and moves the legend. Copy Python is pasted byte-for-byte
+into the installed VS Code, saved and executed through its integrated terminal.
+Three distinct PNGs are opened in three VS Code editor columns. The earlier
+recording-only PySide6 code input helper was removed. The final GIF contains
+86 frames over 14.48 seconds; captions and a pointer halo are composited over
+actual windows. The checked-in clipboard code was replayed on Radeon for
+three datasets, with six initial column uploads each and no style reuploads.
+The recording's isolated terminal profile uses `figgy-demo $` and an editor
+title containing only the active filename; personal usernames, hostnames and
+temporary workspace paths are not displayed in those fields.
+
+### Public gallery and documentation (2026-10-14)
+
+Eight runnable Python recipes now generate the README gallery: dense signals,
+scatter populations, parametric curves, logarithmic axes, model/measurement
+markers, an interpolated signed field, a correlation matrix and a spectrogram.
+All eight were rendered with native Radeon 8060S Vulkan and visually inspected.
+Every standalone CLI exported a 960×600 PNG. An isolated X11/llvmpipe check
+also opened a gallery example with `--show`, closed it through the window manager
+and verified successful PNG saving. `scripts/render_gallery.py` reproduces the
+images and records source links, dimensions, adapter identity and SHA-256.
+
+The README, desktop guide, randomized validation and Linux/Windows benchmark
+reports use English. Translation preserved all benchmark table measurements
+and reproduction commands. Local Markdown links, Python code-block syntax,
+gallery source/image pairs and image hashes/dimensions were checked. The updated
+public GIF was re-recorded with the neutral terminal prompt; exact clipboard
+paste, actual terminal execution and three distinct output images passed again.
+
+### Pie/donut and stylized Python bindings (2026-10-14)
+
+Python now exposes `Axes.pie`, `Axes.donut`, `RadialArtist` slice/value edits,
+`Figure.set_radial_style`, `configure_radial`, `set_facecolor` and
+`set_draw_style`. Pie/donut documents use public upstream `RadialChart` and
+`RadialRenderer` on the shared native device. Native windows paint the upstream
+frame to a GPU texture within egui; ordinary selection/property edits require
+zero column uploads, RGBA readbacks or PNG encodes. Cartesian-axis operations
+are rejected for radial Figures rather than silently changing unused settings.
+
+The installed final wheel passed **78 tests, 3 skipped** in 52.09 s on isolated
+X11/llvmpipe. This includes actual slice selection/clearing, keyboard navigation
+past zero-valued slices, title/material edits, clipboard export, inspector size
+preservation, maximized overlay and PNG saving. The material menu was expanded
+after its default scroll height obscured lower choices during input validation.
+The skips remain absent Playwright and two opt-in Jupyter/WebGPU tests.
+
+The **19 new model/render tests** also passed on Radeon 8060S Vulkan (0.60 s).
+They cover pie/donut differences, all eleven material shaders with distinct
+pixel hashes, NumPy mutation independence, bounded-data validation, radial
+picking/preparation, data-preserving code replay, high-DPI style replay,
+backgrounds and atomic rejection. Exported radial styles clear transient
+selection/hover and preserve new datasets' values, including zero-valued slices.
+
+Milkyway accepts only Line series: scatter, marker lines and heatmaps are
+rejected through public setters, raw settings and subsequent additions. The
+native menu disables incompatible modes, and the browser host checks the same
+series-kind rule before installation. Constellation requires marker lines.
+Unknown draw-style options are explicitly checked because internally tagged
+serde enums can conceal ignored fields from `serde_ignored`.
+
+Renderer scratch-cache IDs remain namespaced per Figure. GPU style uniforms
+derive their star/sketch pattern salt from stable user series IDs, allowing
+identical replay across independent Figures without mixing source data.
+
+The gallery now contains **17 actual Radeon renders**, including pie, ceramic
+donut, paper/wood/hatch/pearl, Sketch handwriting, Constellation and line-only
+Milkyway. Every variant was reproduced in an independent CLI process with exact
+PNG SHA-256 agreement. English Markdown, example links, Python code-block syntax,
+manifest hashes/dimensions, Rust formatting and browser JS syntax were checked.
+Browser model/transport support for Cartesian styles is included, but actual
+browser style pixels were not rerun. Interactive browser radial bindings remain
+unexposed; radial windows/PNG export require the native backend.

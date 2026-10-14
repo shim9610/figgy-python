@@ -1,0 +1,314 @@
+line 100,000 repeat=1 shared: [55.29, 3.92, 2.5, 3.42] ms
+line 100,000 repeat=1 reset: [93.75, 40.27, 46.38, 32.42] ms
+line 100,000 repeat=2 reset: [81.66, 41.1, 38.37, 36.29] ms
+line 100,000 repeat=2 shared: [85.87, 3.17, 2.51, 3.72] ms
+line 100,000 repeat=3 shared: [88.86, 4.1, 2.9, 2.71] ms
+line 100,000 repeat=3 reset: [82.91, 37.48, 37.59, 36.2] ms
+line 100,000 repeat=4 reset: [84.39, 36.99, 35.35, 35.41] ms
+line 100,000 repeat=4 shared: [84.53, 4.25, 3.12, 3.93] ms
+line 100,000 repeat=5 shared: [82.93, 2.9, 2.53, 3.68] ms
+line 100,000 repeat=5 reset: [75.34, 36.99, 32.4, 37.05] ms
+line 1,000,000 repeat=1 shared: [80.47, 15.7, 15.9, 15.89] ms
+line 1,000,000 repeat=1 reset: [64.87, 47.03, 44.97, 44.27] ms
+line 1,000,000 repeat=2 reset: [68.1, 46.51, 51.81, 45.52] ms
+line 1,000,000 repeat=2 shared: [79.61, 15.71, 15.39, 15.37] ms
+line 1,000,000 repeat=3 shared: [77.86, 15.8, 16.11, 15.51] ms
+line 1,000,000 repeat=3 reset: [78.19, 45.66, 44.57, 42.7] ms
+line 1,000,000 repeat=4 reset: [76.76, 62.48, 48.67, 42.66] ms
+line 1,000,000 repeat=4 shared: [68.2, 15.6, 15.09, 15.17] ms
+line 1,000,000 repeat=5 shared: [72.11, 15.63, 15.14, 15.78] ms
+line 1,000,000 repeat=5 reset: [74.76, 45.88, 49.24, 48.79] ms
+line 5,000,000 repeat=1 shared: [128.88, 84.7, 84.51, 83.27] ms
+line 5,000,000 repeat=1 reset: [144.22, 115.72, 115.04, 114.49] ms
+line 5,000,000 repeat=2 reset: [153.77, 116.85, 122.01, 122.18] ms
+line 5,000,000 repeat=2 shared: [136.0, 85.82, 86.8, 82.27] ms
+line 5,000,000 repeat=3 shared: [163.05, 98.34, 83.91, 81.9] ms
+line 5,000,000 repeat=3 reset: [134.37, 117.3, 115.04, 112.91] ms
+line 5,000,000 repeat=4 reset: [147.84, 136.81, 113.71, 115.84] ms
+line 5,000,000 repeat=4 shared: [134.4, 84.7, 87.08, 83.32] ms
+line 5,000,000 repeat=5 shared: [134.21, 85.45, 84.04, 83.49] ms
+line 5,000,000 repeat=5 reset: [135.29, 115.4, 112.45, 114.36] ms
+scatter 100,000 repeat=1 shared: [80.46, 3.15, 3.86, 2.91] ms
+scatter 100,000 repeat=1 reset: [75.98, 34.71, 31.02, 32.89] ms
+scatter 100,000 repeat=2 reset: [71.52, 38.42, 37.26, 38.85] ms
+scatter 100,000 repeat=2 shared: [78.29, 2.95, 2.94, 2.82] ms
+scatter 100,000 repeat=3 shared: [59.93, 3.05, 2.91, 3.02] ms
+scatter 100,000 repeat=3 reset: [81.11, 36.71, 37.11, 36.07] ms
+scatter 100,000 repeat=4 reset: [80.07, 34.88, 31.78, 31.03] ms
+scatter 100,000 repeat=4 shared: [53.19, 3.07, 2.71, 2.73] ms
+scatter 100,000 repeat=5 shared: [81.1, 3.04, 2.78, 3.27] ms
+scatter 100,000 repeat=5 reset: [83.36, 33.17, 32.25, 33.58] ms
+scatter 1,000,000 repeat=1 shared: [81.06, 18.22, 16.85, 16.6] ms
+scatter 1,000,000 repeat=1 reset: [74.76, 51.91, 45.98, 48.11] ms
+scatter 1,000,000 repeat=2 reset: [84.82, 53.33, 52.05, 53.49] ms
+scatter 1,000,000 repeat=2 shared: [64.36, 17.97, 18.4, 16.66] ms
+scatter 1,000,000 repeat=3 shared: [82.33, 21.38, 17.13, 17.19] ms
+scatter 1,000,000 repeat=3 reset: [84.43, 51.61, 55.06, 53.51] ms
+scatter 1,000,000 repeat=4 reset: [83.39, 51.37, 53.9, 49.96] ms
+scatter 1,000,000 repeat=4 shared: [85.24, 19.35, 19.47, 18.28] ms
+scatter 1,000,000 repeat=5 shared: [78.32, 17.79, 17.35, 17.7] ms
+scatter 1,000,000 repeat=5 reset: [73.39, 47.47, 50.98, 48.09] ms
+scatter 5,000,000 repeat=1 shared: [146.71, 93.31, 94.31, 87.64] ms
+scatter 5,000,000 repeat=1 reset: [140.76, 123.62, 124.25, 125.05] ms
+scatter 5,000,000 repeat=2 reset: [135.69, 131.8, 139.43, 124.29] ms
+scatter 5,000,000 repeat=2 shared: [145.71, 89.83, 90.44, 87.71] ms
+scatter 5,000,000 repeat=3 shared: [146.03, 91.97, 96.27, 89.94] ms
+scatter 5,000,000 repeat=3 reset: [146.5, 123.94, 118.94, 124.64] ms
+scatter 5,000,000 repeat=4 reset: [137.56, 124.53, 119.27, 125.48] ms
+scatter 5,000,000 repeat=4 shared: [136.83, 92.7, 90.45, 88.22] ms
+scatter 5,000,000 repeat=5 shared: [139.47, 91.9, 91.64, 90.21] ms
+scatter 5,000,000 repeat=5 reset: [143.26, 125.5, 121.91, 121.79] ms
+[
+  {
+    "kind": "line",
+    "signal": "smooth",
+    "size": 100000,
+    "process_first": {
+      "samples": 10,
+      "median": {
+        "initialize_s": 0.07008883899925422,
+        "register_and_fit_s": 0.008635705500637414,
+        "first_draw_s": 0.005414317500253674,
+        "first_frame_total_s": 0.08365996300017287
+      }
+    },
+    "shared_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.0002010670013987692,
+        "register_and_fit_s": 0.001559013999212766,
+        "first_draw_s": 0.0012207899999339134,
+        "first_frame_total_s": 0.003165738999086898
+      }
+    },
+    "reset_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.024907405999329058,
+        "register_and_fit_s": 0.008001039999726345,
+        "first_draw_s": 0.0043118190005770884,
+        "first_frame_total_s": 0.03699157499977446
+      }
+    },
+    "shared_vs_process_first_speedup": 26.426677317461458,
+    "shared_vs_reset_following_speedup": 11.684973085413558,
+    "paired_following_speedups": [
+      11.766444704447048,
+      12.12171313261534,
+      12.906800994143639,
+      9.002357093019693,
+      12.738088326849587
+    ],
+    "paired_following_speedup_median": 12.12171313261534
+  },
+  {
+    "kind": "line",
+    "signal": "smooth",
+    "size": 1000000,
+    "process_first": {
+      "samples": 10,
+      "median": {
+        "initialize_s": 0.047979113000110374,
+        "register_and_fit_s": 0.017309762500190118,
+        "first_draw_s": 0.008263406999503786,
+        "first_frame_total_s": 0.07575977849955962
+      }
+    },
+    "shared_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.00024368800040974747,
+        "register_and_fit_s": 0.010673652999685146,
+        "first_draw_s": 0.004501725001318846,
+        "first_frame_total_s": 0.01562835899676429
+      }
+    },
+    "reset_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.02348552800140169,
+        "register_and_fit_s": 0.01684742500037828,
+        "first_draw_s": 0.0057836100004351465,
+        "first_frame_total_s": 0.045880350002335035
+      }
+    },
+    "shared_vs_process_first_speedup": 4.847583710819862,
+    "shared_vs_reset_following_speedup": 2.9357112932863996,
+    "paired_following_speedups": [
+      2.830211522740952,
+      3.0217312981696867,
+      2.8210259790529624,
+      3.2080440210803296,
+      3.1218003124385887
+    ],
+    "paired_following_speedup_median": 3.0217312981696867
+  },
+  {
+    "kind": "line",
+    "signal": "smooth",
+    "size": 5000000,
+    "process_first": {
+      "samples": 10,
+      "median": {
+        "initialize_s": 0.03890976349975972,
+        "register_and_fit_s": 0.05864948949965765,
+        "first_draw_s": 0.038819509501081484,
+        "first_frame_total_s": 0.13564553149990388
+      }
+    },
+    "shared_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.0002814979998220224,
+        "register_and_fit_s": 0.05005930999868724,
+        "first_draw_s": 0.034274718000233406,
+        "first_frame_total_s": 0.08450522900056967
+      }
+    },
+    "reset_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.021556147999945097,
+        "register_and_fit_s": 0.056846542000130285,
+        "first_draw_s": 0.0376347719993646,
+        "first_frame_total_s": 0.1153991839983064
+      }
+    },
+    "shared_vs_process_first_speedup": 1.6051732313392046,
+    "shared_vs_reset_following_speedup": 1.3655863117953146,
+    "paired_following_speedups": [
+      1.3613747854538514,
+      1.4216601482758093,
+      1.3710083487851188,
+      1.3676197533627383,
+      1.3607609303845454
+    ],
+    "paired_following_speedup_median": 1.3676197533627383
+  },
+  {
+    "kind": "scatter",
+    "signal": "smooth",
+    "size": 100000,
+    "process_first": {
+      "samples": 10,
+      "median": {
+        "initialize_s": 0.06507764399975713,
+        "register_and_fit_s": 0.00832763249945856,
+        "first_draw_s": 0.005683507500179985,
+        "first_frame_total_s": 0.07917863799957559
+      }
+    },
+    "shared_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.00020278999909351114,
+        "register_and_fit_s": 0.00156456500008062,
+        "first_draw_s": 0.0011594850002438761,
+        "first_frame_total_s": 0.0029492530011339113
+      }
+    },
+    "reset_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.023136534000514075,
+        "register_and_fit_s": 0.00769132799905492,
+        "first_draw_s": 0.00338509100038209,
+        "first_frame_total_s": 0.034714072000497254
+      }
+    },
+    "shared_vs_process_first_speedup": 26.84701447082819,
+    "shared_vs_reset_following_speedup": 11.770462550059488,
+    "paired_following_speedups": [
+      10.445767485027305,
+      13.059062276951689,
+      12.16386418060174,
+      11.644347963020225,
+      10.903543376246407
+    ],
+    "paired_following_speedup_median": 11.644347963020225
+  },
+  {
+    "kind": "scatter",
+    "signal": "smooth",
+    "size": 1000000,
+    "process_first": {
+      "samples": 10,
+      "median": {
+        "initialize_s": 0.05289265450028324,
+        "register_and_fit_s": 0.01882881700021244,
+        "first_draw_s": 0.010336931499296043,
+        "first_frame_total_s": 0.08169272250052018
+      }
+    },
+    "shared_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.0002411820005363552,
+        "register_and_fit_s": 0.010829505999936373,
+        "first_draw_s": 0.0066398159997334005,
+        "first_frame_total_s": 0.017794651999793132
+      }
+    },
+    "reset_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.025470442000369076,
+        "register_and_fit_s": 0.01780588299880037,
+        "first_draw_s": 0.008439041999736219,
+        "first_frame_total_s": 0.05161003800094477
+      }
+    },
+    "shared_vs_process_first_speedup": 4.590858112958314,
+    "shared_vs_reset_following_speedup": 2.900311734196586,
+    "paired_following_speedups": [
+      2.8546084273914714,
+      2.967153112150066,
+      3.1135024939020086,
+      2.6544548172314553,
+      2.7174129849847937
+    ],
+    "paired_following_speedup_median": 2.8546084273914714
+  },
+  {
+    "kind": "scatter",
+    "signal": "smooth",
+    "size": 5000000,
+    "process_first": {
+      "samples": 10,
+      "median": {
+        "initialize_s": 0.03775800749917835,
+        "register_and_fit_s": 0.057630126999356435,
+        "first_draw_s": 0.045526481500019145,
+        "first_frame_total_s": 0.14201091299764812
+      }
+    },
+    "shared_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.00027925399990635924,
+        "register_and_fit_s": 0.05067900200083386,
+        "first_draw_s": 0.0400447219999478,
+        "first_frame_total_s": 0.0904508129988244
+      }
+    },
+    "reset_following": {
+      "samples": 15,
+      "median": {
+        "initialize_s": 0.02344848800021282,
+        "register_and_fit_s": 0.056756121999569586,
+        "first_draw_s": 0.04351524300000165,
+        "first_frame_total_s": 0.12428554500183964
+      }
+    },
+    "shared_vs_process_first_speedup": 1.5700346772946512,
+    "shared_vs_reset_following_speedup": 1.3740677488819806,
+    "paired_following_speedups": [
+      1.3315839810536045,
+      1.4673049706046881,
+      1.3476857191891396,
+      1.3768056678668323,
+      1.330362655445582
+    ],
+    "paired_following_speedup_median": 1.3476857191891396
+  }
+]

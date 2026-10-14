@@ -1,0 +1,217 @@
+{
+  "started_at": "2026-10-14T14:04:32.836987+09:00",
+  "source_commit": "abae8d97da3f8c06e17f02526b654db4d79076db",
+  "source_status_at_start": "",
+  "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "cpu": "{\n   \"lscpu\": [\n      {\n         \"field\": \"\uc544\ud0a4\ud14d\ucc98:\",\n         \"data\": \"x86_64\"\n      },{\n         \"field\": \"CPU \ub3d9\uc791 \ubaa8\ub4dc:\",\n         \"data\": \"32-bit, 64-bit\"\n      },{\n         \"field\": \"\uc8fc\uc18c \ud06c\uae30:\",\n         \"data\": \"48 bits physical, 48 bits virtual\"\n      },{\n         \"field\": \"\ubc14\uc774\ud2b8 \uc21c\uc11c:\",\n         \"data\": \"Little Endian\"\n      },{\n         \"field\": \"CPU:\",\n         \"data\": \"32\"\n      },{\n         \"field\": \"\uc628\ub77c\uc778 CPU \ubaa9\ub85d:\",\n         \"data\": \"0-31\"\n      },{\n         \"field\": \"\uc81c\uc870\uc790 ID:\",\n         \"data\": \"AuthenticAMD\"\n      },{\n         \"field\": \"\ubaa8\ub378 \uc774\ub984:\",\n         \"data\": \"AMD RYZEN AI MAX+ 395 w/ Radeon 8060S\"\n      },{\n         \"field\": \"CPU \uacc4\uc5f4:\",\n         \"data\": \"26\"\n      },{\n         \"field\": \"\ubaa8\ub378:\",\n         \"data\": \"112\"\n      },{\n         \"field\": \"\ucf54\uc5b4 \ub2f9 \uc2a4\ub808\ub4dc:\",\n         \"data\": \"2\"\n      },{\n         \"field\": \"\uc18c\ucf13 \ub2f9 \ucf54\uc5b4 \uc218:\",\n         \"data\": \"16\"\n      },{\n         \"field\": \"\uc18c\ucf13:\",\n         \"data\": \"1\"\n      },{\n         \"field\": \"\uc2a4\ud14c\ud551:\",\n         \"data\": \"0\"\n      },{\n         \"field\": \"\uc8fc\ud30c\uc218 \uac00\uc18d:\",\n         \"data\": \"\ud65c\uc131\"\n      },{\n         \"field\": \"CPU \uc2a4\ucf00\uc77c\ub9c1 MHz:\",\n         \"data\": \"47%\"\n      },{\n         \"field\": \"\ucd5c\ub300 CPU MHz:\",\n         \"data\": \"5187.5000\"\n      },{\n         \"field\": \"\ucd5c\uc18c CPU MHz:\",\n         \"data\": \"625.0000\"\n      },{\n         \"field\": \"BogoMIPS:\",\n         \"data\": \"5988.89\"\n      },{\n         \"field\": \"\ud50c\ub798\uadf8:\",\n         \"data\": \"fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\"\n      },{\n         \"field\": \"\uac00\uc0c1\ud654:\",\n         \"data\": \"AMD-V\"\n      },{\n         \"field\": \"L1d \uce90\uc2dc:\",\n         \"data\": \"768 KiB (\uc778\uc2a4\ud134\uc2a4 16\uac74)\"\n      },{\n         \"field\": \"L1i \uce90\uc2dc:\",\n         \"data\": \"512 KiB (\uc778\uc2a4\ud134\uc2a4 16\uac74)\"\n      },{\n         \"field\": \"L2 \uce90\uc2dc:\",\n         \"data\": \"16 MiB (\uc778\uc2a4\ud134\uc2a4 16\uac74)\"\n      },{\n         \"field\": \"L3 \uce90\uc2dc:\",\n         \"data\": \"64 MiB (\uc778\uc2a4\ud134\uc2a4 2\uac74)\"\n      },{\n         \"field\": \"NUMA \ub178\ub4dc:\",\n         \"data\": \"1\"\n      },{\n         \"field\": \"NUMA \ub178\ub4dc0 CPU:\",\n         \"data\": \"0-31\"\n      },{\n         \"field\": \"Gather data sampling \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Ghostwrite \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Indirect target selection \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Itlb multihit \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"L1tf \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Mds \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Meltdown \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Mmio stale data \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Old microcode \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Reg file data sampling \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Retbleed \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Spec rstack overflow \ucde8\uc57d\uc131:\",\n         \"data\": \"Mitigation; IBPB on VMEXIT only\"\n      },{\n         \"field\": \"Spec store bypass \ucde8\uc57d\uc131:\",\n         \"data\": \"Mitigation; Speculative Store Bypass disabled via prctl\"\n      },{\n         \"field\": \"Spectre v1 \ucde8\uc57d\uc131:\",\n         \"data\": \"Mitigation; usercopy/swapgs barriers and __user pointer sanitization\"\n      },{\n         \"field\": \"Spectre v2 \ucde8\uc57d\uc131:\",\n         \"data\": \"Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\"\n      },{\n         \"field\": \"Srbds \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Tsa \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Tsx async abort \ucde8\uc57d\uc131:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vmscape \ucde8\uc57d\uc131:\",\n         \"data\": \"Mitigation; IBPB on VMEXIT\"\n      }\n   ]\n}\n",
+  "os_release": "PRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo",
+  "memory": "MemTotal:       47902876 kB\nMemFree:        24946160 kB\nMemAvailable:   37778956 kB\nBuffers:          793584 kB\nCached:         11893844 kB\nSwapCached:            0 kB\nActive:          9949988 kB\nInactive:       10287020 kB\nActive(anon):    8042528 kB\nInactive(anon):        0 kB\nActive(file):    1907460 kB\nInactive(file): 10287020 kB\nUnevictable:          48 kB\nMlocked:              48 kB\nSwapTotal:       8388604 kB\nSwapFree:        8388604 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              7220 kB\nWriteback:             0 kB\nAnonPages:       7550460 kB\nMapped:          1862416 kB\nShmem:            493240 kB\nKReclaimable:    1232608 kB\nSlab:            1740736 kB\nSReclaimable:    1232608 kB\nSUnreclaim:       508128 kB\nKernelStack:       47936 kB\nPageTables:       126980 kB\nSecPageTables:      5672 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    32340040 kB\nCommitted_AS:   46798416 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      137268 kB\nVmallocChunk:          0 kB\nPercpu:            45568 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    227328 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nGPUActive:        109752 kB\nGPUReclaim:       162372 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     1118408 kB\nDirectMap2M:    19484672 kB\nDirectMap1G:    29360128 kB",
+  "ac_online": {
+    "/sys/class/power_supply/AC0/online": "1"
+  },
+  "platform_profile": "balanced",
+  "cpu_governor": "powersave",
+  "gpu_performance_level": "auto",
+  "gpu_vram_reserved_bytes": "17179869184",
+  "environment": {
+    "WGPU_BACKEND": "vulkan",
+    "VK_DRIVER_FILES": "/usr/share/vulkan/icd.d/radeon_icd.json",
+    "QT_QPA_PLATFORM": "wayland",
+    "QT_SCALE_FACTOR": "1",
+    "QT_AUTO_SCREEN_SCALE_FACTOR": "0",
+    "DISPLAY": ":0",
+    "WAYLAND_DISPLAY": "wayland-0"
+  },
+  "stages": [
+    {
+      "name": "line",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "benchmarks/compare.py",
+        "--sizes",
+        "100000",
+        "1000000",
+        "5000000",
+        "--repeats",
+        "5",
+        "--timeout",
+        "120",
+        "--kinds",
+        "line",
+        "--signals",
+        "smooth",
+        "noisy",
+        "--backends",
+        "figgy",
+        "matplotlib-default",
+        "matplotlib-unsimplified",
+        "pyqtgraph-opengl",
+        "fastplotlib",
+        "vispy",
+        "--output",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-gpu-line.json",
+        "--images",
+        "benchmarks/results/images/linux-radeon8060s"
+      ],
+      "returncode": 0,
+      "elapsed_s": 76.43875420199947,
+      "log": "linux-radeon8060s-line.txt"
+    },
+    {
+      "name": "scatter",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "benchmarks/compare.py",
+        "--sizes",
+        "100000",
+        "1000000",
+        "5000000",
+        "--repeats",
+        "5",
+        "--timeout",
+        "120",
+        "--kinds",
+        "scatter",
+        "--signals",
+        "noisy",
+        "--backends",
+        "figgy",
+        "matplotlib-default",
+        "fastplotlib",
+        "vispy",
+        "--output",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-gpu-scatter.json"
+      ],
+      "returncode": 0,
+      "elapsed_s": 24.414388675000737,
+      "log": "linux-radeon8060s-scatter.txt"
+    },
+    {
+      "name": "heatmap",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "benchmarks/compare.py",
+        "--sizes",
+        "10000",
+        "1000000",
+        "4000000",
+        "--kinds",
+        "heatmap",
+        "--backends",
+        "figgy",
+        "matplotlib-default",
+        "--repeats",
+        "5",
+        "--timeout",
+        "120",
+        "--output",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-heatmap.json"
+      ],
+      "returncode": 0,
+      "elapsed_s": 4.175331383999946,
+      "log": "linux-radeon8060s-heatmap.txt"
+    },
+    {
+      "name": "first-frame-reuse",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "benchmarks/first_frame_reuse.py",
+        "--sizes",
+        "100000",
+        "1000000",
+        "5000000",
+        "--kinds",
+        "line",
+        "scatter",
+        "--repeats",
+        "5",
+        "--following",
+        "3",
+        "--output",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-first-frame-reuse.json"
+      ],
+      "returncode": 0,
+      "elapsed_s": 26.505844163000802,
+      "log": "linux-radeon8060s-first-frame-reuse.txt"
+    },
+    {
+      "name": "surface",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "benchmarks/ui_surface.py",
+        "--points",
+        "100000",
+        "--frames",
+        "120",
+        "--output",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-surface.json"
+      ],
+      "returncode": 0,
+      "elapsed_s": 1.5176909120000346,
+      "log": "linux-radeon8060s-surface.txt"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--ignore=tests/test_desktop_host.py"
+      ],
+      "returncode": 0,
+      "elapsed_s": 3.3496193129994936,
+      "log": "linux-radeon8060s-tests.txt"
+    },
+    {
+      "name": "plot",
+      "command": [
+        "/home/ssy/git/figgy-python/.venv/bin/python",
+        "benchmarks/plot_results.py",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-gpu-line.json",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-gpu-scatter.json",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-heatmap.json",
+        "--output",
+        "/home/ssy/git/figgy-python/benchmarks/results/linux-radeon8060s-gpu-comparison",
+        "--subtitle",
+        "Ubuntu 26.04 / Radeon 8060S, Vulkan + OpenGL, 5 repeats, 960 x 600 RGBA"
+      ],
+      "returncode": 0,
+      "elapsed_s": 0.3654232119988592,
+      "log": "linux-radeon8060s-plot.txt"
+    }
+  ],
+  "finished_at": "2026-10-14T14:06:49.620216+09:00",
+  "vispy_correction": {
+    "QT_SCALE_FACTOR": "0.5",
+    "validated_canvas_physical_size": [
+      960,
+      600
+    ],
+    "validated_canvas_pixel_scale": 1,
+    "rerun_reports": [
+      "linux-radeon8060s-vispy-line.json",
+      "linux-radeon8060s-vispy-scatter.json"
+    ],
+    "rejected_scale_check": {
+      "backend": "vispy",
+      "kind": "line",
+      "signal": "smooth",
+      "size": 10000,
+      "status": "error",
+      "returncode": 1,
+      "error": "Traceback (most recent call last):\n  File \"/home/ssy/git/figgy-python/benchmarks/compare.py\", line 326, in <module>\n    main()\n    ~~~~^^\n  File \"/home/ssy/git/figgy-python/benchmarks/compare.py\", line 271, in main\n    worker(args); return\n    ~~~~~~^^^^^^\n  File \"/home/ssy/git/figgy-python/benchmarks/compare.py\", line 94, in worker\n    draw, view, style, save_png, cleanup = SETUPS[args.worker](args, x, y, row)\n                                           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^\n  File \"/home/ssy/git/figgy-python/benchmarks/gpu_backends.py\", line 99, in vispy\n    raise RuntimeError(\n    ...<2 lines>...\n    )\nRuntimeError: VisPy benchmark requires canvas pixel_scale=1 for the matched 960x600 viewport; adjust QT_SCALE_FACTOR for the display scale\n"
+    }
+  },
+  "native_wheel": {
+    "filename": "figgy_python-0.2.0-cp314-cp314-linux_x86_64.whl",
+    "sha256": "7c2e3b54c375698b5a3d17b4453ca1dc6e81f965a01cfbe9c4236c3704add15f"
+  },
+  "benchmark_script_sha256": {
+    "benchmarks/compare.py": "e060356864b73456655f5c94bb422f247a201a9f129415daa3c6bb4e1fecb01f",
+    "benchmarks/gpu_backends.py": "19ec0ba683d02fa65ce3e2d099a1e6982de5914d5b53b6d9c1f715de0191461f"
+  },
+  "corrected_at": "2026-10-14T14:10:32.039222+09:00"
+}

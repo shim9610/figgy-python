@@ -33,11 +33,14 @@ def exercise(fig, rng, steps, counts, record, fail):
         return subprocess.check_output(["xdotool", *map(str, args)], text=True).strip()
 
     def window():
-        return xdo("search", "--pid", os.getpid(), "--name", "Figgy").splitlines()[-1]
+        return xdo("search", "--onlyvisible", "--pid", os.getpid(), "--name", "^Figgy$").splitlines()[-1]
 
-    def click(rect):
+    def click(rect, target=None):
         x, y = round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2)
-        xdo("mousemove", "--window", wid, x, y)
+        # Force a motion event after returning from another native window.
+        xdo("mousemove", "--window", target or wid, x + 2, y + 2)
+        pump()
+        xdo("mousemove", "--window", target or wid, x, y)
         pump()
         xdo("mousedown", 1)
         pump()
@@ -46,7 +49,7 @@ def exercise(fig, rng, steps, counts, record, fail):
 
     def paste(value):
         subprocess.run(
-            ["xclip", "-selection", "clipboard"],
+            ["xclip", "-selection", "clipboard", "-t", "UTF8_STRING"],
             input=value,
             text=True,
             stdout=subprocess.DEVNULL,
@@ -70,27 +73,47 @@ def exercise(fig, rng, steps, counts, record, fail):
             )
             record({"stage": "ui_call", "index": i, "operation": mode})
             if mode == "ssot":
+                # Window-manager focus/geometry events may outlive a short pump.
+                for _ in range(16):
+                    pump()
                 if not info()["properties_open"]:
                     click(info()["controls"]["properties"])
-                if "settings_json" not in info()["controls"]:
+                if not info().get("settings_window"):
                     click(info()["controls"]["advanced"])
+                deadline = time.monotonic() + 3
+                retry = time.monotonic() + .5
+                while not info().get("settings_window"):
+                    pump()
+                    if time.monotonic() > deadline:
+                        raise RuntimeError("advanced settings window did not open")
+                    if time.monotonic() > retry:
+                        xdo("windowfocus", wid)
+                        click(info()["controls"]["advanced"])
+                        retry = time.monotonic() + .5
+                settings_id = xdo("search", "--onlyvisible", "--pid", os.getpid(), "--name", "Advanced chart settings").splitlines()[-1]
+                xdo("windowfocus", settings_id)
+                pump()
                 before, revision = fig.get_settings(), fig.revision
                 value, detail = mutate(before, rng)
                 record({"stage": "ui_input", "index": i, "mutation": detail})
-                click(info()["controls"]["settings_json"])
+                click(info()["settings_window"]["controls"]["settings_json"], settings_id)
                 paste(json.dumps(value))
-                click(info()["controls"]["apply_settings"])
-                if info()["error"]:
+                click(info()["settings_window"]["controls"]["apply_settings"], settings_id)
+                if info()["settings_window"]["error"]:
                     counts["ui_errors"] += 1
                     if fig.get_settings() != before or fig.revision != revision:
                         fail(
                             "ui_non_atomic_rejection",
-                            {"index": i, "mutation": detail, "error": info()["error"]},
+                            {"index": i, "mutation": detail, "error": info()["settings_window"]["error"]},
                         )
                 else:
                     counts["ui_accepted_edits"] += 1
                     fig.apply_settings(before)
                     pump()
+                xdo("key", "alt+F4")
+                pump()
+                xdo("windowfocus", wid)
+                pump()
             elif mode == "resize":
                 xdo(
                     "windowsize", wid, rng.randrange(900, 1450), rng.randrange(520, 900)
