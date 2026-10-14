@@ -42,7 +42,7 @@ other branches before building. This does not change main's branch protection.
 1. Check that `pyproject.toml` and `Cargo.toml` have the same intended version.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
 3. Select **main**, **target `testpypi`** and the exact source version (currently
-   preparing **`0.2.1`**; the published preview is `0.2.0`). Leave the run-ID input empty.
+   preparing **`0.2.2`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
 4. Run it. This is an actual public TestPyPI upload, not a build-only dry run.
 
 The pipeline runs these gates in order:
@@ -100,6 +100,9 @@ The old `0.2.0` run cannot promote `0.2.1` sources. Artifacts expire after 30 da
 under one version or use `skip-existing` to conceal mixed builds.
 
 ## Verify an already uploaded preview
+
+The following records the completed 0.2.1 recovery. For a new release such as
+0.2.2, use its own upload/verification run ID; old IDs cannot authorize it.
 
 If a successful upload's installation jobs were skipped, do **not** rebuild and
 upload the same version. Run the workflow on **main** with:
@@ -159,12 +162,20 @@ Those require completing the pending publisher and executing this workflow.
 
 The [first complete TestPyPI publication run](https://github.com/shim9610/figgy-python/actions/runs/38590006371)
 at `35200d1` subsequently succeeded, including all build gates, upload and the
-nine post-upload installation jobs. The published version is `0.2.0`.
+nine post-upload installation jobs. That run published `0.2.0`.
 In this cloud environment, a fresh-venv installation from TestPyPI was attempted
 but its CONNECT tunnel is blocked with HTTP 403 by the network proxy. This is not
 reported as a successful local index install; the actual nine GitHub index
-installation results are the remote evidence. Local 0.2.1 packaging and promotion
-regressions are separate from a new TestPyPI run or production upload.
+installation results are the remote evidence. The [0.2.1 recovery run](https://github.com/shim9610/figgy-python/actions/runs/38618489720)
+subsequently passed all nine TestPyPI installation jobs. The
+[0.2.1 production run](https://github.com/shim9610/figgy-python/actions/runs/38620599251)
+completed successfully, publishing all 74 wheels and one sdist to PyPI and
+passing all nine production-index installation jobs. PyPI's public JSON metadata
+also confirms version 0.2.1 with 75 distribution files.
+
+The prepared 0.2.2 release corrects the package description's installation
+instructions to use PyPI. It still requires a new TestPyPI build/upload and all
+installation checks before promotion; no 0.2.2 publication has occurred.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.
