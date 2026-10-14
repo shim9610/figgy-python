@@ -1,0 +1,28 @@
+{
+  "platform": "Linux x86_64 / Vulkan llvmpipe software GPU",
+  "renderer_version": "0.16.1",
+  "seeds": 32,
+  "seed_start": 0,
+  "operations": 192000,
+  "workers": 192,
+  "watchdog_seconds": 90.0,
+  "status_counts": {
+    "completed": 192
+  },
+  "max_worker_seconds": 17.501,
+  "counts": {
+    "ValueError": 100666,
+    "accepted": 58193,
+    "TypeError": 23493,
+    "renders": 349,
+    "RuntimeError": 9501,
+    "closed_cycles": 1286,
+    "recreated": 70,
+    "recovery": 128,
+    "sentinel_unchanged": 192,
+    "threads_joined": 256,
+    "OverflowError": 147
+  },
+  "passed": true,
+  "upstream_issue": "https://github.com/shim9610/figgy/issues/6"
+}

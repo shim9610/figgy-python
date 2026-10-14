@@ -356,9 +356,14 @@ impl FigureAccess<'_> {
             return Err(invalid("data must contain at least one value"));
         }
         let (mut min, mut max) = (f64::INFINITY, f64::NEG_INFINITY);
-        for v in values {
+        for (index, v) in values.iter().enumerate() {
             let v = v.f64();
             if v.is_finite() {
+                if !(v as f32).is_finite() {
+                    return Err(invalid(format!(
+                        "column {id:?} value at index {index} exceeds the f32 hi/lo representation range"
+                    )));
+                }
                 min = min.min(v);
                 max = max.max(v);
             }
@@ -429,6 +434,7 @@ impl FigureAccess<'_> {
 }
 
 fn validate_config(config: &Config) -> PyResult<()> {
+    validate_model_numbers(config, "config")?;
     let rect = config.chart_area.0;
     if rect.x != 0
         || rect.y != 0
@@ -446,7 +452,10 @@ fn validate_config(config: &Config) -> PyResult<()> {
         &config.top_x,
         &config.left_y,
         &config.right_y,
-    ] {
+    ]
+    .into_iter()
+    .chain(config.colorbar.as_ref().map(|bar| &bar.axis))
+    {
         if !axis.min.is_finite()
             || !axis.max.is_finite()
             || axis.min >= axis.max
@@ -457,14 +466,91 @@ fn validate_config(config: &Config) -> PyResult<()> {
                 "axes require finite increasing bounds and positive tick spacing",
             ));
         }
-        if matches!(axis.scale, renderer::config::AxisScale::Logarithmic) && axis.min <= 0.0 {
-            return Err(invalid("logarithmic axes require positive bounds"));
+        let (min, max) = match axis.scale {
+            renderer::config::AxisScale::Logarithmic => {
+                if axis.min <= 0.0 {
+                    return Err(invalid("logarithmic axes require positive bounds"));
+                }
+                (axis.min.log10(), axis.max.log10())
+            }
+            _ => (axis.min, axis.max),
+        };
+        if !(min as f32).is_finite()
+            || !(max as f32).is_finite()
+            || !((max - min) as f32).is_finite()
+        {
+            return Err(invalid(
+                "axis bounds/span exceed the f32 hi/lo representation range",
+            ));
         }
     }
+    if config.chart_title.top_margin < 0. {
+        return Err(invalid(
+            "config.chart_title.top_margin must be nonnegative; use offset_y to move the title",
+        ));
+    }
     config
-        .data_area()
+        .validate()
         .map_err(|e| invalid(format!("invalid layout: {e:?}")))?;
     Ok(())
+}
+
+// serde accepts a finite f64 JSON number that overflows a renderer f32 field.
+// Serialization then turns that infinity into null. Reject it before GPU use,
+// including optional floats whose null would otherwise deserialize as None.
+fn validate_model_numbers<T: Serialize + serde::de::DeserializeOwned + PartialEq>(
+    model: &T,
+    name: &str,
+) -> PyResult<()> {
+    let value = serde_json::to_value(model).map_err(invalid)?;
+    let restored: T = serde_json::from_value(value.clone()).map_err(|_| {
+        invalid(format!(
+            "{name} contains a non-finite or out-of-range floating-point property"
+        ))
+    })?;
+    if &restored != model {
+        return Err(invalid(format!(
+            "{name} contains a non-finite or out-of-range floating-point property"
+        )));
+    }
+    fn visit(value: &Value, path: &str) -> PyResult<()> {
+        match value {
+            Value::Object(fields) => {
+                for (key, value) in fields {
+                    let path = format!("{path}.{key}");
+                    if key == "font_size"
+                        && let Some(size) = value.as_f64()
+                        && !(size > 0.)
+                    {
+                        return Err(invalid(format!("{path} must be greater than 0 pixels")));
+                    }
+                    if [
+                        "line_width",
+                        "point_size",
+                        "major_x_width",
+                        "major_y_width",
+                        "minor_x_width",
+                        "minor_y_width",
+                    ]
+                    .contains(&key.as_str())
+                        && let Some(size) = value.as_f64()
+                        && size < 0.
+                    {
+                        return Err(invalid(format!("{path} must be nonnegative")));
+                    }
+                    visit(value, &path)?;
+                }
+            }
+            Value::Array(values) => {
+                for (index, value) in values.iter().enumerate() {
+                    visit(value, &format!("{path}[{index}]"))?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    visit(&value, name)
 }
 
 impl FigureCore {
@@ -593,6 +679,7 @@ impl FigureAccess<'_> {
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let cfg: SeriesConfig = parse(json)?;
+        validate_model_numbers(&cfg, "series")?;
         if self
             .data
             .series
@@ -610,12 +697,73 @@ impl FigureAccess<'_> {
         self.data.revision += 1;
         Ok(())
     }
+    // Upload rollback belongs to Python; document registration, fitting and
+    // heatmap settings are one transaction under the document/GPU locks.
+    fn add_series_fitted(
+        &mut self,
+        py: Python<'_>,
+        json: &str,
+        config: Option<&str>,
+        bounds: Option<[f64; 4]>,
+        preserve_x: bool,
+        preserve_y: bool,
+    ) -> PyResult<()> {
+        let old = self.snapshot();
+        let revision = self.data.revision;
+        let result = (|| {
+            if let Some(config) = config {
+                self.commit_config(parse(config)?)?;
+            }
+            self.add_series(json)?;
+            if let Some([xmin, xmax, ymin, ymax]) = bounds {
+                self.set_range("x", xmin, xmax)?;
+                self.set_range("y", ymin, ymax)?;
+            } else {
+                self.fit(py, 0.05)?;
+                let mut next = self.data.chart.config().clone();
+                if preserve_x {
+                    next.bottom_x = old.config.bottom_x.clone();
+                    next.top_x = old.config.top_x.clone();
+                }
+                if preserve_y {
+                    next.left_y = old.config.left_y.clone();
+                    next.right_y = old.config.right_y.clone();
+                }
+                self.commit_config(next)?;
+            }
+            validate_config(self.data.chart.config())?;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            self.renderer
+                .set_chart_series(
+                    self.data.chart_id,
+                    gpu::series(self.data.figure_id, &old.series),
+                )
+                .map_err(runtime)?;
+            self.renderer
+                .set_chart_config(
+                    self.data.chart_id,
+                    gpu::config(self.data.figure_id, &old.config),
+                )
+                .map_err(runtime)?;
+            self.data.chart = Chart::new(old.config);
+            self.data.series = old.series;
+            self.data.revision = revision;
+            return Err(error);
+        }
+        self.data.revision = revision + 1;
+        Ok(())
+    }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut next: Settings = parse(json)?;
         if next.schema_version != 1 || next.renderer_version != "0.16.1" {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&next.config)?;
+        for series in &next.series {
+            validate_model_numbers(series, "series")?;
+        }
         // Settings cannot introduce, remove or silently reconnect source arrays.
         if next.series.len() != self.data.series.len()
             || next.series.iter().zip(&self.data.series).any(|(a, b)| {
@@ -728,6 +876,15 @@ impl FigureAccess<'_> {
             .chart_config(self.data.chart_id)
             .map_err(runtime)?
             .clone();
+        if let Err(error) = validate_config(&next) {
+            self.renderer
+                .set_chart_config(
+                    self.data.chart_id,
+                    gpu::config(self.data.figure_id, self.data.chart.config()),
+                )
+                .map_err(runtime)?;
+            return Err(error);
+        }
         // Fitting changes axes only; keep the local document's selection ids.
         next.picked_data = self.data.chart.config().picked_data.clone();
         next.picked_points = self.data.chart.config().picked_points.clone();
@@ -930,6 +1087,17 @@ impl NativeFigure {
     }
     fn add_series(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.add_series(json))
+    }
+    fn add_series_fitted(
+        &self,
+        py: Python<'_>,
+        json: &str,
+        config: Option<&str>,
+        bounds: Option<[f64; 4]>,
+        preserve_x: bool,
+        preserve_y: bool,
+    ) -> PyResult<()> {
+        self.with(|core| core.add_series_fitted(py, json, config, bounds, preserve_x, preserve_y))
     }
     fn apply_settings(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.apply_settings(json))

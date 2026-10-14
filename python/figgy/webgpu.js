@@ -40,12 +40,37 @@ export function render({model,el}) {
     queue=operation.catch(fail);return propagate?operation:queue;
   };
   function snapshot(){return {schema_version:1,renderer_version:'0.16.1',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};}
+  function checkNumbers(value,path='settings'){
+    if(typeof value==='number' && !Number.isFinite(value))throw Error(`${path} must be finite`);
+    if(value && typeof value==='object')for(const [key,item] of Object.entries(value)){
+      const next=`${path}.${key}`;
+      if(key==='font_size' && typeof item==='number' && !(item>0))throw Error(`${next} must be greater than 0 pixels`);
+      if(['line_width','point_size','major_x_width','major_y_width','minor_x_width','minor_y_width'].includes(key) && typeof item==='number' && !(item>=0))throw Error(`${next} must be nonnegative`);
+      checkNumbers(item,next);
+    }
+  }
+  function checkNumericConversion(requested,accepted,path='settings'){
+    if(typeof requested==='number' && typeof accepted!=='number')throw Error(`${path} exceeds the renderer floating-point range`);
+    if(requested && typeof requested==='object')for(const [key,item] of Object.entries(requested)){
+      if(!accepted || !(key in accepted))throw Error(`Unknown settings field: ${path}.${key}`);
+      checkNumericConversion(item,accepted[key],`${path}.${key}`);
+    }
+  }
   function install(settings){
     // Roll back both trees if either renderer validation rejects a local edit.
     const old=snapshot();
-    try {chart.set_config(JSON.stringify(settings.config));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));}
+    try {
+      if(settings.schema_version!==1 || settings.renderer_version!=='0.16.1')throw Error('Unsupported settings/renderer version');
+      checkNumbers(settings);
+      if(settings.config?.chart_title?.top_margin < 0)throw Error('config.chart_title.top_margin must be nonnegative; use offset_y to move the title');
+      for(const axis of [settings.config?.top_x,settings.config?.bottom_x,settings.config?.left_y,settings.config?.right_y,settings.config?.colorbar?.axis].filter(Boolean)){
+        const min=axis.scale==='Logarithmic'?Math.log10(axis.min):axis.min, max=axis.scale==='Logarithmic'?Math.log10(axis.max):axis.max;
+        if(![min,max,max-min].every(v=>typeof v==='number' && Number.isFinite(Math.fround(v))))throw Error('Axis bounds/span exceed the f32 hi/lo representation range');
+      }
+      chart.set_config(JSON.stringify(settings.config));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));checkNumericConversion(settings,snapshot());
+    }
     catch(e){chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));throw e;}
-    local=snapshot();dirty=true;
+    local=snapshot();dirty=true;error.textContent='';
   }
   function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending};pending=null;stats.kernel_edit_messages++;model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
   function commit(){local=snapshot();pending=clone(local);post();properties();}

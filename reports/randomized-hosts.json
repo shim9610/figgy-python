@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-14",
+  "platform": "Linux x86_64 (software GPU only)",
+  "desktop": {
+    "adapter": "Vulkan llvmpipe",
+    "seeds": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "actions": 320,
+    "workers_completed": 4,
+    "watchdog_timeouts": 0,
+    "counts": {
+      "ui_control_clicks": 52,
+      "ui_errors": 89,
+      "ui_pointer_events": 76,
+      "ui_resizes": 44,
+      "ui_reopens": 44,
+      "ui_accepted_edits": 15,
+      "surface_frames": 6850,
+      "sentinel_unchanged": 4
+    },
+    "normal_interactions_column_reuploads": 0,
+    "normal_interactions_rgba_readbacks": 0,
+    "normal_interactions_png_encodes": 0,
+    "dpi": "Xvfb 1.0",
+    "passed": true
+  },
+  "jupyter": {
+    "host": "JupyterLab + headed Chromium / SwiftShader WebGPU",
+    "installed_wheel": true,
+    "kernel_gpu_forbidden": true,
+    "seed": 9610,
+    "mutations": 300,
+    "rejected": 279,
+    "accepted": 21,
+    "browser_errors": [],
+    "before": {
+      "backend": "browser-webgpu",
+      "binary_upload_bytes": 2048,
+      "column_uploads": 2,
+      "surface_frames": 12,
+      "png_exports": 0,
+      "kernel_edit_messages": 4,
+      "last_input_to_submit_ms": 7.5
+    },
+    "after": {
+      "backend": "browser-webgpu",
+      "binary_upload_bytes": 2048,
+      "column_uploads": 2,
+      "surface_frames": 654,
+      "png_exports": 0,
+      "kernel_edit_messages": 325,
+      "last_input_to_submit_ms": 7.5
+    },
+    "passed": true
+  },
+  "installed_wheel": {
+    "python": "CPython 3.12",
+    "file": "figgy_python-0.2.0-cp312-cp312-manylinux_2_39_x86_64.whl",
+    "tests_passed": 42,
+    "tests_failed": 0,
+    "tests_skipped": 0,
+    "test_seconds": 127.99,
+    "native_extension_loaded": true,
+    "wasm_bytes": 8112575,
+    "js_loaded_from_package": true,
+    "regular_jupyter_samples": 100000,
+    "regular_jupyter_prepare_modes": [
+      true,
+      false
+    ]
+  },
+  "unverified": [
+    "Windows hardware",
+    "macOS hardware",
+    "physical input/display latency",
+    "unbounded OS/GPU memory exhaustion"
+  ]
+}

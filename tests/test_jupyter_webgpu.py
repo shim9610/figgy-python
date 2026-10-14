@@ -25,6 +25,8 @@ ax.plot(x, np.sin(x), id="signal")
 ax.set_title("WASM title")
 widget = fig.widget()
 display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_prepare={auto_prepare!r})')
+    samples=256 if os.environ.get('FIGGY_FUZZ_BROWSER')=='1' else 100_000
+    source=source.replace('100_000',str(samples))
     nbformat.write(nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell(source)],metadata={'kernelspec':{'display_name':'Python 3','language':'python','name':'python3'}}),tmp_path/'check.ipynb')
     env=dict(os.environ,JUPYTER_RUNTIME_DIR=str(runtime))
     log=open(tmp_path/'server.log','w')
@@ -82,7 +84,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             if not auto_prepare:
                 assert page.evaluate(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('')") == 'Deferred title'
             stats=page.evaluate(root+'.stats')
-            assert stats['binary_upload_bytes']==800000 and stats['column_uploads']==2 and stats['png_exports']==0
+            assert stats['binary_upload_bytes']==samples*8 and stats['column_uploads']==2 and stats['png_exports']==0
             assert 'True' in execute("print(widget.status == 'ready' and not fig._native.columns and not widget.columns)")
             page.locator('[data-fields] input[data-property=text]').fill('WebGPU edited title');page.locator('[data-fields] input[data-property=text]').press('Tab')
             page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'WebGPU edited title'")
@@ -102,6 +104,41 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             # Initial picker hit at a real line point, through the actual browser GPU API.
             picked=page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy,c=f.snapshot().config;return await f.pick(100,100,10000);}''')
             assert picked is not None
+            if auto_prepare and os.environ.get('FIGGY_FUZZ_BROWSER') == '1':
+                from scripts.check_randomized import mutate
+                import random
+                rng=random.Random(9610)
+                rejected=accepted=0
+                page.locator('.figgy-properties details').first.evaluate('(el)=>el.open=true')
+                before_stats=page.evaluate(root+'.stats')
+                for index in range(300):
+                    original=page.evaluate(root+'.snapshot()')
+                    mutation, detail=mutate(original,rng)
+                    (tmp_path/'fuzz-last.json').write_text(json.dumps({'index':index,'mutation':detail,'settings':mutation}))
+                    page.evaluate("document.querySelector('.figgy-error').textContent='' ")
+                    page.locator('[data-settings]').fill(json.dumps(mutation))
+                    page.locator('[data-apply]').click()
+                    page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy;await Promise.race([(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await f.flush();})(),new Promise((_,reject)=>setTimeout(()=>reject(Error('fuzz synchronization timed out')),5000))]);}''')
+                    actual=page.evaluate(root+'.snapshot()')
+                    message=page.locator('.figgy-error').inner_text()
+                    if message:
+                        rejected+=1
+                        assert actual==original,(index,detail,message)
+                    else:accepted+=1
+                    # Restore through the real JSON editor + kernel revision handshake.
+                    page.locator('[data-settings]').fill(json.dumps(original));page.locator('[data-apply]').click()
+                    page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy;await Promise.race([f.flush(),new Promise((_,reject)=>setTimeout(()=>reject(Error('fuzz restore timed out')),5000))]);}''')
+                    assert page.locator('.figgy-error').inner_text()=='',(index,detail,'error survived a successful restore')
+                    assert not errors,(index,detail,errors)
+                after_stats=page.evaluate(root+'.stats')
+                assert rejected>200 and accepted>0
+                assert after_stats['column_uploads']==before_stats['column_uploads']==2
+                assert after_stats['binary_upload_bytes']==before_stats['binary_upload_bytes']==samples*8
+                assert after_stats['png_exports']==before_stats['png_exports']==0
+                expected=page.evaluate(root+'.snapshot()')
+                actual=json.loads(execute("await fig.sync(); print(json.dumps(fig.get_settings()))"))
+                assert actual==expected
+                (tmp_path/'fuzz-browser.json').write_text(json.dumps({'seed':9610,'mutations':300,'rejected':rejected,'accepted':accepted,'browser_errors':errors,'before':before_stats,'after':after_stats},indent=2))
             page.locator('[data-copy]').click();page.wait_for_function("document.querySelector('.figgy-editor [data-code]').value.includes('fig.apply_settings')")
             copied=page.evaluate('navigator.clipboard.readText()');assert 'fig.apply_settings' in copied
             execute('exec('+repr(copied)+')')

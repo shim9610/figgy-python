@@ -7,6 +7,8 @@ def _main_thread():
         raise RuntimeError("winit windows and event pumping must run on the main thread")
 
 def show(figure, *, block=True):
+    if not isinstance(block, bool):
+        raise ValueError("block must be a boolean (True or False)")
     _main_thread()
     figure._require_open()
     if figure.backend != "native":

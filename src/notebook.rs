@@ -38,9 +38,9 @@ impl NotebookFigure {
             return Err(invalid("column ID already exists"));
         }
         let ext = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
-            extent(a.as_slice().map_err(invalid)?)
+            extent(a.as_slice().map_err(invalid)?)?
         } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
-            extent(a.as_slice().map_err(invalid)?)
+            extent(a.as_slice().map_err(invalid)?)?
         } else {
             return Err(invalid("expected contiguous f32/f64"));
         };
@@ -52,6 +52,7 @@ impl NotebookFigure {
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let s: SeriesConfig = parse(json)?;
+        validate_model_numbers(&s, "series")?;
         if self.series.iter().any(|a| a.series_id == s.series_id) {
             return Err(invalid("series IDs must be unique"));
         }
@@ -71,12 +72,59 @@ impl NotebookFigure {
         })
         .map_err(runtime)
     }
+    fn add_series_fitted(
+        &mut self,
+        json: &str,
+        config: Option<&str>,
+        bounds: Option<[f64; 4]>,
+        preserve_x: bool,
+        preserve_y: bool,
+    ) -> PyResult<()> {
+        let old_config = self.chart.config().clone();
+        let old_series = self.series.clone();
+        let revision = self.revision;
+        let result = (|| {
+            if let Some(config) = config {
+                let config = parse(config)?;
+                validate_config(&config)?;
+                self.chart = Chart::new(config);
+            }
+            self.add_series(json)?;
+            if let Some([xmin, xmax, ymin, ymax]) = bounds {
+                self.set_range("x", xmin, xmax)?;
+                self.set_range("y", ymin, ymax)?;
+            } else {
+                self.fit(0.05)?;
+                if preserve_x {
+                    self.chart.config_mut().bottom_x = old_config.bottom_x.clone();
+                    self.chart.config_mut().top_x = old_config.top_x.clone();
+                }
+                if preserve_y {
+                    self.chart.config_mut().left_y = old_config.left_y.clone();
+                    self.chart.config_mut().right_y = old_config.right_y.clone();
+                }
+            }
+            validate_config(self.chart.config())?;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            self.chart = Chart::new(old_config);
+            self.series = old_series;
+            self.revision = revision;
+            return Err(error);
+        }
+        self.revision = revision + 1;
+        Ok(())
+    }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut s: Settings = parse(json)?;
         if s.schema_version != 1 || s.renderer_version != "0.16.1" {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&s.config)?;
+        for series in &s.series {
+            validate_model_numbers(series, "series")?;
+        }
         if s.series.len() != self.series.len()
             || s.series.iter().zip(&self.series).any(|(a, b)| {
                 a.series_id != b.series_id || a.x_column != b.x_column || a.y_column != b.y_column
@@ -109,8 +157,11 @@ impl NotebookFigure {
             x.union(&self.columns[&s.x_column]);
             y.union(&self.columns[&s.y_column]);
         }
-        self.chart.auto_fit_x_extent(&x, padding);
-        self.chart.auto_fit_y_extent(&y, padding);
+        let mut fitted = Chart::new(self.chart.config().clone());
+        fitted.auto_fit_x_extent(&x, padding);
+        fitted.auto_fit_y_extent(&y, padding);
+        validate_config(fitted.config())?;
+        self.chart = fitted;
         self.revision += 1;
         Ok(())
     }
@@ -118,15 +169,18 @@ impl NotebookFigure {
         if !min.is_finite() || !max.is_finite() || min >= max {
             return Err(invalid("range must be finite and increasing"));
         }
+        let mut next = Chart::new(self.chart.config().clone());
         match axis {
             "x" => {
-                self.chart.set_x_range(min, max);
+                next.set_x_range(min, max);
             }
             "y" => {
-                self.chart.set_y_range(min, max);
+                next.set_y_range(min, max);
             }
             _ => return Err(invalid("axis must be x or y")),
         };
+        validate_config(next.config())?;
+        self.chart = next;
         self.revision += 1;
         Ok(())
     }
@@ -141,11 +195,16 @@ impl NotebookFigure {
         json!({"backend":"webgpu","kernel_gpu":false,"columns":self.columns.len(),"allocation_mode":"resident","revision":self.revision,"rgba_readbacks":0,"png_encodes":0}).to_string()
     }
 }
-fn extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
+fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
     let mut ext = renderer::chart::FitExtent::EMPTY;
-    for n in a {
+    for (index, n) in a.iter().enumerate() {
         let v = n.f64();
         if v.is_finite() {
+            if !(v as f32).is_finite() {
+                return Err(invalid(format!(
+                    "data value at index {index} exceeds the f32 hi/lo representation range"
+                )));
+            }
             ext.min = ext.min.min(v);
             ext.max = ext.max.max(v);
             if v > 0. {
@@ -153,5 +212,8 @@ fn extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
             }
         }
     }
-    ext
+    if !ext.min.is_finite() {
+        return Err(invalid("data has no finite values"));
+    }
+    Ok(ext)
 }

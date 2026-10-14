@@ -50,6 +50,16 @@ def _segments(text):
              "superscript": False, "subscript": False, "greek": False} for c in str(text)]
 
 
+def _timeout(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("timeout must be positive and finite (seconds)") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError("timeout must be positive and finite (seconds)")
+    return value
+
+
 def _text(value):
     return "".join(s["text"] for s in value["segments"])
 
@@ -160,6 +170,8 @@ class Figure:
 
     def update(self, target, **properties):
         """Edit a stable series/decorative target using familiar property names."""
+        if not isinstance(target, str) or not target:
+            raise ValueError("editable target must be a non-empty string")
         with self._lock:
             self._require_open()
             state = self.get_settings()
@@ -279,7 +291,7 @@ class Figure:
 
     def to_code(self, variable="fig"):
         """Executable settings snapshot for a Figure created with the same series IDs."""
-        if not variable.isidentifier() or keyword.iskeyword(variable):
+        if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
             raise ValueError("variable must be a Python identifier")
         settings = self.get_settings()
         settings["config"] = _diff(self._default_config, settings["config"])
@@ -290,6 +302,8 @@ class Figure:
     def select(self, x, y, *, edit_area=False):
         with self._lock:
             self._require_open()
+            if self.backend != "native":
+                raise RuntimeError("select requires backend='native'; pick data in the WebGPU widget")
             hit = self._native.hit_test(float(x), float(y))
             if hit in (None, "data_area") and not edit_area:
                 picked = json.loads(self._native.pick_json(float(x), float(y)))
@@ -302,6 +316,8 @@ class Figure:
     def select_object(self, target):
         with self._lock:
             self._require_open()
+            if self.backend != "native":
+                raise RuntimeError("select_object requires backend='native'; select objects in the WebGPU widget")
             if not any(s["series_id"] == target for s in self.get_settings()["series"]):
                 self._native.bounds_json(target)  # Validate through renderer element IDs.
             self._native.clear_data_selection()
@@ -317,6 +333,8 @@ class Figure:
     def drag(self, target, dx, dy, *, handle=None):
         with self._lock:
             self._require_open()
+            if self.backend != "native":
+                raise RuntimeError("drag requires backend='native'; drag objects in the WebGPU widget")
             moved = self._native.drag(target, float(dx), float(dy), handle)
         if moved:
             self._changed()
@@ -335,6 +353,11 @@ class Figure:
         Display the returned widget, then await prepare_async(). Repeated calls
         reuse the same widget and its original auto_prepare choice.
         """
+        self._require_open()
+        if backend not in (None, "webgpu", "png"):
+            raise ValueError("widget backend must be webgpu or png")
+        if not isinstance(auto_prepare, bool):
+            raise ValueError("auto_prepare must be a boolean")
         if backend == "png":
             if self.backend != "native":
                 raise RuntimeError("PNG fallback requires a native kernel GPU")
@@ -371,6 +394,7 @@ class Figure:
         separate prewarm_ms. No PNG is generated. This is process/view-local
         preparation, not a persistent shader cache or install-time compilation.
         """
+        timeout = _timeout(timeout)
         if self.backend == "native":
             return self.prepare()
         with self._lock:
@@ -379,11 +403,13 @@ class Figure:
 
     async def sync(self, *, timeout=30):
         """Await pending browser edits; settings getters return accepted revisions."""
+        timeout = _timeout(timeout)
         if self.backend == "webgpu":
             await self.widget().request("barrier", timeout=timeout)
         return self.get_settings()
 
     async def to_png_async(self, *, scale=1.0, timeout=60):
+        timeout = _timeout(timeout)
         if self.backend == "native":
             return self.to_png(scale=scale)
         return await self.widget().request("export", scale=float(scale), timeout=timeout)
@@ -497,7 +523,7 @@ class Axes:
         self._manual_x = False
         self._manual_y = False
 
-    def _add(self, x, y, render_type, label=None, id=None, extra_columns=()):
+    def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None):
         fig = self.figure
         with fig._lock:
             fig._require_open()
@@ -519,19 +545,16 @@ class Axes:
                     rich = copy.deepcopy(fig.get_settings()["config"]["legend"]["content"])
                     rich["segments"] = _segments(label)
                     spec["label"] = rich
-                fig._native.add_series(json.dumps(spec, allow_nan=False))
+                fig._native.add_series_fitted(
+                    json.dumps(spec, allow_nan=False),
+                    json.dumps(config, allow_nan=False) if config is not None else None,
+                    bounds, self._manual_x, self._manual_y,
+                )
             except Exception:
                 for name in reversed(uploaded):
                     fig._native.remove_column(name)
                 raise
             fig._next_series += 1
-            old = fig.get_settings()
-            fig._native.fit(0.05)
-            if self._manual_x or self._manual_y:
-                fitted = fig.get_settings()
-                for key in (["bottom_x", "top_x"] if self._manual_x else []) + (["left_y", "right_y"] if self._manual_y else []):
-                    fitted["config"][key] = old["config"][key]
-                fig._native.apply_settings(json.dumps(fitted, allow_nan=False))
         fig._changed()
         return Artist(fig, sid)
 
@@ -612,19 +635,17 @@ class Axes:
             raise ValueError("vmin and vmax must be finite and increasing")
         # Renderer defaults own colorbar layout; obtain them from a native helper.
         from ._native import default_colorbar_json
-        state = self.figure.get_settings()
         bar = json.loads(default_colorbar_json())
         bar["colormap"] = _colormap(cmap)
         bar["axis"]["min"], bar["axis"]["max"] = low, high
         bar["axis"]["major_spacing"] = (high - low) / 5
-        state["config"]["colorbar"] = bar
-        self.figure.apply_settings(state)
-        artist = self._add(x, y, style, id=id, extra_columns=columns)
-        state = self.figure.get_settings()
-        for key in ("left_y", "right_y"):
-            state["config"][key]["inverted"] = origin == "upper"
-        self.figure.apply_settings(state)
-        self.set_xlim(ext[0], ext[1]); self.set_ylim(ext[2], ext[3])
+        with self.figure._lock:
+            config = self.figure.get_settings()["config"]
+            config["colorbar"] = bar
+            for key in ("left_y", "right_y"):
+                config[key]["inverted"] = origin == "upper"
+            artist = self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
+            self._manual_x = self._manual_y = True
         return artist
 
     def set_title(self, text, **kwargs):

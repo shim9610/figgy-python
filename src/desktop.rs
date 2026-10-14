@@ -540,7 +540,7 @@ impl SurfaceWindow {
                     })
             })
             .collect::<serde_json::Map<_, _>>();
-        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }

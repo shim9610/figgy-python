@@ -19,3 +19,7 @@ __pycache__/
 /benchmarks/results/*.png
 /benchmarks/results/images/
 /benchmarks/results/exploratory*
+
+/randomized-results/
+/scripts/repro_upstream_colorbar/target/
+/scripts/repro_upstream_colorbar/Cargo.lock

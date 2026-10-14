@@ -153,3 +153,5 @@ run_events()  # main thread에서 모든 현재 창이 닫힐 때까지 처리
 
 Jupyter의 브라우저 편집은 [호스트 문서](HOSTS.md), native 공유 자원 수명은
 [전역 공유 문서](NATIVE_SHARING.md)를 참고하세요.
+
+무작위 입력·오류 복구·대기 원인과 검증 범위는 [무작위 검증 보고서](RANDOMIZED_VALIDATION.md)를 참고하세요.

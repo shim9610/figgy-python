@@ -135,12 +135,17 @@ class FigureWidget(anywidget.AnyWidget):
             self.browser_info = content["info"]
 
     async def request(self, action, *, timeout, **kwargs):
-        if action == "prepare":
-            await asyncio.wait_for(self._mounted_event.wait(), timeout)
-        elif self.status == "initializing":
-            if not self.auto_prepare:
-                raise RuntimeError("Browser GPU is not prepared; await fig.prepare_async() first")
-            await asyncio.wait_for(self._ready_event.wait(), timeout)
+        from .figure import _timeout
+        timeout = _timeout(timeout)
+        try:
+            if action == "prepare":
+                await asyncio.wait_for(self._mounted_event.wait(), timeout)
+            elif self.status == "initializing":
+                if not self.auto_prepare:
+                    raise RuntimeError("Browser GPU is not prepared; await fig.prepare_async() first")
+                await asyncio.wait_for(self._ready_event.wait(), timeout)
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Browser {action} initialization timed out after {timeout:g} seconds; display the widget in a WebGPU browser") from None
         if self._closed:
             raise RuntimeError("Figure widget closed")
         if self.status.startswith("WebGPU error"):
@@ -152,6 +157,8 @@ class FigureWidget(anywidget.AnyWidget):
         self.send({"action": action, "id": id, "client": next(reversed(self._clients), None), **kwargs})
         try:
             return await asyncio.wait_for(future, timeout)
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Browser {action} timed out after {timeout:g} seconds; check that the viewer is connected and prepared") from None
         finally:
             self._pending.pop(id, None)
 

@@ -347,6 +347,7 @@ impl Editor {
                     ui.add_space(16.);
                     ui.separator();
                     let advanced = ui.button("Advanced settings…");
+                    self.controls.insert("advanced".into(), advanced.rect);
                     if advanced.clicked() {
                         self.raw = serde_json::to_string_pretty(&c.snapshot()).unwrap();
                         self.advanced_open = true;
@@ -362,14 +363,20 @@ impl Editor {
                 egui::ScrollArea::vertical()
                     .max_height(380.)
                     .show(ui, |ui| {
-                        ui.add(
+                        let response = ui.add(
                             egui::TextEdit::multiline(&mut self.raw)
                                 .code_editor()
                                 .desired_width(f32::INFINITY)
                                 .desired_rows(16),
                         );
+                        self.controls.insert(
+                            "settings_json".into(),
+                            response.rect.intersect(ui.clip_rect()),
+                        );
                     });
-                if ui.button("Apply settings").clicked() {
+                let apply = ui.button("Apply settings");
+                self.controls.insert("apply_settings".into(), apply.rect);
+                if apply.clicked() {
                     match c.apply_settings(&self.raw) {
                         Ok(_) => {
                             self.error.clear();
