@@ -171,8 +171,8 @@ Automatic triggers remain disabled; TestPyPI publication is a separate manual ac
 
 ## Release gates
 
-- [ ] Confirm ownership/registration of `figgyplot` on PyPI/TestPyPI.
-- [ ] Run the manual workflow and review all configured wheel results.
+- [x] Confirm Trusted Publishing works for `figgyplot` on PyPI/TestPyPI.
+- [x] Run the manual workflow and review all 74 configured wheel results (0.2.1).
 - [ ] Verify Windows/macOS and ARM64 window creation, DPI, editing, close/reopen
       and PNG export on actual target hosts.
 - [ ] Verify browser editing in actual JupyterLab after installation.
@@ -180,8 +180,8 @@ Automatic triggers remain disabled; TestPyPI publication is a separate manual ac
       selects wheels rather than silently falling back to source builds.
 - [x] Prepare the manual TestPyPI workflow with OIDC and installation checks.
 - [x] Execute TestPyPI 0.2.0 publication and its nine post-upload installation checks.
-- [ ] Register the production [Trusted Publisher](PUBLISHING.md), validate the
-      prepared 0.2.1 preview and promote its verified artifacts to PyPI.
+- [x] Register the production [Trusted Publisher](PUBLISHING.md), validate the
+      0.2.1 preview and promote its verified artifacts to PyPI.
 
 Local build/installation results for this change are recorded in
 [the packaging report](../reports/figgyplot-packaging.json). Configured targets
@@ -209,8 +209,10 @@ are retained under their originally measured package/source versions.
   `figgyplot._codegen`; browser checks compare actual copied code to `to_code()`.
 
 Windows/macOS/ARM64 configurations are prepared but have not been executed by
-this change. Actionlint, shell syntax and manual-only matrix expansion checks
-passed; no GitHub workflow was dispatched. PyPI publication remains pending.
+the original local packaging checks. Subsequent 0.2.1 GitHub runs built all
+74 platform/interpreter wheels and passed nine clean installation jobs on each
+index. This establishes build/install compatibility, not actual hardware GPU
+window or browser verification on every target.
 
 The final software-GPU validation covers **82 distinct tests** in split execution:
 76 non-desktop tests passed in the full invocation (including actual JupyterLab
@@ -219,3 +221,15 @@ under Openbox (77.60 s). An earlier radial input failure depended on reused wind
 placement/unchanged cursor positions across tests; the X11 input harness now puts
 its expanding inspector on-screen and delivers actual motion before clicking.
 No production picking/rendering workaround was added for that host condition.
+
+## Publication status
+
+Version **0.2.1** is published on [PyPI](https://pypi.org/project/figgyplot/0.2.1/).
+The [production workflow](https://github.com/shim9610/figgy-python/actions/runs/38620599251)
+succeeded after the [complete TestPyPI recheck](https://github.com/shim9610/figgy-python/actions/runs/38618489720).
+All 74 wheels and one sdist were uploaded; all nine production-index installation
+jobs passed. Install with `python -m pip install figgyplot`, or
+`python -m pip install 'figgyplot[notebook]'` for Jupyter.
+
+Version **0.2.2** is prepared to correct the package description's installation
+instructions. It has not been uploaded; it needs its own full release checks.

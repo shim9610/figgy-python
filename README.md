@@ -137,17 +137,17 @@ draw modes, including the line-only Milkyway restriction.
 
 ## Install
 
-Preview wheels are available on **TestPyPI** for the configured CPython
-3.8–3.15 platforms. Install dependencies from regular PyPI first, then select
-TestPyPI explicitly for figgyplot:
+Install from **PyPI** with **Python 3.8–3.15**:
 
 ```bash
-python -m pip install numpy anywidget
-python -m pip install --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: figgyplot==0.2.0
+python -m pip install figgyplot
+# Interactive Jupyter editor:
+python -m pip install 'figgyplot[notebook]'
 ```
 
-A compatible wheel needs no Rust compiler. Regular PyPI publication is still
-pending; `pip install figgyplot` alone does not select TestPyPI.
+A compatible Windows, macOS or Linux wheel needs no Rust compiler and includes
+the notebook JS/WASM assets. TestPyPI is used to verify upcoming releases;
+[the publishing guide](docs/PUBLISHING.md) documents that developer workflow.
 
 Alternatively, install from source with **Python 3.8–3.15**, **Rust 1.99+**,
 a system C/C++ toolchain and an available graphics driver:
@@ -181,8 +181,8 @@ Contributions follow the [contributing guide](CONTRIBUTING.md) and
 [the security policy](SECURITY.md). [Repository setup and PR CI rollout](docs/REPOSITORY_SETUP.md)
 describe the prepared security workflows and main-branch check names.
 
-Add notebook support with `python -m pip install ".[notebook]"`. The WASM assets
-are included in the package; normal installation does not require a WASM build.
+For a source checkout, add notebook support with
+`python -m pip install ".[notebook]"`. The WASM assets are included in the package; normal installation does not require a WASM build.
 
 ## Quick start
 

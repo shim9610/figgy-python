@@ -75,20 +75,21 @@ separately. These measurements include RGBA readback and do not measure UI FPS.
 
 ## Install
 
-To try the preview from TestPyPI, install dependencies from PyPI first:
+Install from PyPI:
 
 ```sh
-python -m pip install numpy anywidget
-python -m pip install --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: figgyplot
+python -m pip install figgyplot
 ```
 
-For releases published to the regular PyPI index:
+For interactive editing in Jupyter, install the notebook extra:
 
 ```sh
-pip install figgyplot
-# Optional Jupyter editor:
-pip install 'figgyplot[notebook]'
+python -m pip install 'figgyplot[notebook]'
 ```
+
+Compatible Windows, macOS and Linux wheels include the native extension and
+notebook JS/WASM assets. No Rust compiler is needed when a compatible wheel
+is available.
 
 ## Quick start
 
