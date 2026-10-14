@@ -136,7 +136,7 @@ def mutate(state, rng):
 
 
 def fresh(backend):
-    import figgy
+    import figgyplot as figgy
 
     # Reserve enough room for default axis/title bands plus the colorbar.
     fig, ax = figgy.subplots(backend=backend, figsize=(4, 3), dpi=80, pool_bytes=4096)
@@ -186,7 +186,7 @@ def operation(fig, ax, rng):
         ]
     )
     if name == "construct":
-        import figgy
+        import figgyplot as figgy
 
         args = ()
         kw = {
@@ -284,7 +284,7 @@ def operation(fig, ax, rng):
 
 
 def worker(args):
-    import figgy
+    import figgyplot as figgy
 
     faulthandler.enable()
     if hasattr(signal, "SIGUSR1"):

@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 
-import figgy
+import figgyplot as figgy
 
 
 def chart(title, xlabel, ylabel):

@@ -1,4 +1,4 @@
-# figgy-python
+# figgyplot
 
 **Plot with NumPy. Edit directly. Reuse the settings in Python.**
 
@@ -138,7 +138,7 @@ draw modes, including the line-only Milkyway restriction.
 ## Install
 
 This is a development release; the Python package is not yet on PyPI. Install
-from source with **Python 3.11–3.14**, **Rust 1.99+**, a system C/C++ toolchain and
+from source with **Python 3.8–3.15**, **Rust 1.99+**, a system C/C++ toolchain and
 an available graphics driver:
 
 ```bash
@@ -155,6 +155,11 @@ Tools. On macOS, use Xcode Command Line Tools. Native desktop rendering uses
 wgpu (Vulkan on Linux, DX12 on Windows, Metal on macOS); Metal support is
 experimental. The native editor does not require Qt or PySide6.
 
+The distribution/import name is **figgyplot**, independent of the unrelated
+`figgy` package on PyPI. The repository name remains `figgy-python`.
+[Platform/Python coverage and release status](docs/DISTRIBUTION.md) distinguish
+configured wheels from executed verification. Wheel CI remains manual only.
+
 Add notebook support with `python -m pip install ".[notebook]"`. The WASM assets
 are included in the package; normal installation does not require a WASM build.
 
@@ -162,7 +167,7 @@ are included in the package; normal installation does not require a WASM build.
 
 ```python
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 x = np.linspace(0, 20, 100_000, dtype=np.float32)
 fig, ax = figgy.subplots(backend="native", figsize=(8, 5), dpi=120)
@@ -249,7 +254,7 @@ use `fig.configure(...)` with ordinary Python dictionaries.
 Open each figure without blocking, then run the shared event loop:
 
 ```python
-from figgy.desktop import run_events
+from figgyplot.desktop import run_events
 
 fig.show(block=False)
 fig2.show(block=False)
@@ -270,7 +275,7 @@ jupyter lab examples/interactive.ipynb
 
 ```python
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 fig, ax = figgy.subplots(backend="webgpu")
 x = np.linspace(0, 20, 100_000, dtype=np.float32)

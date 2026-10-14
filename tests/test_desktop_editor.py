@@ -9,8 +9,8 @@ import time
 import numpy as np
 import pytest
 from PIL import ImageGrab
-import figgy
-from figgy.desktop import poll_events
+import figgyplot as figgy
+from figgyplot.desktop import poll_events
 
 
 @pytest.mark.skipif(not os.environ.get('DISPLAY') or not shutil.which('xdotool') or not shutil.which('xclip'), reason='requires X11, xdotool and xclip')

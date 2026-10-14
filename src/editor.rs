@@ -291,7 +291,7 @@ impl Editor {
                                 let defaults = serde_json::to_string(&c.data.default_config)
                                     .map_err(runtime)?;
                                 Python::attach(|py| {
-                                    py.import("figgy._codegen")?
+                                    py.import("figgyplot._codegen")?
                                         .getattr("settings_to_code")?
                                         .call1((settings, defaults, c.data.code_dpi))?
                                         .extract::<String>()

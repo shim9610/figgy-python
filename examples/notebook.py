@@ -1,6 +1,6 @@
 # %%
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 # %%
 x = np.linspace(0, 20, 1_000_000)

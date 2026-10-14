@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-14",
+  "distribution": "figgyplot",
+  "import": "figgyplot",
+  "version": "0.2.0",
+  "base_commit": "53933a58e3d315bc1a2eeea89fc6adb0088d5874",
+  "python_requirement": ">=3.8,<3.16",
+  "numpy_minimum": "1.24",
+  "pyo3": "0.29.3",
+  "rust_numpy": "0.29.0",
+  "renderer": "0.16.1",
+  "ci": {
+    "trigger": "workflow_dispatch only",
+    "configured_wheels": 74,
+    "dispatched": false,
+    "pypi_upload_job": false
+  },
+  "artifacts": [
+    {
+      "filename": "figgyplot-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl",
+      "bytes": 12227376,
+      "sha256": "cc97798bb33a450c477a7d217ed3572b5b6c141b51801a0bbdc7a1744fea6313"
+    },
+    {
+      "filename": "figgyplot-0.2.0-cp315-cp315-manylinux_2_28_x86_64.whl",
+      "bytes": 12226908,
+      "sha256": "12a8e9629044615b20403057a442a3cb9592a71f6558417741229b680cde72b9"
+    },
+    {
+      "filename": "figgyplot-0.2.0-cp315-cp315t-manylinux_2_28_x86_64.whl",
+      "bytes": 12225985,
+      "sha256": "c8b9a5f677dbcc2cc51fbf5cbe9b75f6ca2a068bdbd8f3fd65cf366a685b2a5e"
+    },
+    {
+      "filename": "figgyplot-0.2.0-cp38-cp38-manylinux_2_28_x86_64.whl",
+      "bytes": 12230793,
+      "sha256": "9331f8eb2f452558057db18aadd2ca97e98baf6d30ae00c13173ecc92d306f51"
+    },
+    {
+      "filename": "figgyplot-0.2.0-cp312-cp312-musllinux_1_2_x86_64.whl",
+      "bytes": 12221174,
+      "sha256": "4fc4007b1aeda3de8ac35570be181309870163d4c67fe59634a6d88361870042"
+    }
+  ],
+  "portable_builds": {
+    "manylinux": "glibc 2.28 container and final Zig glibc 2.28 sysroot builds; ELF maximum required GLIBC_2.28 verified",
+    "musllinux": "Zig x86_64-unknown-linux-musl build; dynamic CRT; Alpine runtime checked"
+  },
+  "runtime_checks": [
+    {
+      "host": "AlmaLinux 8 / glibc 2.28",
+      "python": "3.8.20",
+      "numpy": "1.24.4",
+      "checks": "installed extension import, notebook model/binary assets, provenance",
+      "gpu_required": false,
+      "passed": true
+    },
+    {
+      "host": "Alpine / musl 1.2",
+      "python": "3.12.15",
+      "numpy": "2.5.4",
+      "checks": "binary-only wheel/dependencies install, import, notebook model/assets",
+      "gpu_required": false,
+      "passed": true
+    }
+  ],
+  "interpreter_tests": [
+    {
+      "python": "3.8.20",
+      "numpy": "1.24.4",
+      "tests_passed": 48,
+      "tests_failed": 0
+    },
+    {
+      "python": "3.15.0rc3",
+      "numpy": "2.5.4",
+      "tests_passed": 54,
+      "tests_failed": 0
+    },
+    {
+      "python": "3.15.0rc3 free-threaded",
+      "numpy": "2.5.4",
+      "tests_passed": 54,
+      "tests_failed": 0,
+      "gil_enabled_on_import": true,
+      "gil_warning_expected": true
+    }
+  ],
+  "linux_host_validation": {
+    "python": "3.12.14",
+    "gpu": "llvmpipe software Vulkan",
+    "browser_gpu": "SwiftShader",
+    "display": "Xvfb + Openbox",
+    "full_suite_before_final_x11_harness_fix": {
+      "passed": 81,
+      "failed": 1,
+      "failure": "radial click/popups after window-manager placement; targeted harness now forces visible placement and a real mouse move"
+    },
+    "desktop_final_retest": "6 passed, 0 failed, 0 skipped",
+    "final_split_validation": {
+      "non_desktop_passed": 76,
+      "desktop_passed": 6,
+      "distinct_tests_passed": 82,
+      "desktop_test_seconds": 77.6,
+      "explanation": "Full invocation passed all 76 non-desktop tests; the final targeted desktop run passed all six tests after deterministic X11 placement/motion fixes."
+    }
+  },
+  "unverified": [
+    "Windows and macOS runtime/hardware",
+    "ARM64 runtime/hardware",
+    "remaining interpreter combinations on CI",
+    "Python 3.14t runtime",
+    "PyPI/TestPyPI ownership and publication"
+  ],
+  "automatic_ci_enabled": false,
+  "pypi_published": false
+}

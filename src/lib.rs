@@ -1287,7 +1287,7 @@ mod notebook;
 mod radial;
 mod selection;
 
-#[pyclass(module = "figgy._native")]
+#[pyclass(module = "figgyplot._native")]
 struct NativeFigure {
     core: Arc<Mutex<FigureCore>>,
 }
@@ -1407,7 +1407,7 @@ impl NativeFigure {
     }
 }
 
-#[pymodule]
+#[pymodule(gil_used = true)]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NativeFigure>()?;
     m.add_function(wrap_pyfunction!(gpu::release_gpu, m)?)?;

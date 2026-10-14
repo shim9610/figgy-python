@@ -5,7 +5,7 @@ def test_shared_native_core_with_concurrent_python_calls():
     # A subprocess bounds the failure case: a GIL/mutex deadlock must not hang pytest.
     code='''import threading
 import numpy as np
-from figgy._native import NativeFigure
+from figgyplot._native import NativeFigure
 core=NativeFigure()
 x=np.linspace(0,1,100_000)
 core.upload_column("x",x)

@@ -7,9 +7,9 @@ import shutil
 import subprocess
 import time
 
-import figgy
+import figgyplot as figgy
 import pytest
-from figgy.desktop import poll_events
+from figgyplot.desktop import poll_events
 
 
 @pytest.mark.skipif(not os.environ.get("DISPLAY") or not shutil.which("xdotool"), reason="requires X11 and xdotool")

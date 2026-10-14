@@ -34,3 +34,5 @@ The Python package uses the upstream [Figgy renderer](https://github.com/shim961
 For renderer internals and chart families beyond the exposed Python API, see
 the upstream documentation. Asset licenses and provenance are listed in
 [third-party notices](../THIRD_PARTY_NOTICES.md).
+
+[Distribution and platform compatibility](DISTRIBUTION.md) covers the figgyplot name, Python versions, manual wheel matrix and release gates.

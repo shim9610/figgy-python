@@ -1,5 +1,5 @@
 """A native pie with outside labels and an individually exploded slice."""
-import figgy
+import figgyplot as figgy
 from _gallery import run
 
 

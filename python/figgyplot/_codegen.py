@@ -152,5 +152,5 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     code = "\n".join(lines) + "\n"
     if f"{segments_function}(" in code:
         alias = "" if segments_function == "text_segments" else f" as {segments_function}"
-        code = f"from figgy import text_segments{alias}\n\n" + code
+        code = f"from figgyplot import text_segments{alias}\n\n" + code
     return code

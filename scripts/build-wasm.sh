@@ -18,9 +18,9 @@ fi
 cargo build --manifest-path "$wasm_source/crates/web/Cargo.toml" --target wasm32-unknown-unknown --release --locked
 wasm_target=${CARGO_TARGET_DIR:-$wasm_source/target}
 wasm-bindgen "$wasm_target/wasm32-unknown-unknown/release/figgy.wasm" \
-    --target web --out-dir "$repo_root/python/figgy/assets" --out-name figgy
-chmod 644 "$repo_root"/python/figgy/assets/*
-python - "$repo_root/python/figgy/assets" <<'PYPROVENANCE'
+    --target web --out-dir "$repo_root/python/figgyplot/assets" --out-name figgy
+chmod 644 "$repo_root"/python/figgyplot/assets/*
+python - "$repo_root/python/figgyplot/assets" <<'PYPROVENANCE'
 import hashlib,json,pathlib,sys
 assets=pathlib.Path(sys.argv[1])
 data={'upstream_repository':'https://github.com/shim9610/figgy','upstream_revision':'84aa2783caa97d679c72b5c079fb4aea8bf1040e','renderer_version':'0.16.1','web_package_version':'0.13.1','wasm_bindgen_version':'0.2.129','assets':{p.name:{'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'bytes':p.stat().st_size} for p in assets.iterdir() if p.suffix in ('.js','.wasm')}}

@@ -2,7 +2,7 @@
 import ast
 import copy
 
-import figgy
+import figgyplot as figgy
 import pytest
 
 

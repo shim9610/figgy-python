@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 
 def main():

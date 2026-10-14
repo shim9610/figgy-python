@@ -63,7 +63,7 @@ existing temporary snapshot release/retain policy remains in effect.
 
 ## Packaging and persistence boundary
 
-The wheel includes the CLI and preparation API. `python -m figgy.prepare --json`
+The wheel includes the CLI and preparation API. `python -m figgyplot.prepare --json`
 performs a native smoke/prewarm operation and prints adapter/stage/timing data.
 Its Figure is closed on exit; it is a diagnostic command, not a reliable cache
 producer for later processes. There is no GPU installation hook.

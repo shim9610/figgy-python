@@ -1,7 +1,7 @@
 """Procedural material recipes: paper, wood, hatch and pearl."""
 import argparse
 from pathlib import Path
-import figgy
+import figgyplot as figgy
 
 MATERIALS = ("paper", "wood", "hatch", "pearl")
 

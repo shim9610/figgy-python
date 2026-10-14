@@ -7,8 +7,8 @@ import subprocess
 import time
 import numpy as np
 import pytest
-from figgy import subplots, release_gpu
-from figgy.desktop import poll_events
+from figgyplot import subplots, release_gpu
+from figgyplot.desktop import poll_events
 
 
 def test_surface_drag_resize_reopen_and_no_png(tmp_path):

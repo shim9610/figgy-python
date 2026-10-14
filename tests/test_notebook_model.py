@@ -3,11 +3,11 @@ import json
 import asyncio
 import numpy as np
 import pytest
-from figgy import subplots
+from figgyplot import subplots
 
 def test_gpu_free_binary_snapshot_release_and_revision(monkeypatch):
     import importlib
-    module = importlib.import_module("figgy.figure")
+    module = importlib.import_module("figgyplot.figure")
     monkeypatch.setattr(module, 'NativeFigure', lambda *a: pytest.fail('kernel must not initialize GPU'))
     fig, ax = subplots(backend='webgpu')
     x = np.arange(16, dtype=np.float32)
@@ -55,7 +55,7 @@ def test_manual_preparation_requires_a_mounted_view_and_propagates_result():
     async def check():
         with pytest.raises(RuntimeError, match='prepare_async'):
             await fig.to_png_async()
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(TimeoutError):
             await fig.prepare_async(timeout=.01)
         widget._command(widget, {'action':'mounted','client':'test-view'}, [])
         expected = {'backend':'webgpu','ready':True,'persistent_cache_supported':False}
@@ -71,3 +71,22 @@ def test_manual_preparation_requires_a_mounted_view_and_propagates_result():
         with pytest.raises(RuntimeError, match='closed'):
             await fig.prepare_async(timeout=.01)
     asyncio.run(check())
+
+
+def test_widget_created_before_async_loop_recovers_across_separate_loops():
+    fig, ax = subplots(backend="webgpu")
+    ax.plot([0, 1], [1, 0])
+    widget = fig.widget(auto_prepare=False)
+    try:
+        for _ in range(2):
+            with pytest.raises(TimeoutError, match="display the widget"):
+                asyncio.run(fig.prepare_async(timeout=0.01))
+            assert not widget._mounted_event._waiters and not widget._pending
+        widget._command(widget, {"action": "mounted", "client": "reconnected"}, [])
+        expected = {"ready": True, "backend": "webgpu"}
+        def send(message, **kwargs):
+            widget._command(widget, {"action": "result", "id": message["id"], "result": expected}, [])
+        widget.send = send
+        assert asyncio.run(fig.prepare_async()) == expected
+    finally:
+        fig.close()

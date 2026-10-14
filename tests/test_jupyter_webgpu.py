@@ -15,9 +15,9 @@ def test_jupyter_webgpu_binary_edit_sync_export(tmp_path, auto_prepare):
     with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     source='''import importlib
 import numpy as np
-import figgy
+import figgyplot as figgy
 # Prove that Figure creation never initializes the kernel's native GPU.
-module = importlib.import_module("figgy.figure")
+module = importlib.import_module("figgyplot.figure")
 module.NativeFigure = lambda *a: (_ for _ in ()).throw(RuntimeError("kernel GPU forbidden"))
 fig, ax = figgy.subplots(backend="webgpu")
 x = np.linspace(0, 10, 100_000, dtype=np.float32)
@@ -139,8 +139,11 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
                 actual=json.loads(execute("await fig.sync(); print(json.dumps(fig.get_settings()))"))
                 assert actual==expected
                 (tmp_path/'fuzz-browser.json').write_text(json.dumps({'seed':9610,'mutations':300,'rejected':rejected,'accepted':accepted,'browser_errors':errors,'before':before_stats,'after':after_stats},indent=2))
-            page.locator('[data-copy]').click();page.wait_for_function("document.querySelector('.figgy-editor [data-code]').value.includes('fig.apply_settings')")
-            copied=page.evaluate('navigator.clipboard.readText()');assert 'fig.apply_settings' in copied
+            expected_code=execute("await fig.sync(); print(fig.to_code(), end='')")
+            page.locator('[data-copy]').click()
+            page.wait_for_function("expected=>document.querySelector('.figgy-editor [data-code]').value===expected",arg=expected_code)
+            copied=page.evaluate('navigator.clipboard.readText()')
+            assert copied==expected_code and 'ax.set_title(' in copied
             execute('exec('+repr(copied)+')')
             assert page.evaluate(root+'.stats.png_exports')==0
             assert page.evaluate(root+'.stats.column_uploads')==2

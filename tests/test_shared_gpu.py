@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import figgy
+import figgyplot as figgy
 
 
 def test_multiple_figures_isolate_same_ids_picks_exports_and_close():
@@ -44,7 +44,7 @@ def test_multiple_figures_isolate_same_ids_picks_exports_and_close():
 
 
 def test_closed_figures_reuse_context_and_explicit_release_resets_it():
-    code = '''import gc, numpy as np, figgy
+    code = '''import gc, numpy as np, figgyplot as figgy
 assert figgy.release_gpu() is False
 fig, ax = figgy.subplots(backend="native", pool_bytes=4096)
 ax.plot(np.arange(4000, dtype=np.float32))
@@ -77,7 +77,7 @@ assert figgy.release_gpu() is True
 
 
 def test_concurrent_figures_share_initialization_without_gil_deadlock():
-    code = '''import threading, numpy as np, figgy
+    code = '''import threading, numpy as np, figgyplot as figgy
 start = threading.Barrier(4)
 identities, errors = [], []
 def work(index):

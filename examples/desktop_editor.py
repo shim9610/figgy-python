@@ -1,7 +1,7 @@
 """Run with python examples/desktop_editor.py to edit a 100,000-sample chart."""
 
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 
 def make_figure():

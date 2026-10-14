@@ -25,7 +25,7 @@ struct Control {
     stats: Mutex<Value>,
     settings: Mutex<Option<Arc<Control>>>,
 }
-#[pyclass(module = "figgy._native")]
+#[pyclass(module = "figgyplot._native")]
 pub struct WindowHandle {
     control: Arc<Control>,
 }

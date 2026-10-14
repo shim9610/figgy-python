@@ -4,7 +4,7 @@ try:
     import anywidget
     import traitlets
 except ImportError as exc:
-    raise ImportError("Notebook editing requires: pip install 'figgy-python[notebook]'") from exc
+    raise ImportError("Notebook editing requires: pip install 'figgyplot[notebook]'") from exc
 
 from .editor import EditorSession
 
@@ -48,6 +48,38 @@ import asyncio
 import json
 import uuid
 
+class _AsyncSignal:
+    """One-shot notification whose waiters belong to their running loops.
+
+    Python 3.8 asyncio.Event binds at construction, before a widget's async
+    request loop may exist. Futures are instead created only when awaited.
+    """
+    def __init__(self):
+        self._set = False
+        self._waiters = set()
+
+    @staticmethod
+    def _resolve(future):
+        if not future.done():
+            future.set_result(None)
+
+    def set(self):
+        self._set = True
+        for future in tuple(self._waiters):
+            if not future.done():
+                future.get_loop().call_soon_threadsafe(self._resolve, future)
+
+    async def wait(self):
+        if self._set:
+            return
+        future = asyncio.get_running_loop().create_future()
+        self._waiters.add(future)
+        try:
+            await future
+        finally:
+            self._waiters.discard(future)
+
+
 class FigureWidget(anywidget.AnyWidget):
     """Browser WebGPU host. Comm carries assets, binary columns and settings only."""
     _esm = Path(__file__).with_name("webgpu.js")
@@ -66,8 +98,8 @@ class FigureWidget(anywidget.AnyWidget):
         self._handling = False
         self._pending = {}
         self._clients = {}
-        self._ready_event = asyncio.Event()
-        self._mounted_event = asyncio.Event()
+        self._ready_event = _AsyncSignal()
+        self._mounted_event = _AsyncSignal()
         self._closed = False
         manifest, buffers = figure._native.payload()
         assets = Path(__file__).with_name("assets")

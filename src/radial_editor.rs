@@ -100,7 +100,7 @@ impl Editor {
                     if copy.clicked() {
                         let code = c.settings_json().and_then(|settings| {
                             Python::attach(|py| {
-                                py.import("figgy._codegen")?
+                                py.import("figgyplot._codegen")?
                                     .getattr("settings_to_code")?
                                     .call1((
                                         settings,

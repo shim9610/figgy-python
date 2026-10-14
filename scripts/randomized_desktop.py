@@ -10,7 +10,7 @@ from check_randomized import mutate
 
 
 def exercise(fig, rng, steps, counts, record, fail):
-    from figgy.desktop import poll_events
+    from figgyplot.desktop import poll_events
 
     if (
         not os.environ.get("DISPLAY")

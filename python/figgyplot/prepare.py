@@ -1,4 +1,4 @@
-"""Explicit local GPU setup: python -m figgy.prepare."""
+"""Explicit local GPU setup: python -m figgyplot.prepare."""
 import argparse
 import json
 from .figure import Figure

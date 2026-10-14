@@ -3,7 +3,7 @@ import copy
 import hashlib
 import numpy as np
 import pytest
-import figgy
+import figgyplot as figgy
 
 
 def make(values=(40, 25, 20, 15), **kwargs):

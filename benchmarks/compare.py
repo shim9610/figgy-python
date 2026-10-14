@@ -93,7 +93,7 @@ def worker(args):
         from gpu_backends import SETUPS
         draw, view, style, save_png, cleanup = SETUPS[args.worker](args, x, y, row)
     elif args.worker == "figgy":
-        import figgy
+        import figgyplot as figgy
         row["initialize_s"], (fig, ax) = timed(figgy.subplots)
         def register():
             if args.kind == "line": return ax.plot(x, y, linewidth=1.5, color="#1f77b4")[0]
@@ -281,7 +281,7 @@ def main():
               "environment": {key: os.environ.get(key) for key in ["WGPU_BACKEND", "VK_DRIVER_FILES", "QT_QPA_PLATFORM", "LP_NUM_THREADS",
                               "QT_SCALE_FACTOR", "QT_AUTO_SCREEN_SCALE_FACTOR", "QT_ENABLE_HIGHDPI_SCALING", "QT_SCREEN_SCALE_FACTORS", "WAYLAND_DISPLAY"]}, "rows": []}
     # Query the renderer's own layout once, outside worker timing/RSS.
-    import figgy
+    import figgyplot as figgy
     areas, colorbars = {}, {}
     for kind in args.kinds:
         with figgy.Figure() as reference:

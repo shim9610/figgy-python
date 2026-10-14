@@ -1,6 +1,6 @@
 //! GPU-free document model for a browser-owned resident renderer.
 use super::*;
-#[pyclass(module = "figgy._native")]
+#[pyclass(module = "figgyplot._native")]
 pub struct NotebookFigure {
     background: Option<Color>,
     chart: Chart,

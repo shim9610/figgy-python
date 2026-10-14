@@ -1,5 +1,5 @@
 import numpy as np
-import figgy.pyplot as plt
+import figgyplot.pyplot as plt
 
 x = np.linspace(0, 20, 100_000)
 fig, ax = plt.subplots()

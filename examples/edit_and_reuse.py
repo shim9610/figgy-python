@@ -9,8 +9,8 @@ import argparse
 from pathlib import Path
 
 import numpy as np
-import figgy
-from figgy.desktop import run_events
+import figgyplot as figgy
+from figgyplot.desktop import run_events
 
 
 def make_figure(run=0):

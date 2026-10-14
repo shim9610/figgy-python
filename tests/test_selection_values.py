@@ -2,7 +2,7 @@
 import json
 import numpy as np
 import pytest
-import figgy
+import figgyplot as figgy
 
 
 def choose(figure, identity):

@@ -6,8 +6,8 @@ import subprocess
 import time
 
 import pytest
-import figgy
-from figgy.desktop import poll_events
+import figgyplot as figgy
+from figgyplot.desktop import poll_events
 
 requires_x11 = pytest.mark.skipif(
     not os.environ.get("DISPLAY") or not shutil.which("xdotool") or not shutil.which("xclip") or not shutil.which("wmctrl"),
@@ -20,6 +20,9 @@ class Inputs:
         self.window = window
         self.pump()
         self.wid = self.xdo("search", "--pid", os.getpid(), "--name", "^Figgy$").splitlines()[-1]
+        # A window manager may reuse an offscreen/right-edge placement after
+        # earlier tests; keep the expanding inspector and popups on the display.
+        self.xdo("windowmove", self.wid, 20, 40)
         self.xdo("windowraise", self.wid)
         self.xdo("windowfocus", self.wid)
         self.pump()
@@ -38,7 +41,12 @@ class Inputs:
         return json.loads(self.window.info_json())
 
     def click_rect(self, rect):
-        self.xdo("mousemove", "--window", self.wid, round(rect[0]+rect[2]/2), round(rect[1]+rect[3]/2))
+        x, y = round(rect[0]+rect[2]/2), round(rect[1]+rect[3]/2)
+        # X11 may suppress same-position motion left over from an earlier window.
+        # Deliver a real motion event before pressing on the new chart surface.
+        self.xdo("mousemove", "--window", self.wid, x+8, y+8)
+        self.pump()
+        self.xdo("mousemove", "--window", self.wid, x, y)
         self.pump()
         self.xdo("mousedown", 1)
         self.pump()

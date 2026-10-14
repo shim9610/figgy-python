@@ -47,7 +47,7 @@ A minimal script:
 
 ```python
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 x = np.linspace(0, 20, 100_000, dtype=np.float32)
 fig, ax = figgy.subplots(backend="native")
@@ -159,7 +159,7 @@ Copy Python and Save PNG. See [chart and style API](CHART_TYPES.md) and the
 [gallery recipes](../examples/README.md) for construction and host coverage.
 
 ```python
-from figgy.desktop import run_events
+from figgyplot.desktop import run_events
 
 window = fig.show(block=False)
 window2 = fig2.show(block=False)

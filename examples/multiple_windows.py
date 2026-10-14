@@ -1,7 +1,7 @@
 """Run with python examples/multiple_windows.py; close each window independently."""
 import numpy as np
-import figgy
-from figgy.desktop import run_events
+import figgyplot as figgy
+from figgyplot.desktop import run_events
 
 x = np.linspace(0, 20, 100_000, dtype=np.float32)
 fig, ax = figgy.subplots(backend="native")

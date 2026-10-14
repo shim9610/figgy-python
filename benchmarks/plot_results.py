@@ -13,7 +13,7 @@ import math
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-import figgy
+import figgyplot as figgy
 from PIL import Image
 
 PANELS = [("line", "smooth", "Smooth line"), ("line", "noisy", "Noisy line"),

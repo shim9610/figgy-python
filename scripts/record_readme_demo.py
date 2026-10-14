@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageGrab
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "examples"))
 from edit_and_reuse import make_figure
-from figgy.desktop import poll_events
+from figgyplot.desktop import poll_events
 
 SIZE = (1440, 900)
 BG = "#edf1f6"
@@ -76,7 +76,7 @@ def main():
     def chrome(image):
         draw = ImageDraw.Draw(image)
         draw.rectangle((0, 0, SIZE[0], 60), fill="white")
-        draw.text((36, 17), "figgy-python", font=font(27, bold=True), fill=BLUE)
+        draw.text((36, 17), "figgyplot", font=font(27, bold=True), fill=BLUE)
         draw.text((SIZE[0]-440, 23), chapter, font=font(17, bold=True), fill=INK)
         draw.rectangle((0, 850, SIZE[0], 900), fill="white")
         draw.text((36, 864), caption, font=font(20), fill=INK)

@@ -2,8 +2,8 @@
 import argparse,json,platform,time
 from pathlib import Path
 import numpy as np
-import figgy
-from figgy.desktop import poll_events
+import figgyplot as figgy
+from figgyplot.desktop import poll_events
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--points',type=int,default=100_000);parser.add_argument('--frames',type=int,default=120);parser.add_argument('--output',type=Path,default=Path('benchmarks/results/ui-surface.json'));args=parser.parse_args()

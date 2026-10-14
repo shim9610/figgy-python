@@ -1,28 +1,50 @@
 [build-system]
-requires = ["maturin>=1.9,<2"]
+requires = ["maturin>=1.15,<2"]
 build-backend = "maturin"
 
 [project]
-name = "figgy-python"
+name = "figgyplot"
 version = "0.2.0"
 description = "NumPy-first Python plotting with the native Rust figgy renderer"
-readme = "README.md"
-requires-python = ">=3.11"
+readme = "PYPI_README.md"
+requires-python = ">=3.8,<3.16"
 license = "MIT OR Apache-2.0"
-dependencies = ["numpy>=1.26"]
-classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Python :: 3", "Programming Language :: Rust"]
+dependencies = ["numpy>=1.24"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Programming Language :: Rust",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/shim9610/figgy-python"
+Documentation = "https://github.com/shim9610/figgy-python/tree/main/docs"
+Source = "https://github.com/shim9610/figgy-python"
+Issues = "https://github.com/shim9610/figgy-python/issues"
 
 [project.optional-dependencies]
 notebook = ["anywidget>=0.9,<1"]
 desktop = []
-benchmark = ["matplotlib>=3.8", "psutil>=5.9", "pillow>=10", "pyqtgraph>=0.13"]
+benchmark = ["matplotlib>=3.7; python_version < '3.9'", "matplotlib>=3.8; python_version >= '3.9'", "psutil>=5.9", "pillow>=10", "pyqtgraph>=0.13"]
 benchmark-gpu = ["fastplotlib>=0.7", "vispy>=0.17", "PySide6>=6.8,<7", "PyOpenGL>=3.1"]
 test = ["pytest>=8", "pillow>=10", "anywidget>=0.9,<1"]
 
 [tool.maturin]
 python-source = "python"
-module-name = "figgy._native"
-include = ["python/figgy/*.js", "python/figgy/*.css", "python/figgy/licenses/*.txt", "python/figgy/assets/*", "THIRD_PARTY_NOTICES.md", { path = "docs/*.md", format = "sdist" }, { path = "scripts/build-wasm.sh", format = "sdist" }, { path = "scripts/repro_upstream_colorbar/Cargo.toml", format = "sdist" }, { path = "scripts/repro_upstream_colorbar/README.md", format = "sdist" }, { path = "scripts/repro_upstream_colorbar/src/*.rs", format = "sdist" }]
+module-name = "figgyplot._native"
+include = ["python/figgyplot/*.js", "python/figgyplot/*.css", "python/figgyplot/licenses/*.txt", "python/figgyplot/assets/*", "THIRD_PARTY_NOTICES.md", { path = "docs/*.md", format = "sdist" }, { path = "scripts/build-wasm.sh", format = "sdist" }, { path = "scripts/repro_upstream_colorbar/Cargo.toml", format = "sdist" }, { path = "scripts/repro_upstream_colorbar/README.md", format = "sdist" }, { path = "scripts/repro_upstream_colorbar/src/*.rs", format = "sdist" }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

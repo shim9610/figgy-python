@@ -50,7 +50,7 @@ and aspect ratio; maximized/fullscreen windows use an overlay. The document/expo
 canvas remains unchanged. UI names show labels rather than renderer field keys.
 
 ```python
-from figgy.desktop import poll_events, run_events
+from figgyplot.desktop import poll_events, run_events
 window = fig.show(block=False)
 # Integrate into a main-thread application loop:
 while not window.closed:
@@ -171,7 +171,7 @@ requires a usable kernel GPU and performs image transfers.
 
 ## Assets and builds
 
-`python/figgy/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
+`python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
 `crates/web` at commit `84aa2783caa97d679c72b5c079fb4aea8bf1040e` (renderer 0.16.1,
 web example 0.13.1). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
 wasm-bindgen 0.2.129. `assets/provenance.json` records the versions and SHA-256.

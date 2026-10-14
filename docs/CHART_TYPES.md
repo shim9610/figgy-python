@@ -8,7 +8,7 @@ See the [gallery and runnable examples](../examples/README.md).
 ## Pie and donut
 
 ```python
-import figgy
+import figgyplot as figgy
 
 fig, ax = figgy.subplots(backend="native", figsize=(8, 5), dpi=120)
 ring = ax.donut(
@@ -116,7 +116,7 @@ choices. Constellation requires marker lines, avoiding silently invisible series
 
 ```python
 import numpy as np
-import figgy
+import figgyplot as figgy
 
 fig, ax = figgy.subplots(backend="native")
 t = np.linspace(0, 12, 1800)

@@ -2,7 +2,7 @@
 import json
 import math
 
-import figgy
+import figgyplot as figgy
 
 
 def test_default_title_tick_separation_and_native_notebook_layout_match():

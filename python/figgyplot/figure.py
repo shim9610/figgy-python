@@ -267,13 +267,13 @@ class Figure:
                 elif target == "legend":
                     node, rich = cfg["legend"], cfg["legend"]["content"]
                 elif target.startswith("axis_title_"):
-                    axis = _axis_key(target.removeprefix("axis_title_"))
+                    axis = _axis_key(target[len("axis_title_"): ])
                     node, rich = cfg[axis]["title_option"], cfg[axis]["title_option"]["text"]
                 elif target.startswith("tick_labels_"):
-                    node = cfg[_axis_key(target.removeprefix("tick_labels_"))]["label_style"]
+                    node = cfg[_axis_key(target[len("tick_labels_"): ])]["label_style"]
                     rich = None
                 elif target.startswith("axis_"):
-                    node = cfg[_axis_key(target.removeprefix("axis_"))]
+                    node = cfg[_axis_key(target[len("axis_"): ])]
                     rich = None
                 else:
                     raise ValueError(f"unknown editable target: {target}")

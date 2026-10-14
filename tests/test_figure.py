@@ -5,8 +5,8 @@ import numpy as np
 from PIL import Image
 import pytest
 
-import figgy
-from figgy.editor import EditorSession
+import figgyplot as figgy
+from figgyplot.editor import EditorSession
 
 
 @pytest.fixture

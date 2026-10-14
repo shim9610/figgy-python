@@ -19,7 +19,7 @@ def timed(operation):
 
 
 def worker(args):
-    import figgy
+    import figgyplot as figgy
     # Imports and input creation are excluded, just like compare.py.
     x = np.linspace(0, 100, args.size, dtype=np.float64)
     y = np.sin(x) + .2*np.cos(x*4)
@@ -91,7 +91,7 @@ def summarize(runs):
 
 
 def plot_report(report, output):
-    import figgy
+    import figgyplot as figgy
     with figgy.Figure(backend='native', figsize=(9, 5), dpi=120) as figure:
         ax = figure.axes[0]
         for key, label, color in [('process_first','First Figure in fresh process','#d55232'),
@@ -134,7 +134,7 @@ def main():
     if args.worker:
         print(json.dumps(worker(args)))
         return
-    import figgy
+    import figgyplot as figgy
     report = {'metric':'completed first RGBA; initialize + registration/fit + render/readback',
               'os':platform.platform(), 'python':sys.version.split()[0], 'figgy_version':figgy.__version__,
               'repeats':args.repeats, 'following_per_process':args.following, 'input_dtype':'float64',

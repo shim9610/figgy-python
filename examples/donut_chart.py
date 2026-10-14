@@ -1,5 +1,5 @@
 """A raised ceramic donut with rounded corners, bevel and shadow."""
-import figgy
+import figgyplot as figgy
 from _gallery import run
 
 

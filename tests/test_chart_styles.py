@@ -2,7 +2,7 @@
 import copy
 import numpy as np
 import pytest
-import figgy
+import figgyplot as figgy
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])

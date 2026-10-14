@@ -15,14 +15,14 @@ import numpy as np
 from PIL import Image
 import pytest
 
-from figgy import Figure
-from figgy.editor import EditorSession
+from figgyplot import Figure
+from figgyplot.editor import EditorSession
 
 
 def test_live_editor_select_drag_copy_and_png(tmp_path):
     pytest.importorskip("playwright")
     from playwright.sync_api import sync_playwright
-    import figgy
+    import figgyplot as figgy
     source = Path(figgy.__file__).parent
     with Figure(figsize=(8, 5), dpi=120, pool_bytes=8 * 1024**2) as fig:
         ax = fig.axes[0]
