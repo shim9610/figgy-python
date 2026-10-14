@@ -54,10 +54,9 @@ Describe the final behavior, validation performed and remaining platform limits.
 Run tests relevant to the change and `cargo fmt --check`. Avoid tests that merely
 repeat the implementation.
 
-[PR tests](.github/workflows/pr-tests.yml) and
-[CodeQL](.github/workflows/codeql.yml) are prepared for automatic PR execution,
-but remain manual until stabilization. Follow the rollout document to activate
-them after the wheel matrix is green. Fork PRs use read-only test permissions;
+[PR tests](.github/workflows/pr-tests.yml) run automatically on pull requests to
+main and can also be run manually. [CodeQL](.github/workflows/codeql.yml) remains
+manual; follow the rollout document for its later activation. Fork PRs use read-only test permissions;
 no publication or privileged `pull_request_target` workflow is used.
 
 Dependency updates should respect the pinned renderer and matching wgpu/egui

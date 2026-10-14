@@ -1,3 +1,5 @@
+# Keep first-party package sources identical in every platform wheel.
+/python/figgyplot/** text eol=lf
 # Upstream JS/WASM assets are content-addressed in provenance.json. Preserve
 # their exact bytes on every platform, including Windows core.autocrlf=true.
 /python/figgyplot/assets/* -text

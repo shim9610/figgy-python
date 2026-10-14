@@ -3,6 +3,8 @@ name: Build figgyplot wheels (manual only)
 on:
   # Intentionally no push, pull_request, release, tag or schedule triggers.
   workflow_dispatch:
+  # Called only by the manually dispatched publication workflow.
+  workflow_call:
 
 permissions:
   contents: read

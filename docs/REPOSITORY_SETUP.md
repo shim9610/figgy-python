@@ -48,8 +48,9 @@ commit is used for both its input-metadata checkout and the actual build.
 | Workflow | Initial trigger | Scope |
 | --- | --- | --- |
 | Build figgyplot wheels | Manual only | 74 platform/Python/ABI wheels, sdist and Linux functional verification |
-| PR tests | Manual until stabilization | Workflow/assets preflight; installed Linux native wheel, X11 editor and real JupyterLab/browser WebGPU tests |
-| CodeQL | Manual until first successful scan | Python, Rust and JavaScript security-extended queries, no build; generated upstream assets excluded |
+| Publish figgyplot to TestPyPI | Manual on main only | Reuses all wheel gates, publishes with OIDC, downloads and checks nine actual TestPyPI installations; see [publisher setup](PUBLISHING.md) |
+| PR tests | Pull requests to main and manual | Workflow/assets preflight; installed Linux native wheel, X11 editor and real JupyterLab/browser WebGPU tests |
+| CodeQL | Manual; automatic events still paused | Python, Rust and JavaScript security-extended queries, no build; generated upstream assets excluded |
 
 Run **PR tests → Run workflow** on the desired branch. Its integration job builds
 and installs that checkout's wheel, loads local assets, uses Mesa lavapipe for
@@ -61,9 +62,10 @@ The X11 jobs install and probe `libxkbcommon0`, `libxkbcommon-x11-0`, the X11
 library and Vulkan loader before creating the winit event loop, and use a
 1600×1000 Xvfb display so expanded inspectors stay on screen.
 
-After the wheel run and the first PR test run pass, activate the commented
-`pull_request` block in `.github/workflows/pr-tests.yml`. Enable `merge_group`
-too if using GitHub's merge queue. Do not add path filters to required workflows:
+The [manual PR test run at `84a3187`](https://github.com/shim9610/figgy-python/actions/runs/38577095319)
+passed, including both required jobs. PR events are now enabled so changes can
+pass the repository's main protection rules. Enable the commented `merge_group`
+block too if using GitHub's merge queue. Do not add path filters to required workflows:
 otherwise some PRs can wait forever for checks that were never scheduled.
 
 Run **CodeQL → Run workflow** once on `main`. After its three language scans
@@ -89,9 +91,10 @@ are a separate choice: a PR author cannot approve their own PR, which matters fo
 a repository with one maintainer. Add CodeQL checks only after their actual scans
 are verified and their event coverage matches the chosen merge workflow.
 
-No main-branch protection, automatic merge or PyPI publication is configured by
-this change. New GitHub executions are needed to verify the newly pinned Actions
-and PR/CodeQL workflow behavior; local test results are reported separately.
+The owner has enabled main protection: updates require a pull request and both
+required checks. This change does not modify those rules or enable automatic
+merging. TestPyPI publication is prepared as an explicit manual workflow;
+production PyPI publication remains unconfigured.
 
 ## Executed validation for this preparation
 
@@ -112,5 +115,7 @@ and PR/CodeQL workflow behavior; local test results are reported separately.
   separate local suite. CodeQL scans/uploads and administration switches remain
   unexecuted.
 
-The above run does not verify the newly pinned Actions remotely. Keep automatic
-events disabled until the next manual run confirms the final workflow behavior.
+These local records preceded the successful remote manual PR run linked above.
+The [manual CodeQL run](https://github.com/shim9610/figgy-python/actions/runs/38577120602)
+also completed all three languages successfully. Only PR test triggers have been
+activated; wheel builds, CodeQL and TestPyPI publication remain manual.

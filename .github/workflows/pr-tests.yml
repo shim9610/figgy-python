@@ -2,9 +2,9 @@ name: PR tests
 
 on:
   workflow_dispatch:
-  # Enable after stabilization; do not add paths filters to required checks.
-  # pull_request:
-  #   branches: [main]
+  # The manual run passed; required PR checks have no path filters.
+  pull_request:
+    branches: [main]
   # merge_group:
 
 permissions:
