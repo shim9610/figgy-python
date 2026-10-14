@@ -36,3 +36,5 @@ the upstream documentation. Asset licenses and provenance are listed in
 [third-party notices](../THIRD_PARTY_NOTICES.md).
 
 [Distribution and platform compatibility](DISTRIBUTION.md) covers the figgyplot name, Python versions, manual wheel matrix and release gates.
+[TestPyPI publishing](PUBLISHING.md) gives the exact Trusted Publisher form values,
+GitHub environment settings and manual build/upload/installation sequence.

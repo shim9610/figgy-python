@@ -11,7 +11,7 @@ import yaml
 
 
 def validate(workflow, action):
-    if set(workflow["on"]) != {"workflow_dispatch"}:
+    if set(workflow["on"]) != {"workflow_dispatch", "workflow_call"}:
         raise ValueError("Automatic CI must remain disabled")
     valid_inputs = set(action["inputs"])
     builds = [step for job in workflow["jobs"].values()

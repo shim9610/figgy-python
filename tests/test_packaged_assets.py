@@ -33,6 +33,8 @@ def test_git_autocrlf_checkout_preserves_manifest_bytes(tmp_path, with_attribute
     git("config", "core.autocrlf", "true")
     git("config", "core.safecrlf", "false")
     files = {"python/figgyplot/assets/" + p.name: p.read_bytes() for p in ASSETS.iterdir() if p.is_file()}
+    sources = [ROOT / "python/figgyplot/__init__.py", ROOT / "python/figgyplot/webgpu.js"]
+    files.update({p.relative_to(ROOT).as_posix(): p.read_bytes() for p in sources})
     if with_attributes:
         files[".gitattributes"] = (ROOT / ".gitattributes").read_bytes()
     # Feed raw blobs into the index to preserve the repository's LF bytes;
@@ -46,6 +48,8 @@ def test_git_autocrlf_checkout_preserves_manifest_bytes(tmp_path, with_attribute
     if with_attributes:
         check_assets(checked)
         assert (checked / "figgy.js").read_bytes() == (ASSETS / "figgy.js").read_bytes()
+        for source in sources:
+            assert (tmp_path / source.relative_to(ROOT)).read_bytes() == source.read_bytes()
     else:
         with pytest.raises(ValueError, match=r"figgy\.js.*CRLF"):
             check_assets(checked)

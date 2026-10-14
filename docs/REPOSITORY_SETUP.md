@@ -48,6 +48,7 @@ commit is used for both its input-metadata checkout and the actual build.
 | Workflow | Initial trigger | Scope |
 | --- | --- | --- |
 | Build figgyplot wheels | Manual only | 74 platform/Python/ABI wheels, sdist and Linux functional verification |
+| Publish figgyplot to TestPyPI | Manual on main only | Reuses all wheel gates, publishes with OIDC, downloads and checks nine actual TestPyPI installations; see [publisher setup](PUBLISHING.md) |
 | PR tests | Manual until stabilization | Workflow/assets preflight; installed Linux native wheel, X11 editor and real JupyterLab/browser WebGPU tests |
 | CodeQL | Manual until first successful scan | Python, Rust and JavaScript security-extended queries, no build; generated upstream assets excluded |
 
@@ -89,8 +90,9 @@ are a separate choice: a PR author cannot approve their own PR, which matters fo
 a repository with one maintainer. Add CodeQL checks only after their actual scans
 are verified and their event coverage matches the chosen merge workflow.
 
-No main-branch protection, automatic merge or PyPI publication is configured by
-this change. New GitHub executions are needed to verify the newly pinned Actions
+Main-branch protection, automatic merge and production PyPI publication remain
+owner/future settings. TestPyPI publication is now prepared as an explicit manual
+workflow. New GitHub executions are needed to verify the newly pinned Actions
 and PR/CodeQL workflow behavior; local test results are reported separately.
 
 ## Executed validation for this preparation
