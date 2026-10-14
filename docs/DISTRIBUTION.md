@@ -126,9 +126,20 @@ as documented. The previously built, unchanged Python 3.12 musllinux wheel also
 passed strict metadata and binary-only installation/model/assets checks on Alpine.
 These are GPU-free checks, not new UI/hardware validation or a full Actions run.
 
+The next [run 38563497232](https://github.com/shim9610/figgy-python/actions/runs/38563497232),
+using `7a7a107`, stopped in preflight with ShellCheck `SC2016`; no wheels were
+built. The nested single-quoted `bash -c` command intentionally deferred variable
+expansion but triggered the runner's ShellCheck. Earlier local actionlint runs
+had silently omitted ShellCheck because it was absent from PATH. Preflight now
+installs both actionlint and ShellCheck explicitly, and Xvfb receives its child
+script through a quoted heredoc. The complete preflight command sequence passed
+in a fresh repository with both tools, alongside the seven regressions. Actual
+Xvfb/child-shell execution also verified success and propagation of a nonzero
+child exit code. These checks do not mark the skipped platform builds as passed.
+
 To test the repair in GitHub, choose **Run workflow** on **main** after pulling
-the fix. **Re-run jobs** on the old run retains commit `820bd7f` and the broken
-workflow. Automatic triggers and publication remain disabled.
+the fix. **Re-run jobs** retains that run's original commit and workflow.
+Automatic triggers and publication remain disabled.
 
 ## Release gates
 
