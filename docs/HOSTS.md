@@ -30,14 +30,18 @@ submits and presents. It performs no RGBA mapping, PNG encoding, QWebChannel,
 JavaScript or image transfer. GPU picking reads a small result on explicit picks;
 it does not read the whole frame. PNG export alone uses renderer readback.
 
-The panel edits title/axis/legend text, font size/family and color, axes and series
-styles, plus tick-label font size/family/color. The font entry is a family name,
+The chart-centered toolbar uses vector icons with tooltips and leaves properties
+hidden until an element is selected.
+The contextual panel edits title/axis/legend text, font size/family and color, axes and series
+styles, tick-label font size/family/color, and heatmap color range/presets. The font entry is a family name,
 not a TTF path. Native uses renderer system/registered fonts; a missing family
 falls back to the bundled font.
 Chrome/series selection, renderer drag/resize policies, wheel zoom, Copy Python
 and Save PNG are available; full SSOT JSON covers additional renderer fields.
 Copy Python is a self-contained `json.loads` + `fig.apply_settings` snapshot.
-Save PNG writes the path shown beside the button.
+Save PNG opens a file-path popover; Advanced settings opens the full JSON form.
+Opening/closing properties reflows the surface preview without changing the
+document/export canvas. UI names show labels rather than renderer field keys.
 
 ```python
 from figgy.desktop import poll_events, run_events

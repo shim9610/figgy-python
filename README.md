@@ -33,6 +33,9 @@ Windows/DX12, Linux/Vulkan, macOS/Metal이며 upstream Metal은 실험적 지원
 
 ## 데스크톱
 
+바로 편집 창을 열려면 `python examples/desktop_editor.py`를 실행합니다.
+[실행 방법·UI 스크린샷·제약](docs/DESKTOP_EDITOR.md)을 함께 확인할 수 있습니다.
+
 ```python
 import numpy as np
 import figgy.pyplot as plt
@@ -55,12 +58,12 @@ native Figure도 프로세스의 하나의 GPU 장치·renderer·column pool을 
 일반 프레임은
 surface에 직접 그리며 RGBA readback·PNG 인코딩·JS 이미지 전달을 수행하지 않습니다.
 
-속성 패널에서 제목·축·범례의 글씨 크기·색·폰트 이름, 눈금 글씨 속성, 시리즈 색과
-스타일을 편집하고 객체를 선택·드래그할 수 있습니다. 폰트는 native에서 설치된
+기본 화면은 차트와 아이콘 툴바이며, 객체를 클릭하면 속성 패널이 열립니다. 제목·축·범례의
+글씨 크기·색·폰트 이름, 눈금 글씨 속성, 시리즈 스타일과 히트맵 색 범위를 편집할 수 있습니다. 폰트는 native에서 설치된
 family 이름을 사용하며, 없는 이름은 renderer 기본 폰트로 대체됩니다.
-Edit plot area는 이동/크기 조정, 마우스 휠은 줌입니다. **Copy Python**은 현재 SSOT를
+Layout은 플롯 영역 이동/크기 조정, 마우스 휠은 줌입니다. **Copy Python**은 현재 SSOT를
 `fig.apply_settings(...)` 코드로 복사하며, **Save PNG**는 입력한 경로에 저장합니다.
-추가 renderer 속성은 Full SSOT JSON에서 편집할 수 있습니다.
+추가 renderer 속성은 Advanced settings의 JSON에서 편집할 수 있습니다.
 
 `show()`는 main thread에서 모든 열린 Figgy 창이 닫힐 때까지 실행합니다.
 `show(block=False)` 뒤에는 main thread에서 이벤트를 계속 처리해야 합니다.

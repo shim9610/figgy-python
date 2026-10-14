@@ -61,16 +61,17 @@ struct SurfaceWindow {
     selected: Option<String>,
     handle: Option<String>,
     dragging: bool,
+    chart_pressed: bool,
     edit_area: bool,
     cursor: (f32, f32),
     panel: Rect,
     scale: f32,
-    save_path: String,
-    raw: String,
-    error: String,
+    editor: editor::Editor,
+    last_panel: Option<Rect>,
     frames: u64,
     last_input: Option<Instant>,
     latency_ms: f64,
+    repaint_at: Option<Instant>,
 }
 impl SurfaceWindow {
     fn new(
@@ -87,10 +88,11 @@ impl SurfaceWindow {
             event_loop
                 .create_window(
                     Window::default_attributes()
-                        .with_title("Figgy — Rust surface")
+                        .with_title("Figgy")
+                        .with_min_inner_size(LogicalSize::new(900., 520.))
                         .with_inner_size(LogicalSize::new(
-                            rect.width as f64 + 310.,
-                            rect.height as f64,
+                            (rect.width as f64 + 300.).max(1100.),
+                            (rect.height as f64 + 100.).max(700.),
                         )),
                 )
                 .map_err(runtime)?,
@@ -116,6 +118,7 @@ impl SurfaceWindow {
         };
         surface.configure(c.renderer.device(), &config);
         let ctx = egui::Context::default();
+        editor::theme(&ctx);
         let input = egui_winit::State::new(
             ctx.clone(),
             egui::ViewportId::ROOT,
@@ -142,16 +145,17 @@ impl SurfaceWindow {
             selected: None,
             handle: None,
             dragging: false,
+            chart_pressed: false,
             edit_area: false,
             cursor: (0., 0.),
             panel: rect,
             scale: 1.,
-            save_path: "figure.png".into(),
-            raw: String::new(),
-            error: String::new(),
+            editor: editor::Editor::default(),
+            last_panel: None,
             frames: 0,
             last_input: None,
             latency_ms: 0.,
+            repaint_at: None,
         })
     }
     fn resize(&mut self, w: u32, h: u32) {
@@ -173,12 +177,29 @@ impl SurfaceWindow {
         self.window.request_redraw();
     }
     fn display(&self, c: &FigureAccess<'_>) -> (Config, Rect, f32) {
-        let width = self
-            .config
-            .width
-            .saturating_sub((310. * self.window.scale_factor()) as u32)
-            .max(1);
-        renderer::display_config_for_surface(c.data.chart.config(), (width, self.config.height))
+        let stage = self.editor.stage;
+        let dpr = self.ctx.pixels_per_point();
+        let width = (stage.width() * dpr).round().max(1.) as u32;
+        let height = (stage.height() * dpr).round().max(1.) as u32;
+        let (mut display, _, scale) =
+            renderer::display_config_for_surface(c.data.chart.config(), (width, height));
+        // Reflow the preview into the available editor stage. The original
+        // document/export canvas remains unchanged.
+        let panel = Rect {
+            x: (stage.min.x * dpr).round().max(0.) as u32,
+            y: (stage.min.y * dpr).round().max(0.) as u32,
+            width,
+            height,
+        };
+        display.chart_area = renderer::layout::ChartArea(panel);
+        (display, panel, scale)
+    }
+    fn chart_contains_cursor(&self) -> bool {
+        let p = self.panel;
+        self.cursor.0 >= p.x as f32
+            && self.cursor.0 < (p.x + p.width) as f32
+            && self.cursor.1 >= p.y as f32
+            && self.cursor.1 < (p.y + p.height) as f32
     }
     fn pointer(&mut self, event: &WindowEvent) -> PyResult<()> {
         let input_received = Instant::now();
@@ -214,6 +235,7 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                self.chart_pressed = true;
                 let (x, y) = self.cursor;
                 let measure = CpuTextMeasure::for_style(&display.draw_style);
                 self.handle = self
@@ -277,8 +299,13 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                let chart_pressed = std::mem::take(&mut self.chart_pressed);
                 self.dragging = false;
                 self.handle = None;
+                if chart_pressed && self.selected.is_some() && self.chart_contains_cursor() {
+                    self.editor.inspector_open = true;
+                    self.window.request_redraw();
+                }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let dy = match delta {
@@ -324,170 +351,13 @@ impl SurfaceWindow {
         let ctx = self.ctx.clone();
         let previous_selection = self.selected.clone();
         let output = ctx.run_ui(input, |root| {
-            egui::Panel::right("properties")
-                .exact_size(310.)
-                .show(root, |ui| {
-                    ui.heading("Figgy");
-                    ui.label("Rust · wgpu surface");
-                    ui.checkbox(&mut self.edit_area, "Edit plot area");
-                    if ui.button("Copy Python").clicked() {
-                        match c
-                            .settings_json()
-                            .and_then(|s| serde_json::to_string(&s).map_err(runtime))
-                        {
-                            Ok(quoted) => ctx.copy_text(format!(
-                                "import json\nfig.apply_settings(json.loads({quoted}))\n"
-                            )),
-                            Err(e) => self.error = e.to_string(),
-                        }
-                    }
-                    ui.horizontal(|ui| {
-                        ui.add(egui::TextEdit::singleline(&mut self.save_path).desired_width(170.));
-                        if ui.button("Save PNG").clicked() {
-                            c.data.png_encodes += 1;
-                            match c
-                                .render(1.)
-                                .and_then(|r| encode_png(&r).map_err(runtime))
-                                .and_then(|b| std::fs::write(&self.save_path, b).map_err(runtime))
-                            {
-                                Ok(_) => self.error.clear(),
-                                Err(e) => self.error = e.to_string(),
-                            }
-                            // Export uses its own RGBA target; restore surface pipeline format.
-                            if let Err(e) = c.renderer.ensure_target_format(self.config.format) {
-                                self.error = e.to_string();
-                            }
-                        }
-                    });
-                    egui::ComboBox::from_id_salt("target")
-                        .selected_text(self.selected.as_deref().unwrap_or("Select an object"))
-                        .show_ui(ui, |ui| {
-                            for (id, _) in &c.data.elements {
-                                ui.selectable_value(&mut self.selected, Some(id.clone()), id);
-                            }
-                            for s in &c.data.series {
-                                ui.selectable_value(
-                                    &mut self.selected,
-                                    Some(s.series_id.clone()),
-                                    &s.series_id,
-                                );
-                            }
-                        });
-                    if let Some(target) = self.selected.clone() {
-                        let mut state = serde_json::to_value(c.snapshot()).unwrap();
-                        let mut changed = false;
-                        let config = &mut state["config"];
-                        let node = match target.as_str() {
-                            "chart_title" => Some(&mut config["chart_title"]["text"]),
-                            "axis_title_bottom" => {
-                                Some(&mut config["bottom_x"]["title_option"]["text"])
-                            }
-                            "axis_title_top" => Some(&mut config["top_x"]["title_option"]["text"]),
-                            "axis_title_left" => {
-                                Some(&mut config["left_y"]["title_option"]["text"])
-                            }
-                            "axis_title_right" => {
-                                Some(&mut config["right_y"]["title_option"]["text"])
-                            }
-                            "legend" => Some(&mut config["legend"]["content"]),
-                            _ => None,
-                        };
-                        if let Some(node) = node {
-                            let mut text = node["segments"]
-                                .as_array()
-                                .map(|a| {
-                                    a.iter()
-                                        .filter_map(|s| s["text"].as_str())
-                                        .collect::<String>()
-                                })
-                                .unwrap_or_default();
-                            if ui.text_edit_singleline(&mut text).changed() {
-                                node["segments"] = serde_json::to_value(
-                                    renderer::text::rich_segments_from_text(&text),
-                                )
-                                .unwrap();
-                                changed = true;
-                            }
-                            changed |= number(ui, node, "font_size");
-                            changed |= color(ui, node, "color");
-                            changed |= string(ui, node, "font");
-                        } else if target.starts_with("tick_labels_") {
-                            let key = match target.as_str() {
-                                "tick_labels_bottom" => "bottom_x",
-                                "tick_labels_top" => "top_x",
-                                "tick_labels_left" => "left_y",
-                                _ => "right_y",
-                            };
-                            let style = &mut config[key]["label_style"];
-                            changed |= number(ui, style, "font_size");
-                            changed |= color(ui, style, "color");
-                            changed |= string(ui, style, "label_font");
-                        } else if let Some(s) = state["series"]
-                            .as_array_mut()
-                            .unwrap()
-                            .iter_mut()
-                            .find(|s| s["series_id"] == target)
-                        {
-                            let style = s["render_type"]
-                                .as_object_mut()
-                                .unwrap()
-                                .values_mut()
-                                .next()
-                                .unwrap();
-                            if style["line"].is_object() {
-                                changed |= color(ui, &mut style["line"], "line_color");
-                                changed |= number(ui, &mut style["line"], "line_width");
-                            }
-                            if style["scatter"].is_object() {
-                                changed |= color(ui, &mut style["scatter"], "point_color");
-                                changed |= number(ui, &mut style["scatter"], "point_size");
-                            }
-                            if style["matrix"].is_object() {
-                                ui.label("Heatmap: edit colorbar through full SSOT below");
-                            }
-                        } else {
-                            let key = match target.as_str() {
-                                "axis_bottom" | "tick_labels_bottom" => "bottom_x",
-                                "axis_top" | "tick_labels_top" => "top_x",
-                                "axis_left" | "tick_labels_left" => "left_y",
-                                "axis_right" | "tick_labels_right" => "right_y",
-                                _ => "",
-                            };
-                            if !key.is_empty() {
-                                for field in ["min", "max", "major_spacing", "line_width"] {
-                                    changed |= number(ui, &mut state["config"][key], field);
-                                }
-                                changed |= color(ui, &mut state["config"][key], "line_color");
-                            }
-                        }
-                        if changed {
-                            match c.apply_settings(&state.to_string()) {
-                                Ok(_) => self.error.clear(),
-                                Err(e) => self.error = e.to_string(),
-                            }
-                        }
-                    }
-                    ui.collapsing("Full SSOT", |ui| {
-                        if ui.button("Refresh JSON").clicked() {
-                            self.raw = serde_json::to_string_pretty(&c.snapshot()).unwrap();
-                        }
-                        egui::ScrollArea::vertical()
-                            .max_height(220.)
-                            .show(ui, |ui| {
-                                ui.add(egui::TextEdit::multiline(&mut self.raw).desired_rows(8));
-                            });
-                        if ui.button("Apply JSON").clicked() {
-                            match c.apply_settings(&self.raw) {
-                                Ok(_) => self.error.clear(),
-                                Err(e) => self.error = e.to_string(),
-                            }
-                        }
-                    });
-                    if !self.error.is_empty() {
-                        ui.colored_label(egui::Color32::RED, &self.error);
-                    }
-                });
+            self.editor
+                .show(root, &mut c, &mut self.selected, &mut self.edit_area);
         });
+        // Explicit export may temporarily select its RGBA target pipelines.
+        c.renderer
+            .ensure_target_format(self.config.format)
+            .map_err(runtime)?;
         if previous_selection != self.selected {
             self.last_revision = u64::MAX;
         }
@@ -506,6 +376,7 @@ impl SurfaceWindow {
         if c.data.revision != self.last_revision
             || scale != self.last_scale
             || self.last_pool_generation != c.renderer.pool().generation()
+            || self.last_panel != Some(panel)
         {
             let boxes = self
                 .selected
@@ -540,6 +411,7 @@ impl SurfaceWindow {
             self.last_revision = c.data.revision;
             self.last_scale = scale;
             self.last_pool_generation = c.renderer.pool().generation();
+            self.last_panel = Some(panel);
         }
         let specs = c.gpu_series(&c.data.series);
         let series = specs
@@ -623,64 +495,54 @@ impl SurfaceWindow {
         for id in &output.textures_delta.free {
             self.ui_renderer.free_texture(id);
         }
+        // egui popups use a sizing pass before their visible pass; text inputs
+        // also request delayed caret redraws without another OS input event.
+        self.repaint_at = output
+            .viewport_output
+            .get(&egui::ViewportId::ROOT)
+            .filter(|viewport| viewport.repaint_delay != Duration::MAX)
+            .and_then(|viewport| Instant::now().checked_add(viewport.repaint_delay));
         self.frames += 1;
         if let Some(start) = self.last_input.take() {
             self.latency_ms = start.elapsed().as_secs_f64() * 1000.;
         }
-        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        let dpr = output.pixels_per_point;
+        let controls = self
+            .editor
+            .controls
+            .iter()
+            .map(|(name, rect)| {
+                (
+                    name.clone(),
+                    json!([
+                        rect.min.x * dpr,
+                        rect.min.y * dpr,
+                        rect.width() * dpr,
+                        rect.height() * dpr
+                    ]),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let measure = CpuTextMeasure::for_style(&display.draw_style);
+        let decorations = c
+            .data
+            .elements
+            .iter()
+            .filter_map(|(name, id)| {
+                c.data
+                    .hitmap
+                    .selection_box(*id, &display, &measure)
+                    .map(|b| {
+                        (
+                            name.clone(),
+                            json!([b.rect.x, b.rect.y, b.rect.width, b.rect.height]),
+                        )
+                    })
+            })
+            .collect::<serde_json::Map<_, _>>();
+        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
-}
-fn number(ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
-    let Some(mut value) = node[key].as_f64() else {
-        return false;
-    };
-    let changed = ui
-        .horizontal(|ui| {
-            ui.label(key);
-            ui.add(egui::DragValue::new(&mut value).speed(0.1))
-                .changed()
-        })
-        .inner;
-    if changed {
-        node[key] = json!(value);
-    }
-    changed
-}
-fn string(ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
-    let Some(mut value) = node[key].as_str().map(str::to_owned) else {
-        return false;
-    };
-    let changed = ui
-        .horizontal(|ui| {
-            ui.label(key);
-            ui.text_edit_singleline(&mut value).changed()
-        })
-        .inner;
-    if changed {
-        node[key] = json!(value);
-    }
-    changed
-}
-fn color(ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
-    if !node[key].is_object() {
-        return false;
-    }
-    let keys = ["r", "g", "b", "a"];
-    let mut rgba =
-        std::array::from_fn::<_, 4, _>(|i| node[key][keys[i]].as_f64().unwrap_or(0.) as f32);
-    let changed = ui
-        .horizontal(|ui| {
-            ui.label(key);
-            ui.color_edit_button_rgba_unmultiplied(&mut rgba).changed()
-        })
-        .inner;
-    if changed {
-        for i in 0..4 {
-            node[key][keys[i]] = json!(rgba[i]);
-        }
-    }
-    changed
 }
 struct App {
     pending: Vec<(Arc<Mutex<FigureCore>>, Arc<Control>)>,
@@ -695,8 +557,15 @@ impl ApplicationHandler for App {
         self.open_pending(events);
         self.windows
             .retain(|_, w| !w.control.close.load(Ordering::Acquire) && w.core.strong_count() > 0);
-        for w in self.windows.values() {
-            if w.control.dirty.swap(false, Ordering::AcqRel)
+        for w in self.windows.values_mut() {
+            let due = w
+                .repaint_at
+                .is_some_and(|deadline| Instant::now() >= deadline);
+            if due {
+                w.repaint_at = None;
+            }
+            if due
+                || w.control.dirty.swap(false, Ordering::AcqRel)
                 || w.core
                     .upgrade()
                     .is_some_and(|c| c.lock().unwrap().revision != w.last_revision)
@@ -725,27 +594,30 @@ impl ApplicationHandler for App {
                 Ok(())
             }
             WindowEvent::RedrawRequested => w.frame(),
-            WindowEvent::CursorMoved { position, .. }
-                if !w.dragging
-                    && position.x as f32
-                        >= w.config.width as f32 - 310. * w.window.scale_factor() as f32 =>
-            {
+            WindowEvent::CursorMoved { position, .. } if !w.dragging => {
                 w.cursor = (position.x as f32, position.y as f32);
                 Ok(())
             }
+            WindowEvent::CursorMoved { .. } => w.pointer(&event),
             WindowEvent::MouseInput {
                 state: ElementState::Released,
                 ..
             } => w.pointer(&event),
-            _ if !response.consumed
-                && w.cursor.0 < w.config.width as f32 - 310. * w.window.scale_factor() as f32 =>
+            _ if w.chart_contains_cursor()
+                && (!response.consumed
+                    || w.ctx
+                        .layer_id_at(egui::pos2(
+                            w.cursor.0 / w.ctx.pixels_per_point(),
+                            w.cursor.1 / w.ctx.pixels_per_point(),
+                        ))
+                        .is_none_or(|layer| layer.order == egui::Order::Background)) =>
             {
                 w.pointer(&event)
             }
             _ => Ok(()),
         };
         if let Err(e) = result {
-            w.error = e.to_string();
+            w.editor.error = e.to_string();
             self.error = Some(e);
             w.control.close.store(true, Ordering::Release);
         }

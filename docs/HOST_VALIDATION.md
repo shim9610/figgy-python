@@ -187,4 +187,37 @@ shared resources remain native-process local. Windows/macOS hardware behavior,
 different surface formats and physical VRAM pressure remain unverified here.
 Automatic CI is still disabled; pipeline disk-cache persistence remains absent.
 
+## Contextual desktop editor, vector toolbar and repaint scheduling
+
+`examples/desktop_editor.py` opens a real native surface with two 100,000-sample
+signals. `docs/DESKTOP_EDITOR.md` contains X11 captures for the initial chart-centered
+view, title/font editing and GPU-selected series editing. The toolbar glyphs are
+vector strokes on the native surface with hover/selected backgrounds and tooltips.
+These are screenshots of the presented window, not chart PNG exports or mockups. Capture sessions report 4 initial column
+uploads and 0 renderer RGBA readbacks/PNG encodes during interaction.
+
+Screenshot inspection exposed an egui popup sizing pass that requested another
+frame without a new OS input event. The winit host now schedules egui viewport
+repaint deadlines, including delayed caret updates. The installed-wheel native
+surface regression checks that popup pixels appear without forcing refresh or
+moving the mouse again; drag, font name/size editing, resize, zoom/fit, Copy Python, saves,
+reopen and shared-Figure behavior continue to pass. The inspector starts closed,
+opens after a chart selection, and reflows the available preview when toggled.
+Export-popup interaction does not reopen a closed inspector or zoom the chart
+under the popup. UI and Python PNG exports have identical pixels at the original
+960×600 document size after preview resize and editing. A separate native
+heatmap UI test edits bounds and a colormap and checks Python settings/to_code()
+without readback, PNG encoding or column reuploads. The example's blocking
+`show()` opens a window, handles a normal X11 `WM_DELETE_WINDOW` request and exits
+successfully. Wheel/sdist builds and strict twine checks pass. These remain Linux
+software-GPU checks, not Windows/macOS hardware screenshots.
+
+The final installed-wheel suite passes **26 tests**, including actual headed
+Chromium/JupyterLab WASM/WebGPU tests (SwiftShader browser GPU, llvmpipe native
+GPU). Installed JS/CSS/WASM files and native extension loading were checked;
+the sdist contains the native editor source, example and screenshots.
+A separate X11 run with `WINIT_X11_SCALE_FACTOR=1.25` verifies physical icon bounds,
+chart selection, inspector opening and resize with no PNG/readback or reupload.
+This is a forced scale-factor check, not a physical monitor/DPI transition test.
+
 ![Installed-wheel JupyterLab WebGPU output](images/notebook-webgpu.png)

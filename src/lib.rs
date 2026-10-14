@@ -889,6 +889,7 @@ impl FigureAccess<'_> {
 }
 
 mod desktop;
+mod editor;
 mod gpu;
 mod notebook;
 

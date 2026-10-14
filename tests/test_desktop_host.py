@@ -1,73 +1,262 @@
-"""Actual X11 surface/input regression, enabled when a display and xdotool exist."""
-import json,os,shutil,subprocess,time
-from pathlib import Path
+"""Actual X11 native toolbar/inspector/surface interactions."""
+
+import json
+import os
+import shutil
+import subprocess
+import time
 import numpy as np
 import pytest
 from figgy import subplots, release_gpu
 from figgy.desktop import poll_events
 
+
 def test_surface_drag_resize_reopen_and_no_png(tmp_path):
-    tool = shutil.which('xdotool')
-    if not os.environ.get('DISPLAY') or not tool:
-        pytest.skip('requires X11 display and xdotool; run under Xvfb for software-GPU validation')
+    tool = shutil.which("xdotool")
+    if not os.environ.get("DISPLAY") or not tool:
+        pytest.skip("requires X11 display and xdotool")
     release_gpu()
-    fig, ax = subplots(backend='native', pool_bytes=4096)
-    ax.plot(np.arange(32,dtype=np.float32),np.arange(32,dtype=np.float32),id='signal')
-    ax.set_title('Editable title')
+    fig, ax = subplots(backend="native", pool_bytes=4096)
+    ax.plot(
+        np.arange(32, dtype=np.float32),
+        np.arange(32, dtype=np.float32),
+        id="signal",
+        label="Signal",
+    )
+    ax.set_title("Editable title")
     handle = fig.show(block=False)
+
     def pump():
-        for _ in range(12):
-            poll_events();time.sleep(.005)
-    def xdo(*args):return subprocess.check_output([tool,*map(str,args)],text=True).strip()
-    pump()
-    wid=xdo('search','--name','Figgy').splitlines()[-1]
-    xdo('windowfocus',wid);pump()
-    before=fig.revision
-    bounds=json.loads(fig._native.bounds_json('chart_title'))['rect']
-    x,y=bounds[0]+bounds[2]/2,bounds[1]+bounds[3]/2
-    xdo('mousemove','--window',wid,round(x),round(y));pump();xdo('mousedown',1);pump()
-    for step in range(1,5):
-        xdo('mousemove','--window',wid,round(x+step*5),round(y+step*2));pump()
-    xdo('mouseup',1);pump()
-    assert fig.revision>before
-    assert fig.get_settings()['config']['chart_title']['offset_x']>0
-    # The selected title's property text field is below the Object row.
-    xdo('mousemove','--window',wid,1040,142);xdo('click',1);pump()
-    xdo('key','ctrl+a');xdo('type','Rust edited');pump()
-    assert 'Rust edited' in fig.to_code()
-    # Family input follows title text, size and color in the native panel.
-    xdo('mousemove','--window',wid,1080,208);xdo('click',1);pump()
-    xdo('key','ctrl+a');xdo('type','DejaVu Serif');pump()
-    assert fig.get_settings()['config']['chart_title']['text']['font']=='DejaVu Serif'
-    xdo('windowsize',wid,1350,680);pump()
-    info=json.loads(handle.info_json())
-    assert info['surface_size']==[1350,680]
-    assert info['surface_frames']>1 and info['column_uploads']==2
-    assert info['rgba_readbacks']==0 and info['png_encodes']==0
-    xdo('mousemove','--window',wid,1080,74);xdo('click',1);pump()
-    clip=shutil.which('xclip')
-    if clip:
-        copied=subprocess.check_output([clip,'-selection','clipboard','-o'],text=True,timeout=5)
-        assert 'fig.apply_settings' in copied
-        exec(copied,{'fig':fig})
-    # Resize changed the panel's left edge to 1040 physical pixels.
-    xdo('mousemove','--window',wid,1100,96);xdo('click',1);pump()
-    xdo('key','ctrl+a');xdo('type',str(tmp_path/'ui.png'));pump()
-    xdo('mousemove','--window',wid,1260,96);xdo('click',1);pump()
-    assert (tmp_path/'ui.png').read_bytes().startswith(b'\x89PNG')
-    fig.savefig(tmp_path/'native.png');pump()
-    assert (tmp_path/'native.png').read_bytes().startswith(b'\x89PNG')
-    handle.close();pump()
-    handle=fig.show(block=False);pump()
-    assert json.loads(handle.info_json())['column_uploads']==2
-    assert json.loads(handle.info_json())['png_encodes']==2
-    # Independent Figure documents share the same device/renderer/pool.
-    capacity=fig.info['pool_capacity_bytes']
-    other,other_ax=subplots(backend='native');other_ax.scatter(np.arange(4000,dtype=np.float32),np.arange(4000,dtype=np.float32),id='signal');second=other.show(block=False);pump()
-    assert json.loads(second.info_json())['surface_frames']>0
-    assert fig.info['gpu_context_id']==other.info['gpu_context_id']==json.loads(second.info_json())['gpu_context_id']
-    assert fig.info['pool_capacity_bytes'] > capacity
-    other.close();pump()
-    assert json.loads(handle.info_json())['surface_frames']>0 and not handle.closed
-    assert fig.info['columns']==2 and fig.info['active_figures']==1
-    handle.close();pump();fig.close()
+        for _ in range(14):
+            poll_events()
+            time.sleep(0.005)
+
+    def info():
+        return json.loads(handle.info_json())
+
+    def xdo(*a):
+        return subprocess.check_output([tool, *map(str, a)], text=True).strip()
+
+    def point(rect):
+        return round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2)
+
+    def click_rect(rect, double=False):
+        x, y = point(rect)
+        xdo("mousemove", "--window", wid, x, y)
+        pump()
+        if double:
+            xdo("click", "--repeat", 2, "--delay", 70, 1)
+        else:
+            xdo("mousedown", 1)
+            pump()
+            xdo("mouseup", 1)
+        pump()
+
+    def click(name):
+        click_rect(info()["controls"][name])
+
+    def type_field(name, value):
+        click(name)
+        xdo("key", "ctrl+a")
+        xdo("type", str(value))
+        pump()
+
+    try:
+        pump()
+        wid = xdo("search", "--pid", os.getpid(), "--name", "Figgy").splitlines()[-1]
+        xdo("windowfocus", wid)
+        pump()
+        assert not info()["properties_open"]
+        initial_width = info()["chart_panel"][2]
+        click_rect(info()["decorations"]["chart_title"])
+        assert info()["properties_open"] and info()["selected"] == "chart_title"
+        assert info()["chart_panel"][2] < initial_width
+        # With properties already open, dragging does not change the stage.
+        before = fig.revision
+        x, y = point(info()["decorations"]["chart_title"])
+        xdo("mousemove", "--window", wid, x, y)
+        pump()
+        xdo("mousedown", 1)
+        pump()
+        for step in range(1, 5):
+            xdo("mousemove", "--window", wid, x + step * 5, y + step * 2)
+            pump()
+        xdo("mouseup", 1)
+        pump()
+        assert (
+            fig.revision > before
+            and fig.get_settings()["config"]["chart_title"]["offset_x"] > 0
+        )
+        type_field("text", "Rust edited")
+        type_field("font", "DejaVu Serif")
+        click_rect(info()["controls"]["font_size"], double=True)
+        xdo("key", "ctrl+a")
+        xdo("type", "36")
+        xdo("key", "Return")
+        pump()
+        assert "Rust edited" in fig.to_code()
+        assert (
+            fig.get_settings()["config"]["chart_title"]["text"]["font"]
+            == "DejaVu Serif"
+        )
+        assert fig.get_settings()["config"]["chart_title"]["text"]["font_size"] == 36
+        # Popup must visibly appear without a forced refresh/additional motion.
+        from PIL import ImageGrab
+
+        geometry = dict(
+            line.split("=", 1)
+            for line in xdo("getwindowgeometry", "--shell", wid).splitlines()
+        )
+        gx, gy = int(geometry["X"]), int(geometry["Y"])
+        r = info()["controls"]["object"]
+
+        def popup_pixels():
+            return np.asarray(
+                ImageGrab.grab(
+                    bbox=(
+                        gx + int(r[0]),
+                        gy + int(r[1] + r[3] + 10),
+                        gx + int(r[0] + r[2]),
+                        gy + int(r[1] + r[3] + 120),
+                    ),
+                    xdisplay=os.environ["DISPLAY"],
+                )
+            )
+
+        closed = popup_pixels()
+        click("object")
+        assert np.count_nonzero(np.any(popup_pixels() != closed, axis=2)) > 100
+        xdo("key", "Escape")
+        pump()
+        xdo("windowsize", wid, 1350, 760)
+        pump()
+        assert info()["surface_size"] == [1350, 760]
+        assert info()["surface_frames"] > 1 and info()["column_uploads"] == 2
+        assert info()["rgba_readbacks"] == 0 and info()["png_encodes"] == 0
+        before_axis = fig.get_settings()["config"]["bottom_x"]
+        x, y = point(info()["decorations"]["data_area"])
+        xdo("mousemove", "--window", wid, x, y)
+        pump()
+        xdo("click", 4)
+        pump()
+        zoomed = fig.get_settings()["config"]["bottom_x"]
+        assert zoomed["max"] - zoomed["min"] < before_axis["max"] - before_axis["min"]
+        click("fit")
+        fitted = fig.get_settings()["config"]["bottom_x"]
+        assert fitted["min"] <= 0 and fitted["max"] >= 31
+        click("copy")
+        clip = shutil.which("xclip")
+        if clip:
+            copied = subprocess.check_output(
+                [clip, "-selection", "clipboard", "-o"], text=True, timeout=5
+            )
+            assert "fig.apply_settings" in copied
+            exec(copied, {"fig": fig})
+        click("close_properties")
+        click("save")
+        type_field("save_path", tmp_path / "ui.png")
+        assert not info()["properties_open"]
+        # Wheel over a popup must not zoom the chart below it.
+        xdo("click", 4)
+        pump()
+        assert fig.get_settings()["config"]["bottom_x"] == fitted
+        click("save_confirm")
+        assert (tmp_path / "ui.png").read_bytes().startswith(b"\x89PNG")
+        fig.savefig(tmp_path / "native.png")
+        pump()
+        assert (tmp_path / "native.png").read_bytes().startswith(b"\x89PNG")
+        from PIL import Image
+
+        with (
+            Image.open(tmp_path / "ui.png") as ui_png,
+            Image.open(tmp_path / "native.png") as python_png,
+        ):
+            assert ui_png.size == python_png.size == (960, 600)
+            assert np.array_equal(np.asarray(ui_png), np.asarray(python_png))
+        assert not info()["properties_open"]
+        handle.close()
+        pump()
+        handle = fig.show(block=False)
+        pump()
+        assert info()["column_uploads"] == 2 and info()["png_encodes"] == 2
+        capacity = fig.info["pool_capacity_bytes"]
+        other, other_ax = subplots(backend="native")
+        other_ax.scatter(
+            np.arange(4000, dtype=np.float32),
+            np.arange(4000, dtype=np.float32),
+            id="signal",
+        )
+        second = other.show(block=False)
+        pump()
+        assert json.loads(second.info_json())["surface_frames"] > 0
+        assert (
+            fig.info["gpu_context_id"]
+            == other.info["gpu_context_id"]
+            == json.loads(second.info_json())["gpu_context_id"]
+        )
+        assert fig.info["pool_capacity_bytes"] > capacity
+        other.close()
+        pump()
+        assert info()["surface_frames"] > 0 and not handle.closed
+        assert fig.info["columns"] == 2 and fig.info["active_figures"] == 1
+    finally:
+        handle.close()
+        pump()
+        fig.close()
+
+
+def test_surface_heatmap_edits_sync_without_image_transport():
+    tool = shutil.which("xdotool")
+    if not os.environ.get("DISPLAY") or not tool:
+        pytest.skip("requires X11 display and xdotool")
+    fig, ax = subplots(backend="native")
+    ax.imshow(np.array([[-1.0, 0.0], [1.0, 2.0]], dtype=np.float32), id="Temperature")
+    handle = fig.show(block=False)
+
+    def pump():
+        for _ in range(14):
+            poll_events()
+            time.sleep(0.005)
+
+    def info():
+        return json.loads(handle.info_json())
+
+    def xdo(*args):
+        return subprocess.check_output([tool, *map(str, args)], text=True).strip()
+
+    def click_rect(rect, double=False):
+        x, y = round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2)
+        xdo("mousemove", "--window", wid, x, y)
+        pump()
+        if double:
+            xdo("click", "--repeat", 2, "--delay", 70, 1)
+        else:
+            xdo("mousedown", 1)
+            pump()
+            xdo("mouseup", 1)
+        pump()
+
+    try:
+        pump()
+        wid = xdo("search", "--pid", os.getpid(), "--name", "Figgy").splitlines()[-1]
+        xdo("windowfocus", wid)
+        pump()
+        click_rect(info()["decorations"]["data_area"])
+        assert info()["selected"] == "Temperature" and info()["properties_open"]
+        for name, value in [("min", "-2"), ("max", "4")]:
+            click_rect(info()["controls"][name], double=True)
+            xdo("key", "ctrl+a")
+            xdo("type", "--", value)
+            xdo("key", "Return")
+            pump()
+        click_rect(info()["controls"]["colormap"])
+        click_rect(info()["controls"]["colormap_Magma"])
+        bar = fig.get_settings()["config"]["colorbar"]
+        assert bar["axis"]["min"] == -2 and bar["axis"]["max"] == 4
+        assert bar["colormap"] == "Magma" and "Magma" in fig.to_code()
+        assert info()["column_uploads"] == 4
+        assert info()["rgba_readbacks"] == info()["png_encodes"] == 0
+    finally:
+        handle.close()
+        pump()
+        fig.close()
