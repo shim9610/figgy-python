@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import json
 import math
+import os
+import sys
 from pathlib import Path
 import re
 import threading
@@ -48,6 +50,20 @@ class RenderWarning(UserWarning):
     """A tick setting the renderer could not draw as written and replaced."""
 
 
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _warn_external(message, category):
+    """Warn at the first caller outside figgyplot (like matplotlib's warn_external)."""
+    if sys.version_info >= (3, 12):
+        warnings.warn(message, category, skip_file_prefixes=(_PACKAGE_DIR,))
+        return
+    frame, level = sys._getframe(1), 1
+    while frame is not None and os.path.abspath(frame.f_code.co_filename).startswith(_PACKAGE_DIR):
+        frame, level = frame.f_back, level + 1
+    warnings.warn(message, category, stacklevel=level)
+
+
 _ALIGN = {"left": "Left", "center": "Center", "right": "Right"}
 
 
@@ -70,6 +86,22 @@ def _timeout(value):
     if not math.isfinite(value) or value <= 0:
         raise ValueError("timeout must be positive and finite (seconds)")
     return value
+
+
+def _display_texts(settings):
+    """Editor text for each rich node: the text its renderer segments came from.
+
+    Editors show and re-map this, so "10⁻³" keeps its superscripts when a title
+    is edited instead of becoming "10-3".
+    """
+    cfg = settings["config"]
+    texts = {"chart_title": _text(cfg["chart_title"]["text"]), "legend": _text(cfg["legend"]["content"])}
+    for side, key in (("bottom", "bottom_x"), ("top", "top_x"), ("left", "left_y"), ("right", "right_y")):
+        texts["axis_title_" + side] = _text(cfg[key]["title_option"]["text"])
+    for spec in settings["series"]:
+        if spec.get("label") is not None:
+            texts["series:" + spec["series_id"]] = _text(spec["label"])
+    return texts
 
 
 def _text(value):
@@ -238,7 +270,7 @@ class Figure:
 
     def _report_render_warnings(self):
         for message in self._native.take_render_warnings():
-            warnings.warn(message, RenderWarning, stacklevel=3)
+            _warn_external(message, RenderWarning)
 
     def update(self, target, **properties):
         """Edit a stable series/decorative target using familiar property names."""
@@ -339,14 +371,18 @@ class Figure:
                     elif key in node and key in ("visible", "line_width", "line_visible", "major_spacing", "min", "max"):
                         node[key] = value
                         if key in ("min", "max") and "range_locked" in node:
-                            # An explicit range edit: later fits keep it.
-                            node["range_locked"] = True
+                            # An explicit range edit: later fits keep it. The
+                            # marker goes on both axes of the pair, as the
+                            # binding reads it from the primary axis.
+                            pair = ("bottom_x", "top_x") if node is cfg["bottom_x"] or node is cfg["top_x"] else ("left_y", "right_y")
+                            for axis in pair:
+                                cfg[axis]["range_locked"] = True
                     else:
                         raise ValueError(f"unsupported property for {target}: {key}")
                 # Like the renderer's title helpers, derive the title band from
                 # the new text: a title taller than the band (multi-line or
                 # enlarged) grows it instead of being clipped at the top.
-                if target == "chart_title" and {"text", "fontsize", "font"} & properties.keys():
+                if target == "chart_title" and {"text", "fontsize", "font", "visible"} & properties.keys():
                     cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in state["series"]:
@@ -442,7 +478,16 @@ class Figure:
             raise ValueError("draw style must be precise, sketch, milkyway or constellation")
         if self.get_settings().get("radial") is not None:
             raise ValueError("use set_radial_style(material=...) for pie/donut charts")
-        return self.configure(config={"draw_style": {"mode": mode, **options}})
+        with self._lock:
+            self.configure(config={"draw_style": {"mode": mode, **options}})
+            # The style changes the title's font (sketch draws Comic Neue), so
+            # re-derive its band like the title helpers do.
+            state = self.get_settings()
+            band = fitted_chart_title_margin(json.dumps(state["config"], allow_nan=False))
+            if band != state["config"]["chart_title"]["top_margin"]:
+                state["config"]["chart_title"]["top_margin"] = band
+                self.apply_settings(state)
+        return self
 
     def configure_radial(self, *, style=None, slices=None, expected_slices=None, **properties):
         """Patch an existing pie/donut, preserving its values unless explicitly set.

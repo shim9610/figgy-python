@@ -40,7 +40,7 @@ impl Editor {
                         changed = true;
                     }
                 }
-                ui.small("Milkyway: lines only. Constellation: marker lines.");
+                ui.small("Sketch: lines, scatter, error bars. Milkyway: lines only. Constellation: marker lines.");
                 let mut value = serde_json::to_value(cfg.draw_style).unwrap();
                 for spec in draw_style_specs(&cfg.draw_style) {
                     let mut number = value[spec.key].as_f64().unwrap();

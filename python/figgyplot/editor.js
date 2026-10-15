@@ -21,7 +21,9 @@ export function render({ model, el }) {
   let pointer = null, dragTimer = null, dragDelta = [0, 0], handle = null;
   let localTarget = null;
   const finite = value => Number.isFinite(Number(value));
-  const richText = rich => rich?.segments?.map(s => s.text).join("") ?? "";
+  // Kernel-provided text for a rich node (keeps "10⁻³" as typed); the joined
+  // characters only when the kernel sent none for it.
+  const richText = (rich, key) => current.texts?.[key] ?? rich?.segments?.map(s => s.text).join("") ?? "";
   const hex = c => "#" + [c.r, c.g, c.b].map(v => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
   const sideKey = {bottom: "bottom_x", top: "top_x", left: "left_y", right: "right_y"};
 
@@ -64,7 +66,7 @@ export function render({ model, el }) {
     const series = current.settings.series.find(s => s.series_id === selected);
     if (series) {
       const style = Object.values(series.render_type)[0];
-      input("Label", "text", richText(series.label), "label");
+      input("Label", "text", richText(series.label, "series:" + series.series_id), "label");
       if (style.line) { input("Color", "color", hex(style.line.line_color), "color"); input("Line width (pt)", "number", style.line.line_width * 72 / current.dpi, "linewidth"); }
       if (style.scatter) { if (!style.line) input("Color", "color", hex(style.scatter.point_color), "color"); input("Marker size (pt)", "number", style.scatter.point_size * 144 / current.dpi, "markersize"); }
       if (style.matrix && cfg.colorbar) { input("Minimum", "number", cfg.colorbar.axis.min, "vmin"); input("Maximum", "number", cfg.colorbar.axis.max, "vmax"); }
@@ -77,7 +79,7 @@ export function render({ model, el }) {
     else if (selected.startsWith("tick_labels_")) node = cfg[sideKey[selected.slice(12)]]?.label_style;
     else if (selected.startsWith("axis_")) node = cfg[sideKey[selected.slice(5)]];
     if (!node) { fields.textContent = "Select a title, axis, legend or data object. Drag selected decorations; use handles to resize the plot area."; return; }
-    if (rich) { input("Text", "text", richText(rich), "text"); input("Font size (pt)", "number", rich.font_size * 72 / current.dpi, "fontsize"); input("Color", "color", hex(rich.color), "color"); }
+    if (rich) { input("Text", "text", richText(rich, selected), "text"); input("Font size (pt)", "number", rich.font_size * 72 / current.dpi, "fontsize"); input("Color", "color", hex(rich.color), "color"); }
     if ("visible" in node) input("Visible", "checkbox", node.visible, "visible");
     if ("line_width" in node) input("Line width", "number", node.line_width, "line_width");
   }

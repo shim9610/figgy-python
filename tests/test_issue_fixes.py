@@ -166,3 +166,62 @@ def test_tick_substitution_warns_once_per_change(plot):
         warnings.simplefilter("always")
         fig.render_rgba()
     assert not [w for w in caught if issubclass(w.category, figgy.RenderWarning)], "reported once"
+
+
+def test_to_code_replays_an_injected_title_margin(plot):
+    fig, ax = plot
+    ax.plot(np.arange(10.0), np.arange(10.0), id="a")
+    fig.update("chart_title", text="Line one\nLine two\nLine three")
+    state = fig.get_settings()
+    default_band = fig._default_config["chart_title"]["top_margin"]
+    state["config"]["chart_title"]["top_margin"] = default_band
+    fig.apply_settings(state)
+    expected = fig.get_settings()
+
+    target, target_ax = figgy.subplots(figsize=(6, 4), dpi=100)
+    try:
+        target_ax.plot(np.arange(10.0), np.arange(10.0), id="a")
+        exec(fig.to_code(variable="fig"), {"fig": target})
+        assert target.get_settings() == expected
+    finally:
+        target.close()
+
+
+def test_a_range_edit_on_a_secondary_axis_marks_the_pair(plot):
+    fig, ax = plot
+    ax.plot(np.arange(100.0), np.arange(100.0))
+    fig.update("axis_top", min=5.0, max=40.0)
+    config = fig.get_settings()["config"]
+    assert config["top_x"]["range_locked"] and config["bottom_x"]["range_locked"]
+
+
+def test_scaled_exports_report_tick_substitutions(plot):
+    import io
+
+    fig, ax = plot
+    ax.plot(np.arange(100.0), np.arange(100.0))
+    fig.configure(config={"bottom_x": {"major_spacing": 1e-6}})
+    with pytest.warns(figgy.RenderWarning, match="bottom_x"):
+        fig.savefig(io.BytesIO(), dpi=2 * fig.dpi)
+
+
+def test_editors_receive_the_original_text_of_styled_segments(plot):
+    from figgyplot.editor import EditorSession
+
+    fig, ax = plot
+    ax.plot(np.arange(3.0), np.arange(3.0), id="a", label="k₂")
+    fig.update("chart_title", text="Rate 10⁻³")
+    texts = EditorSession(fig).snapshot()["texts"]
+    assert texts["chart_title"] == "Rate 10⁻³"
+    assert texts["series:a"] == "k₂"
+
+
+def test_draw_style_change_rederives_a_clipped_title_band(plot):
+    fig, ax = plot
+    ax.plot(np.arange(10.0), np.arange(10.0))
+    fig.update("chart_title", text="Line one\nLine two\nLine three")
+    state = fig.get_settings()
+    state["config"]["chart_title"]["top_margin"] = fig._default_config["chart_title"]["top_margin"]
+    fig.apply_settings(state)
+    fig.set_draw_style("sketch")
+    assert fig.get_settings()["config"]["chart_title"]["top_margin"] > fig._default_config["chart_title"]["top_margin"]

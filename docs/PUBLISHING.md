@@ -39,7 +39,11 @@ other branches before building. This does not change main's branch protection.
 
 ## Run publication
 
-1. Check that `pyproject.toml` and `Cargo.toml` have the same intended version.
+1. Set the intended version in `Cargo.toml` (`[package] version`), the single version
+   source. `pyproject.toml` keeps `dynamic = ["version"]` and `figgyplot.__version__`
+   comes from the extension, so neither holds a version of its own. Remove any
+   `[patch.crates-io]` renderer override first: a release builds against a published
+   `figgy-renderer`.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
 3. Select **main**, **target `testpypi`** and the exact source version (currently
    preparing **`0.2.2`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
@@ -143,7 +147,7 @@ log and rerun only the failed jobs. There is no rollback of a published version.
 `skip-existing` is deliberately false: a new build must not silently mix with
 another build under the same version. If an upload partially succeeds, inspect
 which files exist before recovery. A fresh complete release should use a new
-version in both source manifests. Re-running the entire publication against an
+version in `Cargo.toml`. Re-running the entire publication against an
 already uploaded version fails instead of replacing immutable files. Artifact
 retention is temporary; archive verified release files/manifest if needed later.
 

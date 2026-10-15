@@ -9,6 +9,7 @@ import pprint
 
 def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     from .figure import _code_tree, _diff, _segments, _text
+    from ._native import fitted_chart_title_margin, font_family_available
 
     if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
         raise ValueError("variable must be a Python identifier")
@@ -60,6 +61,10 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         for field, prop, val in (("font_size", "fontsize", rich["font_size"] * 72 / dpi),
                                  ("font", "font", rich["font"]),
                                  ("color", "color", tuple(rich["color"][c] for c in "rgba"))):
+            # The font setter rejects families that do not resolve; such a
+            # font (e.g. typed in an editor) is restored by the patch below.
+            if field == "font" and not font_family_available(val):
+                continue
             if field == "font_size" or rich[field] != baseline["text"][field]:
                 args.append(f"{prop}={val!r}")
                 baseline["text"][field] = copy.deepcopy(rich[field])
@@ -71,6 +76,10 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             args.append(f"offset={offset!r}")
             baseline["offset_x"], baseline["offset_y"] = offset
         lines.append(f"{axis}.{method}({', '.join(args)})")
+
+    # set_title derives the title band like the renderer's title helper;
+    # model that, so the patch below restores a margin that differs from it.
+    modeled["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(modeled, allow_nan=False))
 
     for dimension, keys in (("x", ("bottom_x", "top_x")), ("y", ("left_y", "right_y"))):
         primary = cfg[keys[0]]

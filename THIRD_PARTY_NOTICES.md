@@ -17,7 +17,7 @@ The notebook extra uses anywidget and ipywidgets under their respective licenses
 
 Generated JS/WASM assets use upstream `figgy` web package 0.13.1 and
 `figgy-renderer` 0.16.1 at commit
-`84aa2783caa97d679c72b5c079fb4aea8bf1040e`, under MIT OR Apache-2.0.
+`3fbd423c37caa68f8962b7dbb53f7a4b76b351ce`, under MIT OR Apache-2.0.
 Rebuild path and asset hashes are documented in `docs/HOSTS.md` and
 `python/figgyplot/assets/provenance.json`. The same bundled font licenses apply.
 

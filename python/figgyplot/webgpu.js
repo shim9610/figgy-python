@@ -105,14 +105,28 @@ export function render({model,el}) {
     else if(target.startsWith('axis_title_'))path=[side[target.slice(11)],'title_option','text'];
     else if(target==='legend')path=['legend','content'];
     if(path){const find=s=>path.reduce((n,k)=>n[k],s.config),rich=find(local);
-      field('text',text(rich),'text',(s,v)=>find(s).segments=segments(v));
+      // Show the kernel's text for this node while the browser still holds
+      // the kernel's segments (it keeps "10⁻³" as typed).
+      const kernel=model.get('state'),same=JSON.stringify(path.reduce((n,k)=>n?.[k],kernel.settings?.config)?.segments)===JSON.stringify(rich.segments);
+      const shown=same?(kernel.texts?.[target] ?? text(rich)):text(rich);
+      // Titles go through the renderer's title helpers: its super/subscript
+      // mapping, and set_title's title-band fit.
+      const helper={chart_title:'set_title',axis_title_bottom:'set_x_title',axis_title_left:'set_y_title'}[target];
+      field('text',shown,'text',(s,v)=>{
+        if(!helper){find(s).segments=segments(v);return;}
+        chart[helper](v);const live=JSON.parse(chart.get_config());
+        if(target==='chart_title')s.config.chart_title=live.chart_title;else find(s).segments=path.reduce((n,k)=>n[k],live).segments;
+      });
       field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
       field('font',rich.font,'text',(s,v)=>find(s).font=v);
     }else if(series){const kind=Object.keys(series.render_type)[0],style=series.render_type[kind];const find=s=>s.series.find(v=>v.series_id===target).render_type[kind];
       if(style.line){color('color',style.line.line_color,s=>find(s).line.line_color);field('line_width',style.line.line_width,'number',(s,v)=>find(s).line.line_width=v);}
       if(style.scatter){color('color',style.scatter.point_color,s=>find(s).scatter.point_color);field('point_size',style.scatter.point_size,'number',(s,v)=>find(s).scatter.point_size=v);}
       if(style.matrix){field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);}
-    }else if(target.startsWith('axis_')){const key=side[target.slice(5)];for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>s.config[key][name]=v);color('color',cfg[key].line_color,s=>s.config[key].line_color);
+    }else if(target.startsWith('axis_')){const key=side[target.slice(5)],pair=key.endsWith('_x')?['bottom_x','top_x']:['left_y','right_y'];
+      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{s.config[key][name]=v;
+        // A typed range is fixed by the user (the SSOT marker set_xlim writes).
+        if(name==='min'||name==='max')for(const a of pair)s.config[a].range_locked=true;});color('color',cfg[key].line_color,s=>s.config[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>s.config[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>s.config[key].label_style.label_font=v);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
@@ -153,7 +167,9 @@ export function render({model,el}) {
   select.addEventListener('change',()=>enqueue(()=>{selected=select.value;properties();}));
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
-  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{await chart.auto_fit_all(0.05);dirty=true;commit();}));
+  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{await chart.auto_fit_all(0.05);
+    // An explicit fit fits every axis, so no range stays marked fixed (as fig.fit()).
+    const s=snapshot();for(const key of Object.values(side))s.config[key].range_locked=false;install(s);dirty=true;commit();}));
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
   canvas.addEventListener('pointerdown',e=>{if(!chart)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const [x,y]=position(e);pointer=[x,y];inputAt=performance.now();enqueue(async()=>{
     const hit=chart.hit_test(x,y);selected=hit;

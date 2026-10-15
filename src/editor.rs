@@ -578,12 +578,7 @@ impl Editor {
                     if !series["label"].is_object() {
                         continue;
                     }
-                    let mut text = series["label"]["segments"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter_map(|s| s["text"].as_str())
-                        .collect::<String>();
+                    let mut text = display_text(&series["label"]["segments"]);
                     let response =
                         ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
                     self.controls.insert(
@@ -615,14 +610,7 @@ impl Editor {
                     changed = true;
                 }
             } else {
-                let mut text = node["segments"]
-                    .as_array()
-                    .map(|a| {
-                        a.iter()
-                            .filter_map(|s| s["text"].as_str())
-                            .collect::<String>()
-                    })
-                    .unwrap_or_default();
+                let mut text = display_text(&node["segments"]);
                 ui.label("Text");
                 let response =
                     ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
@@ -761,8 +749,21 @@ impl Editor {
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
             let node = &mut config[key];
-            changed |= number(ui, node, "min", "Minimum", "", &mut self.controls);
-            changed |= number(ui, node, "max", "Maximum", "", &mut self.controls);
+            let range_changed = number(ui, node, "min", "Minimum", "", &mut self.controls)
+                | number(ui, node, "max", "Maximum", "", &mut self.controls);
+            changed |= range_changed;
+            if range_changed {
+                // A range typed here is fixed by the user, like set_xlim: both
+                // axes of the pair carry the SSOT marker.
+                let pair = match key {
+                    "bottom_x" | "top_x" => ["bottom_x", "top_x"],
+                    _ => ["left_y", "right_y"],
+                };
+                for axis in pair {
+                    config[axis]["range_locked"] = json!(true);
+                }
+            }
+            let node = &mut config[key];
             changed |= number(
                 ui,
                 node,
@@ -783,6 +784,15 @@ impl Editor {
         } else {
             ui.label(RichText::new("Drag this element to adjust its layout.").weak());
         }
+        if changed && target == "chart_title" {
+            // The title fields act as the renderer's title helper: a title
+            // taller than its band grows the band instead of being clipped.
+            if let Ok(mut parsed) = serde_json::from_value::<Config>(config.clone()) {
+                let measure = renderer::CpuTextMeasure::for_style(&parsed.draw_style);
+                renderer::layout::fit_chart_title_margin(&mut parsed, &measure);
+                config["chart_title"]["top_margin"] = json!(parsed.chart_title.top_margin);
+            }
+        }
         state["config"] = config;
         if changed {
             match c.apply_settings(&state.to_string()) {
@@ -794,6 +804,21 @@ impl Editor {
             }
         }
     }
+}
+
+/// What a text field shows for a rich node: the text whose renderer segments
+/// these are (keeping "10⁻³" as typed), or the plain characters when the
+/// segments carry styling no plain text maps to.
+fn display_text(segments: &Value) -> String {
+    serde_json::from_value::<Vec<renderer::text::RichSegment>>(segments.clone())
+        .ok()
+        .and_then(|segments| crate::plain_text_of(&segments))
+        .unwrap_or_else(|| {
+            segments
+                .as_array()
+                .map(|a| a.iter().filter_map(|s| s["text"].as_str()).collect())
+                .unwrap_or_default()
+        })
 }
 
 fn axis_key(name: &str) -> &'static str {

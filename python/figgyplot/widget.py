@@ -7,6 +7,7 @@ except ImportError as exc:
     raise ImportError("Notebook editing requires: pip install 'figgyplot[notebook]'") from exc
 
 from .editor import EditorSession
+from .figure import _display_texts
 
 
 class PNGFigureWidget(anywidget.AnyWidget):
@@ -111,7 +112,9 @@ class FigureWidget(anywidget.AnyWidget):
 
     def refresh(self):
         if not self._handling:
-            self.state = {"settings": self.figure.get_settings(), "revision": self.figure.revision, "code": self.figure.to_code()}
+            settings = self.figure.get_settings()
+            self.state = {"settings": settings, "revision": self.figure.revision, "code": self.figure.to_code(),
+                          "texts": _display_texts(settings)}
 
     def _command(self, widget, content, buffers):
         action = content.get("action")

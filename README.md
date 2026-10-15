@@ -256,16 +256,20 @@ Ranges, ticks and titles:
   To keep tick spacing you chose explicitly, use `ax.set_xlim_without_tick_auto(a, b)`
   / `set_ylim_without_tick_auto`. Either way the range stays fixed when more series are
   added; `fig.fit()` fits all axes again.
-- A tick setting the renderer cannot draw as written (for example a spacing that
-  would draw thousands of ticks) is replaced by automatic ticks and reported once as
-  a `figgy.RenderWarning` when the figure is next rendered.
+- A tick setting the renderer cannot draw as written is replaced: a spacing that
+  would draw thousands of ticks falls back to automatic spacing, and `minor_count`
+  is capped at 99. Each change is reported once as a `figgy.RenderWarning` by the next
+  native PNG/RGBA render (`render_rgba`, `to_png`, `savefig`, the PNG widget). Desktop
+  windows and the browser (webgpu) backend do not report it.
 - `fig.update("chart_title", text="Line 1\nLine 2", align="center")` aligns the
   lines of multi-line text (`left`, `center`, `right`); a title taller than its band
   grows the band instead of being clipped. Unicode super/subscripts such as `10⁻³`
   are drawn as super/subscript text.
 - `font=` must name an installed family or `"Liberation Sans"` (or `""` for the
-  default); an unknown name raises `ValueError` on the native backend. Characters a
-  font lacks are drawn from another available font.
+  default); an unknown name raises `ValueError` on the native backend. The browser
+  backend cannot see installed fonts and draws an unknown family with the bundled font.
+  Characters a font lacks are drawn from another available font (natively including
+  installed fonts).
 
 To reuse the saved code yourself, from the repository root:
 
@@ -385,7 +389,9 @@ rates are reported separately; they are not monitor FPS measurements.
 ## Renderer and documentation
 
 This package uses **figgy-renderer 0.16.1** from the upstream
-[figgy repository](https://github.com/shim9610/figgy). Rust owns chart layout,
+[figgy repository](https://github.com/shim9610/figgy). While unreleased renderer
+changes are validated, the native extension and the packaged browser kernel are both
+built from figgy commit `3fbd423` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 

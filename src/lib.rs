@@ -165,6 +165,8 @@ struct FigureCore {
     /// raster is rebuilt; a changed list is reported once.
     render_warnings: Vec<renderer::RenderWarning>,
     pending_warnings: Vec<String>,
+    /// Document revision the warnings above were derived for.
+    warnings_revision: Option<u64>,
 }
 
 /// An operation holds the document lock, then the shared renderer lock.
@@ -247,6 +249,15 @@ impl FigureAccess<'_> {
         }
         rendered
     }
+    /// Record the tick warnings of the current revision's raster; a changed
+    /// list is queued for Python once.
+    fn note_render_warnings(&mut self, warnings: &[renderer::RenderWarning]) {
+        self.data.warnings_revision = Some(self.data.revision);
+        if warnings != self.data.render_warnings.as_slice() {
+            self.data.pending_warnings = warnings.iter().map(ToString::to_string).collect();
+            self.data.render_warnings = warnings.to_vec();
+        }
+    }
     fn render_inner(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
         if self.data.radial.is_some() {
             return self.render_radial(scale);
@@ -259,6 +270,16 @@ impl FigureAccess<'_> {
             renderer::config::DrawStyle::Precise
         );
         if scale != 1.0 && !styled {
+            // Exports at another scale rasterize without a ChartView, so derive
+            // this revision's tick warnings from a view of the document itself.
+            if self.data.warnings_revision != Some(self.data.revision) {
+                let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
+                let view = self
+                    .renderer
+                    .create_chart_view(&chart, chart.config().chart_area.0)
+                    .map_err(runtime)?;
+                self.note_render_warnings(view.render_warnings());
+            }
             return pollster::block_on(self.renderer.export_panel_rgba_with_clear_async(
                 &Chart::new(gpu::config(self.data.figure_id, self.data.chart.config())),
                 &gpu::series(self.data.figure_id, &self.data.series),
@@ -349,10 +370,17 @@ impl FigureAccess<'_> {
                 .map_err(runtime)?;
             target.revision = self.data.revision;
         }
+        // Same bookkeeping as note_render_warnings, on disjoint fields while
+        // `target` is still borrowed.
+        self.data.warnings_revision = Some(self.data.revision);
         if target.view.render_warnings() != self.data.render_warnings.as_slice() {
-            let warnings = target.view.render_warnings().to_vec();
-            self.data.pending_warnings = warnings.iter().map(ToString::to_string).collect();
-            self.data.render_warnings = warnings;
+            self.data.render_warnings = target.view.render_warnings().to_vec();
+            self.data.pending_warnings = self
+                .data
+                .render_warnings
+                .iter()
+                .map(ToString::to_string)
+                .collect();
         }
         let drawn = specs
             .iter()
@@ -679,15 +707,6 @@ fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()>
             "Milkyway supports line-only series; scatter and marker lines are disabled",
         ));
     }
-    if matches!(config.draw_style, DrawStyle::Constellation(_))
-        && series
-            .iter()
-            .any(|s| !matches!(s.render_type, DataRenderType::ScatterLine { .. }))
-    {
-        return Err(invalid(
-            "Constellation requires line series with markers (plot(..., marker='o'))",
-        ));
-    }
     let values = serde_json::to_value(config.draw_style).map_err(invalid)?;
     for spec in draw_style_specs(&config.draw_style) {
         let value = values[spec.key]
@@ -847,6 +866,7 @@ impl FigureCore {
                 radial: None,
                 render_warnings: Vec::new(),
                 pending_warnings: Vec::new(),
+                warnings_revision: None,
             })
         })
     }
@@ -1510,9 +1530,16 @@ fn text_segments_json(text: &str) -> PyResult<String> {
 /// Lets code export write `text_segments("10⁻³")` back instead of raw dicts.
 #[pyfunction]
 fn segments_plain_text(json: &str) -> PyResult<Option<String>> {
+    let segments: Vec<renderer::text::RichSegment> = parse(json)?;
+    Ok(plain_text_of(&segments))
+}
+
+/// The text whose renderer segments are exactly `segments`, when there is one:
+/// the inverse of `rich_segments_from_text`, so editors can show and re-map
+/// "10⁻³" without losing its superscripts.
+pub(crate) fn plain_text_of(segments: &[renderer::text::RichSegment]) -> Option<String> {
     use renderer::text::{RichSegment, rich_segments_from_text};
     use std::sync::OnceLock;
-    let segments: Vec<RichSegment> = parse(json)?;
     // Characters the renderer maps to styled segments, found by asking the
     // renderer itself over the blocks that hold super/subscript forms.
     static STYLED: OnceLock<Vec<(RichSegment, char)>> = OnceLock::new();
@@ -1534,7 +1561,7 @@ fn segments_plain_text(json: &str) -> PyResult<Option<String>> {
                 .map_or(segment.text, |(_, c)| *c)
         })
         .collect();
-    Ok((rich_segments_from_text(&text) == segments).then_some(text))
+    (rich_segments_from_text(&text) == segments).then_some(text)
 }
 
 /// `chart_title.top_margin` after the renderer's title-band fit: grown to the
