@@ -67,7 +67,8 @@ def validate_source(root, tested_commit, current_commit):
 
 def validate_files(root, directory, manifest, commit, run_id):
     project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
-    if (manifest.get("name") != "figgyplot" or manifest.get("version") != project["version"]
+    version = tomllib.loads((root / "Cargo.toml").read_text())["package"]["version"]
+    if (manifest.get("name") != "figgyplot" or manifest.get("version") != version
             or manifest.get("commit") != commit or str(manifest.get("run_id")) != str(run_id)):
         raise ValueError("Release manifest must match this version, commit and successful TestPyPI run")
     paths = list(directory.iterdir())
@@ -89,10 +90,10 @@ def validate_files(root, directory, manifest, commit, run_id):
             if len(matches) != 1 or matches & seen:
                 raise ValueError("Duplicate or unexpected promotion wheel platform/ABI")
             expected_tag = next(iter(matches))
-            validate_wheel(path, expected_tag, project["version"], project["requires-python"], source_files)
+            validate_wheel(path, expected_tag, version, project["requires-python"], source_files)
             seen.add(expected_tag)
         else:
-            validate_sdist(path, project["version"], project["requires-python"], source_files)
+            validate_sdist(path, version, project["requires-python"], source_files)
             sdists += 1
     if seen != expected or sdists != 1:
         raise ValueError("Incomplete promotion wheel/sdist coverage")

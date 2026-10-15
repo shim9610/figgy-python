@@ -65,6 +65,7 @@ export function render({model,el}) {
       if(settings.schema_version!==1 || settings.renderer_version!=='0.16.1')throw Error('Unsupported settings/renderer version');
       checkNumbers(settings);
       const mode=settings.config?.draw_style?.mode;
+      if(mode==='sketch' && settings.series.some(s=>s.render_type.Histogram||s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour))throw Error('Sketch draws line, scatter and errorbar series; bars, heatmaps and contours are not supported');
       if(mode==='milkyway' && settings.series.some(s=>!s.render_type.Line))throw Error('Milkyway supports line-only series; scatter and marker lines are disabled');
       if(mode==='constellation' && settings.series.some(s=>!s.render_type.ScatterLine))throw Error('Constellation requires line series with markers');
       if(settings.config?.chart_title?.top_margin < 0)throw Error('config.chart_title.top_margin must be nonnegative; use offset_y to move the title');

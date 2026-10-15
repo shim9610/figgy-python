@@ -70,7 +70,7 @@ impl NotebookFigure {
     fn settings_json(&self) -> PyResult<String> {
         serde_json::to_string(&Settings {
             schema_version: 1,
-            renderer_version: "0.16.1".into(),
+            renderer_version: RENDERER_VERSION.into(),
             config: self.chart.config().clone(),
             series: self.series.clone(),
             radial: None,
@@ -83,10 +83,10 @@ impl NotebookFigure {
         json: &str,
         config: Option<&str>,
         bounds: Option<[f64; 4]>,
-        preserve_x: bool,
-        preserve_y: bool,
     ) -> PyResult<()> {
         let old_config = self.chart.config().clone();
+        let preserve_x = old_config.bottom_x.range_locked;
+        let preserve_y = old_config.left_y.range_locked;
         let old_series = self.series.clone();
         let revision = self.revision;
         let result = (|| {
@@ -124,7 +124,7 @@ impl NotebookFigure {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut s: Settings = parse(json)?;
-        if s.schema_version != 1 || s.renderer_version != "0.16.1" {
+        if s.schema_version != 1 || s.renderer_version != RENDERER_VERSION {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&s.config)?;
@@ -177,6 +177,7 @@ impl NotebookFigure {
         let mut fitted = Chart::new(self.chart.config().clone());
         fitted.auto_fit_x_extent(&x, padding);
         fitted.auto_fit_y_extent(&y, padding);
+        clear_range_fixed(fitted.config_mut());
         validate_config(fitted.config())?;
         self.chart = fitted;
         self.revision += 1;
@@ -196,6 +197,7 @@ impl NotebookFigure {
             }
             _ => return Err(invalid("axis must be x or y")),
         };
+        mark_range_fixed(next.config_mut(), axis);
         validate_config(next.config())?;
         self.chart = next;
         self.revision += 1;

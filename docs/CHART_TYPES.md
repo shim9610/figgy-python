@@ -104,12 +104,15 @@ fig.set_draw_style("precise")
 | Mode | Supported series and appearance |
 | --- | --- |
 | `precise` | Default scientific rendering |
-| `sketch` | Hand-drawn paths/decoration strokes and bundled Comic Neue handwriting |
+| `sketch` | Line, scatter and errorbar series: hand-drawn paths/decoration strokes and bundled Comic Neue handwriting |
 | `constellation` | `ax.plot(..., marker="o")`: stars at the actual source samples, connected by translucent lines |
 | `milkyway` | Line-only series: star chains and series-colored nebula ribbons |
 
 **Milkyway scatter and marker-line series are intentionally disabled.** Setting
 it on a Figure containing scatter, marker lines or a heatmap raises `ValueError`.
+Sketch does not draw bars, heatmaps or contours, so setting it on a Figure with
+one (or adding one afterwards) also raises `ValueError` instead of leaving the
+plot empty.
 Adding those series afterward is also rejected. Raw settings, advanced JSON and
 browser edits enforce the same rule. The native Style menu disables incompatible
 choices. Constellation requires marker lines, avoiding silently invisible series.

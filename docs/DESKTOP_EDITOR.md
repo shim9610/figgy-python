@@ -185,9 +185,12 @@ native Figures, `figgy.release_gpu()` releases the shared context.
 
 ## Fonts, preparation and coverage
 
-- Font entries accept installed family names, not file paths. Missing families
-  fall back to the renderer's bundled font. Text in other scripts needs an
-  installed font with those glyphs, for example `Malgun Gothic` on Windows.
+- Font entries accept installed family names, not file paths. While typing in
+  the editor, a missing family falls back to the renderer's bundled font; the
+  Python API (`update(..., font=...)`) rejects one with `ValueError` on the
+  native backend. Characters the chosen font lacks are drawn per character from
+  the bundled font or an installed font that has them; text in other scripts
+  still needs such a font, for example `Malgun Gothic` on Windows.
 - Property sizes use renderer document units. Python `fontsize`/`linewidth`
   values use points, converted by `dpi / 72`. At 120 DPI, `fontsize=18` appears
   as 30 pixels in properties.

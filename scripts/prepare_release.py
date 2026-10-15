@@ -128,8 +128,9 @@ def validate_sdist(path, version, requires_python, files):
 def prepare(root, artifacts, destination, manifest_path):
     project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
     cargo = tomllib.loads((root / "Cargo.toml").read_text())["package"]
-    version = project["version"]
-    if project["name"] != "figgyplot" or cargo["version"] != version:
+    # Cargo.toml is the single version source; pyproject declares it dynamic.
+    version = cargo["version"]
+    if project["name"] != "figgyplot" or project.get("version", version) != version:
         raise ValueError("Source package names/versions must agree")
     expected = expected_artifacts(root)
     actual = {p.name for p in artifacts.iterdir()}

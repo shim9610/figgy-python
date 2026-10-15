@@ -6,11 +6,12 @@ import math
 from pathlib import Path
 import re
 import threading
+import warnings
 import weakref
 
 import numpy as np
 
-from ._native import NativeFigure
+from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 _NAMED = {"blue": "#0000ff", "red": "#ff0000", "green": "#008000", "black": "#000000", "white": "#ffffff", "orange": "#ffa500", "purple": "#800080", "gray": "#808080", "grey": "#808080", "b": "#0000ff", "r": "#ff0000", "g": "#008000", "k": "#000000", "w": "#ffffff"}
@@ -43,9 +44,22 @@ def _array(value):
     return np.ascontiguousarray(value, dtype=dtype)
 
 
+class RenderWarning(UserWarning):
+    """A tick setting the renderer could not draw as written and replaced."""
+
+
+_ALIGN = {"left": "Left", "center": "Center", "right": "Right"}
+
+
 def _segments(text):
-    return [{"text": c, "bold": False, "italic": False, "underline": False,
-             "superscript": False, "subscript": False, "greek": False} for c in str(text)]
+    # The renderer's own plain-text segments, including its mapping of
+    # Unicode superscript/subscript characters (e.g. "10⁻³") to styled ones.
+    return json.loads(text_segments_json(str(text)))
+
+
+def _segments_text(segments):
+    """The text whose segments are exactly ``segments``, or None."""
+    return segments_plain_text(json.dumps(segments))
 
 
 def _timeout(value):
@@ -59,7 +73,8 @@ def _timeout(value):
 
 
 def _text(value):
-    return "".join(s["text"] for s in value["segments"])
+    text = _segments_text(value["segments"])
+    return "".join(s["text"] for s in value["segments"]) if text is None else text
 
 
 class Artist:
@@ -208,6 +223,23 @@ class Figure:
         for window in list(self._windows):
             window.refresh()
 
+    def _check_font(self, value):
+        """Reject a font family the native text stack would silently replace."""
+        if not isinstance(value, str):
+            raise ValueError("font must be a font family name")
+        # The browser backend resolves fonts in the page, where only the
+        # bundled face is available; there is nothing installed to check.
+        if self.backend == "native" and not font_family_available(value):
+            raise ValueError(
+                f"unknown font family {value!r}: it is neither installed nor the bundled "
+                "'Liberation Sans' (use '' for the default font)"
+            )
+        return value
+
+    def _report_render_warnings(self):
+        for message in self._native.take_render_warnings():
+            warnings.warn(message, RenderWarning, stacklevel=3)
+
     def update(self, target, **properties):
         """Edit a stable series/decorative target using familiar property names."""
         if not isinstance(target, str) or not target:
@@ -223,7 +255,7 @@ class Figure:
                 elif key == "fontsize":
                     radial["font_size"] = float(value) * self.dpi / 72
                 elif key == "font":
-                    radial["font_family"] = value
+                    radial["font_family"] = self._check_font(value)
                 else:
                     raise ValueError(f"unsupported radial title property: {key}")
             return self.configure_radial(**radial)
@@ -237,7 +269,7 @@ class Figure:
                 for key, value in properties.items():
                     if key == "color":
                         matched = False
-                        for kind, field in [("line", "line_color"), ("scatter", "point_color"), ("bar", "bar_color")]:
+                        for kind, field in [("line", "line_color"), ("scatter", "point_color"), ("bar", "fill_color")]:
                             if kind in style:
                                 style[kind][field] = _color(value)
                                 matched = True
@@ -280,11 +312,14 @@ class Figure:
                 for key, value in properties.items():
                     if key == "text" and rich is not None:
                         rich["segments"] = _segments(value)
+                    elif key == "align" and rich is not None:
+                        if not isinstance(value, str) or value.lower() not in _ALIGN:
+                            raise ValueError("align must be 'left', 'center' or 'right'")
+                        rich["align"] = _ALIGN[value.lower()]
                     elif key in ("color", "fontsize", "font"):
                         field = {"color": "color", "fontsize": "font_size", "font": "font"}[key]
                         if key == "font":
-                            if not isinstance(value, str):
-                                raise ValueError("font must be a font family name")
+                            value = self._check_font(value)
                             if rich is None and "label_font" in node:
                                 field = "label_font"
                         if key == "fontsize":
@@ -303,8 +338,16 @@ class Figure:
                         node["offset_x"], node["offset_y"] = map(float, value)
                     elif key in node and key in ("visible", "line_width", "line_visible", "major_spacing", "min", "max"):
                         node[key] = value
+                        if key in ("min", "max") and "range_locked" in node:
+                            # An explicit range edit: later fits keep it.
+                            node["range_locked"] = True
                     else:
                         raise ValueError(f"unsupported property for {target}: {key}")
+                # Like the renderer's title helpers, derive the title band from
+                # the new text: a title taller than the band (multi-line or
+                # enlarged) grows it instead of being clipped at the top.
+                if target == "chart_title" and {"text", "fontsize", "font"} & properties.keys():
+                    cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in state["series"]:
                 for style in spec["render_type"].values():
@@ -322,6 +365,7 @@ class Figure:
             if self.backend != "native":
                 raise RuntimeError("render_rgba requires a native GPU; use browser export via await fig.to_png_async()")
             w, h, data = self._native.render_rgba(float(scale))
+            self._report_render_warnings()
             return np.frombuffer(data, dtype=np.uint8).reshape(h, w, 4)
 
     def to_png(self, *, scale=1.0):
@@ -329,7 +373,9 @@ class Figure:
             self._require_open()
             if self.backend != "native":
                 raise RuntimeError("Browser export is asynchronous: await fig.to_png_async() or await fig.savefig_async(path)")
-            return self._native.render_png(float(scale))
+            data = self._native.render_png(float(scale))
+            self._report_render_warnings()
+            return data
 
     def savefig(self, filename, *, dpi=None, scale=None):
         """Write PNG directly, without opening a window or importing a GUI."""
@@ -387,8 +433,10 @@ class Figure:
     def set_draw_style(self, mode="precise", **options):
         """Use precise/sketch/milkyway/constellation with upstream parameters.
 
-        Milkyway accepts line-only series. Constellation requires marker lines.
-        These restrictions also apply to later additions and raw settings edits.
+        Sketch draws line, scatter and errorbar series; bars, heatmaps and
+        contours are not supported. Milkyway accepts line-only series.
+        Constellation requires marker lines. These restrictions also apply to
+        later additions and raw settings edits.
         """
         if mode not in ("precise", "sketch", "milkyway", "constellation"):
             raise ValueError("draw style must be precise, sketch, milkyway or constellation")
@@ -653,8 +701,8 @@ def _code_tree(value, segments_function="text_segments"):
         result = {}
         for key, current in value.items():
             if key == "segments" and isinstance(current, list):
-                text = "".join(s["text"] for s in current)
-                if current == _segments(text):
+                text = _segments_text(current)
+                if text is not None:
                     result[key] = _CodeExpression(f"{segments_function}({text!r})")
                     continue
             result[key] = _code_tree(current, segments_function)
@@ -665,7 +713,11 @@ def _code_tree(value, segments_function="text_segments"):
 
 
 def text_segments(text):
-    """Build plain renderer RichSegment values, including safe Unicode text."""
+    """Build renderer RichSegment values for ``text``.
+
+    Unicode superscript/subscript characters such as ``"10⁻³"`` become
+    superscript/subscript segments, exactly as the renderer maps them.
+    """
     return _segments(text)
 
 
@@ -689,8 +741,6 @@ def _material(value):
 class Axes:
     def __init__(self, figure):
         self.figure = figure
-        self._manual_x = False
-        self._manual_y = False
 
     def set_draw_style(self, mode="precise", **options):
         return self.figure.set_draw_style(mode, **options)
@@ -774,7 +824,7 @@ class Axes:
                 fig._native.add_series_fitted(
                     json.dumps(spec, allow_nan=False),
                     json.dumps(config, allow_nan=False) if config is not None else None,
-                    bounds, self._manual_x, self._manual_y,
+                    bounds,
                 )
             except Exception:
                 for name in reversed(uploaded):
@@ -870,9 +920,7 @@ class Axes:
             config["colorbar"] = bar
             for key in ("left_y", "right_y"):
                 config[key]["inverted"] = origin == "upper"
-            artist = self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
-            self._manual_x = self._manual_y = True
-        return artist
+            return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
 
     def set_title(self, text, **kwargs):
         return self.figure.update("chart_title", text=text, **kwargs)
@@ -922,7 +970,6 @@ class Axes:
         with self.figure._lock:
             self.figure._require_open()
             self.figure._native.set_range("x", float(left), float(right))
-            self._manual_x = True
         self.figure._changed()
         return (left, right)
 
@@ -931,9 +978,36 @@ class Axes:
         with self.figure._lock:
             self.figure._require_open()
             self.figure._native.set_range("y", float(bottom), float(top))
-            self._manual_y = True
         self.figure._changed()
         return (bottom, top)
+
+    def _set_lim_keeping_ticks(self, keys, low, high):
+        low, high = float(low), float(high)
+        if not math.isfinite(low) or not math.isfinite(high) or low >= high:
+            raise ValueError("range must be finite and increasing")
+        with self.figure._lock:
+            self.figure._require_open()
+            state = self.figure.get_settings()
+            for key in keys:
+                axis = state["config"][key]
+                axis["min"], axis["max"] = low, high
+                axis["range_locked"] = True
+            self.figure.apply_settings(state)
+        return (low, high)
+
+    def set_xlim_without_tick_auto(self, left, right):
+        """Set the x range only; tick spacing and labels stay as configured.
+
+        ``set_xlim`` re-derives readable ticks for the new range. Use this when
+        the tick settings were chosen explicitly and must be kept.
+        """
+        self.figure._require_cartesian()
+        return self._set_lim_keeping_ticks(("bottom_x", "top_x"), left, right)
+
+    def set_ylim_without_tick_auto(self, bottom, top):
+        """Set the y range only; tick spacing and labels stay as configured."""
+        self.figure._require_cartesian()
+        return self._set_lim_keeping_ticks(("left_y", "right_y"), bottom, top)
 
     def grid(self, visible=True):
         self.figure._require_cartesian()
@@ -956,8 +1030,8 @@ def figure(*args, **kwargs):
 
 
 def subplots(nrows=1, ncols=1, **kwargs):
-    """Return a Figure and Axes. The initial release supports one panel."""
+    """Return a Figure and Axes. A Figure currently has one panel."""
     if (nrows, ncols) != (1, 1):
-        raise NotImplementedError("multiple panels are not supported in 0.1")
+        raise NotImplementedError(f"multiple panels are not supported in figgyplot {__version__}")
     fig = Figure(**kwargs)
     return fig, fig.axes[0]

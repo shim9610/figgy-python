@@ -68,6 +68,10 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
     Ok(value)
 }
 
+/// Renderer version stamped into, and required from, Settings documents.
+/// It names the `figgy-renderer` pin in Cargo.toml; update both together.
+const RENDERER_VERSION: &str = "0.16.1";
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Settings {
@@ -156,6 +160,11 @@ struct FigureCore {
     preparation: Option<Value>,
     target: Option<RenderTarget>,
     radial: Option<radial::RadialDocument>,
+    /// Tick-guard warnings of the last rebuilt axis raster, and the messages
+    /// not yet handed to Python. The renderer re-derives them only when the
+    /// raster is rebuilt; a changed list is reported once.
+    render_warnings: Vec<renderer::RenderWarning>,
+    pending_warnings: Vec<String>,
 }
 
 /// An operation holds the document lock, then the shared renderer lock.
@@ -340,6 +349,11 @@ impl FigureAccess<'_> {
                 .map_err(runtime)?;
             target.revision = self.data.revision;
         }
+        if target.view.render_warnings() != self.data.render_warnings.as_slice() {
+            let warnings = target.view.render_warnings().to_vec();
+            self.data.pending_warnings = warnings.iter().map(ToString::to_string).collect();
+            self.data.render_warnings = warnings;
+        }
         let drawn = specs
             .iter()
             .zip(&target.styles)
@@ -509,7 +523,7 @@ impl FigureAccess<'_> {
     fn snapshot(&self) -> Settings {
         Settings {
             schema_version: 1,
-            renderer_version: "0.16.1".into(),
+            renderer_version: RENDERER_VERSION.into(),
             config: self.data.chart.config().clone(),
             series: self.data.series.clone(),
             radial: self.data.radial.as_ref().map(|r| r.chart.clone()),
@@ -614,8 +628,48 @@ fn draw_style_specs(
     }
 }
 
+/// Record in the SSOT that the host fixed this dimension's range, on both
+/// axes of the pair, so later fits (e.g. when a series is added) keep it.
+fn mark_range_fixed(config: &mut Config, axis: &str) {
+    let (a, b) = match axis {
+        "x" => (&mut config.bottom_x, &mut config.top_x),
+        _ => (&mut config.left_y, &mut config.right_y),
+    };
+    a.range_locked = true;
+    b.range_locked = true;
+}
+
+fn clear_range_fixed(config: &mut Config) {
+    for axis in [
+        &mut config.bottom_x,
+        &mut config.top_x,
+        &mut config.left_y,
+        &mut config.right_y,
+    ] {
+        axis.range_locked = false;
+    }
+}
+
 fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()> {
     use renderer::{DataRenderType, config::DrawStyle};
+    // A stylized style silently skips series it has no entry point for; the
+    // renderer's own predicate says which, so none reaches it unrejected.
+    if !series
+        .iter()
+        .all(|s| renderer::draw_style_supports(&config.draw_style, &s.render_type))
+    {
+        return Err(invalid(match config.draw_style {
+            DrawStyle::Sketch(_) => {
+                "Sketch draws line, scatter and errorbar series; bars, heatmaps and contours are not supported"
+            }
+            DrawStyle::Milkyway(_) => {
+                "Milkyway supports line-only series; scatter and marker lines are disabled"
+            }
+            _ => "Constellation requires line series with markers (plot(..., marker='o'))",
+        }));
+    }
+    // Product policy on top of the renderer: the binding offers Milkyway for
+    // plain lines only (the renderer also draws its scatter and errorbars).
     if matches!(config.draw_style, DrawStyle::Milkyway(_))
         && series
             .iter()
@@ -791,6 +845,8 @@ impl FigureCore {
                 preparation: None,
                 target: None,
                 radial: None,
+                render_warnings: Vec::new(),
+                pending_warnings: Vec::new(),
             })
         })
     }
@@ -891,10 +947,10 @@ impl FigureAccess<'_> {
         json: &str,
         config: Option<&str>,
         bounds: Option<[f64; 4]>,
-        preserve_x: bool,
-        preserve_y: bool,
     ) -> PyResult<()> {
         let old = self.snapshot();
+        let preserve_x = old.config.bottom_x.range_locked;
+        let preserve_y = old.config.left_y.range_locked;
         let revision = self.data.revision;
         let result = (|| {
             if let Some(config) = config {
@@ -943,7 +999,7 @@ impl FigureAccess<'_> {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut next: Settings = parse(json)?;
-        if next.schema_version != 1 || next.renderer_version != "0.16.1" {
+        if next.schema_version != 1 || next.renderer_version != RENDERER_VERSION {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&next.config)?;
@@ -1093,6 +1149,9 @@ impl FigureAccess<'_> {
                 .map_err(runtime)?;
             return Err(error);
         }
+        // An explicit fit fits every axis (renderer contract), so no range is
+        // host-fixed afterwards. add_series_fitted restores the fixed ones.
+        clear_range_fixed(&mut next);
         // Fitting changes axes only; keep the local document's selection ids.
         next.picked_data = self.data.chart.config().picked_data.clone();
         next.picked_points = self.data.chart.config().picked_points.clone();
@@ -1110,7 +1169,9 @@ impl FigureAccess<'_> {
             "y" => next.set_y_range(min, max),
             _ => return Err(invalid("axis must be x or y")),
         }
-        self.commit_config(next.config().clone())
+        let mut config = next.config().clone();
+        mark_range_fixed(&mut config, axis);
+        self.commit_config(config)
     }
     fn render_rgba<'py>(
         &mut self,
@@ -1336,10 +1397,8 @@ impl NativeFigure {
         json: &str,
         config: Option<&str>,
         bounds: Option<[f64; 4]>,
-        preserve_x: bool,
-        preserve_y: bool,
     ) -> PyResult<()> {
-        self.with(|core| core.add_series_fitted(py, json, config, bounds, preserve_x, preserve_y))
+        self.with(|core| core.add_series_fitted(py, json, config, bounds))
     }
     fn apply_settings(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.apply_settings(json))
@@ -1396,6 +1455,11 @@ impl NativeFigure {
     fn info_json(&self) -> PyResult<String> {
         self.with(|core| Ok(core.info_json()))
     }
+    /// Messages for tick settings the last rebuilt axis raster replaced, each
+    /// returned once after the list changed.
+    fn take_render_warnings(&self) -> PyResult<Vec<String>> {
+        Ok(std::mem::take(&mut self.lock()?.pending_warnings))
+    }
     #[getter]
     fn revision(&self) -> PyResult<u64> {
         Ok(self.lock()?.revision)
@@ -1420,7 +1484,68 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
     m.add_function(wrap_pyfunction!(radial::default_radial_json, m)?)?;
     m.add_function(wrap_pyfunction!(draw_style_specs_json, m)?)?;
+    m.add_function(wrap_pyfunction!(font_family_available, m)?)?;
+    m.add_function(wrap_pyfunction!(text_segments_json, m)?)?;
+    m.add_function(wrap_pyfunction!(segments_plain_text, m)?)?;
+    m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
+}
+
+/// Whether a font family resolves to a registered or installed face rather
+/// than the bundled fallback (native text stack).
+#[pyfunction]
+fn font_family_available(family: &str) -> bool {
+    renderer::text_render::font_family_available(family)
+}
+
+/// The renderer's plain-text segments for `text`, including its
+/// superscript/subscript character mapping.
+#[pyfunction]
+fn text_segments_json(text: &str) -> PyResult<String> {
+    serde_json::to_string(&renderer::text::rich_segments_from_text(text)).map_err(runtime)
+}
+
+/// The text whose renderer segments are exactly `json`, when there is one.
+/// Lets code export write `text_segments("10⁻³")` back instead of raw dicts.
+#[pyfunction]
+fn segments_plain_text(json: &str) -> PyResult<Option<String>> {
+    use renderer::text::{RichSegment, rich_segments_from_text};
+    use std::sync::OnceLock;
+    let segments: Vec<RichSegment> = parse(json)?;
+    // Characters the renderer maps to styled segments, found by asking the
+    // renderer itself over the blocks that hold super/subscript forms.
+    static STYLED: OnceLock<Vec<(RichSegment, char)>> = OnceLock::new();
+    let styled = STYLED.get_or_init(|| {
+        ('\u{a0}'..='\u{2fff}')
+            .chain('\u{1d00}'..='\u{1dbf}')
+            .filter_map(|c| {
+                let segment = rich_segments_from_text(&c.to_string()).pop()?;
+                (segment.text != c).then_some((segment, c))
+            })
+            .collect()
+    });
+    let text: String = segments
+        .iter()
+        .map(|segment| {
+            styled
+                .iter()
+                .find(|(styled, _)| styled == segment)
+                .map_or(segment.text, |(_, c)| *c)
+        })
+        .collect();
+    Ok((rich_segments_from_text(&text) == segments).then_some(text))
+}
+
+/// `chart_title.top_margin` after the renderer's title-band fit: grown to the
+/// measured title when the title is taller than its band, otherwise as given.
+/// The title helpers call it; settings applied directly keep their margin.
+#[pyfunction]
+fn fitted_chart_title_margin(config: &str) -> PyResult<f32> {
+    let mut config: Config = parse(config)?;
+    let measure = renderer::CpuTextMeasure::for_style(&config.draw_style);
+    renderer::layout::fit_chart_title_margin(&mut config, &measure);
+    Ok(config.chart_title.top_margin)
 }
 
 #[pyfunction]

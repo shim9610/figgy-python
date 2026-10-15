@@ -27,3 +27,11 @@ egui-winit = "0.36.2"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Unreleased renderer changes under validation (font fallback and checks,
+# draw_style_supports, render warnings, RichText alignment, title band,
+# AxisOptions.range_locked, colourbar strip). Remove this patch and move the
+# pin above to the next figgy-renderer release once it is published.
+[patch.crates-io]
+figgy-renderer = { git = "https://github.com/shim9610/figgy", branch = "claude/cool-lamport-ogcyzt" }
+figgy-model = { git = "https://github.com/shim9610/figgy", branch = "claude/cool-lamport-ogcyzt" }

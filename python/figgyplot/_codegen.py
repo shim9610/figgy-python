@@ -8,7 +8,7 @@ import pprint
 
 
 def settings_to_code(settings, defaults, dpi=120, variable="fig"):
-    from .figure import _code_tree, _diff, _segments
+    from .figure import _code_tree, _diff, _segments, _text
 
     if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
         raise ValueError("variable must be a Python identifier")
@@ -50,9 +50,12 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         node = cfg[key] if key == "chart_title" else cfg[key]["title_option"]
         baseline = modeled[key] if key == "chart_title" else modeled[key]["title_option"]
         rich = node["text"]
-        value = "".join(s["text"] for s in rich["segments"])
+        value = _text(rich)
         args = [repr(value)]
         baseline["text"]["segments"] = _segments(value)
+        if rich.get("align", "Left") != baseline["text"].get("align", "Left"):
+            args.append(f"align={rich['align'].lower()!r}")
+            baseline["text"]["align"] = rich["align"]
         # Python's font sizes are points; the renderer/editor stores pixels.
         for field, prop, val in (("font_size", "fontsize", rich["font_size"] * 72 / dpi),
                                  ("font", "font", rich["font"]),
@@ -74,6 +77,9 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         lines.append(f"{axis}.set_{dimension}lim({primary['min']!r}, {primary['max']!r})")
         for key in keys:
             modeled[key]["min"], modeled[key]["max"] = primary["min"], primary["max"]
+            # set_xlim/set_ylim mark the range as fixed; a fitted original is
+            # restored by the patch below.
+            modeled[key]["range_locked"] = True
         if primary["scale"] in ("Linear", "Logarithmic") and all(cfg[k]["scale"] == primary["scale"] for k in keys):
             scale = "log" if primary["scale"] == "Logarithmic" else "linear"
             lines.append(f"{axis}.set_{dimension}scale({scale!r})")
@@ -93,7 +99,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         style = next(iter(patch["render_type"].values()))
         properties = {}
         colors = [(style[k], field) for k, field in
-                  (("line", "line_color"), ("scatter", "point_color"), ("bar", "bar_color")) if k in style]
+                  (("line", "line_color"), ("scatter", "point_color"), ("bar", "fill_color")) if k in style]
         if colors and all(node[field] == colors[0][0][colors[0][1]] for node, field in colors):
             color = colors[0][0][colors[0][1]]
             properties["color"] = tuple(color[c] for c in "rgba")
@@ -108,7 +114,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             properties["markersize"] = style["scatter"].pop("point_size") * 144 / dpi
         if patch.get("label") is not None:
             label = patch["label"]
-            value = "".join(s["text"] for s in label["segments"])
+            value = _text(label)
             properties["label"] = value
             if label["segments"] == _segments(value):
                 del label["segments"]
