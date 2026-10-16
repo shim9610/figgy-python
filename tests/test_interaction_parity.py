@@ -65,13 +65,15 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
             inputs.click('layout_mode')
             box=inputs.info()['decorations']['data_area']
             inputs.click_rect([*native_point(inputs.info(),(box[0]+box[2]/2,box[1]+box[3]/2)),0,0])
-            fig.select_object('data_area')
-            handles=fig.selection_bounds()['handles']
+            assert inputs.info()['decoration_selected']=='DataArea'
+            original_area=inputs.info()['decorations']['data_area']
+            handles=json.loads(fig._native.bounds_json('data_area'))['handles']
             end=max(handles,key=lambda r:r[0]+r[1])
             point=(end[0]+end[2]/2,end[1]+end[3]/2)
             drag_native(inputs,native_point(inputs.info(),point),(-16*scale,-12*scale))
             native_area=fig.get_settings()[kind]['decorations']['data_area']
             assert native_area is not None
+            assert [native_area['width'],native_area['height']]==pytest.approx([original_area[2]-16,original_area[3]-12],abs=1.2)
             # Restore auto layout before comparing the same hit in both hosts.
             fig.fit();inputs.pump();inputs.click('select_mode')
             hit=None
@@ -104,7 +106,7 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
         assert page.locator('[data-layout] svg').count()==1
         for selector in ['data-fit','data-copy','data-save','data-properties']:
             assert page.locator(f'[{selector}] svg').count()==1
-        box=page.evaluate(ROOT+".decorations().find(v=>v.id==='chart_title').rect")
+        box=page.evaluate("async()=> (await "+ROOT+".decorations()).find(v=>v.id==='chart_title').rect")
         start=browser_point(page,(box[0]+box[2]/2,box[1]+box[3]/2))
         end=browser_point(page,(box[0]+box[2]/2+12,box[1]+box[3]/2+6))
         page.mouse.move(*start);page.mouse.down();page.mouse.move(*end,steps=5);page.mouse.up()
@@ -112,10 +114,10 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert offset(state[kind],'ChartTitle')==pytest.approx([12,6],abs=1.2)
         page.locator('[data-layout]').click()
-        box=page.evaluate(ROOT+".decorations().find(v=>v.id==='data_area').rect")
+        box=page.evaluate("async()=> (await "+ROOT+".decorations()).find(v=>v.id==='data_area').rect")
         page.mouse.click(*browser_point(page,(box[0]+box[2]/2,box[1]+box[3]/2)))
         if panel.is_visible():page.locator('[data-close-properties]').click()
-        handles=page.evaluate(ROOT+".decorations().find(v=>v.id==='data_area').handles")
+        handles=page.evaluate("async()=> (await "+ROOT+".decorations()).find(v=>v.id==='data_area').handles")
         h=max(handles,key=lambda r:r[0]+r[1]);pos=(h[0]+h[2]/2,h[1]+h[3]/2)
         click_at=browser_point(page,pos)
         (tmp_path/'resize-before.json').write_text(json.dumps({'logical':pos,'screen':click_at,'handles':handles,'state':page.evaluate(ROOT+'.snapshot()'),'element':page.evaluate('(p)=>document.elementFromPoint(...p)?.outerHTML.slice(0,500)',click_at)}))
@@ -210,7 +212,7 @@ def test_cartesian_hosts_share_pointer_anchored_zoom_pan_and_toolbar(tmp_path, t
     with notebook(tmp_path/transform,source) as (page,execute):
         def rect():
             # Browser measurements are physical canvas pixels; mouse input uses CSS.
-            r=page.evaluate(ROOT+'.decorations().data_area.rect');c=page.locator('.figgy-editor canvas').bounding_box()
+            r=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect');c=page.locator('.figgy-editor canvas').bounding_box()
             size=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
             return [c['x']+r[0]*c['width']/size[0],c['y']+r[1]*c['height']/size[1],r[2]*c['width']/size[0],r[3]*c['height']/size[1]]
         def config():

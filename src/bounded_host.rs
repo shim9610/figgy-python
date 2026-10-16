@@ -163,12 +163,16 @@ impl SurfaceWindow {
                             });
                             let dx = d.x * logical_size.0 as f32 / image_rect.width();
                             let dy = d.y * logical_size.1 as f32 / image_rect.height();
-                            if let Some(h) = self.handle.as_ref().and_then(|name| {
-                                ALL_HANDLES.into_iter().find(|h| format!("{h:?}") == *name)
-                            }) {
-                                map.resize_by(chart.decorations_mut(), id, h, dx, dy);
-                            } else {
-                                map.drag_by(chart.decorations_mut(), id, dx, dy);
+                            // A stationary pointer must not materialize an explicit
+                            // layout or increment the document revision.
+                            if dx != 0. || dy != 0. {
+                                if let Some(h) = self.handle.as_ref().and_then(|name| {
+                                    ALL_HANDLES.into_iter().find(|h| format!("{h:?}") == *name)
+                                }) {
+                                    map.resize_by(chart.decorations_mut(), id, h, dx, dy);
+                                } else {
+                                    map.drag_by(chart.decorations_mut(), id, dx, dy);
+                                }
                             }
                         }
                     }

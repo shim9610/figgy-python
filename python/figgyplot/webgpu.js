@@ -306,7 +306,7 @@ export function render({model,el}) {
   canvas.addEventListener('pointermove',e=>{if(!chart)return;const next=localPoint(e);hoverPoint=next;if(!pointer)return;const gesture=pointer;inputAt=performance.now();enqueue(()=>{
     const distance=Math.hypot(next[0]-gesture.origin[0],next[1]-gesture.origin[1]);if(distance>=3)gesture.moved=true;
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
-    if(kind){if(gesture.target&&gesture.moved)chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
+    if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
     else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;for(const k of ['bottom_x','top_x'])navigate(s.config[k],1,.5,-(next[0]-old[0])/r[2]);for(const k of ['left_y','right_y'])navigate(s.config[k],1,.5,(next[1]-old[1])/r[3]);install(s);}}
     else chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
   });});
@@ -354,7 +354,7 @@ export function render({model,el}) {
     await chart.first_frame_ready();}properties();observer.observe(canvas);resize();status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);
-    root.figgy={stats,snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))]))};
+    root.figgy={stats,snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();

@@ -119,7 +119,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             canvas_pixels=np.asarray(Image.open(io.BytesIO(canvas.screenshot())).convert('RGB'))
             assert np.count_nonzero((canvas_pixels[:,:,0]>150)&(canvas_pixels[:,:,1]<100)&(canvas_pixels[:,:,2]<100))>100
             # Initial picker hit at a real line point, through the actual browser GPU API.
-            picked=page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy,c=f.snapshot().config,r=f.decorations().data_area.rect;return await f.pick(r[0]+(0-c.bottom_x.min)/(c.bottom_x.max-c.bottom_x.min)*r[2],r[1]+c.left_y.max/(c.left_y.max-c.left_y.min)*r[3],12);}''')
+            picked=page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy,c=f.snapshot().config,r=(await f.decorations()).data_area.rect;return await f.pick(r[0]+(0-c.bottom_x.min)/(c.bottom_x.max-c.bottom_x.min)*r[2],r[1]+c.left_y.max/(c.left_y.max-c.left_y.min)*r[3],12);}''')
             assert picked is not None
             if auto_prepare and os.environ.get('FIGGY_FUZZ_BROWSER') == '1':
                 from scripts.check_randomized import mutate
