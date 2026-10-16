@@ -85,9 +85,15 @@ def notebook(tmp_path, source):
                 # budget on CI (raw POSIX exit 512 = RESULT_CODE_HUNG). Keep the
                 # watchdog enabled, aligned with the existing startup deadline.
                 browser_args.append('--gpu-watchdog-timeout-seconds=180')
+            executable = os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium')
             browser = p.chromium.launch(headless=os.environ.get('FIGGY_TEST_HEADFUL') != '1', env=browser_env,
-                executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
-                args=browser_args)
+                executable_path=executable, args=browser_args)
+            driver = os.environ.get('FIGGY_BROWSER_VK_DRIVER')
+            (tmp_path/'browser-info.json').write_text(json.dumps({
+                'version': browser.version,
+                'executable': executable or p.chromium.executable_path,
+                'vulkan_driver': Path(driver).name if driver else None,
+            }))
             context = browser.new_context(viewport={'width': 1500, 'height': 1000}, permissions=['clipboard-read', 'clipboard-write'], accept_downloads=True)
             context.route('https://**/*', lambda route: route.abort())
             page = context.new_page()

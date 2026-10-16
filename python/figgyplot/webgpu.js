@@ -294,7 +294,17 @@ export function render({model,el}) {
   const observer=new ResizeObserver(resize);
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
   function frame(now=0){if(disposed)return;
-    if(kind&&chart&&!busy){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;}lastFrame=now;if(chart && dirty && !busy){try{chart.frame();recordFrame();if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}}catch(e){fail(e);}}raf=requestAnimationFrame(frame);}
+    if(kind&&chart&&!busy){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
+    if(chart&&dirty&&!busy)enqueue(async()=>{
+      if(!dirty)return;
+      // Keep only one display frame in flight. Otherwise animation/input can
+      // build a GPU backlog that delays readback long after export is requested.
+      const ready=chart.first_frame_ready();
+      if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}
+      await ready;if(disposed)return;recordFrame();
+    });
+    raf=requestAnimationFrame(frame);
+  }
   async function exporting(scale=1){await flush();return enqueue(async()=>{stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){

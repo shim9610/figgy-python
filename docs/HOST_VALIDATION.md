@@ -147,6 +147,20 @@ geometry and hit targets with timer polling, then uses real mouse events.
 Its setup is also tested with animation-frame callbacks suppressed, so moving
 a frame-dependent `trial` click earlier cannot reintroduce the same failure.
 
+The subsequent hosted run reached PNG export but exceeded its 60-second
+deadline. Reproduction with the hosted Chromium 156/SwiftShader build recorded
+three unfinished surface frames when export began: those frames took about
+31.7 seconds to finish, export rendering/readback took another 12.9 seconds,
+and PNG encoding/result transmission took about 42 milliseconds. Ordinary
+redraws now wait for GPU completion before submitting the next surface frame.
+A held-completion regression sends a burst of real pointer input and checks
+that submissions stay bounded while the final drag and PNG remain correct.
+The export deadline is unchanged. Use the browser and bundled driver selected
+by `scripts/ci_gpu_env.py` when reproducing hosted failures; a system Chromium
+installation can be a different version from Playwright's CI browser.
+Each shared notebook scenario records the actual browser version, executable
+and driver filename in `browser-info.json` alongside its other artifacts.
+
 ## Remaining platform work
 
 Windows hardware surface/input/DPI, macOS Metal/event-loop behavior, Wayland,

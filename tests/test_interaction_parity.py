@@ -231,6 +231,8 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
         page.mouse.move(*browser_point(page,(x,y)))
         page.wait_for_function(ROOT+f".snapshot().{kind}."+('interaction.hovered' if kind=='radial' else 'hovered')+" !== null")
         page.mouse.click(*browser_point(page,(x,y)))
+        # The click waits for an in-flight GPU frame's mutable WASM borrow.
+        panel.wait_for(state='visible')
         assert panel.is_visible()
         # Hover and click do not recreate columns or encode images.
         canvas=page.locator('.figgy-editor canvas')
@@ -249,6 +251,55 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
         pixels=np.asarray(Image.open(path).convert('RGB'))
         assert pixels.shape==(600,960,3)
         assert np.count_nonzero(np.any(pixels<200,axis=2))>500
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
+    """Slow GPU completion must not build a frame backlog ahead of PNG export."""
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\nax.bar(['A','B'],[3,5])\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
+    with notebook(tmp_path/'frame-backpressure', source) as (page,execute):
+        box=page.evaluate("async()=> (await "+ROOT+".decorations()).find(v=>v.id==='chart_title').rect")
+        logical=(box[0]+box[2]/2,box[1]+box[3]/2)
+        start=browser_point(page,logical)
+        end=browser_point(page,(logical[0]+12,logical[1]+6))
+        page.mouse.move(*start)
+        page.evaluate(ROOT+'.flush()')
+        baseline=page.evaluate('window.figgyGPUWork.submitted')
+        page.evaluate("""()=>{
+            const prototype=GPUQueue.prototype,original=prototype.onSubmittedWorkDone;
+            let release;const held=new Promise(resolve=>{release=resolve;});
+            window.figgyFrameGate={entered:false,release:()=>{
+                prototype.onSubmittedWorkDone=original;release();
+            }};
+            prototype.onSubmittedWorkDone=function(...args){
+                const completion=original.apply(this,args);
+                window.figgyFrameGate.entered=true;
+                return completion.then(()=>held);
+            };
+        }""")
+        try:
+            page.mouse.down()
+            page.wait_for_function('window.figgyFrameGate.entered', polling=100)
+            submitted=page.evaluate('window.figgyGPUWork.submitted')
+            assert submitted == baseline+1
+            # Actual input continues while the first draw owns the renderer.
+            # Subsequent RAF callbacks must coalesce redraws, not submit them.
+            page.mouse.move(*end, steps=5)
+            page.mouse.up()
+            page.evaluate("window.figgyHeldFrames=0;requestAnimationFrame(()=>{window.figgyHeldFrames++;requestAnimationFrame(()=>window.figgyHeldFrames++);})")
+            page.wait_for_function('window.figgyHeldFrames===2', polling=100)
+            assert page.evaluate('window.figgyGPUWork.submitted') == submitted
+        finally:
+            page.evaluate('window.figgyFrameGate.release()')
+        execute('await fig.sync()')
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert offset(state['categorical'],'ChartTitle') == pytest.approx([12,6],abs=1.2)
+        path=tmp_path/'coalesced-export.png'
+        execute(f'await fig.savefig_async({str(path)!r})')
+        from PIL import Image
+        pixels=np.asarray(Image.open(path).convert('RGB'))
+        assert pixels.shape == (600,960,3)
+        assert np.count_nonzero(np.any(pixels<200,axis=2)) > 500
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')

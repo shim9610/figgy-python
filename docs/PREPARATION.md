@@ -60,6 +60,9 @@ submitting a redundant, unawaited frame. Preparation failures remain visible
 in the status and propagate to Python. The browser shows upstream stage progress.
 Preparation, menu access and redraw/picking/export operations are serialized to
 protect the WASM chart.
+Ordinary browser redraws also await GPU completion before submitting another
+surface frame. Input received during that wait is applied before the next
+redraw, so exports do not queue behind a burst of obsolete animation frames.
 `elapsed_ms` covers the browser request, including initialization/upload when
 deferred; `prewarm_ms` separately measures prewarm plus first-frame readiness.
 Kernel/comm scheduling and outbound transfer before the request are not included.
