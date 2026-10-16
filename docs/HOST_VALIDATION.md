@@ -178,7 +178,30 @@ interaction cases; preflight **107 passed**. The radial export took **24.1 s**:
 12.1 s waiting for the one outstanding display frame, 11.9 s rendering/readback,
 and approximately 0.04 s encoding/transmission. These software-GPU measurements
 are not physical-GPU frame-rate or export-latency claims. No hosted CI run has
-been performed for this unpushed correction.
+been performed at that local validation checkpoint.
+
+The subsequent hosted run for `3f2c253` reported **293 passed, 1 failed and
+32 setup errors**. The radial failure was `Browser prepare timed out after
+60 seconds` in the deliberate preparation/menu/resize overlap scenario, before
+its PNG export check. The setup errors came from `git apply --numstat` filtering
+patch paths when fixtures lived below the checkout (`--basetemp=ci-results`).
+The asset checker now parses in an isolated Git root; the checkout-local asset
+suite reproduces the old errors and passes after that correction.
+
+Until this failure is resolved, CI runs the asset suite and exact radial case
+first, then the full suite. Priority and full results use separate directories
+so pytest cannot delete earlier evidence. Verbose, unbuffered output identifies
+the active test. Notebook diagnostics retain actual adapter/device metadata,
+existing submission/fence/readback timings, host queue/request stages and the
+artificial preparation gate's release time on success and failure. Failures
+also print a compact diagnostic summary in the job log. Observers add no GPU
+completion requests, and timeout values and behavioral assertions are unchanged.
+Local validation of this diagnostic update: **112 preflight tests passed** and
+**49 priority tests passed**, using a checkout-local temporary directory. The
+radial trace recorded a 0.14-second artificial gate, two preparation frames
+within a 26.8-second request, and approximately 0.2-1.4 ms edit barrier responses.
+These are local software-adapter observations, not a reconstruction of the
+preceding hosted timeout. The next hosted run must supply its own stage evidence.
 
 A separate standalone comparison removed Jupyter from both paths and rendered
 the same three-slice donut with figgy-web `18cdff3` and the Python WASM host.

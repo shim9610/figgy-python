@@ -54,14 +54,20 @@ def check_bounded_menus_during_preparation(page, execute, kind):
         const original=prototype.onSubmittedWorkDone;
         let release;
         const gate=new Promise(resolve=>{release=resolve;});
-        window.figgyPreparationGate={entered:false,armedAt:performance.now(),release:()=>{
+        window.figgyPreparationGate={entered:false,enteredCount:0,armedAt:performance.now(),release:()=>{
+            const state=window.figgyPreparationGate;state.releasedAt=performance.now();
+            window.figgyDiagnosticEvent?.('preparation-gate-released',{durationMs:state.releasedAt-state.armedAt,enteredCount:state.enteredCount});
             prototype.onSubmittedWorkDone=original;release();
         }};
+        window.figgyDiagnosticEvent?.('preparation-gate-armed',{armedAt:window.figgyPreparationGate.armedAt});
         prototype.onSubmittedWorkDone=function(...args){
             const completion=original.apply(this,args);
-            window.figgyPreparationGate.entered=true;
-            window.figgyPreparationGate.enteredAt=performance.now();
-            return completion.then(()=>gate);
+            const state=window.figgyPreparationGate;state.entered=true;state.enteredCount++;
+            state.enteredAt??=performance.now();
+            window.figgyDiagnosticEvent?.('preparation-gate-entered',{count:state.enteredCount,elapsedMs:performance.now()-state.armedAt});
+            return completion.then(()=>{state.gpuCompletedAt=performance.now();
+                window.figgyDiagnosticEvent?.('preparation-gate-gpu-completed',{elapsedMs:state.gpuCompletedAt-state.armedAt,releasedAt:state.releasedAt});
+                return gate;});
         };
     }""")
     try:
@@ -71,11 +77,16 @@ def check_bounded_menus_during_preparation(page, execute, kind):
             # timer so delayed software-GPU presentation cannot stall RAF polling.
             page.wait_for_function('window.figgyPreparationGate.entered', polling=100)
         except Exception:
-            print('Preparation gate diagnostic:', page.evaluate("""()=>({
-                gate:window.figgyPreparationGate,now:performance.now(),
-                status:document.querySelector('.figgy-editor [data-status]')?.textContent,
-                stats:document.querySelector('.figgy-editor')?.figgy?.stats
-            })"""))
+            # The fixture saves full diagnostics independently; avoid masking
+            # the original handshake timeout if the page cannot be evaluated.
+            try:
+                print('Preparation gate diagnostic:', page.evaluate("""()=>({
+                    gate:window.figgyPreparationGate,now:performance.now(),
+                    status:document.querySelector('.figgy-editor [data-status]')?.textContent,
+                    stats:document.querySelector('.figgy-editor')?.figgy?.stats
+                })"""))
+            except Exception as error:
+                print('Preparation gate diagnostic unavailable:', repr(error))
             raise
         execute('assert not preparation.done()')
         for selector, x, y in menu_points:
@@ -95,12 +106,23 @@ def check_bounded_menus_during_preparation(page, execute, kind):
         # must cover the new surface even if ResizeObserver is queued behind it.
         before_size = page.locator('.figgy-editor canvas').evaluate('canvas=>[canvas.width,canvas.height]')
         requested_size = page.locator('.figgy-editor canvas').evaluate("""canvas=>{
+            const before=[canvas.width,canvas.height];
             canvas.style.width='90%';const r=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
-            return [Math.round(r.width*dpr),Math.round(r.height*dpr)];
+            const requested=[Math.round(r.width*dpr),Math.round(r.height*dpr)];
+            window.figgyDiagnosticEvent?.('preparation-gate-resize',{before,requested,css:[r.width,r.height],dpr});
+            return requested;
         }""")
         assert requested_size != before_size
     finally:
-        page.evaluate('window.figgyPreparationGate.release()')
+        # Preserve an existing assertion/timeout if browser cleanup also fails.
+        import sys
+        active_error = sys.exc_info()[0] is not None
+        try:
+            page.evaluate('window.figgyPreparationGate.release()')
+        except Exception as error:
+            if not active_error:
+                raise
+            print('Preparation gate release failed:', repr(error))
     report=json.loads(execute('print(json.dumps(await preparation))'))
     assert report['ready'] and report['backend']=='webgpu'
     page.evaluate(ROOT+'.flush()')

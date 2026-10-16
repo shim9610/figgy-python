@@ -108,6 +108,16 @@ def test_host_patch_check_does_not_depend_on_callers_git_subdirectory(registry_p
     check_pairing(registry_pairing)
 
 
+def test_host_patch_inside_another_checkout(tmp_path):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    nested = tmp_path / "ci-results" / "fixture"
+    (nested / "scripts").mkdir(parents=True)
+    shutil.copyfile(ROOT / "scripts/wasm-host.patch", nested / "scripts/wasm-host.patch")
+    checker = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"]
+    assert checker(nested) == checker(ROOT)
+
+
 @pytest.mark.parametrize("change", ["bytes", "missing", "hash", "path", "files"])
 def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
     import json

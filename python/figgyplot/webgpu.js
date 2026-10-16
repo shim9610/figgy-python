@@ -57,13 +57,21 @@ export function render({model,el}) {
   function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;}
   function layoutMode(enabled){if(!enabled&&kind&&chart&&selected==='data_area')enqueue(()=>{chart.clear_selection();selected=null;dirty=true;commit();});root.querySelector('[data-area]').checked=enabled;root.querySelector('[data-layout]').setAttribute('aria-pressed',String(enabled));root.querySelector('[data-select]').setAttribute('aria-pressed',String(!enabled));}
   let inputAt=null,busy=0,startInit,pendingFrame=null,frameError=null;
+  let queuedOperations=0,operationSequence=0;
+  // Optional CI diagnostics. Never read the WASM chart or wait on GPU work.
+  function diagnostics(){return {kind:kind??'cartesian',busy,queued:queuedOperations,
+    dirty,frame_pending:!!pendingFrame,frame_error:frameError?String(frameError):null,
+    edit_inflight:inflight?.sequence??null,edit_pending:!!pending,
+    canvas:[canvas.width,canvas.height],disposed};}
+  function trace(stage,details={}){try{globalThis.__figgyTrace?.(stage,{client,...diagnostics(),...details});}catch{}}
   const requested=new Promise(resolve=>{startInit=resolve;});
   let initializedResolve,initializedReject;
   const initialized=new Promise((resolve,reject)=>{initializedResolve=resolve;initializedReject=reject;});
   initialized.catch(()=>{});
   const fail=e=>{error.textContent=String(e?.message ?? e);stats.last_error=error.textContent;};
   const enqueue=(fn,propagate=false)=>{
-    const operation=queue.then(async()=>{if(disposed)throw Error('Widget disposed');busy++;try{return await fn();}finally{busy--;}});
+    const operationId=++operationSequence;queuedOperations++;trace('queue.enqueued',{operationId});
+    const operation=queue.then(async()=>{queuedOperations--;if(disposed)throw Error('Widget disposed');busy++;trace('queue.started',{operationId});try{return await fn();}finally{busy--;trace('queue.finished',{operationId});}});
     queue=operation.catch(fail);return propagate?operation:queue;
   };
   function snapshot(){if(kind)return {...clone(local),[kind]:JSON.parse(chart.get_document())};return {schema_version:1,renderer_version:'0.17.0',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
@@ -284,21 +292,23 @@ export function render({model,el}) {
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
   function displaySize(){const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;return [Math.max(1,Math.round(rect.width*dpr)),Math.max(1,Math.round(rect.height*dpr))];}
-  function resizeSurface(){const [width,height]=displaySize();if(canvas.width===width&&canvas.height===height)return false;canvas.width=width;canvas.height=height;wheelArea=null;chart.resize(width,height);dirty=true;return true;}
+  function resizeSurface(){const [width,height]=displaySize();if(canvas.width===width&&canvas.height===height)return false;const previous=[canvas.width,canvas.height];canvas.width=width;canvas.height=height;wheelArea=null;chart.resize(width,height);dirty=true;trace('surface.resized',{previous});return true;}
   function resize(){if(!chart || disposed)return;const [width,height]=displaySize();if(canvas.width!==width||canvas.height!==height)enqueue(resizeSurface);}
   function recordFrame(){if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;}
   async function readyDisplayedFrame(){
     if(disposed)throw Error('Widget disposed');
     resizeSurface();
-    do{await chart.first_frame_ready();if(disposed)throw Error('Widget disposed');recordFrame();}while(resizeSurface());
+    do{trace('ready_frame.started');await chart.first_frame_ready();trace('ready_frame.completed');if(disposed)throw Error('Widget disposed');recordFrame();}while(resizeSurface());
   }
   const observer=new ResizeObserver(resize);
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
   async function waitForFrame(){
+    trace('display_wait.started');
     if(frameError)throw frameError;
     await pendingFrame;
     if(disposed)throw Error('Widget disposed');
     if(frameError)throw frameError;
+    trace('display_wait.completed');
   }
   function frame(now=0){if(disposed)return;
     if(kind&&chart&&!busy&&!pendingFrame&&!frameError){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
@@ -306,13 +316,14 @@ export function render({model,el}) {
       if(!dirty||pendingFrame||frameError)return;
       try{
         chart.frame();
+        trace('display.submitted');
         if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}
         recordFrame();
         // GPU completion owns no chart borrow and must not hold the edit/ack
         // queue. Only further display submissions wait for this fence.
         const completion=Promise.resolve(chart.gpu_ready()).catch(e=>{
-          frameError=e;if(!disposed)fail(e);throw e;
-        }).finally(()=>{if(pendingFrame===completion)pendingFrame=null;});
+          frameError=e;trace('display.failed',{error:String(e)});if(!disposed)fail(e);throw e;
+        }).finally(()=>{if(pendingFrame===completion)pendingFrame=null;trace('display.settled');});
         pendingFrame=completion;
         completion.catch(()=>{}); // Export/prepare also observe the rejection.
       }catch(e){frameError=e;throw e;}
@@ -320,7 +331,7 @@ export function render({model,el}) {
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1){await flush();return enqueue(async()=>{await waitForFrame();stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
+  async function exporting(scale=1){trace('export.flush_started',{scale});await flush();trace('export.flush_completed');return enqueue(async()=>{await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
@@ -338,15 +349,16 @@ export function render({model,el}) {
       properties();idle();
     });
     else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
+      const request={requestId:message.id,action:message.action};trace('request.received',request);
       // Do not block the serialized queue while waiting for an ack processed by it.
-      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;await queue;await flush();let result=null;
+      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await queue;trace('request.queue_drained',request);await flush();trace('request.edits_acknowledged',request);let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
-          const start=performance.now(),stages=[];status.textContent='Preparing…';
-          try{await waitForFrame();if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';
+          const start=performance.now(),stages=[];status.textContent='Preparing…';trace('prepare.started',request);
+          try{await waitForFrame();if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);trace('prepare.prewarm',{...request,event});status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';trace('prepare.completed',request);
             return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
           }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
-        const data=message.action==='export'?await exporting(message.scale):null;model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);}catch(e){model.send({action:'result',id:message.id,error:String(e)});}})();
+        const data=message.action==='export'?await exporting(message.scale):null;trace('response.send_started',request);model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);trace('response.sent',{...request,elapsed_ms:performance.now()-requestedAt});}catch(e){trace('request.failed',{...request,error:String(e)});model.send({action:'result',id:message.id,error:String(e)});}})();
     }
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
@@ -487,7 +499,7 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);
-    root.figgy={stats,snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
+    root.figgy={stats,diagnostics,snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();

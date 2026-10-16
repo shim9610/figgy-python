@@ -12,6 +12,131 @@ import urllib.request
 import uuid
 
 
+# Diagnostic observers wrap only GPU operations already requested by the host.
+# A completed submission is one observed through an existing fence; mapAsync
+# completion alone does not advance that counter or prove later work is idle.
+GPU_TRACE_INIT = r"""(() => {
+    const limit=400, events=[], queues=new WeakMap(), buffers=new WeakMap();
+    const work=window.figgyGPUWork={submitted:0,completed:0,completedCanvas:null};
+    const trace=window.figgyBrowserTrace={events,hostStages:[],dropped:0,adapters:[],devices:[],queues:[],limit};
+    const record=(kind,details={})=>{
+        try { events.push({t:performance.now(),kind,...details});
+            if(events.length>limit){events.shift();trace.dropped++;}
+        } catch (_) { /* Diagnostics must never change host behavior. */ }
+    };
+    window.__figgyTrace=(stage,details={})=>{
+        record('host',{stage,...details});
+        if(/^(request|prepare|ready_frame|display_wait|export|response|surface)\./.test(stage)){
+            trace.hostStages.push({t:performance.now(),stage,...details});
+            if(trace.hostStages.length>100)trace.hostStages.shift();
+        }
+    };
+    window.figgyDiagnosticEvent=record;
+    record('instrumented',{timeOrigin:performance.timeOrigin});
+    if(!navigator.gpu){record('gpu-unavailable');return;}
+    const submit=GPUQueue.prototype.submit,done=GPUQueue.prototype.onSubmittedWorkDone;
+    let fenceId=0,bufferId=0,deviceId=0,adapterId=0;
+    GPUQueue.prototype.submit=function(...args){
+        const q=queues.get(this),start=performance.now();
+        try {const value=submit.apply(this,args);
+            if(q){q.submitted++;work.submitted++;
+                const canvas=document.querySelector('.figgy-editor canvas');
+                q.canvas=canvas?[canvas.width,canvas.height]:null;
+                q.globalSubmitted=work.submitted;
+                record('submit',{queue:q.id,submission:q.submitted,globalSubmission:work.submitted,canvas:q.canvas,cpuMs:performance.now()-start});
+            }return value;
+        }catch(error){record('submit-error',{queue:q?.id,error:String(error)});throw error;}
+    };
+    GPUQueue.prototype.onSubmittedWorkDone=function(...args){
+        const q=queues.get(this),id=++fenceId,submission=q?.submitted,globalSubmission=q?.globalSubmitted,canvas=q?.canvas;
+        record('fence-start',{id,queue:q?.id,submission});
+        let promise;try{promise=done.apply(this,args);}catch(error){record('fence-error',{id,error:String(error)});throw error;}
+        if(q)q.pendingFences++;
+        return promise.then(value=>{
+            if(q){q.pendingFences--;q.completed=Math.max(q.completed,submission);work.completed=Math.max(work.completed,globalSubmission||0);work.completedCanvas=canvas;}
+            record('fence-end',{id,queue:q?.id,submission});return value;
+        },error=>{if(q)q.pendingFences--;record('fence-error',{id,queue:q?.id,error:String(error)});throw error;});
+    };
+    const map=GPUBuffer.prototype.mapAsync;
+    GPUBuffer.prototype.mapAsync=function(...args){
+        let id=buffers.get(this);if(!id){id=++bufferId;buffers.set(this,id);}
+        record('map-start',{id,size:this.size,label:this.label,mode:args[0]});
+        let promise;try{promise=map.apply(this,args);}catch(error){record('map-error',{id,error:String(error)});throw error;}
+        return promise.then(value=>{record('map-end',{id});return value;},error=>{record('map-error',{id,error:String(error)});throw error;});
+    };
+    for(const name of ['getMappedRange','unmap']){
+        const original=GPUBuffer.prototype[name];
+        GPUBuffer.prototype[name]=function(...args){
+            record(name,{id:buffers.get(this),size:this.size});
+            try{return original.apply(this,args);}catch(error){record(name+'-error',{id:buffers.get(this),error:String(error)});throw error;}
+        };
+    }
+    const requestAdapter=navigator.gpu.requestAdapter.bind(navigator.gpu);
+    navigator.gpu.requestAdapter=async(...args)=>{
+        record('adapter-request',{options:args[0]});
+        let adapter;try{adapter=await requestAdapter(...args);}catch(error){record('adapter-error',{error:String(error)});throw error;}
+        if(!adapter){record('adapter-missing');return adapter;}
+        const id=++adapterId,info=adapter.info;
+        const description={id,vendor:info?.vendor,architecture:info?.architecture,device:info?.device,description:info?.description,
+            isFallbackAdapter:info?.isFallbackAdapter??adapter.isFallbackAdapter};
+        if(trace.adapters.length<16)trace.adapters.push(description);record('adapter-ready',description);
+        const requestDevice=adapter.requestDevice.bind(adapter);
+        adapter.requestDevice=async(...args)=>{
+            record('device-request',{adapter:id,requiredFeatures:args[0]?.requiredFeatures,requiredLimits:args[0]?.requiredLimits});
+            let device;try{device=await requestDevice(...args);}catch(error){record('device-error',{adapter:id,error:String(error)});throw error;}
+            const q={id:++deviceId,submitted:0,completed:0,pendingFences:0,canvas:null,globalSubmitted:0};queues.set(device.queue,q);
+            const metadata={id:q.id,adapter:id,label:device.label,features:Array.from(device.features)};
+            if(trace.devices.length<16)trace.devices.push(metadata);if(trace.queues.length<16)trace.queues.push(q);record('device-ready',metadata);
+            device.addEventListener('uncapturederror',event=>record('gpu-error',{device:q.id,error:String(event.error)}));
+            device.lost.then(info=>{record('device-lost',{device:q.id,reason:info.reason,message:info.message});console.error('WebGPU device lost:',info.reason,info.message);},error=>record('device-lost-error',{device:q.id,error:String(error)}));
+            return device;
+        };return adapter;
+    };
+})()"""
+
+DIAGNOSTIC_SNAPSHOT = r"""()=>{
+    const now=performance.now(),root=document.querySelector('.figgy-editor'),f=root?.figgy;
+    const canvas=root?.querySelector('canvas'),rect=canvas?.getBoundingClientRect(),gate=window.figgyPreparationGate;
+    const result={now,timeOrigin:performance.timeOrigin,visibility:document.visibilityState,focused:document.hasFocus(),
+        status:root?.querySelector('[data-status]')?.textContent,gpu_work:window.figgyGPUWork,trace:window.figgyBrowserTrace,
+        canvas:canvas?{width:canvas.width,height:canvas.height,css:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},dpr:devicePixelRatio}:null,
+        preparation_gate:gate?{armedAt:gate.armedAt,entered:gate.entered,enteredAt:gate.enteredAt,enteredCount:gate.enteredCount,
+            releasedAt:gate.releasedAt,gpuCompletedAt:gate.gpuCompletedAt,durationMs:(gate.releasedAt??now)-gate.armedAt}:null};
+    // Each independent read survives a borrowed/unavailable WASM snapshot.
+    for(const [key,read] of Object.entries({stats:()=>f?.stats,host:()=>typeof f?.diagnostics==='function'?f.diagnostics():f?.diagnostics,state:()=>f?.snapshot()})){
+        try{result[key]=read();}catch(error){result[key+'_error']=String(error);}
+    }return result;
+}"""
+
+
+def save_browser_diagnostics(page, folder, browser_info, outcome, errors, console_errors, kernel_executions=None):
+    """Best effort, including success paths; never replace the test exception."""
+    result = {'outcome': outcome, 'browser': browser_info, 'kernel_executions': kernel_executions or []}
+    try:
+        result.update(page.evaluate(DIAGNOSTIC_SNAPSHOT))
+    except Exception as error:
+        result['collection_error'] = repr(error)
+    result['browser_errors'] = errors
+    result['console_errors'] = console_errors
+    for name, value in [('diagnostics.json', result), ('widget-state.json', result),
+                        ('browser-errors.json', errors), ('console-errors.json', console_errors)]:
+        try:
+            (folder/name).write_text(json.dumps(value, default=str))
+        except Exception as error:
+            print(f'Figgy diagnostic write failed ({name}): {error}', file=sys.stderr)
+    if outcome == 'failed':
+        trace = result.get('trace') or {}
+        summary = {key: result.get(key) for key in ('browser', 'status', 'host', 'gpu_work', 'preparation_gate', 'state_error', 'collection_error')}
+        summary.update(queues=trace.get('queues'), adapters=trace.get('adapters'),
+                       last_host_stages=(trace.get('hostStages') or [])[-12:],
+                       last_events=(trace.get('events') or [])[-16:], kernel_executions=(kernel_executions or [])[-5:])
+        try:
+            print('FIGGY FAILURE DIAGNOSTICS ' + json.dumps(summary, default=str), flush=True)
+        except Exception:
+            pass
+    return result
+
+
 def button_point_without_frames(page, selector):
     """Validate a stable, unobscured button using DOM timers, independent of RAF."""
     page.locator(selector).evaluate("button=>button.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'})")
@@ -89,11 +214,14 @@ def notebook(tmp_path, source):
             browser = p.chromium.launch(headless=os.environ.get('FIGGY_TEST_HEADFUL') != '1', env=browser_env,
                 executable_path=executable, args=browser_args)
             driver = os.environ.get('FIGGY_BROWSER_VK_DRIVER')
-            (tmp_path/'browser-info.json').write_text(json.dumps({
+            browser_info = {
                 'version': browser.version,
                 'executable': executable or p.chromium.executable_path,
                 'vulkan_driver': Path(driver).name if driver else None,
-            }))
+                'headless': os.environ.get('FIGGY_TEST_HEADFUL') != '1',
+                'args': browser_args,
+            }
+            (tmp_path/'browser-info.json').write_text(json.dumps(browser_info))
             context = browser.new_context(viewport={'width': 1500, 'height': 1000}, permissions=['clipboard-read', 'clipboard-write'], accept_downloads=True)
             context.route('https://**/*', lambda route: route.abort())
             page = context.new_page()
@@ -101,33 +229,10 @@ def notebook(tmp_path, source):
             console_errors = []
             page.on('pageerror', lambda e: errors.append(e.stack or str(e)))
             page.on('console', lambda m: console_errors.append(m.text) if m.type == 'error' else None)
-            page.add_init_script("""if(navigator.gpu){
-                const work=window.figgyGPUWork={submitted:0,completed:0,completedCanvas:null};
-                const tracked=new WeakSet(),prototype=GPUQueue.prototype;
-                const submit=prototype.submit,done=prototype.onSubmittedWorkDone;
-                let submittedCanvas=null;
-                prototype.submit=function(...args){submit.apply(this,args);if(tracked.has(this)){work.submitted++;
-                    const canvas=document.querySelector('.figgy-editor canvas');
-                    submittedCanvas=canvas?[canvas.width,canvas.height]:null;
-                }};
-                prototype.onSubmittedWorkDone=function(...args){const completion=done.apply(this,args);
-                    if(!tracked.has(this))return completion;
-                    const submitted=work.submitted,canvas=submittedCanvas;
-                    return completion.then(value=>{work.completed=submitted;work.completedCanvas=canvas;return value;});
-                };
-                const requestAdapter=navigator.gpu.requestAdapter.bind(navigator.gpu);
-                navigator.gpu.requestAdapter=async(...args)=>{
-                    const adapter=await requestAdapter(...args);
-                    if(adapter){const requestDevice=adapter.requestDevice.bind(adapter);
-                        adapter.requestDevice=async(...args)=>{
-                            const device=await requestDevice(...args);
-                            device.lost.then(info=>console.error('WebGPU device lost:',info.reason,info.message));
-                            tracked.add(device.queue);
-                            return device;
-                        };
-                    }return adapter;
-                };
-            }""")
+            page.add_init_script(GPU_TRACE_INIT)
+            outcome = 'failed'
+            diagnostics_saved = False
+            kernel_executions = []
             try:
                 page.goto(base+'/lab/workspaces/'+uuid.uuid4().hex+'/tree/check.ipynb')
                 page.locator('.jp-CodeCell .cm-content').wait_for(timeout=45000)
@@ -147,37 +252,52 @@ def notebook(tmp_path, source):
                 client.start_channels()
 
                 def execute(code):
-                    mid = client.execute(code)
-                    messages = []
-                    while True:
-                        message = client.get_iopub_msg(timeout=180)
-                        if message.get('parent_header', {}).get('msg_id') != mid:
-                            continue
-                        if message['msg_type'] == 'error':
-                            raise AssertionError(message['content']['evalue'])
-                        if message['msg_type'] == 'stream':
-                            messages.append(message['content']['text'])
-                        if message['msg_type'] == 'status' and message['content']['execution_state'] == 'idle':
-                            return ''.join(messages)
+                    started = time.monotonic()
+                    entry = {'started_unix': time.time(), 'characters': len(code), 'outcome': 'pending'}
+                    kernel_executions.append(entry)
+                    del kernel_executions[:-40]
+                    try:
+                        mid = client.execute(code)
+                        entry['message_id'] = mid
+                        messages = []
+                        while True:
+                            message = client.get_iopub_msg(timeout=180)
+                            if message.get('parent_header', {}).get('msg_id') != mid:
+                                continue
+                            if message['msg_type'] == 'error':
+                                raise AssertionError(message['content']['evalue'])
+                            if message['msg_type'] == 'stream':
+                                messages.append(message['content']['text'])
+                            if message['msg_type'] == 'status' and message['content']['execution_state'] == 'idle':
+                                entry['outcome'] = 'passed'
+                                return ''.join(messages)
+                    except Exception:
+                        entry['outcome'] = 'failed'
+                        raise
+                    finally:
+                        entry['duration_ms'] = (time.monotonic()-started)*1000
                 yield page, execute
                 assert not errors
                 assert page.locator('.figgy-error').inner_text() == ''
+                outcome = 'passed'
             except Exception:
                 import traceback
-                (tmp_path/'failure.txt').write_text(traceback.format_exc())
-                (tmp_path/'browser-errors.json').write_text(json.dumps(errors))
-                (tmp_path/'console-errors.json').write_text(json.dumps(console_errors))
                 try:
-                    (tmp_path/'widget-state.json').write_text(json.dumps(page.evaluate("""()=>{
-                        const f=document.querySelector('.figgy-editor')?.figgy;
-                        return f?{stats:f.stats,state:f.snapshot(),gpu_work:window.figgyGPUWork,
-                            visibility:document.visibilityState,focused:document.hasFocus()}:null;
-                    }""")))
+                    (tmp_path/'failure.txt').write_text(traceback.format_exc())
+                except Exception as error:
+                    print(f'Figgy failure traceback write failed: {error}', file=sys.stderr)
+                save_browser_diagnostics(page, tmp_path, browser_info, outcome, errors, console_errors, kernel_executions)
+                diagnostics_saved = True
+                # Preserve failure-time metadata before attempting a screenshot,
+                # which can itself time out while rendering is stalled.
+                try:
                     page.screenshot(path=str(tmp_path/'failure.png'), timeout=5000)
                 except Exception:
                     pass
                 raise
             finally:
+                if not diagnostics_saved:
+                    save_browser_diagnostics(page, tmp_path, browser_info, outcome, errors, console_errors, kernel_executions)
                 context.close()
                 browser.close()
     finally:

@@ -31,13 +31,20 @@ HOST_PATCH_FILES = {"crates/web/src/lib.rs", "crates/web/src/bounded.rs"}
 def host_patch_record(root):
     """Allow only additive changes to the two unpublished WASM bridge files."""
     import subprocess
+    import tempfile
     path = Path(root) / HOST_PATCH
     data = path.read_bytes()
     if b"\r" in data or any(line.startswith((b"old mode ", b"new mode ", b"new file ",
             b"deleted file ", b"rename ", b"copy ", b"GIT binary patch")) for line in data.splitlines()):
         raise ValueError("WASM host patch must contain only LF text additions to existing bridge files")
-    result = subprocess.run(["git", "apply", "--numstat", "-z", str(path.resolve())], cwd=root,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # git apply filters paths when cwd is a subdirectory of a surrounding
+    # checkout (including pytest's repository-local --basetemp). Parse in an
+    # isolated repository root; this also works when TMPDIR is inside a checkout.
+    with tempfile.TemporaryDirectory(prefix="figgy-patch-check-") as isolated:
+        subprocess.run(["git", "init", "-q", isolated], check=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(["git", "apply", "--numstat", "-z"], cwd=isolated,
+                                input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode:
         raise ValueError("WASM host patch is not a valid Git patch")
     entries = [entry.split("\t", 2) for entry in result.stdout.decode().split("\0") if entry]
