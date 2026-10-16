@@ -167,17 +167,96 @@ def test_log_axes_render_and_pick_in_native_coordinates(plot):
     assert ax.get_xscale() == ax.get_yscale() == "linear"
 
 
-def test_invalid_scale_changes_preserve_settings(plot):
-    fig, ax = plot
-    ax.plot([-1, 1], [-1, 1])
-    before, revision = fig.get_settings(), fig.revision
-    with pytest.raises(ValueError, match="positive bounds"):
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("values,limits", [
+    ([-10, 0, 2, 20], (2, 20)),
+    ([-10, 0, 2, 2], (.2, 20)),
+    ([-10, -2, 0, 0], (1, 10)),
+])
+def test_log_axes_accept_nonpositive_samples_without_changing_data(backend, values, limits):
+    source = np.asarray(values, dtype=np.float32)
+    original = source.copy()
+    with figgy.figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.scatter(source, source, id="noisy")
+        series, info = fig.get_settings()["series"], fig.info
+        # Both dimensions cross zero before the user chooses logarithmic display.
+        ax.set_xlim(-10, 30)
+        ax.set_ylim(-10, 30)
         ax.set_xscale("log")
-    with pytest.raises(ValueError, match="positive bounds"):
         ax.set_yscale("log")
-    with pytest.raises(ValueError, match="scale must"):
-        ax.set_xscale("symlog")
-    assert fig.get_settings() == before and fig.revision == revision
+        for key in ("bottom_x", "top_x", "left_y", "right_y"):
+            axis = fig.get_settings()["config"][key]
+            assert axis["scale"] == "Logarithmic"
+            assert (axis["min"], axis["max"]) == pytest.approx(limits)
+        assert fig.get_settings()["series"] == series
+        assert fig.info["columns"] == info["columns"] == 2
+        np.testing.assert_array_equal(source, original)
+        if backend == "native":
+            assert fig.info["column_uploads"] == info["column_uploads"] == 2
+            assert fig.render_rgba().shape == (600, 960, 4)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("dimension", ["x", "y"])
+def test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers(backend, dimension):
+    centers = np.array([-1., -2.])
+    errors = np.array([101., 202.])
+    other = np.array([1., 2.])
+    x, y = (centers, other) if dimension == "x" else (other, centers)
+    with figgy.figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.errorbar(x, y, **{dimension + "err": errors}, id="uncertain")
+        getattr(ax, "set_" + dimension + "lim")(-250, 250)
+        before, info = fig.get_settings(), fig.info
+        if backend == "webgpu":
+            widget = fig.widget()
+            assert widget.state["log_bounds"][dimension] == pytest.approx((100, 200))
+            widget._command(widget, {"action": "ready", "info": {"column_uploads": info["columns"]}}, [])
+            assert widget.columns == [] and fig._native.columns == {}
+        getattr(ax, "set_" + dimension + "scale")("log")
+        keys = ("bottom_x", "top_x") if dimension == "x" else ("left_y", "right_y")
+        for key in keys:
+            axis = fig.get_settings()["config"][key]
+            assert axis["scale"] == "Logarithmic"
+            # The positive endpoints are center + error, not the error magnitudes.
+            assert (axis["min"], axis["max"]) == pytest.approx((100, 200))
+        assert fig.get_settings()["series"] == before["series"]
+        assert fig.info["columns"] == info["columns"]
+        if backend == "native":
+            assert fig.info["column_uploads"] == info["column_uploads"]
+        else:
+            assert widget.state["log_bounds"][dimension] == pytest.approx((100, 200))
+        np.testing.assert_array_equal(centers, [-1., -2.])
+        np.testing.assert_array_equal(errors, [101., 202.])
+        # Removing whiskers through SSOT must also remove their cached extent.
+        state = copy.deepcopy(before)
+        style = next(iter(state["series"][0]["render_type"].values()))
+        state["series"][0]["render_type"] = {"Scatter": {"scatter": style["scatter"]}}
+        fig.apply_settings(state)
+        getattr(ax, "set_" + dimension + "scale")("log")
+        for key in keys:
+            axis = fig.get_settings()["config"][key]
+            assert (axis["min"], axis["max"]) == pytest.approx((1, 10))
+        np.testing.assert_array_equal(other, [1., 2.])
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_log_axes_preserve_explicit_positive_limits_and_reject_unknown_scale(backend):
+    with figgy.figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.plot([-1, 0, 1, 100], [-1, 0, 1, 100])
+        ax.set_xlim(.5, 500)
+        ax.set_ylim(.25, 250)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        config = fig.get_settings()["config"]
+        assert (config["bottom_x"]["min"], config["bottom_x"]["max"]) == (.5, 500)
+        assert (config["left_y"]["min"], config["left_y"]["max"]) == (.25, 250)
+        before, revision = fig.get_settings(), fig.revision
+        with pytest.raises(ValueError, match="scale must"):
+            ax.set_xscale("symlog")
+        assert fig.get_settings() == before and fig.revision == revision
 
 
 def test_device_limit_error_preserves_existing_plot(plot):

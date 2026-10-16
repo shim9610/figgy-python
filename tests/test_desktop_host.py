@@ -254,6 +254,12 @@ def test_surface_heatmap_edits_sync_without_image_transport():
             xdo("type", "--", value)
             xdo("key", "Return")
             pump()
+        # A picked heatmap also shows its sample details below the scrollable
+        # properties. Scroll there before clicking controls below the viewport.
+        rect = info()["controls"]["max"]
+        xdo("mousemove", "--window", wid, round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2))
+        xdo("click", "--repeat", 3, "--delay", 70, 5)
+        pump()
         click_rect(info()["controls"]["colormap"])
         click_rect(info()["controls"]["colormap_Magma"])
         bar = fig.get_settings()["config"]["colorbar"]

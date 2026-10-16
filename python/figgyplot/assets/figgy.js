@@ -265,6 +265,246 @@ export const ColorCycle = Object.freeze({
     Monochrome: 4, "4": "Monochrome",
 });
 
+export class FiggyBoundedChart {
+    static __wrap(ptr) {
+        const obj = Object.create(FiggyBoundedChart.prototype);
+        obj.__wbg_ptr = ptr;
+        FiggyBoundedChartFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        FiggyBoundedChartFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_figgyboundedchart_free(ptr, 0);
+    }
+    clear_selection() {
+        wasm.figgyboundedchart_clear_selection(this.__wbg_ptr);
+    }
+    /**
+     * One GPU surface; no kernel PNG transport is used for interactive frames.
+     * @param {HTMLCanvasElement} canvas
+     * @param {string} family
+     * @param {string} value
+     * @param {number} width
+     * @param {number} height
+     * @returns {Promise<FiggyBoundedChart>}
+     */
+    static create(canvas, family, value, width, height) {
+        const ptr0 = passStringToWasm0(family, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(value, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_create(canvas, ptr0, len0, ptr1, len1, width, height);
+        return ret;
+    }
+    /**
+     * Renderer-measured logical pixel bounds and resize handles.
+     * @returns {string}
+     */
+    decorations() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgyboundedchart_decorations(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * @param {string} target
+     * @param {number} dx
+     * @param {number} dy
+     * @param {string | null} [handle]
+     * @returns {boolean}
+     */
+    drag(target, dx, dy, handle) {
+        const ptr0 = passStringToWasm0(target, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(handle) ? 0 : passStringToWasm0(handle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_drag(this.__wbg_ptr, ptr0, len0, dx, dy, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
+     * @param {number} scale
+     * @returns {Promise<Uint8Array>}
+     */
+    export_png(scale) {
+        const ret = wasm.figgyboundedchart_export_png(this.__wbg_ptr, scale);
+        return ret;
+    }
+    /**
+     * Submit one frame and wait for actual GPU completion. Hosts must await
+     * this before publishing Ready; rejected completion (including device
+     * loss) is returned to the caller instead of reporting an unusable chart.
+     * @returns {Promise<void>}
+     */
+    first_frame_ready() {
+        const ret = wasm.figgyboundedchart_first_frame_ready(this.__wbg_ptr);
+        return ret;
+    }
+    frame() {
+        const ret = wasm.figgyboundedchart_frame(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {string}
+     */
+    get_document() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgyboundedchart_get_document(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * Observe completion of work already submitted to this chart's GPU queue.
+     * The returned Promise owns a queue clone, not a borrow of this chart.
+     * Hosts may keep processing edits while waiting, and should coalesce
+     * display submissions until it settles. Device loss rejects the Promise.
+     * @returns {Promise<any>}
+     */
+    gpu_ready() {
+        const ret = wasm.figgyboundedchart_gpu_ready(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {boolean} edit_area
+     * @returns {string | undefined}
+     */
+    hit_decoration(x, y, edit_area) {
+        const ret = wasm.figgyboundedchart_hit_decoration(this.__wbg_ptr, x, y, edit_area);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]);
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * @param {number | null | undefined} x
+     * @param {number | null | undefined} y
+     * @param {number} dt
+     * @returns {boolean}
+     */
+    hover(x, y, dt) {
+        const ret = wasm.figgyboundedchart_hover(this.__wbg_ptr, isLikeNone(x) ? Number.MAX_SAFE_INTEGER : Math.fround(x), isLikeNone(y) ? Number.MAX_SAFE_INTEGER : Math.fround(y), dt);
+        return ret !== 0;
+    }
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {boolean} toggle
+     * @returns {string}
+     */
+    pick(x, y, toggle) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgyboundedchart_pick(this.__wbg_ptr, x, y, toggle);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * @param {number} width
+     * @param {number} height
+     */
+    resize(width, height) {
+        wasm.figgyboundedchart_resize(this.__wbg_ptr, width, height);
+    }
+    /**
+     * @param {string} target
+     * @param {number} x
+     * @param {number} y
+     * @returns {string | undefined}
+     */
+    resize_handle(target, x, y) {
+        const ptr0 = passStringToWasm0(target, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_resize_handle(this.__wbg_ptr, ptr0, len0, x, y);
+        let v2;
+        if (ret[0] !== 0) {
+            v2 = getStringFromWasm0(ret[0], ret[1]);
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v2;
+    }
+    /**
+     * @param {string | null} [target]
+     */
+    select_decoration(target) {
+        var ptr0 = isLikeNone(target) ? 0 : passStringToWasm0(target, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_select_decoration(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Validate and prepare before replacing the SSOT, retaining the old chart on failure.
+     * @param {string} value
+     * @param {number} width
+     * @param {number} height
+     */
+    set_document(value, width, height) {
+        const ptr0 = passStringToWasm0(value, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_set_document(this.__wbg_ptr, ptr0, len0, width, height);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @param {boolean} backwards
+     */
+    step_selection(backwards) {
+        wasm.figgyboundedchart_step_selection(this.__wbg_ptr, backwards);
+    }
+}
+if (Symbol.dispose) FiggyBoundedChart.prototype[Symbol.dispose] = FiggyBoundedChart.prototype.free;
+
 export class FiggyChart {
     static __wrap(ptr) {
         const obj = Object.create(FiggyChart.prototype);
@@ -504,12 +744,6 @@ export class FiggyChart {
         const ret = wasm.figgychart_cancel_stream_operation_and_wait(this.__wbg_ptr, handle.__wbg_ptr);
         return ret;
     }
-    cancel_streaming() {
-        const ret = wasm.figgychart_cancel_streaming(this.__wbg_ptr);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
-        }
-    }
     /**
      * Cancel this chart and resolve only after its submitted work and
      * retired renderer-owned surfaces have crossed the completion fence.
@@ -518,6 +752,12 @@ export class FiggyChart {
     cancel_streaming_and_wait() {
         const ret = wasm.figgychart_cancel_streaming_and_wait(this.__wbg_ptr);
         return ret;
+    }
+    cancel_streaming() {
+        const ret = wasm.figgychart_cancel_streaming(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Configure the total GPU budget and chart-local packed-view limit.
@@ -571,6 +811,31 @@ export class FiggyChart {
     static create_with_progress(canvas, on_event) {
         const ret = wasm.figgychart_create_with_progress(canvas, on_event);
         return ret;
+    }
+    /**
+     * Renderer-measured decoration bounds in physical canvas pixels.
+     * @param {string} target
+     * @returns {string}
+     */
+    decoration_bounds(target) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(target, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_decoration_bounds(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
     }
     /**
      * Normalize a complete referenced-column closure from resident or
@@ -747,6 +1012,17 @@ export class FiggyChart {
         } finally {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
+    }
+    /**
+     * Observe completion of work already submitted to this chart's GPU queue.
+     * The returned Promise owns a queue clone, not a borrow of this chart.
+     * Hosts may keep processing edits while waiting, and should coalesce
+     * display submissions until it settles. Device loss rejects the Promise.
+     * @returns {Promise<any>}
+     */
+    gpu_ready() {
+        const ret = wasm.figgychart_gpu_ready(this.__wbg_ptr);
+        return ret;
     }
     /**
      * @returns {boolean}
@@ -1037,8 +1313,13 @@ export class FiggyChart {
      * Register a font (TTF/OTF/TTC bytes) for SSoT `font` family names.
      * Returns the family names the file declares — use them verbatim in
      * `content.font` / label styles. Registered fonts win over native
-     * system fonts, so resolution behaves identically on web and
-     * desktop. Already-drawn text re-rasterizes on the next `frame()`.
+     * system fonts. A character the chosen face cannot draw falls back
+     * per character to registered fonts (in registration order), then
+     * the bundled Liberation Sans, then, on desktop only, installed
+     * system fonts. Resolution through registered and bundled faces is
+     * therefore identical on web and desktop; installed system fonts
+     * are a desktop-only fallback. Already-drawn text re-rasterizes on
+     * the next `frame()`.
      *
      * JS: `chart.register_font(new Uint8Array(await (await fetch(url)).arrayBuffer()))`
      * @param {Uint8Array} bytes
@@ -1256,6 +1537,18 @@ export class FiggyChart {
         }
     }
     /**
+     * Inspect the first resident typed selection as JSON, or `"null"` when
+     * none is selected. Only selected GPU samples are read back. Histograms
+     * expose `bin_start`, `bin_end`, `value`, and `orientation`; the value
+     * is the stored height (also valid for weighted/density histograms).
+     * Point and matrix selections expose their coordinates and cell value.
+     * @returns {Promise<string>}
+     */
+    selection_details() {
+        const ret = wasm.figgychart_selection_details(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * Report the effective primitive/grid extent currently drawn.
      * @param {string} series_id
      * @returns {string}
@@ -1324,6 +1617,11 @@ export class FiggyChart {
      * Replace the whole option SSoT from JSON. Marks everything dirty —
      * the next `frame()` re-rasters the chrome and refreshes the
      * transform, exactly like any other config edit.
+     * Use `get_config`, edit only the desired fields, then submit the
+     * complete config here for selective control. For example, writing
+     * only axis `min` / `max` preserves tick and label settings, whereas
+     * the auto-fit helpers derive those settings along with the range.
+     * This call does not auto-fit ranges or fit the title band.
      * JS: `chart.set_config(JSON.stringify(cfg));`
      * @param {string} json
      */
@@ -1452,6 +1750,9 @@ export class FiggyChart {
         }
     }
     /**
+     * Set plain title text and grow its band if needed. For a text-only
+     * edit that keeps the exact margin, use `get_config` / `set_config`
+     * and change only `chart_title.text`.
      * @param {string} text
      */
     set_title(text) {
@@ -1483,6 +1784,19 @@ export class FiggyChart {
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
+    }
+    /**
+     * Move the resident typed data selection using source indices.
+     * @param {number} dx
+     * @param {number} dy
+     * @returns {boolean}
+     */
+    step_selection(dx, dy) {
+        const ret = wasm.figgychart_step_selection(this.__wbg_ptr, dx, dy);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
     }
     /**
      * @param {StreamingOperationHandle} handle
@@ -2072,6 +2386,10 @@ function __wbg_get_imports() {
         },
         __wbg_features_5cac120c28ba0475: function(arg0) {
             const ret = arg0.features;
+            return ret;
+        },
+        __wbg_figgyboundedchart_new: function(arg0) {
+            const ret = FiggyBoundedChart.__wrap(arg0);
             return ret;
         },
         __wbg_figgychart_new: function(arg0) {
@@ -3122,23 +3440,23 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 951, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1097, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 908, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1048, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 908, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__128);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1048, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 908, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__129);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1048, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0) {
@@ -3186,15 +3504,15 @@ function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__128(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__128(arg0, arg1, arg2);
+function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__129(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__129(arg0, arg1, arg2);
+function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
@@ -3290,6 +3608,9 @@ const AutoStreamingRangeRequestResultFinalization = (typeof FinalizationRegistry
 const AutoStreamingRequestResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_autostreamingrequestresult_free(ptr, 1));
+const FiggyBoundedChartFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_figgyboundedchart_free(ptr, 1));
 const FiggyChartFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_figgychart_free(ptr, 1));

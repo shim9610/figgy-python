@@ -81,6 +81,31 @@ impl FigureAccess<'_> {
                 result["x"] = json!(values[0]);
                 result["y"] = json!(values[1]);
             }
+            PickedDataRef::HistogramBin { bin_index, .. } => {
+                let renderer::DataRenderType::Histogram { bar } = &series.render_type else {
+                    return Err(invalid("selected series is not a histogram"));
+                };
+                let (edges, values) = match bar.orientation {
+                    renderer::data_config::BarOrientation::Vertical => {
+                        (&series.x_column, &series.y_column)
+                    }
+                    renderer::data_config::BarOrientation::Horizontal => {
+                        (&series.y_column, &series.x_column)
+                    }
+                };
+                let samples = self.read_samples(&[
+                    (edges.clone(), *bin_index),
+                    (edges.clone(), bin_index + 1),
+                    (values.clone(), *bin_index),
+                ])?;
+                result["index"] = json!(bin_index);
+                result["bin_start"] = json!(samples[0]);
+                result["bin_end"] = json!(samples[1]);
+                // Histograms, weighted/density histograms and stairs share the
+                // same renderer type. The stored height is not always a count.
+                result["value"] = json!(samples[2]);
+                result["orientation"] = json!(bar.orientation);
+            }
             PickedDataRef::MatrixCell {
                 x_index, y_index, ..
             } => {
@@ -172,6 +197,52 @@ impl FigureAccess<'_> {
                 *series_id = series.series_id.clone();
                 *source_id = series.source_id.clone();
                 *point_index = shift(*point_index, dx, count);
+            }
+            PickedDataRef::HistogramBin {
+                series_id,
+                source_id,
+                bin_index,
+            } => {
+                let renderer::DataRenderType::Histogram { bar } =
+                    &self.data.series[position].render_type
+                else {
+                    return Ok(false);
+                };
+                let horizontal = matches!(
+                    bar.orientation,
+                    renderer::data_config::BarOrientation::Horizontal
+                );
+                let histograms = self
+                    .data
+                    .series
+                    .iter()
+                    .filter(|s| {
+                        matches!(&s.render_type,
+                        renderer::DataRenderType::Histogram { bar: other }
+                        if other.orientation == bar.orientation)
+                    })
+                    .collect::<Vec<_>>();
+                let index = histograms
+                    .iter()
+                    .position(|s| s.series_id == *series_id)
+                    .unwrap();
+                let (bin_delta, series_delta) = if horizontal { (dy, dx) } else { (dx, dy) };
+                let series = histograms[shift(index, series_delta, histograms.len())];
+                let (edges, values) = if horizontal {
+                    (&series.y_column, &series.x_column)
+                } else {
+                    (&series.x_column, &series.y_column)
+                };
+                let count = self.data.columns[edges]
+                    .0
+                    .saturating_sub(1)
+                    .min(self.data.columns[values].0);
+                if count == 0 {
+                    return Ok(false);
+                }
+                *series_id = series.series_id.clone();
+                *source_id = series.source_id.clone();
+                *bin_index = shift(*bin_index, bin_delta, count);
             }
             PickedDataRef::MatrixCell {
                 x_index, y_index, ..

@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-figgyplot is an unpublished 0.2.0 development release. Security fixes are made
-on `main`; older development commits are not maintained as release branches.
+Security fixes target the latest published figgyplot release and current
+development on `main`; older development commits are not maintained as release
+branches. As of 2026-10-16, PyPI has 0.2.1 and this source tree prepares 0.3.0.
 See [distribution status](docs/DISTRIBUTION.md) for platform coverage.
 
 ## Report a vulnerability privately

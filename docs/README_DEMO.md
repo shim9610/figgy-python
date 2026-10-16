@@ -1,5 +1,10 @@
 # README edit → copy → reuse demo
 
+The checked-in recording and validation results document the 0.2 development
+checkpoint on 2026-10-14, not a new 0.3 capture or performance measurement.
+The commands below describe the runnable example and recorder; see
+[desktop editing](DESKTOP_EDITOR.md) for the current native/Jupyter controls.
+
 The README animation records actual Figgy and VS Code windows. It starts with
 Figgy's automatic upper-right legend (zero position offsets) covering a late
 synthetic response peak. Real Ctrl/Shift-wheel input adjusts the axes; Layout

@@ -120,8 +120,8 @@ python scripts/render_gallery.py                 # Reproduce all 17 gallery imag
 
 [Example index and commands](examples/README.md) ·
 [Rendering provenance](docs/images/gallery/manifest.json).
-[Chart and style API](docs/CHART_TYPES.md) documents pies, donuts, materials and
-draw modes, including the line-only Milkyway restriction.
+[Chart and style API](docs/CHART_TYPES.md) documents every exposed constructor,
+host coverage, materials and draw modes, including the line-only Milkyway restriction.
 
 ## What you can do
 
@@ -136,6 +136,10 @@ draw modes, including the line-only Milkyway restriction.
   Jupyter renders through WASM/WebGPU in the browser.
 
 ## Install
+
+This checkout documents **figgyplot 0.3.0**. Before that release is published,
+PyPI installs the previous release (0.2.1); use the source-checkout instructions
+below to try the features described here.
 
 Install from **PyPI** with **Python 3.8–3.15**:
 
@@ -250,6 +254,58 @@ ax.set_ylim(0.0, 2.7)
 # The complete export also preserves legend placement and advanced styling.
 ```
 
+Ranges, ticks and titles:
+
+- Property-panel edits and `fig.update("axis_bottom", major_spacing=2)` share
+  changed fields with the opposite axis when the pair had exactly equal `min`,
+  `max`, `scale` and `inverted` values before the edit. The same rule applies in
+  either direction to bottom/top and left/right, including `tick_labels_*` edits.
+  For example, `fig.update("tick_labels_right", format="Scientific",
+  significant_digits=4)` changes only those label fields on a matching left/right
+  pair. Unedited differences in fonts, colors or tick settings remain intact.
+  Axis-line visibility, titles, margins and offsets remain independent. Different
+  coordinate ranges/scales remain independent too; comparison uses exact values
+  without rounding. Use the raw SSOT APIs below for a deliberate one-sided edit.
+- `ax.set_xlim(a, b)` / `set_ylim` set the range and derive readable ticks for it.
+  To keep tick spacing you chose explicitly, use `ax.set_xlim_without_tick_auto(a, b)`
+  / `set_ylim_without_tick_auto`. These change only the paired axes' SSOT bounds;
+  they do not create a persistent range lock. Plot-creation helpers fit the data
+  again when adding a series, and `fig.fit()` explicitly fits all axes. Apply
+  manual ranges after adding the series when they should be the final view.
+- `fig.fit()` and both UI Fit buttons use zero padding for figures containing
+  only heatmaps, contours or filled contours, including combinations. Mixing in
+  lines, scatter or other Cartesian series uses 5%. Explicit padding overrides
+  either default: `fig.fit(padding=0.05)` adds 5%, while `fig.fit(padding=0)` fits
+  tightly to the rendered data extent.
+- For selective control, use `fig.configure(config={...})` or read the current
+  state with `fig.get_settings()`, edit only the intended fields, then submit it
+  through `fig.apply_settings(state)`. For example:
+
+  ```python
+  fig.configure(config={"bottom_x": {"min": 20.0, "max": 80.0}})
+  ```
+
+  This preserves that axis's tick and label settings and leaves the top axis
+  untouched. Include `top_x` too when the pair should share bounds. In contrast,
+  `set_xlim` / `set_ylim` choose ticks and label formatting, `fit` also derives
+  bounds from data, and title helpers can enlarge the title band. Direct SSOT
+  edits do not run these adjustments. Rendering still validates settings and
+  applies safety limits; visible tick positions and label counts depend on range.
+- A tick setting the renderer cannot draw as written is replaced: a spacing that
+  would draw thousands of ticks falls back to automatic spacing, and `minor_count`
+  is capped at 99. Each change is reported once as a `figgy.RenderWarning` by the next
+  native PNG/RGBA render (`render_rgba`, `to_png`, `savefig`, the PNG widget). Desktop
+  windows and the browser (webgpu) backend do not report it.
+- `fig.update("chart_title", text="Line 1\nLine 2", align="center")` aligns the
+  lines of multi-line text (`left`, `center`, `right`); a title taller than its band
+  grows the band instead of being clipped. Unicode super/subscripts such as `10⁻³`
+  are drawn as super/subscript text.
+- `font=` must name an installed family or `"Liberation Sans"` (or `""` for the
+  default); an unknown name raises `ValueError` on the native backend. The browser
+  backend cannot see installed fonts and draws an unknown family with the bundled font.
+  Characters a font lacks are drawn from another available font (natively including
+  installed fonts).
+
 To reuse the saved code yourself, from the repository root:
 
 ```python
@@ -339,19 +395,19 @@ commands and expected outputs.
 
 ## Scope and performance
 
-The Python API provides **line plots, scatter plots, heatmaps, pies and donuts**, with
+The Python API provides **line/scatter/errorbar plots, histograms, heatmaps, contours, categorical bars, boxplots, pies and donuts**, with
 multiple series on one Axes, linear/log and inverted axes, picking, editable
 text/legend/styles, and PNG export. Cartesian plots support Precise, Sketch,
 Constellation and Milkyway draw modes. **Milkyway accepts line-only series;
 scatter and marker lines are intentionally disabled.** Constellation uses
 marker lines so stars remain at source samples.
 
-Native pies/donuts expose 11 upstream materials, camera tilt, extrusion, rounded
+Pies/donuts on both native and browser WebGPU hosts expose 11 upstream materials, camera tilt, extrusion, rounded
 corners, textures and slice editing. Their bounded model contains up to 64
 categories and uses the upstream radial renderer on the shared GPU device.
-Pie/donut windows and PNG export are native; browser WebGPU radial editing is
-not yet exposed. Multi-panel figures and high-level bar/box-plot/contour APIs
-remain outside the Python API.
+All chart families support native desktop and Jupyter WebGPU editing and PNG export.
+Categorical bars and boxplots use their upstream bounded models; histograms and
+contours use resident Cartesian columns. Multi-panel figures remain unsupported.
 
 `figsize` is in inches; `fontsize`, `linewidth` and `markersize` use points.
 Native Cartesian arrays are uploaded to a resident GPU column pool and reused during edits.
@@ -367,14 +423,18 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-This package uses **figgy-renderer 0.16.1** from the upstream
-[figgy repository](https://github.com/shim9610/figgy). Rust owns chart layout,
+The native extension uses the published **figgy-renderer 0.17.0** and
+**figgy-model 0.11.0** crates from crates.io, pinned in `Cargo.lock`.
+The packaged browser kernel is built from their upstream release commit
+`783353a` with a recorded web-binding patch for non-borrowing GPU completion.
+Asset provenance checks pair the registry versions and checksums with that
+source revision and verify the binding patch hash. Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 
 - [Desktop editor guide](docs/DESKTOP_EDITOR.md) — controls and screenshots
 - [Documentation index](docs/README.md) — user guides and validation reports
-- [Chart and style API](docs/CHART_TYPES.md) — pies, donuts, materials and draw modes
+- [Chart and style API](docs/CHART_TYPES.md) — chart constructors, materials and draw modes
 - [Host architecture](docs/HOSTS.md) — native and notebook integration
 - [GPU preparation](docs/PREPARATION.md) — explicit first-use preparation
 - [Native resource sharing](docs/NATIVE_SHARING.md) — ownership and memory limits

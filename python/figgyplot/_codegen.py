@@ -8,7 +8,8 @@ import pprint
 
 
 def settings_to_code(settings, defaults, dpi=120, variable="fig"):
-    from .figure import _code_tree, _diff, _segments
+    from .figure import _code_tree, _diff, _segments, _text
+    from ._native import fitted_chart_title_margin, font_family_available
 
     if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
         raise ValueError("variable must be a Python identifier")
@@ -16,6 +17,20 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         settings = json.loads(settings)
     if isinstance(defaults, str):
         defaults = json.loads(defaults)
+    for kind in ('categorical', 'boxplot'):
+        if settings.get(kind) is not None:
+            chart = copy.deepcopy(settings[kind])
+            chart['hovered'] = chart['selected'] = None
+            chart['decorations']['selected'] = None
+            chart['expected_categories'] = [c['id'] for c in chart['categories']]
+            chart['expected_series'] = [s['id'] for s in chart['series']]
+            chart['series'] = {s['id']: {k: v for k, v in s.items() if k not in ('id', 'values')} for s in chart['series']}
+            args = pprint.pformat(chart, width=96, sort_dicts=False)
+            canvas = pprint.pformat({'chart_area': settings['config']['chart_area']})
+            return (f"# Apply to an existing {kind} chart with matching category/series IDs and DPI.\n"
+                    f"# Existing data values are preserved.\n"
+                    f"{variable}.configure(config={canvas})\n"
+                    f"{variable}.configure_bounded({kind!r}, **{args})\n")
     if settings.get("radial") is not None:
         chart = copy.deepcopy(settings["radial"])
         chart["interaction"] = {"hovered": None, "selected": None, "hover_progress": 0.0}
@@ -50,13 +65,20 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         node = cfg[key] if key == "chart_title" else cfg[key]["title_option"]
         baseline = modeled[key] if key == "chart_title" else modeled[key]["title_option"]
         rich = node["text"]
-        value = "".join(s["text"] for s in rich["segments"])
+        value = _text(rich)
         args = [repr(value)]
         baseline["text"]["segments"] = _segments(value)
+        if rich.get("align", "Left") != baseline["text"].get("align", "Left"):
+            args.append(f"align={rich['align'].lower()!r}")
+            baseline["text"]["align"] = rich["align"]
         # Python's font sizes are points; the renderer/editor stores pixels.
         for field, prop, val in (("font_size", "fontsize", rich["font_size"] * 72 / dpi),
                                  ("font", "font", rich["font"]),
                                  ("color", "color", tuple(rich["color"][c] for c in "rgba"))):
+            # The font setter rejects families that do not resolve; such a
+            # font (e.g. typed in an editor) is restored by the patch below.
+            if field == "font" and not font_family_available(val):
+                continue
             if field == "font_size" or rich[field] != baseline["text"][field]:
                 args.append(f"{prop}={val!r}")
                 baseline["text"][field] = copy.deepcopy(rich[field])
@@ -68,6 +90,10 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             args.append(f"offset={offset!r}")
             baseline["offset_x"], baseline["offset_y"] = offset
         lines.append(f"{axis}.{method}({', '.join(args)})")
+
+    # set_title derives the title band like the renderer's title helper;
+    # model that, so the patch below restores a margin that differs from it.
+    modeled["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(modeled, allow_nan=False))
 
     for dimension, keys in (("x", ("bottom_x", "top_x")), ("y", ("left_y", "right_y"))):
         primary = cfg[keys[0]]
@@ -93,7 +119,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         style = next(iter(patch["render_type"].values()))
         properties = {}
         colors = [(style[k], field) for k, field in
-                  (("line", "line_color"), ("scatter", "point_color"), ("bar", "bar_color")) if k in style]
+                  (("line", "line_color"), ("scatter", "point_color"), ("bar", "fill_color")) if k in style]
         if colors and all(node[field] == colors[0][0][colors[0][1]] for node, field in colors):
             color = colors[0][0][colors[0][1]]
             properties["color"] = tuple(color[c] for c in "rgba")
@@ -108,7 +134,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             properties["markersize"] = style["scatter"].pop("point_size") * 144 / dpi
         if patch.get("label") is not None:
             label = patch["label"]
-            value = "".join(s["text"] for s in label["segments"])
+            value = _text(label)
             properties["label"] = value
             if label["segments"] == _segments(value):
                 del label["segments"]

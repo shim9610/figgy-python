@@ -1,4 +1,24 @@
-# 0.2 host verification
+# Host verification history
+
+## Current 0.3 validation setup
+
+The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.17.0`
+and `figgy-model 0.11.0`. The dated measurements and test totals below belong
+to earlier checkpoints; they are not a test count or performance claim for the
+current release candidate.
+
+Automatic pull-request checks are enabled in
+[PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
+integration. The [interaction parity guard](../scripts/check_interaction_parity.py)
+rejects changes to only one host without the corresponding host/test updates.
+[Shared interaction tests](../tests/test_interaction_parity.py) cover native and
+real Jupyter WebGPU controls. Pies/donuts, categorical bars and boxplots now use
+both hosts; the historical native-only radial limitation below no longer applies.
+See [chart types](CHART_TYPES.md) and [desktop editing](DESKTOP_EDITOR.md) for
+current supported controls. A configured check or an earlier passing run does
+not establish the result of a later commit; inspect that commit's CI result.
+
+## Historical 0.2 checkpoints (2026-10-14)
 
 2026-10-14 (Asia/Seoul), based on main `294b270a2b2e6645056278b3ef035e5199a5f658`.
 
@@ -104,6 +124,112 @@ the production Python wrapper does not set it. `BROWSER_EXECUTABLE_PATH` can
 select Chromium. Headed mode requires a working `DISPLAY`/Xvfb. Test screenshots
 and raw browser metrics are emitted into pytest's temporary directory.
 
+When `FIGGY_BROWSER_VK_DRIVER` selects the software-GPU verification driver, the
+shared Jupyter harness sets Chromium's GPU watchdog to 180 seconds, matching the
+existing first-frame startup deadline. The watchdog remains enabled; device-loss
+errors, gesture deadlines, and interaction assertions still fail the test.
+[CI run 38883720288](https://github.com/shim9610/figgy-python/actions/runs/38883720288)
+recorded the ceramic donut failing before its first frame: Chromium terminated
+its GPU process after about 30 seconds with raw POSIX exit status 512, which is
+Chromium's `RESULT_CODE_HUNG` (2), and WebGPU reported a lost external Instance.
+Chromium's `gpu/ipc/service/gpu_watchdog_thread.cc` terminates a hung GPU process
+with that result code and accepts the `--gpu-watchdog-timeout-seconds` override.
+This test-only budget accommodates cold SwiftShader compilation on shared CI
+CPUs; production browser configuration is unchanged. The saved `chromium.log`
+provides the GPU process diagnostic alongside the normal browser error records.
+
+Later hosted runs exposed a different startup failure: the chart and toolbar
+were visible with no GPU or JavaScript errors, but Playwright's frame-based
+button stability check timed out. Initialization now waits for the final
+CSS/device-pixel-sized surface before reporting Ready and avoids an immediate
+duplicate frame. The preparation-overlap test checks button visibility,
+geometry and hit targets with timer polling, then uses real mouse events.
+Its setup is also tested with animation-frame callbacks suppressed, so moving
+a frame-dependent `trial` click earlier cannot reintroduce the same failure.
+
+The subsequent hosted run reached PNG export but exceeded its 60-second
+deadline. Reproduction with the hosted Chromium 156/SwiftShader build recorded
+three unfinished surface frames when export began: those frames took about
+31.7 seconds to finish, export rendering/readback took another 12.9 seconds,
+and PNG encoding/result transmission took about 42 milliseconds. This reproduces
+GPU queue latency, but the original hosted timeout did not record per-stage
+timestamps and is not itself proof of the same timing breakdown.
+
+Comparison with figgy-web `18cdff3` (also renderer 0.17.0) identified the missing host boundary:
+`app/js/bounded-studio.js` submits with `render()` and waits separately on
+`BoundedCanvas.gpu_ready()`. That Promise retains no chart borrow. Python's first
+backpressure fix instead awaited `first_frame_ready(&mut self)` inside its
+edit/acknowledgement queue, adding GPU latency to the edit-only `fig.sync()`
+contract. It has been replaced with a synchronous `frame()` submission and a
+separate non-borrowing `gpu_ready()` fence. New display submissions wait for the
+fence; edits and acknowledgements continue. Export and preparation wait explicitly.
+The completion bridge is recorded in `scripts/wasm-host.patch`; renderer/model
+sources remain identical to their published crates.
+
+A held-completion regression sends a burst of real pointer input and checks
+that submissions stay bounded while the final drag and PNG remain correct.
+It also switches inspector targets while completion is held and checks that
+controls immediately match the selected target, without waiting for a WASM borrow.
+An edit barrier must return with accepted final settings while the GPU fence is
+still held; this fails with the previous shared-queue implementation.
+Validation of the replacement on Chromium 156.0.8078.4/SwiftShader: **326 tests
+passed** in the complete local integration run, including native and Jupyter
+interaction cases; preflight **107 passed**. The radial export took **24.1 s**:
+12.1 s waiting for the one outstanding display frame, 11.9 s rendering/readback,
+and approximately 0.04 s encoding/transmission. These software-GPU measurements
+are not physical-GPU frame-rate or export-latency claims. No hosted CI run has
+been performed at that local validation checkpoint.
+
+The subsequent hosted run for `3f2c253` reported **293 passed, 1 failed and
+32 setup errors**. The radial failure was `Browser prepare timed out after
+60 seconds` in the deliberate preparation/menu/resize overlap scenario, before
+its PNG export check. The setup errors came from `git apply --numstat` filtering
+patch paths when fixtures lived below the checkout (`--basetemp=ci-results`).
+The asset checker now parses in an isolated Git root; the checkout-local asset
+suite reproduces the old errors and passes after that correction.
+
+Until this failure is resolved, CI runs the asset suite and exact radial case
+first, then the full suite. Priority and full results use separate directories
+so pytest cannot delete earlier evidence. Verbose, unbuffered output identifies
+the active test. Notebook diagnostics retain actual adapter/device metadata,
+existing submission/fence/readback timings, host queue/request stages and the
+artificial preparation gate's release time on success and failure. Failures
+also print a compact diagnostic summary in the job log. Observers add no GPU
+completion requests, and timeout values and behavioral assertions are unchanged.
+Local validation of this diagnostic update: **112 preflight tests passed** and
+**49 priority tests passed**, using a checkout-local temporary directory. The
+radial trace recorded a 0.14-second artificial gate, two preparation frames
+within a 26.8-second request, and approximately 0.2-1.4 ms edit barrier responses.
+These are local software-adapter observations, not a reconstruction of the
+preceding hosted timeout. The next hosted run must supply its own stage evidence.
+
+A separate standalone comparison removed Jupyter from both paths and rendered
+the same three-slice donut with figgy-web `18cdff3` and the Python WASM host.
+Both used renderer 0.17.0, Chromium 156.0.8078.4, DPR 1 and the actual
+Google/SwiftShader fallback adapter. After one cold frame, the mean of two
+completed warm frames and a subsequent export with no pending display work were:
+
+| 960 x 600 material | Web frame | Python frame | Web PNG | Python PNG |
+| --- | ---: | ---: | ---: | ---: |
+| Flat | 11.94 s | 11.96 s | 12.95 s | 11.20 s |
+| Ceramic | 12.38 s | 13.43 s | 13.70 s | 12.78 s |
+
+At 480 x 300, warm frames took approximately 2.8-3.6 seconds, consistent with
+cost increasing with pixel count. CPU submission at 960 x 600 took only
+0.25-1.3 milliseconds; export GPU readback waiting accounted for all but
+37-41 milliseconds. Decoded PNG pixels were identical between hosts in all
+four size/material pairs. This establishes that the slow single-frame workload
+also occurs in figgy-web on this software adapter, independently of Python's
+frame scheduling. It does not establish hardware-GPU latency or identify a
+specific shader instruction as the bottleneck. Depth was zero and shadows were
+disabled, so this case did not execute the depth raymarch or shadow path.
+
+The export deadline is unchanged. Use the browser and bundled driver selected
+by `scripts/ci_gpu_env.py` when reproducing hosted failures; a system Chromium
+installation can be a different version from Playwright's CI browser.
+Each shared notebook scenario records the actual browser version, executable
+and driver filename in `browser-info.json` alongside its other artifacts.
+
 ## Remaining platform work
 
 Windows hardware surface/input/DPI, macOS Metal/event-loop behavior, Wayland,
@@ -137,8 +263,9 @@ snapshots are released on ready; creating/discarding an unprepared additional
 view does not request an adapter. Automatic mode remains covered separately.
 
 The wheel includes `figgy.prepare`, both preparation APIs, and local JS/WASM.
-The sdist includes `docs/PREPARATION.md`; strict twine checks pass. Automatic CI
-remains paused (`workflow_dispatch` only).
+The sdist included `docs/PREPARATION.md`; strict twine checks passed. At this
+checkpoint automatic CI was paused (`workflow_dispatch` only); current PR checks
+are described above.
 
 **No persistent shader cache was saved or restored.** Renderer 0.16.1 exposes
 prewarming but no public pipeline-cache injection. Reports explicitly return
@@ -185,7 +312,8 @@ Report charts, when generated, continue to use Figgy.
 Release/locked wheel/sdist builds and strict twine metadata checks passed. All
 shared resources remain native-process local. Windows/macOS hardware behavior,
 different surface formats and physical VRAM pressure remain unverified here.
-Automatic CI is still disabled; pipeline disk-cache persistence remains absent.
+Automatic CI was still disabled at that checkpoint. Pipeline disk-cache
+persistence was not implemented by that change.
 
 ## Contextual desktop editor, vector toolbar and repaint scheduling
 
@@ -377,6 +505,8 @@ donut, paper/wood/hatch/pearl, Sketch handwriting, Constellation and line-only
 Milkyway. Every variant was reproduced in an independent CLI process with exact
 PNG SHA-256 agreement. English Markdown, example links, Python code-block syntax,
 manifest hashes/dimensions, Rust formatting and browser JS syntax were checked.
-Browser model/transport support for Cartesian styles is included, but actual
-browser style pixels were not rerun. Interactive browser radial bindings remain
-unexposed; radial windows/PNG export require the native backend.
+Browser model/transport support for Cartesian styles was included, but actual
+browser style pixels were not rerun at that checkpoint. Interactive browser
+radial bindings were not yet exposed then; radial windows/PNG export required
+the native backend. The current 0.3 binding supports interactive radial charts
+and browser PNG export in Jupyter as well.

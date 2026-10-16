@@ -23,6 +23,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Require native and Jupyter interaction changes together
+        if: github.event_name == 'pull_request'
+        env:
+          PARITY_BASE: ${{ github.event.pull_request.base.sha }}
+          PARITY_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/check_interaction_parity.py --base "$PARITY_BASE" --head "$PARITY_HEAD"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: PyO3/maturin-action
@@ -42,7 +49,9 @@ jobs:
       WGPU_BACKEND: vulkan
       FIGGY_TEST_JUPYTER: '1'
       FIGGY_TEST_HEADFUL: '1'
+      FIGGY_REQUIRE_INTERACTION_PARITY: '1'
       FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
+      PYTHONUNBUFFERED: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -78,15 +87,25 @@ jobs:
         run: |
           .venv/bin/python -m playwright install --with-deps chromium
           .venv/bin/python scripts/ci_gpu_env.py
-      - name: Test native surface, editing and real JupyterLab WebGPU
+      - name: Test previous failures first, then native and Jupyter integration
         run: |
           cargo fmt --check
+          mkdir -p ci-results
           xvfb-run -a -s '-screen 0 1600x1000x24' bash <<'SCRIPT'
             set -euo pipefail
             openbox > /tmp/figgyplot-openbox.log 2>&1 &
             wm_pid=$!
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
-            .venv/bin/python -m pytest -q --basetemp=ci-results --junitxml=ci-results/junit.xml
+            # Temporary priority gate: reproduce the failing checkout-local
+            # asset fixtures and radial preparation before the full suite.
+            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
+              --basetemp=ci-results/priority --junitxml=ci-results/priority.xml \
+              tests/test_packaged_assets.py \
+              'tests/test_interaction_parity.py::test_bounded_hosts_share_drag_resize_pick_hover_and_export[radial]' \
+              2>&1 | tee ci-results/priority.log
+            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=30 \
+              --basetemp=ci-results/full --junitxml=ci-results/junit.xml \
+              2>&1 | tee ci-results/full.log
           SCRIPT
       - name: Save integration results
         if: always()

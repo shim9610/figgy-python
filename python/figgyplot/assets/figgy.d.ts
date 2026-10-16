@@ -61,6 +61,49 @@ export enum ColorCycle {
     Monochrome = 4,
 }
 
+export class FiggyBoundedChart {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    clear_selection(): void;
+    /**
+     * One GPU surface; no kernel PNG transport is used for interactive frames.
+     */
+    static create(canvas: HTMLCanvasElement, family: string, value: string, width: number, height: number): Promise<FiggyBoundedChart>;
+    /**
+     * Renderer-measured logical pixel bounds and resize handles.
+     */
+    decorations(): string;
+    drag(target: string, dx: number, dy: number, handle?: string | null): boolean;
+    export_png(scale: number): Promise<Uint8Array>;
+    /**
+     * Submit one frame and wait for actual GPU completion. Hosts must await
+     * this before publishing Ready; rejected completion (including device
+     * loss) is returned to the caller instead of reporting an unusable chart.
+     */
+    first_frame_ready(): Promise<void>;
+    frame(): void;
+    get_document(): string;
+    /**
+     * Observe completion of work already submitted to this chart's GPU queue.
+     * The returned Promise owns a queue clone, not a borrow of this chart.
+     * Hosts may keep processing edits while waiting, and should coalesce
+     * display submissions until it settles. Device loss rejects the Promise.
+     */
+    gpu_ready(): Promise<any>;
+    hit_decoration(x: number, y: number, edit_area: boolean): string | undefined;
+    hover(x: number | null | undefined, y: number | null | undefined, dt: number): boolean;
+    pick(x: number, y: number, toggle: boolean): string;
+    resize(width: number, height: number): void;
+    resize_handle(target: string, x: number, y: number): string | undefined;
+    select_decoration(target?: string | null): void;
+    /**
+     * Validate and prepare before replacing the SSOT, retaining the old chart on failure.
+     */
+    set_document(value: string, width: number, height: number): void;
+    step_selection(backwards: boolean): void;
+}
+
 export class FiggyChart {
     private constructor();
     free(): void;
@@ -146,12 +189,12 @@ export class FiggyChart {
      */
     begin_streaming(max_primitives_per_chunk: number): void;
     cancel_stream_operation_and_wait(handle: StreamingOperationHandle): Promise<void>;
-    cancel_streaming(): void;
     /**
      * Cancel this chart and resolve only after its submitted work and
      * retired renderer-owned surfaces have crossed the completion fence.
      */
     cancel_streaming_and_wait(): Promise<void>;
+    cancel_streaming(): void;
     /**
      * Configure the total GPU budget and chart-local packed-view limit.
      * Automatic streaming keeps original sources nonresident, then caches
@@ -177,6 +220,10 @@ export class FiggyChart {
      * from the callback.
      */
     static create_with_progress(canvas: HTMLCanvasElement, on_event: Function): Promise<FiggyChart>;
+    /**
+     * Renderer-measured decoration bounds in physical canvas pixels.
+     */
+    decoration_bounds(target: string): string;
     /**
      * Normalize a complete referenced-column closure from resident or
      * mixed authority to exact streamed metadata. The typed arrays are
@@ -246,6 +293,13 @@ export class FiggyChart {
      * queue completion callback fires.
      */
     gpu_memory_status(): string;
+    /**
+     * Observe completion of work already submitted to this chart's GPU queue.
+     * The returned Promise owns a queue clone, not a borrow of this chart.
+     * Hosts may keep processing edits while waiting, and should coalesce
+     * display submissions until it settles. Device loss rejects the Promise.
+     */
+    gpu_ready(): Promise<any>;
     has_selection(): boolean;
     /**
      * Hit-test the chart chrome at canvas pixel `(x, y)` — returns the
@@ -368,8 +422,13 @@ export class FiggyChart {
      * Register a font (TTF/OTF/TTC bytes) for SSoT `font` family names.
      * Returns the family names the file declares — use them verbatim in
      * `content.font` / label styles. Registered fonts win over native
-     * system fonts, so resolution behaves identically on web and
-     * desktop. Already-drawn text re-rasterizes on the next `frame()`.
+     * system fonts. A character the chosen face cannot draw falls back
+     * per character to registered fonts (in registration order), then
+     * the bundled Liberation Sans, then, on desktop only, installed
+     * system fonts. Resolution through registered and bundled faces is
+     * therefore identical on web and desktop; installed system fonts
+     * are a desktop-only fallback. Already-drawn text re-rasterizes on
+     * the next `frame()`.
      *
      * JS: `chart.register_font(new Uint8Array(await (await fetch(url)).arrayBuffer()))`
      */
@@ -445,6 +504,14 @@ export class FiggyChart {
      */
     resize(width: number, height: number): void;
     /**
+     * Inspect the first resident typed selection as JSON, or `"null"` when
+     * none is selected. Only selected GPU samples are read back. Histograms
+     * expose `bin_start`, `bin_end`, `value`, and `orientation`; the value
+     * is the stored height (also valid for weighted/density histograms).
+     * Point and matrix selections expose their coordinates and cell value.
+     */
+    selection_details(): Promise<string>;
+    /**
      * Report the effective primitive/grid extent currently drawn.
      */
     series_draw_info(series_id: string): string;
@@ -470,6 +537,11 @@ export class FiggyChart {
      * Replace the whole option SSoT from JSON. Marks everything dirty —
      * the next `frame()` re-rasters the chrome and refreshes the
      * transform, exactly like any other config edit.
+     * Use `get_config`, edit only the desired fields, then submit the
+     * complete config here for selective control. For example, writing
+     * only axis `min` / `max` preserves tick and label settings, whereas
+     * the auto-fit helpers derive those settings along with the range.
+     * This call does not auto-fit ranges or fit the title band.
      * JS: `chart.set_config(JSON.stringify(cfg));`
      */
     set_config(json: string): void;
@@ -519,9 +591,18 @@ export class FiggyChart {
     set_series_label(series_id: string, label: string): boolean;
     set_stream_chunk_budget(primitives: number): void;
     set_stream_operation_chunk_budget(handle: StreamingOperationHandle, max_primitives: number): void;
+    /**
+     * Set plain title text and grow its band if needed. For a text-only
+     * edit that keeps the exact margin, use `get_config` / `set_config`
+     * and change only `chart_title.text`.
+     */
     set_title(text: string): void;
     set_x_title(text: string): void;
     set_y_title(text: string): void;
+    /**
+     * Move the resident typed data selection using source indices.
+     */
+    step_selection(dx: number, dy: number): boolean;
     stream_operation_request_ranges(handle: StreamingOperationHandle): AutoStreamingRangeRequestResult;
     stream_operation_submit_ranges(handle: StreamingOperationHandle, ids: string[], revisions: Float64Array, source_lengths: Float64Array, offsets: Float64Array, sources: Array<any>): StreamingStepResult;
     /**
@@ -634,6 +715,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_autostreamingrangerequestresult_free: (a: number, b: number) => void;
     readonly __wbg_autostreamingrequestresult_free: (a: number, b: number) => void;
+    readonly __wbg_figgyboundedchart_free: (a: number, b: number) => void;
     readonly __wbg_figgychart_free: (a: number, b: number) => void;
     readonly __wbg_streamingoperationhandle_free: (a: number, b: number) => void;
     readonly __wbg_streamingstepresult_free: (a: number, b: number) => void;
@@ -661,6 +743,23 @@ export interface InitOutput {
     readonly color_cycle_css: (a: number) => [number, number];
     readonly draw_style_modes: () => [number, number, number, number];
     readonly draw_style_param_specs: (a: number, b: number) => [number, number, number, number];
+    readonly figgyboundedchart_clear_selection: (a: number) => void;
+    readonly figgyboundedchart_create: (a: any, b: number, c: number, d: number, e: number, f: number, g: number) => any;
+    readonly figgyboundedchart_decorations: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_drag: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly figgyboundedchart_export_png: (a: number, b: number) => any;
+    readonly figgyboundedchart_first_frame_ready: (a: number) => any;
+    readonly figgyboundedchart_frame: (a: number) => [number, number];
+    readonly figgyboundedchart_get_document: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_gpu_ready: (a: number) => any;
+    readonly figgyboundedchart_hit_decoration: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly figgyboundedchart_hover: (a: number, b: number, c: number, d: number) => number;
+    readonly figgyboundedchart_pick: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly figgyboundedchart_resize: (a: number, b: number, c: number) => void;
+    readonly figgyboundedchart_resize_handle: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly figgyboundedchart_select_decoration: (a: number, b: number, c: number) => [number, number];
+    readonly figgyboundedchart_set_document: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly figgyboundedchart_step_selection: (a: number, b: number) => void;
     readonly figgychart_add_line_series: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number];
     readonly figgychart_apply_axis_preset: (a: number, b: number) => [number, number];
     readonly figgychart_apply_color_cycle: (a: number, b: number) => [number, number];
@@ -682,6 +781,7 @@ export interface InitOutput {
     readonly figgychart_configure_streaming: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
     readonly figgychart_create: (a: any) => any;
     readonly figgychart_create_with_progress: (a: any, b: any) => any;
+    readonly figgychart_decoration_bounds: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_demote_auto_resident_columns: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number];
     readonly figgychart_discard_stream_selection_request: (a: number, b: number) => [number, number];
     readonly figgychart_ensure_extent_engine: (a: number) => any;
@@ -694,6 +794,7 @@ export interface InitOutput {
     readonly figgychart_get_config: (a: number) => [number, number, number, number];
     readonly figgychart_get_series: (a: number) => [number, number, number, number];
     readonly figgychart_gpu_memory_status: (a: number) => [number, number];
+    readonly figgychart_gpu_ready: (a: number) => any;
     readonly figgychart_has_selection: (a: number) => number;
     readonly figgychart_hit_test: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_inspect_column_admission: (a: number, b: number, c: number) => [number, number, number, number];
@@ -725,6 +826,7 @@ export interface InitOutput {
     readonly figgychart_request_stream_auto_fit: (a: number, b: number) => [number, number, number];
     readonly figgychart_reset_legend_from_series_labels: (a: number) => [number, number];
     readonly figgychart_resize: (a: number, b: number, c: number) => [number, number];
+    readonly figgychart_selection_details: (a: number) => any;
     readonly figgychart_series_draw_info: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_set_clear_color: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly figgychart_set_colorbar_axis: (a: number, b: number, c: number) => [number, number];
@@ -741,6 +843,7 @@ export interface InitOutput {
     readonly figgychart_set_title: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_x_title: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_y_title: (a: number, b: number, c: number) => [number, number];
+    readonly figgychart_step_selection: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_stream_operation_request_ranges: (a: number, b: number) => [number, number, number];
     readonly figgychart_stream_operation_submit_ranges: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: any) => [number, number, number];
     readonly figgychart_stream_selection_request_ranges: (a: number) => [number, number, number];
@@ -766,8 +869,8 @@ export interface InitOutput {
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__128: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__129: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150: (a: number, b: number, c: any) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

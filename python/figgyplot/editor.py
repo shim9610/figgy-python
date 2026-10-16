@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import copy
 
+from .figure import _display_texts
+
 
 class EditorSession:
     def __init__(self, figure):
@@ -29,7 +31,8 @@ class EditorSession:
                     "bounds": fig.selection_bounds(), "handle": self.handle,
                     "width": rect["width"], "height": rect["height"],
                     "dpi": fig.dpi,
-                    "code": fig.to_code(), "error": self.error, "last_request": self.last_request}
+                    "code": fig.to_code(), "error": self.error, "last_request": self.last_request,
+                    "texts": _display_texts(settings)}
 
     def dispatch(self, message):
         fig = self.figure

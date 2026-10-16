@@ -1,0 +1,48 @@
+diff --git a/crates/web/src/lib.rs b/crates/web/src/lib.rs
+--- a/crates/web/src/lib.rs
++++ b/crates/web/src/lib.rs
+@@ -5756,6 +5756,20 @@
+             Ok(())
+         }
+ 
++        /// Observe completion of work already submitted to this chart's GPU queue.
++        /// The returned Promise owns a queue clone, not a borrow of this chart.
++        /// Hosts may keep processing edits while waiting, and should coalesce
++        /// display submissions until it settles. Device loss rejects the Promise.
++        pub fn gpu_ready(&self) -> js_sys::Promise {
++            let queue = self.renderer.queue().clone();
++            wasm_bindgen_futures::future_to_promise(async move {
++                renderer::init::wait_browser_submitted_work(&queue)
++                    .await
++                    .map_err(js_err)?;
++                Ok(JsValue::UNDEFINED)
++            })
++        }
++
+         /// Alias for [`Self::first_frame_ready`].
+         pub async fn warm_up(&mut self) -> Result<(), JsValue> {
+             self.first_frame_ready().await
+diff --git a/crates/web/src/bounded.rs b/crates/web/src/bounded.rs
+--- a/crates/web/src/bounded.rs
++++ b/crates/web/src/bounded.rs
+@@ -461,6 +461,20 @@
+             .map_err(js_err)
+     }
+ 
++    /// Observe completion of work already submitted to this chart's GPU queue.
++    /// The returned Promise owns a queue clone, not a borrow of this chart.
++    /// Hosts may keep processing edits while waiting, and should coalesce
++    /// display submissions until it settles. Device loss rejects the Promise.
++    pub fn gpu_ready(&self) -> js_sys::Promise {
++        let queue = self.gpu.queue().clone();
++        wasm_bindgen_futures::future_to_promise(async move {
++            renderer::init::wait_browser_submitted_work(&queue)
++                .await
++                .map_err(js_err)?;
++            Ok(JsValue::UNDEFINED)
++        })
++    }
++
+     pub async fn export_png(&mut self, scale: f32) -> Result<js_sys::Uint8Array, JsValue> {
+         let image = self.renderer.export(&self.chart, self.size, scale).await?;
+         let bytes = renderer::encode_png(&image).map_err(js_err)?;

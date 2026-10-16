@@ -3,10 +3,14 @@ use super::*;
 #[pyclass(module = "figgyplot._native")]
 pub struct NotebookFigure {
     background: Option<Color>,
+    document: Option<bounded::DocumentChart>,
     chart: Chart,
     series: Vec<SeriesConfig>,
     columns: HashMap<String, renderer::chart::FitExtent>,
+    edge_samples: HashMap<String, renderer::chart::FitExtent>,
+    center_cells: HashMap<String, renderer::chart::FitExtent>,
     revision: u64,
+    fit_extents: HashMap<String, [renderer::chart::FitExtent; 2]>,
 }
 #[pymethods]
 impl NotebookFigure {
@@ -27,28 +31,48 @@ impl NotebookFigure {
         validate_config(&config)?;
         Ok(Self {
             background: None,
+            document: None,
             chart: Chart::new(config),
             series: vec![],
             columns: HashMap::new(),
+            edge_samples: HashMap::new(),
+            center_cells: HashMap::new(),
             revision: 0,
+            fit_extents: HashMap::new(),
+        })
+    }
+    fn set_radial(&mut self, json: &str) -> PyResult<()> {
+        self.set_document_model(bounded::DocumentChart::Radial(parse(json)?))
+    }
+    fn set_bounded(&mut self, family: &str, json: &str) -> PyResult<()> {
+        self.set_document_model(match family {
+            "categorical" => bounded::DocumentChart::Categorical(parse(json)?),
+            "boxplot" => bounded::DocumentChart::BoxPlot(parse(json)?),
+            _ => return Err(invalid("unknown chart family")),
         })
     }
     fn upload_column(&mut self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
         if self.columns.contains_key(id) {
             return Err(invalid("column ID already exists"));
         }
-        let ext = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
-            extent(a.as_slice().map_err(invalid)?)?
+        let (ext, samples, cells) = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
+            let a = a.as_slice().map_err(invalid)?;
+            (extent(a)?, edge_sample_extent(a), center_cell_extent(a))
         } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
-            extent(a.as_slice().map_err(invalid)?)?
+            let a = a.as_slice().map_err(invalid)?;
+            (extent(a)?, edge_sample_extent(a), center_cell_extent(a))
         } else {
             return Err(invalid("expected contiguous f32/f64"));
         };
         self.columns.insert(id.into(), ext);
+        self.edge_samples.insert(id.into(), samples);
+        self.center_cells.insert(id.into(), cells);
         Ok(())
     }
     fn remove_column(&mut self, id: &str) {
         self.columns.remove(id);
+        self.edge_samples.remove(id);
+        self.center_cells.remove(id);
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let s: SeriesConfig = parse(json)?;
@@ -70,10 +94,24 @@ impl NotebookFigure {
     fn settings_json(&self) -> PyResult<String> {
         serde_json::to_string(&Settings {
             schema_version: 1,
-            renderer_version: "0.16.1".into(),
+            renderer_version: RENDERER_VERSION.into(),
             config: self.chart.config().clone(),
             series: self.series.clone(),
-            radial: None,
+            radial: self.document.as_ref().and_then(|c| c.radial().cloned()),
+            categorical: self.document.as_ref().and_then(|c| {
+                if let bounded::DocumentChart::Categorical(c) = c {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            }),
+            boxplot: self.document.as_ref().and_then(|c| {
+                if let bounded::DocumentChart::BoxPlot(c) = c {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            }),
             background: self.background,
         })
         .map_err(runtime)
@@ -83,8 +121,6 @@ impl NotebookFigure {
         json: &str,
         config: Option<&str>,
         bounds: Option<[f64; 4]>,
-        preserve_x: bool,
-        preserve_y: bool,
     ) -> PyResult<()> {
         let old_config = self.chart.config().clone();
         let old_series = self.series.clone();
@@ -101,14 +137,6 @@ impl NotebookFigure {
                 self.set_range("y", ymin, ymax)?;
             } else {
                 self.fit(0.05)?;
-                if preserve_x {
-                    self.chart.config_mut().bottom_x = old_config.bottom_x.clone();
-                    self.chart.config_mut().top_x = old_config.top_x.clone();
-                }
-                if preserve_y {
-                    self.chart.config_mut().left_y = old_config.left_y.clone();
-                    self.chart.config_mut().right_y = old_config.right_y.clone();
-                }
             }
             validate_config(self.chart.config())?;
             Ok(())
@@ -124,15 +152,22 @@ impl NotebookFigure {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut s: Settings = parse(json)?;
-        if s.schema_version != 1 || s.renderer_version != "0.16.1" {
+        if s.schema_version != 1 || s.renderer_version != RENDERER_VERSION {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&s.config)?;
         validate_background(s.background)?;
-        if s.radial.is_some() {
-            return Err(invalid(
-                "pie/donut charts currently require backend='native'",
-            ));
+        let document = s.document()?;
+        if document.as_ref().map(|c| c.family()) != self.document.as_ref().map(|c| c.family()) {
+            return Err(invalid("settings cannot change the Figure's chart family"));
+        }
+        if let Some(d) = &document {
+            d.validate(s.config.chart_area.0)?;
+            if !matches!(s.config.draw_style, renderer::config::DrawStyle::Precise) {
+                return Err(invalid(
+                    "bounded charts use materials, not Cartesian draw styles",
+                ));
+            }
         }
         validate_draw_style(&s.config, &s.series)?;
         for series in &s.series {
@@ -155,14 +190,66 @@ impl NotebookFigure {
         }
         if s.series != self.series
             || s.config != *self.chart.config()
+            || document != self.document
             || s.background != self.background
         {
+            self.document = document;
             self.chart = Chart::new(s.config);
             self.series = s.series;
             self.background = s.background;
             self.revision += 1;
         }
         Ok(())
+    }
+    fn cache_fit_extent(
+        &mut self,
+        id: String,
+        x: (f64, f64, Option<f64>),
+        y: (f64, f64, Option<f64>),
+    ) -> PyResult<()> {
+        let make = |(min, max, min_positive): (f64, f64, Option<f64>)| {
+            if !min.is_finite()
+                || !max.is_finite()
+                || min > max
+                || min_positive.is_some_and(|v| !v.is_finite() || v <= 0.)
+            {
+                return Err(invalid("invalid fit extent"));
+            }
+            Ok(renderer::chart::FitExtent {
+                min,
+                max,
+                min_positive,
+            })
+        };
+        self.fit_extents.insert(id, [make(x)?, make(y)?]);
+        Ok(())
+    }
+    fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
+        let mut extra = renderer::chart::FitExtent::EMPTY;
+        if matches!(axis, "x" | "y") {
+            for series in &self.series {
+                if !matches!(
+                    series.render_type,
+                    renderer::DataRenderType::ScatterErrorbarX { .. }
+                        | renderer::DataRenderType::ScatterErrorbarY { .. }
+                        | renderer::DataRenderType::ScatterErrorbarXY { .. }
+                        | renderer::DataRenderType::LineScatterErrorbarX { .. }
+                        | renderer::DataRenderType::LineScatterErrorbarY { .. }
+                        | renderer::DataRenderType::LineScatterErrorbarXY { .. }
+                ) {
+                    continue;
+                }
+                if let Some(bounds) = self.fit_extents.get(&series.series_id) {
+                    extra.union(&bounds[usize::from(axis == "y")]);
+                }
+            }
+        }
+        positive_data_bounds(axis, &self.series, extra, |id| {
+            self.columns
+                .get(id)
+                .copied()
+                .ok_or_else(|| invalid("unknown column"))
+        })
     }
     fn fit(&mut self, padding: f64) -> PyResult<()> {
         if !padding.is_finite() || padding < 0. {
@@ -171,8 +258,44 @@ impl NotebookFigure {
         let mut x = renderer::chart::FitExtent::EMPTY;
         let mut y = x;
         for s in &self.series {
-            x.union(&self.columns[&s.x_column]);
-            y.union(&self.columns[&s.y_column]);
+            let [mut a, mut b] = self
+                .fit_extents
+                .get(&s.series_id)
+                .copied()
+                .unwrap_or([self.columns[&s.x_column], self.columns[&s.y_column]]);
+            // Use the renderer's fit-domain classification for every matrix
+            // family, including SSOT shading changes after transfer release.
+            use renderer::gpu_errorbar::{GpuFieldExtentMode, GpuSeriesFitMode};
+            if let Some(GpuSeriesFitMode::Field(mode)) =
+                GpuSeriesFitMode::from_render_type(&s.render_type)
+            {
+                let columns = match mode {
+                    GpuFieldExtentMode::EdgesSamples => &self.edge_samples,
+                    GpuFieldExtentMode::CentersCells => &self.center_cells,
+                    GpuFieldExtentMode::EdgesCells | GpuFieldExtentMode::CentersSamples => {
+                        &self.columns
+                    }
+                };
+                a = columns[&s.x_column];
+                b = columns[&s.y_column];
+            }
+            if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
+                let base = renderer::chart::FitExtent {
+                    min: bar.baseline,
+                    max: bar.baseline,
+                    min_positive: (bar.baseline > 0.).then_some(bar.baseline),
+                };
+                if matches!(
+                    bar.orientation,
+                    renderer::data_config::BarOrientation::Vertical
+                ) {
+                    b.union(&base);
+                } else {
+                    a.union(&base);
+                }
+            }
+            x.union(&a);
+            y.union(&b);
         }
         let mut fitted = Chart::new(self.chart.config().clone());
         fitted.auto_fit_x_extent(&x, padding);
@@ -212,6 +335,42 @@ impl NotebookFigure {
         json!({"backend":"webgpu","kernel_gpu":false,"columns":self.columns.len(),"allocation_mode":"resident","revision":self.revision,"rgba_readbacks":0,"png_encodes":0}).to_string()
     }
 }
+fn edge_sample_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
+    let mut ext = renderer::chart::FitExtent::EMPTY;
+    for pair in a.windows(2) {
+        let value = (pair[0].f64() + pair[1].f64()) * 0.5;
+        if value.is_finite() {
+            ext.min = ext.min.min(value);
+            ext.max = ext.max.max(value);
+            if value > 0. {
+                ext.min_positive = Some(ext.min_positive.map_or(value, |old| old.min(value)));
+            }
+        }
+    }
+    ext
+}
+
+fn center_cell_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
+    if a.len() < 2 {
+        return renderer::chart::FitExtent::EMPTY;
+    }
+    let mut result = edge_sample_extent(a);
+    let last = a.len() - 1;
+    for value in [
+        a[0].f64() + (a[0].f64() - a[1].f64()) * 0.5,
+        a[last].f64() + (a[last].f64() - a[last - 1].f64()) * 0.5,
+    ] {
+        if value.is_finite() {
+            result.min = result.min.min(value);
+            result.max = result.max.max(value);
+            if value > 0. {
+                result.min_positive = Some(result.min_positive.map_or(value, |old| old.min(value)));
+            }
+        }
+    }
+    result
+}
+
 fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
     let mut ext = renderer::chart::FitExtent::EMPTY;
     for (index, n) in a.iter().enumerate() {
@@ -233,4 +392,31 @@ fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
         return Err(invalid("data has no finite values"));
     }
     Ok(ext)
+}
+
+impl NotebookFigure {
+    fn set_document_model(&mut self, document: bounded::DocumentChart) -> PyResult<()> {
+        if !self.series.is_empty() || !self.columns.is_empty() {
+            return Err(invalid("create a separate Figure for bounded charts"));
+        }
+        if !matches!(
+            self.chart.config().draw_style,
+            renderer::config::DrawStyle::Precise
+        ) {
+            return Err(invalid(
+                "bounded charts use materials, not Cartesian draw styles",
+            ));
+        }
+        if self
+            .document
+            .as_ref()
+            .is_some_and(|d| d.family() != document.family())
+        {
+            return Err(invalid("cannot change chart family"));
+        }
+        document.validate(self.chart.config().chart_area.0)?;
+        self.document = Some(document);
+        self.revision += 1;
+        Ok(())
+    }
 }

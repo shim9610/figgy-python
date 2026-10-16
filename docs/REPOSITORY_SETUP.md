@@ -19,11 +19,10 @@ identity's admin access before writing and reports applied settings. It does not
 modify branch protection. It may stop partway if a setting is unavailable; inspect
 the reported response and remaining UI switches. No token is stored in the repo.
 
-These writes could not be executed in the Codex cloud session: the connected
-GitHub tools provide no repository-administration write operation, and the CLI's
-GitHub API access is blocked by the environment network policy. The connected
-repository metadata reports admin access, so this is a tool/network limitation,
-not a claim that the repository owner lacks permission.
+The initial setup session could not execute these writes through its available
+tools/network. That historical restriction does not describe every environment
+or prove the current repository settings; check GitHub Settings before changing
+them.
 
 Equivalent UI locations are **Settings → Advanced Security** (or **Code security**
 on some layouts): private vulnerability reporting, Dependabot alerts, secret
@@ -57,7 +56,10 @@ and installs that checkout's wheel, loads local assets, uses Mesa lavapipe for
 native rendering and Chromium's SwiftShader for browser WebGPU, and saves JUnit
 results/test artifacts for five days. Missing software drivers or Chromium fail
 explicitly. UI/GPU checks are software-GPU checks, not hardware certification.
-The outer CI job timeout does not change production GPU wait behavior.
+The outer CI job timeout does not change production GPU wait behavior. When the
+test harness explicitly selects its software Vulkan driver, Chromium's GPU
+watchdog uses the same 180-second budget as the readiness check. The watchdog,
+GPU-loss errors and interaction assertions remain enabled.
 The X11 jobs install and probe `libxkbcommon0`, `libxkbcommon-x11-0`, the X11
 library and Vulkan loader before creating the winit event loop, and use a
 1600×1000 Xvfb display so expanded inspectors stay on screen.
@@ -96,7 +98,7 @@ required checks. This change does not modify those rules or enable automatic
 merging. TestPyPI publication is prepared as an explicit manual workflow;
 production PyPI promotion is explicit and requires its separate publisher/environment.
 
-## Executed validation for this preparation
+## Historical validation for the initial rollout (2026-10-14)
 
 - The previous manual run at `03996da` built and checked all 74 configured wheels
   and the sdist. Its final Linux functional job failed when the runner lacked

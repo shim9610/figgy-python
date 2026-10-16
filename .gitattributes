@@ -3,3 +3,5 @@
 # Upstream JS/WASM assets are content-addressed in provenance.json. Preserve
 # their exact bytes on every platform, including Windows core.autocrlf=true.
 /python/figgyplot/assets/* -text
+# Build provenance hashes the bridge patch byte-for-byte.
+/scripts/wasm-host.patch text eol=lf

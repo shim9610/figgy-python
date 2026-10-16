@@ -13,7 +13,7 @@ on:
         description: 'Exact source version (public upload to the selected index)'
         required: true
         type: string
-        default: '0.2.2'
+        default: '0.3.0'
       testpypi-run-id:
         description: 'For verify-testpypi/PyPI: numeric TestPyPI run ID from the run URL (not #2)'
         type: string
@@ -46,7 +46,7 @@ jobs:
           TEST_RUN_ID: ${{ inputs.testpypi-run-id }}
         run: |
           python - <<'PY'
-          import ast, os, tomllib
+          import os, tomllib
           from pathlib import Path
           if os.environ['GITHUB_REF'] != 'refs/heads/main':
               raise SystemExit('Publication is allowed only from main; select main in Run workflow.')
@@ -56,11 +56,11 @@ jobs:
               raise SystemExit('Enter testpypi-run-id: the numeric ID after /actions/runs/ in the TestPyPI run URL.')
           project = tomllib.loads(Path('pyproject.toml').read_text())['project']
           cargo = tomllib.loads(Path('Cargo.toml').read_text())['package']
-          version = project['version']
-          module = ast.parse(Path('python/figgyplot/__init__.py').read_text())
-          python_version = next(ast.literal_eval(node.value) for node in module.body if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__version__' for t in node.targets))
-          if project['name'] != 'figgyplot' or cargo['version'] != version or python_version != version or os.environ['REQUESTED_VERSION'] != version:
-              raise SystemExit('Input, pyproject.toml, Cargo.toml and Python package versions must match exactly.')
+          # Cargo.toml is the single version source: pyproject declares the
+          # version dynamic and figgyplot.__version__ comes from the extension.
+          version = cargo['version']
+          if project['name'] != 'figgyplot' or 'version' in project or 'version' not in project.get('dynamic', []) or os.environ['REQUESTED_VERSION'] != version:
+              raise SystemExit('Input must match the Cargo.toml version, and pyproject.toml must declare the version dynamic.')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'version={version}\n')
           PY

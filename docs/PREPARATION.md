@@ -2,14 +2,17 @@
 
 The wrapper exposes `Figure.prepare()` for native rendering and
 `await Figure.prepare_async(timeout=180)` for a mounted WebGPU widget. Both call
-the **public upstream renderer prewarm API**; this repository contains no shader
-engine or renderer source copy.
+the public upstream renderer APIs: Cartesian pipeline prewarming or bounded-chart
+first-frame preparation. This repository contains no shader engine or renderer
+source copy.
 
 ## Native
 
 Construct the Figure, register the actual series, then call `prepare()` before
-timing/drawing. It calls `Renderer.prewarm_all_observed`, waits for submitted GPU
-work and completes one RGBA render of the current document. It releases the GIL,
+timing/drawing. For Cartesian charts it calls `Renderer.prewarm_all_observed`
+and waits for submitted GPU work. Pie/donut, categorical and boxplot charts
+prepare their own bounded renderer through the current document render. Both
+paths complete one RGBA render of the current document. The call releases the GIL,
 reuses resident columns, preserves settings/revision, and does not encode PNG.
 Allocation/validation errors propagate as Python exceptions. The completed
 readback is temporary, not a retained CPU copy of the original arrays.
@@ -47,9 +50,25 @@ occur. The kernel remains GPU-free. Python settings changes while preparation is
 deferred are applied when it starts.
 
 `prepare_async()` waits for a mounted frontend, initializes WASM/WebGPU, uploads
-the binary columns, uses `FiggyChart.prewarm_all_with_progress` and awaits
-`first_frame_ready`. The browser shows upstream stage progress. Preparation and
-redraw/picking/export operations are serialized to protect the WASM chart.
+the binary columns, uses `FiggyChart.prewarm_all_with_progress` for Cartesian
+charts and awaits `first_frame_ready`. Radial, categorical and boxplot charts
+compile their pipelines asynchronously and also await the first GPU frame.
+The browser sizes the surface to its displayed CSS size and device pixel ratio
+before awaiting the frame, repeating this if the display size changes during
+preparation. Ready therefore covers the displayed surface without immediately
+submitting a redundant, unawaited frame. Preparation failures remain visible
+in the status and propagate to Python. The browser shows upstream stage progress.
+Preparation and renderer reads/mutations, including picking and export, are
+serialized to protect the WASM chart. Choosing an inspector target immediately
+renders its controls from the last accepted settings without borrowing the chart;
+edits still enter the renderer queue.
+Ordinary browser redraws submit synchronously and retain a separate GPU completion
+Promise that owns no chart borrow. Only the next display submission waits for
+that Promise; input, accepted settings and Python edit acknowledgements continue
+through the operation queue. `fig.sync()` acknowledges edits without waiting for
+display completion. Export and explicit preparation wait for the outstanding
+frame before starting their own GPU work. Edits made during a frame remain dirty
+until a later submission, so completion cannot discard a newer redraw.
 `elapsed_ms` covers the browser request, including initialization/upload when
 deferred; `prewarm_ms` separately measures prewarm plus first-frame readiness.
 Kernel/comm scheduling and outbound transfer before the request are not included.
@@ -69,7 +88,7 @@ Its Figure is closed on exit; it is a diagnostic command, not a reliable cache
 producer for later processes. There is no GPU installation hook.
 
 **Persistent pipeline cache save/restore is not implemented.** All current reports
-set `persistent_cache_supported=False`. Renderer 0.16.1's public construction
+set `persistent_cache_supported=False`. Renderer 0.17.0's public construction
 path provides no cache injection; its pipeline descriptors use `cache: None`.
 Creating an unrelated wgpu cache in the wrapper would not cache those pipelines.
 

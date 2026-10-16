@@ -1,6 +1,10 @@
 # Native surface / notebook WebGPU hosts
 
-The Python distribution uses `figgy-renderer 0.16.1`. Chart layout, styles, data
+The figgyplot 0.3.0 source uses the published `figgy-renderer 0.17.0` and
+`figgy-model 0.11.0` crates from crates.io. `Cargo.lock` pins their versions
+and checksums; packaged WASM uses their release commit `783353a`.
+Provenance checks preserve this source pairing; see [publishing](PUBLISHING.md).
+Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
 vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
 
@@ -12,10 +16,11 @@ f32/f64 → hi/lo staging path. `NativeFigure` and the desktop host share one
 All native Figures in this process now share one GPU instance/adapter,
 device/queue, renderer, resident column pool and pipeline/picking resources.
 Each Figure owns its chart registration, settings, columns and export target.
-Pie/donut Figures additionally own an upstream bounded radial model/renderer.
-They share the device/queue but use no Cartesian source columns. Native radial
+Pie/donut, categorical-bar and boxplot Figures own the corresponding upstream
+bounded model/renderer.
+They share the device/queue but use no Cartesian source columns. Native bounded-chart
 windows paint upstream frames to a GPU texture embedded in egui, without PNG or
-RGBA transfer during redraw. Small category values remain in the radial CPU model.
+RGBA transfer during redraw. Small category values and box summaries remain in the bounded CPU model.
 Cartesian uploads retain no CPU array copy. See [native sharing](NATIVE_SHARING.md)
 for ownership, capacity, synchronization and explicit release behavior.
 
@@ -37,7 +42,8 @@ it does not read the whole frame. PNG export alone uses renderer readback.
 The chart-centered toolbar uses vector icons with tooltips and leaves properties
 hidden until an element is selected.
 The contextual panel edits title/axis/legend text, font size/family and color, axes and series
-styles, tick-label font size/family/color, and heatmap color range/presets. The font entry is a family name,
+styles, tick-label format/significant digits/font size/family/color, and matrix
+color range, logarithmic mapping and palettes. The font entry is a family name,
 not a TTF path. Native uses renderer system/registered fonts; a missing family
 falls back to the bundled font.
 Chrome/series selection, renderer drag/resize policies, wheel zoom, Copy Python
@@ -77,7 +83,7 @@ The process keeps one reusable main-thread winit loop for close/reopen. These
 APIs do not integrate automatically with a foreign Qt/Tk event loop or `%gui qt`.
 
 Native `fig.info` counts `column_uploads`, `rgba_readbacks`, `png_encodes`.
-For pie/donut Figures, `allocation_mode="bounded"`; their retained radial export
+For bounded-chart Figures, `allocation_mode="bounded"`; their retained export
 resources are included in `known_gpu_bytes`. Cartesian figures use `resident`.
 These counters and `columns`/`figure_column_bytes` are per Figure. The
 `gpu_context_id`, `gpu_sharing="process"`, `active_figures`, `pool_capacity_bytes`
@@ -92,17 +98,21 @@ readback. Do not compare the two as the same FPS metric.
 
 ## Jupyter
 
-Pie/donut editing currently requires the native host. See
-[chart and style API](CHART_TYPES.md) for static notebook output and style limits.
+Native and Jupyter WebGPU hosts support Cartesian, radial, categorical and boxplot
+charts. Both expose click selection, hover, decoration dragging and plot-area
+resize handles. See [chart and style API](CHART_TYPES.md) for constructors and limits.
 
 `backend="auto"` selects `webgpu` inside an IPython kernel and `native` elsewhere.
 Use `Figure(backend="webgpu")` explicitly in shared scripts. Its PyO3
 `NotebookFigure` constructs only the common renderer's `Chart`/settings model;
 it creates no adapter, device or native GPU pool. Initial min/max metadata is
-computed while scanning inputs; renderer `Chart.auto_fit_*_extent` owns range
-fitting. The browser Fit action uses upstream GPU fit. This initial metadata path
-covers the exposed plot/scatter/heatmap APIs; it is not a general errorbar fit
-engine.
+computed while scanning inputs; errorbar endpoint extents and positive bounds
+are retained as metadata after upload buffers are released. The renderer's
+`Chart.auto_fit_*_extent` helpers own range/tick fitting. The browser Fit action
+uses upstream GPU fit. Both paths cover plot/scatter/errorbar/histogram/heatmap/
+contour APIs and use zero padding for matrix-only figures, or 5% when other
+Cartesian series are present. An explicit `fig.fit(padding=...)` overrides this
+binding default.
 
 The browser creates upstream `FiggyChart` on a real WebGPU canvas. Float32 and
 float64 NumPy snapshots cross anywidget as binary buffers, then typed arrays
@@ -172,9 +182,12 @@ requires a usable kernel GPU and performs image transfers.
 ## Assets and builds
 
 `python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
-`crates/web` at commit `84aa2783caa97d679c72b5c079fb4aea8bf1040e` (renderer 0.16.1,
-web example 0.13.1). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
-wasm-bindgen 0.2.129. `assets/provenance.json` records the versions and SHA-256.
+`crates/web` at commit `783353a5e3343f27a48da3b0aa1c67969c9d63ff` (renderer 0.17.0,
+web example 0.14.0). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
+wasm-bindgen 0.2.129. `assets/provenance.json` records the versions, asset hashes
+and native registry package checksums. Rebuilding verifies the downloaded crate
+archives and their source commit against the WASM checkout. Offline preflight
+rejects native/WASM version, source or checksum mismatches and Git/path overrides.
 The script uses an external checkout; it does not copy Rust sources into this
 repository. It is a maintainer step; pip installation uses packaged artifacts.
 

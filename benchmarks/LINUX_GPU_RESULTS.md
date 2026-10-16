@@ -1,5 +1,9 @@
 # Linux Radeon 8060S benchmarks
 
+Historical hardware report. The measurements and test totals below belong to
+the 0.2 checkpoint; they have not been remeasured for `figgyplot 0.3.0` /
+renderer `0.17.0` / model `0.11.0`.
+
 2026-10-14 (Asia/Seoul). Figgy 0.2.0, release build of source `abae8d9` at the
 measurement checkpoint.
 

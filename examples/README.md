@@ -73,9 +73,10 @@ The [manifest](../docs/images/gallery/manifest.json) records each source/image
 pair, canvas dimensions, GPU adapter and PNG SHA-256. The gallery currently
 contains 17 images built from the exposed Python chart/style APIs. It includes
 four separate material variants from `material_textures.py`. See the
-[chart and style reference](../docs/CHART_TYPES.md) for supported combinations
-and the native-only pie/donut host boundary. High-level bar, box-plot and contour
-APIs are not exposed yet.
+[chart and style reference](../docs/CHART_TYPES.md) for all constructors and
+supported combinations. Pies/donuts, categorical bars, boxplots, histograms and
+contours are available in both native windows and Jupyter WebGPU; the gallery
+is a selection of examples, not the complete API surface.
 
 ## Editing and host examples
 

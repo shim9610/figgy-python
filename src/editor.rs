@@ -6,11 +6,13 @@ pub const INSPECTOR_WIDTH: f32 = 320.;
 
 pub(crate) struct Editor {
     pub inspector_open: bool,
+    pub edit_area: bool,
     pub error: String,
     pub advanced_requested: bool,
     pub picked: Option<Value>,
     save_path: String,
     raw: String,
+    text_ranges: HashMap<String, std::ops::Range<usize>>,
     notice: String,
     pub stage: egui::Rect,
     pub controls: HashMap<String, egui::Rect>,
@@ -20,11 +22,13 @@ impl Default for Editor {
     fn default() -> Self {
         Self {
             inspector_open: false,
+            edit_area: false,
             error: String::new(),
             advanced_requested: false,
             picked: None,
             save_path: "figure.png".into(),
             raw: String::new(),
+            text_ranges: HashMap::new(),
             notice: String::new(),
             stage: egui::Rect::NOTHING,
             controls: HashMap::new(),
@@ -113,6 +117,25 @@ pub fn object_name(id: &str, data: &FigureCore) -> String {
     name.into()
 }
 
+// UI helper only: direct SSOT injection keeps the caller's layout untouched.
+fn fit_enabled_title(config: &mut Config, target: &str) {
+    if target == "chart_title" {
+        let measure = renderer::CpuTextMeasure::for_style(&config.draw_style);
+        renderer::layout::fit_chart_title_margin(config, &measure);
+    } else {
+        let axis = match target {
+            "axis_title_bottom" => &mut config.bottom_x,
+            "axis_title_left" => &mut config.left_y,
+            "axis_title_top" => &mut config.top_x,
+            "axis_title_right" => &mut config.right_y,
+            _ => return,
+        };
+        if axis.title_option.visible {
+            axis.out_margin = axis.out_margin.max(axis.title_option.text.font_size * 2.0);
+        }
+    }
+}
+
 impl Editor {
     pub fn show(
         &mut self,
@@ -147,7 +170,20 @@ impl Editor {
                     );
                     self.controls.insert("fit".into(), response.rect);
                     if response.clicked() {
-                        match Python::attach(|py| c.fit(py, 0.05)) {
+                        let padding = if !c.data.series.is_empty()
+                            && c.data.series.iter().all(|s| {
+                                matches!(
+                                    s.render_type,
+                                    renderer::DataRenderType::Heatmap { .. }
+                                        | renderer::DataRenderType::Contour { .. }
+                                        | renderer::DataRenderType::HeatmapContour { .. }
+                                )
+                            }) {
+                            0.0
+                        } else {
+                            0.05
+                        };
+                        match Python::attach(|py| c.fit(py, padding)) {
                             Ok(()) => self.notice = "View fitted".into(),
                             Err(e) => self.error = e.to_string(),
                         }
@@ -186,39 +222,71 @@ impl Editor {
                             ui.heading("Show / hide");
                             let mut cfg = c.data.chart.config().clone();
                             let mut changed = false;
-                            for (key, label, visible) in [
-                                ("chart_title", "Chart title", &mut cfg.chart_title.visible),
-                                ("legend", "Legend", &mut cfg.legend.visible),
+                            let mut enabled_title = None;
+                            for (key, label, visible, rich) in [
+                                (
+                                    "chart_title",
+                                    "Chart title",
+                                    &mut cfg.chart_title.visible,
+                                    Some(&mut cfg.chart_title.text),
+                                ),
+                                ("legend", "Legend", &mut cfg.legend.visible, None),
                                 (
                                     "axis_title_bottom",
                                     "X axis title",
                                     &mut cfg.bottom_x.title_option.visible,
+                                    Some(&mut cfg.bottom_x.title_option.text),
                                 ),
                                 (
                                     "axis_title_left",
                                     "Y axis title",
                                     &mut cfg.left_y.title_option.visible,
+                                    Some(&mut cfg.left_y.title_option.text),
                                 ),
                                 (
                                     "axis_title_top",
                                     "Top axis title",
                                     &mut cfg.top_x.title_option.visible,
+                                    Some(&mut cfg.top_x.title_option.text),
                                 ),
                                 (
                                     "axis_title_right",
                                     "Right axis title",
                                     &mut cfg.right_y.title_option.visible,
+                                    Some(&mut cfg.right_y.title_option.text),
                                 ),
                             ] {
-                                let response = ui.checkbox(visible, label);
+                                // An empty title is not visible, even when its SSOT flag is true.
+                                let empty = rich.as_ref().is_some_and(|r| {
+                                    r.segments.iter().all(|s| s.text.is_whitespace())
+                                });
+                                let mut shown = *visible && !empty;
+                                let response = ui.checkbox(&mut shown, label);
                                 self.controls.insert(format!("show_{key}"), response.rect);
-                                changed |= response.changed();
+                                if response.changed() {
+                                    *visible = shown;
+                                    changed = true;
+                                    if shown && let Some(rich) = rich {
+                                        if empty {
+                                            rich.segments =
+                                                renderer::text::rich_segments_from_text(label);
+                                        }
+                                        enabled_title = Some(key);
+                                    }
+                                }
+                            }
+                            if let Some(target) = enabled_title {
+                                fit_enabled_title(&mut cfg, target);
                             }
                             if changed {
                                 match c.commit_config(cfg) {
                                     Ok(()) => {
                                         self.error.clear();
                                         self.notice = "Visibility updated".into();
+                                        if let Some(target) = enabled_title {
+                                            *selected = Some(target.into());
+                                            self.inspector_open = true;
+                                        }
                                     }
                                     Err(error) => self.error = error.to_string(),
                                 }
@@ -463,7 +531,17 @@ impl Editor {
         if let Some(picked) = &self.picked {
             ui.separator();
             ui.label(RichText::new("SELECTED DATA").size(11.).strong());
-            for key in ["index", "x_index", "y_index", "x", "y", "value"] {
+            for key in [
+                "index",
+                "x_index",
+                "y_index",
+                "bin_start",
+                "bin_end",
+                "x",
+                "y",
+                "value",
+                "orientation",
+            ] {
                 if let Some(value) = picked.get(key) {
                     ui.monospace(format!("{key}: {value}"));
                 }
@@ -528,6 +606,66 @@ impl Editor {
             });
     }
 
+    fn rich_text_editor(&mut self, ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
+        let mut text = display_text(&node["segments"]);
+        ui.label("Text (select characters to format)");
+        let output = egui::TextEdit::singleline(&mut text)
+            .id_salt(key)
+            .desired_width(f32::INFINITY)
+            .show(ui);
+        self.controls.insert(key.to_owned(), output.response.rect);
+        if let Some(range) = output.cursor_range {
+            if output.response.has_focus() || output.response.lost_focus() {
+                let chars = range.as_sorted_char_range();
+                self.text_ranges
+                    .insert(key.to_owned(), chars.start.0..chars.end.0);
+            }
+        }
+        let mut changed = output.response.changed();
+        if changed {
+            let fresh =
+                serde_json::to_value(renderer::text::rich_segments_from_text(&text)).unwrap();
+            node["segments"] = preserve_segment_styles(&node["segments"], fresh);
+        }
+        let segments = node["segments"].as_array_mut().unwrap();
+        let count = segments.len();
+        let range = self
+            .text_ranges
+            .get(key)
+            .filter(|r| r.start < r.end)
+            .cloned()
+            .unwrap_or(0..count);
+        let range = range.start.min(count)..range.end.min(count);
+        ui.horizontal_wrapped(|ui| {
+            for (flag, label) in [
+                ("bold", "B"),
+                ("italic", "I"),
+                ("underline", "U"),
+                ("superscript", "x²"),
+                ("subscript", "x₂"),
+                ("greek", "αβ"),
+            ] {
+                let active =
+                    !range.is_empty() && segments[range.clone()].iter().all(|s| s[flag] == true);
+                let response = ui.selectable_label(active, label).on_hover_text(flag);
+                self.controls.insert(format!("{key}_{flag}"), response.rect);
+                if response.clicked() {
+                    for segment in &mut segments[range.clone()] {
+                        segment[flag] = json!(!active);
+                        if !active && flag == "superscript" {
+                            segment["subscript"] = json!(false);
+                        }
+                        if !active && flag == "subscript" {
+                            segment["superscript"] = json!(false);
+                        }
+                    }
+                    changed = true;
+                }
+            }
+        });
+        changed
+    }
+
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
         let mut state = serde_json::to_value(c.snapshot()).unwrap();
         let mut changed = false;
@@ -553,10 +691,37 @@ impl Editor {
         };
         if let Some((node, key)) = visibility {
             if let Some(mut value) = node[key].as_bool() {
-                let response = ui.checkbox(&mut value, "Visible");
+                let is_title = target == "chart_title" || target.starts_with("axis_title_");
+                if is_title
+                    && node["text"]["segments"].as_array().is_some_and(|segments| {
+                        segments
+                            .iter()
+                            .all(|s| s["text"].as_str().is_none_or(|v| v.trim().is_empty()))
+                    })
+                {
+                    value = false;
+                }
+                let label = if key == "line_visible" {
+                    "Axis line"
+                } else {
+                    "Visible"
+                };
+                let response = ui.checkbox(&mut value, label);
                 self.controls.insert("visible".into(), response.rect);
                 if response.changed() {
                     node[key] = json!(value);
+                    if value
+                        && is_title
+                        && node["text"]["segments"].as_array().is_some_and(|segments| {
+                            segments
+                                .iter()
+                                .all(|s| s["text"].as_str().is_none_or(|v| v.trim().is_empty()))
+                        })
+                    {
+                        node["text"]["segments"] = json!(renderer::text::rich_segments_from_text(
+                            &object_name(target, c.data)
+                        ));
+                    }
                     changed = true;
                 }
             }
@@ -578,24 +743,8 @@ impl Editor {
                     if !series["label"].is_object() {
                         continue;
                     }
-                    let mut text = series["label"]["segments"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter_map(|s| s["text"].as_str())
-                        .collect::<String>();
-                    let response =
-                        ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
-                    self.controls.insert(
-                        format!("legend_label_{}", series["series_id"].as_str().unwrap()),
-                        response.rect,
-                    );
-                    if response.changed() {
-                        series["label"]["segments"] =
-                            serde_json::to_value(renderer::text::rich_segments_from_text(&text))
-                                .unwrap();
-                        labels_changed = true;
-                    }
+                    let key = format!("legend_label_{}", series["series_id"].as_str().unwrap());
+                    labels_changed |= self.rich_text_editor(ui, &mut series["label"], &key);
                 }
                 if labels_changed {
                     let mut content: renderer::text::RichText =
@@ -615,24 +764,7 @@ impl Editor {
                     changed = true;
                 }
             } else {
-                let mut text = node["segments"]
-                    .as_array()
-                    .map(|a| {
-                        a.iter()
-                            .filter_map(|s| s["text"].as_str())
-                            .collect::<String>()
-                    })
-                    .unwrap_or_default();
-                ui.label("Text");
-                let response =
-                    ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
-                self.controls.insert("text".into(), response.rect);
-                if response.changed() {
-                    node["segments"] =
-                        serde_json::to_value(renderer::text::rich_segments_from_text(&text))
-                            .unwrap();
-                    changed = true;
-                }
+                changed |= self.rich_text_editor(ui, node, "text");
             }
             changed |= text_field(
                 ui,
@@ -651,9 +783,22 @@ impl Editor {
                 &mut self.controls,
             );
             changed |= color(ui, node, "color", "Text color", &mut self.controls);
+            let previous = node["align"].as_str().unwrap_or("Left").to_owned();
+            let mut align = previous.clone();
+            ui.horizontal(|ui| {
+                for name in ["Left", "Center", "Right"] {
+                    let response = ui.selectable_value(&mut align, name.to_owned(), name);
+                    self.controls.insert(format!("align_{name}"), response.rect);
+                }
+            });
+            if align != previous {
+                node["align"] = json!(align);
+                changed = true;
+            }
         } else if target.starts_with("tick_labels_") {
             let key = axis_key(target.trim_start_matches("tick_labels_"));
             let node = &mut config[key]["label_style"];
+            changed |= label_format_controls(ui, node, &mut self.controls);
             changed |= text_field(
                 ui,
                 node,
@@ -720,49 +865,60 @@ impl Editor {
                 );
             }
             if style["matrix"].is_object() {
-                let bar = &mut config["colorbar"];
-                ui.label(RichText::new("COLOR SCALE").size(11.).weak());
-                changed |= number(
-                    ui,
-                    &mut bar["axis"],
-                    "min",
-                    "Minimum",
-                    "",
-                    &mut self.controls,
-                );
-                changed |= number(
-                    ui,
-                    &mut bar["axis"],
-                    "max",
-                    "Maximum",
-                    "",
-                    &mut self.controls,
-                );
-                ui.label("Color map");
-                let previous = bar["colormap"].as_str().unwrap_or("Custom").to_owned();
-                let mut value = previous.clone();
-                let response = egui::ComboBox::from_id_salt("colormap")
-                    .width(ui.available_width())
-                    .selected_text(&value)
-                    .show_ui(ui, |ui| {
-                        for name in ["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"] {
-                            let response = ui.selectable_value(&mut value, name.to_owned(), name);
-                            self.controls
-                                .insert(format!("colormap_{name}"), response.rect);
-                        }
-                    });
-                self.controls
-                    .insert("colormap".into(), response.response.rect);
-                if value != previous {
-                    bar["colormap"] = json!(value);
-                    changed = true;
-                }
+                changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
             }
+        } else if target == "colorbar" || target.starts_with("colorbar_") {
+            changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
             let node = &mut config[key];
-            changed |= number(ui, node, "min", "Minimum", "", &mut self.controls);
-            changed |= number(ui, node, "max", "Maximum", "", &mut self.controls);
+            changed |= scale_control(ui, node, "axis_scale", &mut self.controls);
+            let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
+            let response = ui.checkbox(&mut labels, "Tick labels");
+            self.controls
+                .insert("tick_labels_visible".into(), response.rect);
+            if response.changed() {
+                node["label_style"]["visible"] = json!(labels);
+                changed = true;
+            }
+            let mut ticks = node["tick"] != "None";
+            let response = ui.checkbox(&mut ticks, "Tick marks");
+            self.controls.insert("ticks_visible".into(), response.rect);
+            if response.changed() {
+                node["tick"] = json!(if ticks { "Outside" } else { "None" });
+                changed = true;
+            }
+            ui.label("Tick direction / visibility");
+            let previous = node["tick"].as_str().unwrap_or("Outside").to_owned();
+            let mut direction = previous.clone();
+            let response = egui::ComboBox::from_id_salt("tick_direction")
+                .selected_text(if direction == "None" {
+                    "Hidden"
+                } else {
+                    &direction
+                })
+                .show_ui(ui, |ui| {
+                    for (value, label) in [
+                        ("None", "Hidden"),
+                        ("Outside", "Outside"),
+                        ("Inside", "Inside"),
+                        ("Both", "Both sides"),
+                    ] {
+                        let response = ui.selectable_value(&mut direction, value.to_owned(), label);
+                        self.controls.insert(format!("tick_{value}"), response.rect);
+                    }
+                });
+            self.controls
+                .insert("tick_direction".into(), response.response.rect);
+            if direction != previous {
+                node["tick"] = json!(direction);
+                changed = true;
+            }
+            changed |= label_format_controls(ui, &mut node["label_style"], &mut self.controls);
+            let range_changed = number(ui, node, "min", "Minimum", "", &mut self.controls)
+                | number(ui, node, "max", "Maximum", "", &mut self.controls);
+            changed |= range_changed;
+            let node = &mut config[key];
             changed |= number(
                 ui,
                 node,
@@ -783,6 +939,57 @@ impl Editor {
         } else {
             ui.label(RichText::new("Drag this element to adjust its layout.").weak());
         }
+        if changed && (target == "chart_title" || target.starts_with("axis_title_")) {
+            // The title fields act as the renderer's title helper: a title
+            // taller than its band grows the band instead of being clipped.
+            if let Ok(mut parsed) = serde_json::from_value::<Config>(config.clone()) {
+                fit_enabled_title(&mut parsed, target);
+                config = serde_json::to_value(parsed).unwrap();
+            }
+        }
+        if changed {
+            // A scale switch is a view helper: use the positive data domain if
+            // the old linear limits cross zero, without editing source arrays.
+            for (key, dimension) in [
+                ("bottom_x", "x"),
+                ("top_x", "x"),
+                ("left_y", "y"),
+                ("right_y", "y"),
+                ("colorbar", "z"),
+            ] {
+                if !config[key].is_object() {
+                    continue;
+                }
+                let old = if key == "colorbar" {
+                    &state["config"][key]["axis"]
+                } else {
+                    &state["config"][key]
+                };
+                let axis = if key == "colorbar" {
+                    &mut config[key]["axis"]
+                } else {
+                    &mut config[key]
+                };
+                if axis["scale"] == "Logarithmic"
+                    && old["scale"] != "Logarithmic"
+                    && axis["min"].as_f64().is_some_and(|v| v <= 0.)
+                {
+                    match c.log_bounds(dimension) {
+                        Ok((min, max)) => {
+                            axis["min"] = json!(min);
+                            axis["max"] = json!(max);
+                        }
+                        Err(e) => {
+                            self.error = e.to_string();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        if changed {
+            crate::axis_edit::sync_linked_axis_edit(&state["config"], &mut config, target);
+        }
         state["config"] = config;
         if changed {
             match c.apply_settings(&state.to_string()) {
@@ -794,6 +1001,21 @@ impl Editor {
             }
         }
     }
+}
+
+/// What a text field shows for a rich node: the text whose renderer segments
+/// these are (keeping "10⁻³" as typed), or the plain characters when the
+/// segments carry styling no plain text maps to.
+fn display_text(segments: &Value) -> String {
+    serde_json::from_value::<Vec<renderer::text::RichSegment>>(segments.clone())
+        .ok()
+        .and_then(|segments| crate::plain_text_of(&segments))
+        .unwrap_or_else(|| {
+            segments
+                .as_array()
+                .map(|a| a.iter().filter_map(|s| s["text"].as_str()).collect())
+                .unwrap_or_default()
+        })
 }
 
 fn axis_key(name: &str) -> &'static str {
@@ -828,6 +1050,120 @@ fn text_field(
     }
     response.changed()
 }
+fn color_scale_properties(
+    ui: &mut egui::Ui,
+    bar: &mut Value,
+    controls: &mut HashMap<String, egui::Rect>,
+) -> bool {
+    if !bar.is_object() {
+        ui.label("No color scale is configured.");
+        return false;
+    }
+    let mut changed = scale_control(ui, &mut bar["axis"], "color_scale", controls);
+    ui.label(RichText::new("COLOR SCALE").size(11.).weak());
+    changed |= number(ui, &mut bar["axis"], "min", "Minimum", "", controls);
+    changed |= number(ui, &mut bar["axis"], "max", "Maximum", "", controls);
+    ui.label("Color map");
+    let previous = bar["colormap"].as_str().unwrap_or("Custom").to_owned();
+    let mut value = previous.clone();
+    let response = egui::ComboBox::from_id_salt("colormap")
+        .width(ui.available_width())
+        .selected_text(&value)
+        .show_ui(ui, |ui| {
+            for name in ["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"] {
+                let response = ui.selectable_value(&mut value, name.to_owned(), name);
+                controls.insert(format!("colormap_{name}"), response.rect);
+            }
+        });
+    controls.insert("colormap".into(), response.response.rect);
+    if value != previous {
+        bar["colormap"] = json!(value);
+        changed = true;
+    }
+    changed |= label_format_controls(ui, &mut bar["axis"]["label_style"], controls);
+    changed
+}
+
+fn label_format_controls(
+    ui: &mut egui::Ui,
+    labels: &mut Value,
+    controls: &mut HashMap<String, egui::Rect>,
+) -> bool {
+    ui.label("Number format");
+    let previous = labels["format"].as_str().unwrap_or("Timestamp");
+    let mut value = previous.to_owned();
+    let response = egui::ComboBox::from_id_salt("label_format")
+        .selected_text(previous)
+        .show_ui(ui, |ui| {
+            for (name, label) in [
+                ("Decimal", "Decimal (123.45)"),
+                ("Scientific", "Scientific (1.23e2)"),
+                ("Power", "Power (1.23 × 10²)"),
+            ] {
+                let response = ui.selectable_value(&mut value, name.to_owned(), label);
+                controls.insert(format!("label_format_{name}"), response.rect);
+            }
+        });
+    controls.insert("label_format".into(), response.response.rect);
+    let mut changed = value != previous;
+    if changed {
+        labels["format"] = json!(value);
+    }
+    if value != "Timestamp" {
+        let mut digits = labels["significant_digits"].as_u64().unwrap_or(3) as u8;
+        let response = ui
+            .horizontal(|ui| {
+                ui.label("Significant digits");
+                ui.add(egui::DragValue::new(&mut digits).range(1..=15).speed(1))
+            })
+            .inner;
+        controls.insert("significant_digits".into(), response.rect);
+        if response.changed() {
+            labels["significant_digits"] = json!(digits);
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn scale_control(
+    ui: &mut egui::Ui,
+    axis: &mut Value,
+    id: &str,
+    controls: &mut HashMap<String, egui::Rect>,
+) -> bool {
+    ui.label("Scale");
+    let previous = axis["scale"].as_str().unwrap_or("Linear");
+    let mut value = previous.to_owned();
+    let response = egui::ComboBox::from_id_salt(id)
+        .selected_text(if previous == "Logarithmic" {
+            "Logarithmic (base 10)"
+        } else {
+            "Linear"
+        })
+        .show_ui(ui, |ui| {
+            for (name, label) in [
+                ("Linear", "Linear"),
+                ("Logarithmic", "Logarithmic (base 10)"),
+            ] {
+                let response = ui.selectable_value(&mut value, name.to_owned(), label);
+                controls.insert(format!("{id}_{name}"), response.rect);
+            }
+        });
+    controls.insert(id.into(), response.response.rect);
+    ui.label("Log view omits zero and negative values; source data is preserved.");
+    if value == previous {
+        return false;
+    }
+    axis["scale"] = json!(value);
+    axis["major_spacing"] = json!(if value == "Logarithmic" {
+        1.0
+    } else {
+        (axis["max"].as_f64().unwrap() - axis["min"].as_f64().unwrap()) / 5.0
+    });
+    true
+}
+
 fn number(
     ui: &mut egui::Ui,
     node: &mut Value,
@@ -1041,3 +1377,24 @@ fn toolbar_icon(
 
 #[path = "radial_editor.rs"]
 mod radial_editor;
+
+// Preserve unchanged rich characters when editing the plain text input.
+fn preserve_segment_styles(old: &Value, mut fresh: Value) -> Value {
+    let (Some(old), Some(next)) = (old.as_array(), fresh.as_array_mut()) else {
+        return fresh;
+    };
+    let mut prefix = 0;
+    while prefix < old.len().min(next.len()) && old[prefix]["text"] == next[prefix]["text"] {
+        next[prefix] = old[prefix].clone();
+        prefix += 1;
+    }
+    let mut suffix = 0;
+    while suffix < old.len().min(next.len()) - prefix
+        && old[old.len() - 1 - suffix]["text"] == next[next.len() - 1 - suffix]["text"]
+    {
+        let index = next.len() - 1 - suffix;
+        next[index] = old[old.len() - 1 - suffix].clone();
+        suffix += 1;
+    }
+    fresh
+}

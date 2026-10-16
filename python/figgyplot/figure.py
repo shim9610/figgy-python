@@ -3,14 +3,17 @@ from __future__ import annotations
 import copy
 import json
 import math
+import os
+import sys
 from pathlib import Path
 import re
 import threading
+import warnings
 import weakref
 
 import numpy as np
 
-from ._native import NativeFigure
+from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 _NAMED = {"blue": "#0000ff", "red": "#ff0000", "green": "#008000", "black": "#000000", "white": "#ffffff", "orange": "#ffa500", "purple": "#800080", "gray": "#808080", "grey": "#808080", "b": "#0000ff", "r": "#ff0000", "g": "#008000", "k": "#000000", "w": "#ffffff"}
@@ -43,9 +46,36 @@ def _array(value):
     return np.ascontiguousarray(value, dtype=dtype)
 
 
+class RenderWarning(UserWarning):
+    """A tick setting the renderer could not draw as written and replaced."""
+
+
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _warn_external(message, category):
+    """Warn at the first caller outside figgyplot (like matplotlib's warn_external)."""
+    if sys.version_info >= (3, 12):
+        warnings.warn(message, category, skip_file_prefixes=(_PACKAGE_DIR,))
+        return
+    frame, level = sys._getframe(1), 1
+    while frame is not None and os.path.abspath(frame.f_code.co_filename).startswith(_PACKAGE_DIR):
+        frame, level = frame.f_back, level + 1
+    warnings.warn(message, category, stacklevel=level)
+
+
+_ALIGN = {"left": "Left", "center": "Center", "right": "Right"}
+
+
 def _segments(text):
-    return [{"text": c, "bold": False, "italic": False, "underline": False,
-             "superscript": False, "subscript": False, "greek": False} for c in str(text)]
+    # The renderer's own plain-text segments, including its mapping of
+    # Unicode superscript/subscript characters (e.g. "10⁻³") to styled ones.
+    return json.loads(text_segments_json(str(text)))
+
+
+def _segments_text(segments):
+    """The text whose segments are exactly ``segments``, or None."""
+    return segments_plain_text(json.dumps(segments))
 
 
 def _timeout(value):
@@ -58,8 +88,25 @@ def _timeout(value):
     return value
 
 
+def _display_texts(settings):
+    """Editor text for each rich node: the text its renderer segments came from.
+
+    Editors show and re-map this, so "10⁻³" keeps its superscripts when a title
+    is edited instead of becoming "10-3".
+    """
+    cfg = settings["config"]
+    texts = {"chart_title": _text(cfg["chart_title"]["text"]), "legend": _text(cfg["legend"]["content"])}
+    for side, key in (("bottom", "bottom_x"), ("top", "top_x"), ("left", "left_y"), ("right", "right_y")):
+        texts["axis_title_" + side] = _text(cfg[key]["title_option"]["text"])
+    for spec in settings["series"]:
+        if spec.get("label") is not None:
+            texts["series:" + spec["series_id"]] = _text(spec["label"])
+    return texts
+
+
 def _text(value):
-    return "".join(s["text"] for s in value["segments"])
+    text = _segments_text(value["segments"])
+    return "".join(s["text"] for s in value["segments"]) if text is None else text
 
 
 class Artist:
@@ -165,8 +212,8 @@ class Figure:
             raise RuntimeError("Figure is closed")
 
     def _require_cartesian(self):
-        if self.get_settings().get("radial") is not None:
-            raise ValueError("pie/donut charts have no Cartesian axes; use radial properties or slice selection")
+        if _family(self.get_settings()) is not None:
+            raise ValueError("bounded charts have no Cartesian axes; use their chart properties or data selection")
 
     @property
     def revision(self):
@@ -190,7 +237,12 @@ class Figure:
             return json.loads(self._native.settings_json())
 
     def apply_settings(self, settings, *, expected_revision=None, reset=False):
-        """Replace accepted settings for existing series; source arrays are not copied."""
+        """Replace accepted settings for existing series; source arrays are not copied.
+
+        Read the current SSOT with ``get_settings``, edit only the desired
+        fields, then submit it here for precise control. This does not choose
+        tick spacing, fit data ranges or enlarge the title band.
+        """
         with self._lock:
             self._require_open()
             if expected_revision is not None and expected_revision != self.revision:
@@ -208,36 +260,60 @@ class Figure:
         for window in list(self._windows):
             window.refresh()
 
+    def _check_font(self, value):
+        """Reject a font family the native text stack would silently replace."""
+        if not isinstance(value, str):
+            raise ValueError("font must be a font family name")
+        # The browser backend resolves fonts in the page, where only the
+        # bundled face is available; there is nothing installed to check.
+        if self.backend == "native" and not font_family_available(value):
+            raise ValueError(
+                f"unknown font family {value!r}: it is neither installed nor the bundled "
+                "'Liberation Sans' (use '' for the default font)"
+            )
+        return value
+
+    def _report_render_warnings(self):
+        for message in self._native.take_render_warnings():
+            _warn_external(message, RenderWarning)
+
     def update(self, target, **properties):
-        """Edit a stable series/decorative target using familiar property names."""
+        """Edit a stable series/decorative target using familiar property names.
+
+        Axis/tick-label edits also patch the opposite axis when both axes had
+        exactly equal min, max, scale and inverted fields before the edit.
+        Only changed tick/range/style fields are shared; untouched differences,
+        axis-line visibility, titles, margins and offsets stay independent.
+        Use configure/apply_settings for exact one-sided SSOT edits.
+        """
         if not isinstance(target, str) or not target:
             raise ValueError("editable target must be a non-empty string")
-        radial_document = self.get_settings().get("radial") is not None
-        if radial_document and target != "chart_title":
-            raise ValueError("use radial properties or set_slice() to edit a pie/donut")
-        if radial_document and target == "chart_title":
-            radial = {}
+        kind = _family(self.get_settings())
+        if kind is not None:
+            patch = {}
+            titles = {'chart_title': 'title', 'axis_title_bottom': 'category_title', 'axis_title_left': 'value_title'}
+            if kind != 'radial' and self.get_settings()[kind]['direction'] == 'Horizontal':
+                titles.update(axis_title_bottom='value_title', axis_title_left='category_title')
+            if target not in titles or (kind == 'radial' and target != 'chart_title'):
+                raise ValueError('use the chart artist or configure_bounded/configure_radial for data properties')
             for key, value in properties.items():
-                if key == "text":
-                    radial["title"] = str(value)
-                elif key == "fontsize":
-                    radial["font_size"] = float(value) * self.dpi / 72
-                elif key == "font":
-                    radial["font_family"] = value
-                else:
-                    raise ValueError(f"unsupported radial title property: {key}")
-            return self.configure_radial(**radial)
+                if key == 'text': patch[titles[target]] = str(value)
+                elif key == 'fontsize': patch['font_size'] = float(value)*self.dpi/72
+                elif key == 'font': patch['font_family'] = self._check_font(value)
+                else: raise ValueError(f'unsupported bounded title property: {key}')
+            return self.configure_radial(**patch) if kind == 'radial' else self.configure_bounded(kind, **patch)
         with self._lock:
             self._require_open()
             state = self.get_settings()
             cfg = state["config"]
+            before_config = copy.deepcopy(cfg)
             series = next((s for s in state["series"] if s["series_id"] == target), None)
             if series is not None:
                 style = next(iter(series["render_type"].values()))
                 for key, value in properties.items():
                     if key == "color":
                         matched = False
-                        for kind, field in [("line", "line_color"), ("scatter", "point_color"), ("bar", "bar_color")]:
+                        for kind, field in [("line", "line_color"), ("scatter", "point_color"), ("bar", "fill_color")]:
                             if kind in style:
                                 style[kind][field] = _color(value)
                                 matched = True
@@ -280,11 +356,14 @@ class Figure:
                 for key, value in properties.items():
                     if key == "text" and rich is not None:
                         rich["segments"] = _segments(value)
+                    elif key == "align" and rich is not None:
+                        if not isinstance(value, str) or value.lower() not in _ALIGN:
+                            raise ValueError("align must be 'left', 'center' or 'right'")
+                        rich["align"] = _ALIGN[value.lower()]
                     elif key in ("color", "fontsize", "font"):
                         field = {"color": "color", "fontsize": "font_size", "font": "font"}[key]
                         if key == "font":
-                            if not isinstance(value, str):
-                                raise ValueError("font must be a font family name")
+                            value = self._check_font(value)
                             if rich is None and "label_font" in node:
                                 field = "label_font"
                         if key == "fontsize":
@@ -301,10 +380,37 @@ class Figure:
                             raise ValueError(f"unsupported property for {target}: {key}")
                     elif key == "offset" and "offset_x" in node:
                         node["offset_x"], node["offset_y"] = map(float, value)
-                    elif key in node and key in ("visible", "line_width", "line_visible", "major_spacing", "min", "max"):
+                    elif key in ("format", "significant_digits") and "label_style" in node:
+                        node["label_style"][key] = copy.deepcopy(value)
+                    elif key == "label_style" and "label_style" in node:
+                        if not isinstance(value, dict):
+                            raise ValueError("label_style must be a settings dictionary")
+                        node["label_style"].update(copy.deepcopy(value))
+                    elif key == "scale" and "scale" in node:
+                        node[key] = {"linear": "Linear", "log": "Logarithmic"}.get(value, value)
+                    elif key in node and key in (
+                        "visible", "line_width", "line_visible", "line_color", "line_style",
+                        "major_spacing", "minor_count", "min", "max", "inverted", "tick",
+                        "major_tick_length", "minor_tick_length", "format", "significant_digits",
+                        "label_visible", "font_size", "label_font", "label_offset_x", "label_offset_y",
+                    ):
                         node[key] = value
                     else:
                         raise ValueError(f"unsupported property for {target}: {key}")
+                # Like the renderer's title helpers, derive the title band from
+                # the new text: a title taller than the band (multi-line or
+                # enlarged) grows it instead of being clipped at the top.
+                if target == "chart_title" and {"text", "fontsize", "font", "visible"} & properties.keys():
+                    cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
+                if target.startswith("axis_") and not target.startswith("axis_title_") and "scale" in properties:
+                    axis = _axis_key(target[len("axis_"):])
+                    node = cfg[axis]
+                    if node["scale"] == "Logarithmic" and before_config[axis]["scale"] != "Logarithmic" and node["min"] <= 0:
+                        node["min"], node["max"] = self._native.log_bounds("x" if axis.endswith("_x") else "y")
+                    if "major_spacing" not in properties:
+                        node["major_spacing"] = 1.0 if node["scale"] == "Logarithmic" else (node["max"] - node["min"]) / 5
+                state["config"] = json.loads(sync_linked_axis_edit_json(
+                    json.dumps(before_config, allow_nan=False), json.dumps(cfg, allow_nan=False), target))
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in state["series"]:
                 for style in spec["render_type"].values():
@@ -322,6 +428,7 @@ class Figure:
             if self.backend != "native":
                 raise RuntimeError("render_rgba requires a native GPU; use browser export via await fig.to_png_async()")
             w, h, data = self._native.render_rgba(float(scale))
+            self._report_render_warnings()
             return np.frombuffer(data, dtype=np.uint8).reshape(h, w, 4)
 
     def to_png(self, *, scale=1.0):
@@ -329,7 +436,9 @@ class Figure:
             self._require_open()
             if self.backend != "native":
                 raise RuntimeError("Browser export is asynchronous: await fig.to_png_async() or await fig.savefig_async(path)")
-            return self._native.render_png(float(scale))
+            data = self._native.render_png(float(scale))
+            self._report_render_warnings()
+            return data
 
     def savefig(self, filename, *, dpi=None, scale=None):
         """Write PNG directly, without opening a window or importing a GUI."""
@@ -350,6 +459,9 @@ class Figure:
         ``series`` maps stable series IDs to style patches. Source columns and
         series IDs remain owned by the existing Figure. ``reset`` resets layout
         to this Figure's defaults before applying the optional patches.
+        With the default ``reset=False``, a range-only patch preserves existing
+        ticks and labels. Use ``fit`` / ``set_xlim`` / ``set_ylim`` when their
+        automatic range or tick adjustments are wanted instead.
         """
         with self._lock:
             state = self.get_settings()
@@ -374,8 +486,8 @@ class Figure:
         """Set the chart background for native and browser rendering/export."""
         with self._lock:
             state = self.get_settings()
-            if state.get("radial") is not None:
-                state["radial"]["background"] = _color(color)
+            if _family(state) is not None:
+                state[_family(state)]["background"] = _color(color)
             else:
                 rgba = _color(color)
                 if rgba == _color("white"):
@@ -387,14 +499,25 @@ class Figure:
     def set_draw_style(self, mode="precise", **options):
         """Use precise/sketch/milkyway/constellation with upstream parameters.
 
-        Milkyway accepts line-only series. Constellation requires marker lines.
-        These restrictions also apply to later additions and raw settings edits.
+        Sketch draws line, scatter and errorbar series; bars, heatmaps and
+        contours are not supported. Milkyway accepts line-only series.
+        Constellation requires marker lines. These restrictions also apply to
+        later additions and raw settings edits.
         """
         if mode not in ("precise", "sketch", "milkyway", "constellation"):
             raise ValueError("draw style must be precise, sketch, milkyway or constellation")
-        if self.get_settings().get("radial") is not None:
-            raise ValueError("use set_radial_style(material=...) for pie/donut charts")
-        return self.configure(config={"draw_style": {"mode": mode, **options}})
+        if _family(self.get_settings()) is not None:
+            raise ValueError("bounded charts use their own material/style properties")
+        with self._lock:
+            self.configure(config={"draw_style": {"mode": mode, **options}})
+            # The style changes the title's font (sketch draws Comic Neue), so
+            # re-derive its band like the title helpers do.
+            state = self.get_settings()
+            band = fitted_chart_title_margin(json.dumps(state["config"], allow_nan=False))
+            if band != state["config"]["chart_title"]["top_margin"]:
+                state["config"]["chart_title"]["top_margin"] = band
+                self.apply_settings(state)
+        return self
 
     def configure_radial(self, *, style=None, slices=None, expected_slices=None, **properties):
         """Patch an existing pie/donut, preserving its values unless explicitly set.
@@ -426,6 +549,33 @@ class Figure:
                     _merge(chart["slices"][index], patch)
             return self.apply_settings(state)
 
+    def configure_bounded(self, kind=None, *, style=None, series=None, expected_categories=None, expected_series=None, **properties):
+        """Patch a categorical/box chart SSOT without changing unspecified fields.
+
+        ``series`` maps stable series IDs to patches. Values are only replaced
+        when explicitly supplied; Copy Python preserves the destination data.
+        """
+        with self._lock:
+            state = self.get_settings()
+            kind = kind or _family(state)
+            if kind not in ('categorical', 'boxplot') or state.get(kind) is None:
+                raise ValueError('create the corresponding bounded chart first')
+            chart = state[kind]
+            if expected_categories is not None and [c['id'] for c in chart['categories']] != expected_categories:
+                raise ValueError('style replay requires matching category IDs')
+            if expected_series is not None and [s['id'] for s in chart['series']] != expected_series:
+                raise ValueError('style replay requires matching series IDs')
+            _merge(chart, properties)
+            if style is not None:
+                _merge(chart['style'], style)
+            if series is not None:
+                existing = {s['id']: s for s in chart['series']}
+                for sid, patch in series.items():
+                    if sid not in existing or 'id' in patch:
+                        raise ValueError('series patches must address existing IDs')
+                    _merge(existing[sid], patch)
+            return self.apply_settings(state)
+
     def set_radial_style(self, *, material=None, **properties):
         """Edit upstream radial material, texture, camera, corners and outlines."""
         if material is not None:
@@ -446,9 +596,7 @@ class Figure:
             self._require_open()
             if self.backend != "native":
                 raise RuntimeError("select requires backend='native'; pick data in the WebGPU widget")
-            if self.get_settings().get("radial") is not None:
-                if edit_area:
-                    raise ValueError("radial selection addresses slices, not Cartesian plot-area handles")
+            if _family(self.get_settings()) is not None and not edit_area:
                 self._selection = json.loads(self._native.pick_json(float(x), float(y)))
                 self._changed()
                 return self._selection
@@ -464,7 +612,6 @@ class Figure:
     def select_object(self, target):
         with self._lock:
             self._require_open()
-            self._require_cartesian()
             if self.backend != "native":
                 raise RuntimeError("select_object requires backend='native'; select objects in the WebGPU widget")
             if not any(s["series_id"] == target for s in self.get_settings()["series"]):
@@ -475,7 +622,7 @@ class Figure:
     def selection_bounds(self):
         with self._lock:
             self._require_open()
-            if self.get_settings().get("radial") is not None:
+            if isinstance(self._selection, dict):
                 return None
             if self._selection is None or any(s["series_id"] == self._selection for s in self.get_settings()["series"]):
                 return None
@@ -484,7 +631,6 @@ class Figure:
     def drag(self, target, dx, dy, *, handle=None):
         with self._lock:
             self._require_open()
-            self._require_cartesian()
             if self.backend != "native":
                 raise RuntimeError("drag requires backend='native'; drag objects in the WebGPU widget")
             moved = self._native.drag(target, float(dx), float(dy), handle)
@@ -492,10 +638,27 @@ class Figure:
             self._changed()
         return moved
 
-    def fit(self, padding=0.05):
+    def fit(self, padding=None):
+        """Fit axes and derive ticks/labels from the rendered data extent.
+
+        Figures containing only heatmaps, contours, or filled contours default
+        to zero padding. Other Cartesian figures use 5%. Pass an explicit
+        padding fraction to override either default.
+        """
         with self._lock:
             self._require_open()
-            self._require_cartesian()
+            kind = _family(self.get_settings())
+            if kind:
+                state = self.get_settings()
+                state[kind]['decorations']['data_area'] = None
+                if kind == 'boxplot': state[kind]['value_range'] = None
+                return self.apply_settings(state)
+            if padding is None:
+                series = self.get_settings()['series']
+                padding = 0.0 if series and all(
+                    any(kind in s['render_type'] for kind in ('Heatmap', 'Contour', 'HeatmapContour'))
+                    for s in series
+                ) else 0.05
             self._native.fit(float(padding))
         self._changed()
         return self
@@ -506,8 +669,6 @@ class Figure:
         Display the returned widget, then await prepare_async(). Repeated calls
         reuse the same widget and its original auto_prepare choice.
         """
-        if self.get_settings().get("radial") is not None:
-            raise RuntimeError("Pie/donut editing uses native show(); use to_png() for static notebook output")
         self._require_open()
         if backend not in (None, "webgpu", "png"):
             raise ValueError("widget backend must be webgpu or png")
@@ -583,7 +744,7 @@ class Figure:
             path.write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
-        if self.get_settings().get("radial") is not None:
+        if _family(self.get_settings()) is not None:
             return {"image/png": self.to_png()}
         # Keep a live widget referenced; Jupyter displays the model once per output.
         return self.widget()._repr_mimebundle_(**kwargs)
@@ -653,8 +814,8 @@ def _code_tree(value, segments_function="text_segments"):
         result = {}
         for key, current in value.items():
             if key == "segments" and isinstance(current, list):
-                text = "".join(s["text"] for s in current)
-                if current == _segments(text):
+                text = _segments_text(current)
+                if text is not None:
                     result[key] = _CodeExpression(f"{segments_function}({text!r})")
                     continue
             result[key] = _code_tree(current, segments_function)
@@ -665,7 +826,11 @@ def _code_tree(value, segments_function="text_segments"):
 
 
 def text_segments(text):
-    """Build plain renderer RichSegment values, including safe Unicode text."""
+    """Build renderer RichSegment values for ``text``.
+
+    Unicode superscript/subscript characters such as ``"10⁻³"`` become
+    superscript/subscript segments, exactly as the renderer maps them.
+    """
     return _segments(text)
 
 
@@ -686,11 +851,12 @@ def _material(value):
     return names[value.lower().replace("-", "_")]
 
 
-class Axes:
+from ._charts import ChartMethods, family as _family
+
+
+class Axes(ChartMethods):
     def __init__(self, figure):
         self.figure = figure
-        self._manual_x = False
-        self._manual_y = False
 
     def set_draw_style(self, mode="precise", **options):
         return self.figure.set_draw_style(mode, **options)
@@ -705,8 +871,6 @@ class Axes:
         ``startangle=90`` starts at the top; slices proceed clockwise.
         """
         fig = self.figure
-        if fig.backend != "native":
-            raise RuntimeError("Pie/donut charts currently require backend='native'")
         values = _array(values)
         count = values.size
         if not 1 <= count <= 64 or not np.isfinite(values).all() or (values < 0).any() or not np.isfinite(values.sum()) or values.sum() <= 0:
@@ -746,7 +910,7 @@ class Axes:
         fig = self.figure
         with fig._lock:
             fig._require_open()
-            if fig.get_settings().get("radial") is not None:
+            if _family(fig.get_settings()) is not None:
                 raise ValueError("create a separate Figure for Cartesian series")
             mode = fig.get_settings()["config"].get("draw_style", {}).get("mode", "precise")
             if mode == "milkyway" and "Line" not in render_type:
@@ -774,7 +938,7 @@ class Axes:
                 fig._native.add_series_fitted(
                     json.dumps(spec, allow_nan=False),
                     json.dumps(config, allow_nan=False) if config is not None else None,
-                    bounds, self._manual_x, self._manual_y,
+                    bounds,
                 )
             except Exception:
                 for name in reversed(uploaded):
@@ -870,19 +1034,15 @@ class Axes:
             config["colorbar"] = bar
             for key in ("left_y", "right_y"):
                 config[key]["inverted"] = origin == "upper"
-            artist = self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
-            self._manual_x = self._manual_y = True
-        return artist
+            return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
 
     def set_title(self, text, **kwargs):
         return self.figure.update("chart_title", text=text, **kwargs)
 
     def set_xlabel(self, text, **kwargs):
-        self.figure._require_cartesian()
         return self.figure.update("axis_title_bottom", text=text, **kwargs)
 
     def set_ylabel(self, text, **kwargs):
-        self.figure._require_cartesian()
         return self.figure.update("axis_title_left", text=text, **kwargs)
 
     def _set_scale(self, axis, scale):
@@ -893,20 +1053,20 @@ class Axes:
         with self.figure._lock:
             state = self.figure.get_settings()
             keys = ("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")
-            if scale == "log" and any(state["config"][key]["min"] <= 0 for key in keys):
-                raise ValueError(f"log scale requires positive bounds; call set_{axis}lim first")
             for key in keys:
                 node = state["config"][key]
+                if scale == "log" and node["min"] <= 0:
+                    node["min"], node["max"] = self.figure._native.log_bounds(axis)
                 node["scale"] = scales[scale]
                 node["major_spacing"] = 1.0 if scale == "log" else (node["max"] - node["min"]) / 5
             self.figure.apply_settings(state)
 
     def set_xscale(self, scale):
-        """Choose linear/log scaling; logarithmic bounds must already be positive."""
+        """Choose linear/log scaling; fit positive data if current limits cross zero."""
         return self._set_scale("x", scale)
 
     def set_yscale(self, scale):
-        """Choose linear/log scaling; logarithmic bounds must already be positive."""
+        """Choose linear/log scaling; fit positive data if current limits cross zero."""
         return self._set_scale("y", scale)
 
     def get_xscale(self):
@@ -918,24 +1078,63 @@ class Axes:
         return "log" if self.figure.get_settings()["config"]["left_y"]["scale"] == "Logarithmic" else "linear"
 
     def set_xlim(self, left, right):
+        """Set both X bounds and derive ticks/labels for the new range.
+
+        Use ``set_xlim_without_tick_auto`` or an SSOT config patch to keep
+        existing tick and label settings.
+        """
         self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
             self.figure._native.set_range("x", float(left), float(right))
-            self._manual_x = True
         self.figure._changed()
         return (left, right)
 
     def set_ylim(self, bottom, top):
+        """Set both Y bounds and derive ticks/labels, as ``set_xlim`` does."""
         self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
             self.figure._native.set_range("y", float(bottom), float(top))
-            self._manual_y = True
         self.figure._changed()
         return (bottom, top)
 
+    def _set_lim_keeping_ticks(self, keys, low, high):
+        low, high = float(low), float(high)
+        if not math.isfinite(low) or not math.isfinite(high) or low >= high:
+            raise ValueError("range must be finite and increasing")
+        with self.figure._lock:
+            self.figure._require_open()
+            state = self.figure.get_settings()
+            for key in keys:
+                axis = state["config"][key]
+                axis["min"], axis["max"] = low, high
+            self.figure.apply_settings(state)
+        return (low, high)
+
+    def set_xlim_without_tick_auto(self, left, right):
+        """Set the x range only; tick spacing and labels stay as configured.
+
+        ``set_xlim`` re-derives readable ticks for the new range. Use this when
+        the tick settings were chosen explicitly and must be kept. This edits
+        the SSOT bounds without locking future fits: adding a series or calling
+        ``Figure.fit`` still derives bounds and ticks again.
+        """
+        self.figure._require_cartesian()
+        return self._set_lim_keeping_ticks(("bottom_x", "top_x"), left, right)
+
+    def set_ylim_without_tick_auto(self, bottom, top):
+        """Set the y range only; tick spacing and labels stay as configured.
+
+        Like ``set_xlim_without_tick_auto``, this does not lock future fits.
+        """
+        self.figure._require_cartesian()
+        return self._set_lim_keeping_ticks(("left_y", "right_y"), bottom, top)
+
     def grid(self, visible=True):
+        kind = _family(self.figure.get_settings())
+        if kind in ('categorical', 'boxplot'):
+            return self.figure.configure_bounded(kind, grid=bool(visible))
         self.figure._require_cartesian()
         state = self.figure.get_settings()
         state["config"]["grid"]["show_major_x"] = bool(visible)
@@ -943,6 +1142,9 @@ class Axes:
         self.figure.apply_settings(state)
 
     def legend(self, visible=True):
+        kind = _family(self.figure.get_settings())
+        if kind in ('categorical', 'boxplot'):
+            return self.figure.configure_bounded(kind, legend=bool(visible))
         self.figure._require_cartesian()
         from ._native import rebuild_legend_json
         state = self.figure.get_settings()
@@ -956,8 +1158,8 @@ def figure(*args, **kwargs):
 
 
 def subplots(nrows=1, ncols=1, **kwargs):
-    """Return a Figure and Axes. The initial release supports one panel."""
+    """Return a Figure and Axes. A Figure currently has one panel."""
     if (nrows, ncols) != (1, 1):
-        raise NotImplementedError("multiple panels are not supported in 0.1")
+        raise NotImplementedError(f"multiple panels are not supported in figgyplot {__version__}")
     fig = Figure(**kwargs)
     return fig, fig.axes[0]

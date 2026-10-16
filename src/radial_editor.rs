@@ -40,7 +40,7 @@ impl Editor {
                         changed = true;
                     }
                 }
-                ui.small("Milkyway: lines only. Constellation: marker lines.");
+                ui.small("Sketch: lines, scatter, error bars. Milkyway: lines only. Constellation: marker lines.");
                 let mut value = serde_json::to_value(cfg.draw_style).unwrap();
                 for spec in draw_style_specs(&cfg.draw_style) {
                     let mut number = value[spec.key].as_f64().unwrap();
@@ -73,7 +73,7 @@ impl Editor {
             });
     }
 
-    pub(crate) fn show_radial(
+    pub(crate) fn show_bounded(
         &mut self,
         root: &mut egui::Ui,
         c: &mut FigureAccess<'_>,
@@ -85,17 +85,79 @@ impl Editor {
             .show(root, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.label(RichText::new("Figgy").size(19.).strong());
-                    let props = ui.button("Properties");
+                    let props = toolbar_icon(
+                        ui,
+                        Icon::Properties,
+                        self.inspector_open,
+                        "Properties",
+                        "Open or close properties",
+                    );
                     self.controls.insert("properties".into(), props.rect);
                     if props.clicked() {
                         self.inspector_open = !self.inspector_open;
                     }
+                    let select = toolbar_icon(
+                        ui,
+                        Icon::Select,
+                        !self.edit_area,
+                        "Select",
+                        "Select a chart element",
+                    );
+                    self.controls.insert("select_mode".into(), select.rect);
+                    if select.clicked() {
+                        self.edit_area = false;
+                        let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                        if chart.decorations().selected == Some(renderer::DecorationId::DataArea) {
+                            chart.clear_selection();
+                            if let Err(e) = c.set_document(chart) {
+                                self.error = e.to_string();
+                            }
+                        }
+                    }
+                    let area = toolbar_icon(
+                        ui,
+                        Icon::Layout,
+                        self.edit_area,
+                        "Layout",
+                        "Move or resize the plot area",
+                    );
+                    self.controls.insert("edit_area".into(), area.rect);
+                    self.controls.insert("layout_mode".into(), area.rect);
+                    if area.clicked() {
+                        self.edit_area = true;
+                    }
+                    let fit = toolbar_icon(
+                        ui,
+                        Icon::Fit,
+                        false,
+                        "Fit view",
+                        "Reset the automatic plot area",
+                    );
+                    self.controls.insert("fit".into(), fit.rect);
+                    if fit.clicked() {
+                        let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                        chart.decorations_mut().data_area = None;
+                        if let crate::bounded::DocumentChart::BoxPlot(c) = &mut chart {
+                            c.value_range = None;
+                        }
+                        match c.set_document(chart) {
+                            Ok(()) => self.error.clear(),
+                            Err(e) => self.error = e.to_string(),
+                        }
+                    }
+
                     let advanced = ui.button("Advanced settings…");
                     self.controls.insert("advanced".into(), advanced.rect);
                     if advanced.clicked() {
                         self.advanced_requested = true;
                     }
-                    let copy = ui.button("Copy Python");
+                    let copy = toolbar_icon(
+                        ui,
+                        Icon::Code,
+                        false,
+                        "Copy Python",
+                        "Copy reusable chart settings",
+                    );
                     self.controls.insert("copy".into(), copy.rect);
                     if copy.clicked() {
                         let code = c.settings_json().and_then(|settings| {
@@ -119,7 +181,13 @@ impl Editor {
                             Err(e) => self.error = e.to_string(),
                         }
                     }
-                    let save = ui.button("Save PNG");
+                    let save = toolbar_icon(
+                        ui,
+                        Icon::Save,
+                        false,
+                        "Save PNG",
+                        "Export the current chart",
+                    );
                     self.controls.insert("save".into(), save.rect);
                     egui::Popup::menu(&save).show(|ui| {
                         ui.label("File path");
@@ -150,7 +218,7 @@ impl Editor {
         egui::Panel::bottom("radial_status").exact_size(30.).show(root, |ui| {
             ui.label(if !self.error.is_empty() { self.error.as_str() } else if !self.notice.is_empty() {
                 self.notice.as_str()
-            } else { "Click a slice: Select / clear  ·  Left / Right: Change slice  ·  Esc: Clear  ·  F11: Full screen" });
+            } else { "Click: select / clear · Drag: move / resize · Arrows: move selection · Esc: clear · F11: full screen" });
         });
         if self.inspector_open && !overlay {
             egui::Panel::right("radial_properties")
@@ -178,8 +246,115 @@ impl Editor {
         }
     }
 
+    fn bounded_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        let document = &c.data.document.as_ref().unwrap().chart;
+        let (family, mut value) = match document {
+            crate::bounded::DocumentChart::Categorical(v) => {
+                ("categorical", serde_json::to_value(v).unwrap())
+            }
+            crate::bounded::DocumentChart::BoxPlot(v) => {
+                ("boxplot", serde_json::to_value(v).unwrap())
+            }
+            _ => unreachable!(),
+        };
+        ui.heading(if family == "categorical" {
+            "Categorical bars"
+        } else {
+            "Box plot"
+        });
+        let mut changed = false;
+        for key in ["title", "category_title", "value_title"] {
+            ui.label(key.replace('_', " "));
+            let mut text = value[key].as_str().unwrap().to_owned();
+            let response = ui.text_edit_singleline(&mut text);
+            self.controls
+                .insert(format!("bounded_{key}"), response.rect);
+            if response.changed() {
+                value[key] = json!(text);
+                changed = true;
+            }
+        }
+        for key in ["grid", "legend"] {
+            let mut v = value[key].as_bool().unwrap();
+            if ui.checkbox(&mut v, key).changed() {
+                value[key] = json!(v);
+                changed = true;
+            }
+        }
+        if let Some(selected) = value["selected"].as_object().cloned() {
+            ui.separator();
+            ui.heading("Selected data");
+            let index = value["categories"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .position(|v| v["id"] == selected["category_id"])
+                .unwrap();
+            let category = &mut value["categories"][index];
+            let mut label = category["label"].as_str().unwrap().to_owned();
+            ui.label("Category label");
+            if ui.text_edit_singleline(&mut label).changed() {
+                category["label"] = json!(label);
+                changed = true;
+            }
+            let series = value["series"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|v| v["id"] == selected["series_id"])
+                .unwrap();
+            let mut label = series["label"].as_str().unwrap().to_owned();
+            ui.label("Series label");
+            if ui.text_edit_singleline(&mut label).changed() {
+                series["label"] = json!(label);
+                changed = true;
+            }
+            let mut rgb = [
+                series["color"]["r"].as_f64().unwrap() as f32,
+                series["color"]["g"].as_f64().unwrap() as f32,
+                series["color"]["b"].as_f64().unwrap() as f32,
+            ];
+            if ui.color_edit_button_rgb(&mut rgb).changed() {
+                series["color"] = json!(Color::new(rgb[0], rgb[1], rgb[2], 1.));
+                changed = true;
+            }
+            if family == "categorical" {
+                let mut v = series["values"][index].as_f64().unwrap();
+                ui.label("Value");
+                if ui.add(egui::DragValue::new(&mut v).speed(0.1)).changed() {
+                    series["values"][index] = json!(v);
+                    changed = true;
+                }
+            } else {
+                ui.label(
+                    "Summary statistics: edit through Advanced settings or the Python artist.",
+                );
+            }
+        }
+        if changed {
+            match c.set_bounded(family, &value.to_string()) {
+                Ok(()) => {
+                    self.error.clear();
+                    ui.ctx().request_repaint();
+                }
+                Err(e) => self.error = e.to_string(),
+            }
+        }
+    }
     fn radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
-        let mut chart = c.data.radial.as_ref().unwrap().chart.clone();
+        if c.data.document.as_ref().unwrap().chart.radial().is_none() {
+            self.bounded_properties(ui, c);
+            return;
+        }
+        let mut chart = c
+            .data
+            .document
+            .as_ref()
+            .unwrap()
+            .chart
+            .radial()
+            .unwrap()
+            .clone();
         let mut changed = false;
         ui.heading("Pie / donut");
         ui.label("Title");

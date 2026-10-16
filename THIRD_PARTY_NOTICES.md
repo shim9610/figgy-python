@@ -7,17 +7,17 @@ and the separation of accepted model state from UI drafts in shim9610/figgy-web
 Studio application are not copied into this package.
 
 figgy-renderer and its bundled fonts retain their MIT/Apache-2.0 and OFL notices.
-The font notices are shipped in `figgy/licenses/LICENSE-LiberationSans.txt` and
-`figgy/licenses/LICENSE-ComicNeue.txt`, including when fonts are embedded in the
+The font notices are shipped in `figgyplot/licenses/LICENSE-LiberationSans.txt` and
+`figgyplot/licenses/LICENSE-ComicNeue.txt`, including when fonts are embedded in the
 native extension.
 The native desktop uses winit/wgpu and egui. PySide6 is optional benchmark-only tooling.
 The notebook extra uses anywidget and ipywidgets under their respective licenses.
 
 ## Packaged browser kernel
 
-Generated JS/WASM assets use upstream `figgy` web package 0.13.1 and
-`figgy-renderer` 0.16.1 at commit
-`84aa2783caa97d679c72b5c079fb4aea8bf1040e`, under MIT OR Apache-2.0.
+Generated JS/WASM assets use upstream `figgy` web package 0.14.0 and
+`figgy-renderer` 0.17.0 at commit
+`bf665c099e25a39ff2f7229f9ad4f4197d223e45`, under MIT OR Apache-2.0.
 Rebuild path and asset hashes are documented in `docs/HOSTS.md` and
 `python/figgyplot/assets/provenance.json`. The same bundled font licenses apply.
 

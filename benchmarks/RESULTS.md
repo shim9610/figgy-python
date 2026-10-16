@@ -1,5 +1,10 @@
 # Python bindings and benchmark results
 
+This page preserves historical 0.1/0.2 measurement checkpoints. None of the
+timings below is a new `figgyplot 0.3.0` / renderer `0.17.0` / model `0.11.0`
+benchmark. Follow the recorded environment and source revision when comparing
+results; running the commands with current source produces a separate result.
+
 For Figgy 0.2.0 measurements on actual Ubuntu/Radeon 8060S hardware, see
 [Linux GPU benchmarks](LINUX_GPU_RESULTS.md). The llvmpipe results below use
 software Vulkan and should be considered separately.
@@ -12,10 +17,11 @@ actual pyqtgraph OpenGL rendering.
 Report charts are rendered with Figgy one panel at a time, then arranged as
 images. SVG embeds the finished PNG.
 
-The original campaign used Python 0.1 alpha with figgy-renderer 0.16.1:
+The original campaign used Figgy Python 0.1 alpha with figgy-renderer 0.16.1:
 matplotlib-like plot/scatter/imshow, NumPy staging uploads, desktop/Jupyter
-editing, Python settings export and PNG output. The current package is 0.2.0;
-see [host validation](../docs/HOST_VALIDATION.md) for subsequent host changes.
+editing, Python settings export and PNG output. The later 0.2 host measurements
+and current 0.3 verification setup are distinguished in
+[host validation](../docs/HOST_VALIDATION.md).
 There is no automatic streaming/downsampling/chunk-render transition. A small
 resident pool grows as needed. Exceeding device limits raises `MemoryError`
 with capacity, column and adapter context.
@@ -130,14 +136,17 @@ measurements.
 - Built a Linux CPython 3.12 wheel for glibc 2.35 or later; strict twine checks
   passed.
 - Windows/macOS and Python 3.11–3.14 wheel CI were configured but had not been
-  run remotely at this checkpoint. CI is currently disabled while stabilizing.
+  run remotely at this checkpoint. CI was disabled then; current automatic PR
+  checks are enabled in [PR tests](../.github/workflows/pr-tests.yml).
 - Actual Windows Qt/hardware checks are in the [separate report](WINDOWS_RESULTS.md).
 - PyPI publication and actual macOS GUI verification have not been performed;
   upstream describes Metal support as experimental.
 
-The high-level Python API exposes single-panel plot/scatter/imshow. Multi-panel
-figures and high-level pie/bar/boxplot/contour APIs are future scope. Editing
-changes appearance, layout and axes rather than dragging original data values.
+At this checkpoint the high-level Python API exposed single-panel
+plot/scatter/imshow. The current 0.3 binding also exposes pie/donut,
+bar/boxplot/contour and other constructors in [chart types](../docs/CHART_TYPES.md).
+Multi-panel figures remain unsupported. The recorded benchmark does not measure
+these subsequently added chart types or their native/Jupyter interaction paths.
 
 ## Reproduce
 

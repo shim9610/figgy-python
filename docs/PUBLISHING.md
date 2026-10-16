@@ -7,7 +7,11 @@ production index. `target=verify-testpypi` checks an already uploaded release
 without rebuilding or uploading it. The default is TestPyPI. There are no automatic push, PR, tag
 or release publication triggers. No API token or password needs to be added to GitHub.
 
-## Complete the pending Trusted Publisher form
+## Trusted Publisher setup
+
+The 0.2.1 publication already verified the TestPyPI and PyPI publishers below.
+Retain those registrations for 0.3.0; this setup is needed only when configuring
+or repairing a publisher.
 
 On [TestPyPI's publishing page](https://test.pypi.org/manage/account/publishing/),
 use the GitHub tab:
@@ -37,12 +41,48 @@ the **`main` branch**. Required reviewers are optional; configuring one introduc
 an approval step before the upload. The workflow also rejects dispatches from
 other branches before building. This does not change main's branch protection.
 
+## Versions and coordinated release order
+
+| Component | This source release | Published version verified 2026-10-16 |
+| --- | --- | --- |
+| `figgy-model` | 0.11.0 | 0.11.0 |
+| `figgy-renderer` | 0.17.0 | 0.17.0 |
+| `figgyplot` | 0.3.0 | 0.2.1 |
+| `figgy` WASM wrapper | 0.14.0 | Not a crates.io package (`publish = false`) |
+
+Model 0.11.0 and renderer 0.17.0 are published. Next, validate and publish
+Python 0.3.0 through TestPyPI and PyPI below. For future coordinated releases,
+publish the model before the renderer, then the Python package. Each package
+has its own version; the WASM wrapper's 0.14.0 is not the renderer version.
+The native extension consumes crates.io packages with versions and checksums
+pinned in `Cargo.lock`. The bundled WASM uses their upstream release revision
+`783353a5e3343f27a48da3b0aa1c67969c9d63ff`, recorded in
+`scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
+
+When updating the renderer, update the registry dependency and lockfile, then
+rebuild WASM from the matching clean release checkout. The rebuild verifies the
+downloaded `.crate` checksums, `.cargo_vcs_info.json` source revision and Rust
+sources before recording provenance. Offline preflight checks that the native
+versions/checksums and WASM revision remain paired; Git/path overrides fail this
+gate. The build then applies `scripts/wasm-host.patch` to a disposable copy of
+the web host. This additive binding patch exposes non-borrowing GPU completion;
+it does not change renderer/model sources. Provenance records its hash, and
+preflight rejects a mismatched patch or changes outside the two web host files.
+Do not edit provenance by hand to bypass a source mismatch.
+Python source builds fetch the Rust dependencies from crates.io; compatible
+wheels contain the compiled extension and need neither Git nor Cargo to install.
+
 ## Run publication
 
-1. Check that `pyproject.toml` and `Cargo.toml` have the same intended version.
+1. Set the intended version in `Cargo.toml` (`[package] version`), the single version
+   source. `pyproject.toml` keeps `dynamic = ["version"]` and `figgyplot.__version__`
+   comes from the extension, so neither holds a version of its own. Keep the
+   exact renderer version and registry `Cargo.lock` entries paired with the
+   packaged WASM provenance. Publishing a new Rust version does not automatically
+   update these pinned dependencies or existing Python installations.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
 3. Select **main**, **target `testpypi`** and the exact source version (currently
-   preparing **`0.2.2`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
+   preparing **`0.3.0`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
 4. Run it. This is an actual public TestPyPI upload, not a build-only dry run.
 
 The pipeline runs these gates in order:
@@ -102,13 +142,13 @@ under one version or use `skip-existing` to conceal mixed builds.
 ## Verify an already uploaded preview
 
 The following records the completed 0.2.1 recovery. For a new release such as
-0.2.2, use its own upload/verification run ID; old IDs cannot authorize it.
+0.3.0, use its own upload/verification run ID; old IDs cannot authorize it.
 
 If a successful upload's installation jobs were skipped, do **not** rebuild and
 upload the same version. Run the workflow on **main** with:
 
 - **target:** `verify-testpypi`
-- **version:** the uploaded version, currently `0.2.1`
+- **version:** the uploaded version (`0.2.1` in this historical example)
 - **testpypi-run-id:** the original upload's numeric ID, **`38605305486`** for the
   first 0.2.1 upload (from its `/actions/runs/38605305486` URL, not the label `#2`).
 
@@ -126,9 +166,9 @@ now explicitly uses `always()`, cancellation handling and success of the selecte
 preparation/upload branch. The failed PyPI run `38612755099` had an empty source
 run-ID input and stopped in the gate; it made no production upload.
 
-The Codex connector in this session can prepare/validate workflows and read CI
-results, but has no workflow-dispatch operation. The owner clicks **Run workflow**;
-OIDC then lets GitHub Actions publish without sharing an API key with Codex.
+An authorized maintainer dispatches the workflow through GitHub Actions or an
+authenticated GitHub CLI. OIDC supplies the registry identity; no PyPI API key
+needs to be placed in the repository.
 
 The free-threaded wheels may enable the GIL on import, as declared by the native
 extension. That warning is expected. Native/browser GPU behavior still depends
@@ -143,7 +183,7 @@ log and rerun only the failed jobs. There is no rollback of a published version.
 `skip-existing` is deliberately false: a new build must not silently mix with
 another build under the same version. If an upload partially succeeds, inspect
 which files exist before recovery. A fresh complete release should use a new
-version in both source manifests. Re-running the entire publication against an
+version in `Cargo.toml`. Re-running the entire publication against an
 already uploaded version fails instead of replacing immutable files. Artifact
 retention is temporary; archive verified release files/manifest if needed later.
 
@@ -158,13 +198,13 @@ The workflow, ShellCheck, reusable-build contract and release regressions are
 checked locally. Existing real glibc/musl wheels and a newly built sdist are
 inspected with the release validator; no filenames or binary tags are repaired.
 Local tests cannot prove GitHub OIDC issuance or TestPyPI upload/index behavior.
-Those require completing the pending publisher and executing this workflow.
+Those require the configured publisher and an actual workflow execution.
 
 The [first complete TestPyPI publication run](https://github.com/shim9610/figgy-python/actions/runs/38590006371)
 at `35200d1` subsequently succeeded, including all build gates, upload and the
 nine post-upload installation jobs. That run published `0.2.0`.
-In this cloud environment, a fresh-venv installation from TestPyPI was attempted
-but its CONNECT tunnel is blocked with HTTP 403 by the network proxy. This is not
+During that initial 0.2.0 release session, a fresh-venv installation from TestPyPI
+was blocked with HTTP 403 by that environment's network proxy. It was not
 reported as a successful local index install; the actual nine GitHub index
 installation results are the remote evidence. The [0.2.1 recovery run](https://github.com/shim9610/figgy-python/actions/runs/38618489720)
 subsequently passed all nine TestPyPI installation jobs. The
@@ -173,9 +213,12 @@ completed successfully, publishing all 74 wheels and one sdist to PyPI and
 passing all nine production-index installation jobs. PyPI's public JSON metadata
 also confirms version 0.2.1 with 75 distribution files.
 
-The prepared 0.2.2 release corrects the package description's installation
-instructions to use PyPI. It still requires a new TestPyPI build/upload and all
-installation checks before promotion; no 0.2.2 publication has occurred.
+The prepared 0.3.0 release moves to figgy-renderer 0.17.0 and fixes the issues
+reported against 0.2.1; it also carries the PyPI installation instructions that
+were prepared as 0.2.2, which was never uploaded. Follow the coordinated version
+order above while retaining the native/WASM source pins. It needs a new TestPyPI
+build/upload and all installation checks before promotion; no 0.3.0 publication
+has occurred as of 2026-10-16.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.

@@ -1,5 +1,9 @@
 # Windows RTX 4070 Ti benchmarks
 
+Historical hardware report for the source revision below. The 0.1-era timings
+and functional checks have not been rerun for `figgyplot 0.3.0` / renderer
+`0.17.0` / model `0.11.0`; they do not establish current host performance.
+
 See the subsequent [GPU library comparison](WINDOWS_GPU_RESULTS.md) for
 fastplotlib, VisPy and pyqtgraph OpenGL. The pyqtgraph rows below use the earlier
 QPainter path.
