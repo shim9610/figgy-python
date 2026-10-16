@@ -39,7 +39,8 @@ python examples/desktop_editor.py
 
 Source builds require Rust 1.99 or later and a system C/C++ toolchain: MSVC Build
 Tools on Windows, Xcode Command Line Tools on macOS, or a compiler/linker on
-Linux. The package has not been published on PyPI. Compatible prebuilt wheels
+Linux. These instructions target the upcoming 0.3.0 release; PyPI currently
+provides 0.2.1. Compatible prebuilt wheels
 do not require Rust. PR CI checks native/Jupyter interaction parity and packaged assets; see
 [validation records](HOST_VALIDATION.md) for tested builds.
 

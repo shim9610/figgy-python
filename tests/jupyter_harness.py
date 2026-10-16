@@ -12,6 +12,32 @@ import urllib.request
 import uuid
 
 
+def button_point_without_frames(page, selector):
+    """Validate a stable, unobscured button using DOM timers, independent of RAF."""
+    page.locator(selector).evaluate("button=>button.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'})")
+    point = page.wait_for_function("""(()=>{
+        let previous;
+        return selector=>{
+            const button=document.querySelector(selector);
+            if(!button || button.disabled)return false;
+            const rect=button.getBoundingClientRect(),style=getComputedStyle(button);
+            const geometry=[rect.x,rect.y,rect.width,rect.height];
+            const stable=previous && geometry.every((value,i)=>Math.abs(value-previous[i])<.01);
+            previous=geometry;
+            if(!stable || rect.width<=0 || rect.height<=0 || style.visibility!=='visible' ||
+                style.display==='none' || rect.left<0 || rect.top<0 || rect.right>innerWidth || rect.bottom>innerHeight)return false;
+            const points=[[rect.x+rect.width/2,rect.y+rect.height/2],
+                [rect.x+rect.width/2,rect.top+1],[rect.x+rect.width/2,rect.bottom-1],
+                [rect.left+1,rect.y+rect.height/2],[rect.right-1,rect.y+rect.height/2]];
+            return points.every(([x,y])=>document.elementFromPoint(x,y)?.closest('button')===button)?points[0]:false;
+        };
+    })()""", arg=selector, polling=100)
+    try:
+        return point.json_value()
+    finally:
+        point.dispose()
+
+
 @contextmanager
 def notebook(tmp_path, source):
     import nbformat
@@ -70,6 +96,19 @@ def notebook(tmp_path, source):
             page.on('pageerror', lambda e: errors.append(e.stack or str(e)))
             page.on('console', lambda m: console_errors.append(m.text) if m.type == 'error' else None)
             page.add_init_script("""if(navigator.gpu){
+                const work=window.figgyGPUWork={submitted:0,completed:0,completedCanvas:null};
+                const tracked=new WeakSet(),prototype=GPUQueue.prototype;
+                const submit=prototype.submit,done=prototype.onSubmittedWorkDone;
+                let submittedCanvas=null;
+                prototype.submit=function(...args){submit.apply(this,args);if(tracked.has(this)){work.submitted++;
+                    const canvas=document.querySelector('.figgy-editor canvas');
+                    submittedCanvas=canvas?[canvas.width,canvas.height]:null;
+                }};
+                prototype.onSubmittedWorkDone=function(...args){const completion=done.apply(this,args);
+                    if(!tracked.has(this))return completion;
+                    const submitted=work.submitted,canvas=submittedCanvas;
+                    return completion.then(value=>{work.completed=submitted;work.completedCanvas=canvas;return value;});
+                };
                 const requestAdapter=navigator.gpu.requestAdapter.bind(navigator.gpu);
                 navigator.gpu.requestAdapter=async(...args)=>{
                     const adapter=await requestAdapter(...args);
@@ -77,6 +116,7 @@ def notebook(tmp_path, source):
                         adapter.requestDevice=async(...args)=>{
                             const device=await requestDevice(...args);
                             device.lost.then(info=>console.error('WebGPU device lost:',info.reason,info.message));
+                            tracked.add(device.queue);
                             return device;
                         };
                     }return adapter;
@@ -124,7 +164,8 @@ def notebook(tmp_path, source):
                 try:
                     (tmp_path/'widget-state.json').write_text(json.dumps(page.evaluate("""()=>{
                         const f=document.querySelector('.figgy-editor')?.figgy;
-                        return f?{stats:f.stats,state:f.snapshot()}:null;
+                        return f?{stats:f.stats,state:f.snapshot(),gpu_work:window.figgyGPUWork,
+                            visibility:document.visibilityState,focused:document.hasFocus()}:null;
                     }""")))
                     page.screenshot(path=str(tmp_path/'failure.png'), timeout=5000)
                 except Exception:

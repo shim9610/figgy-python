@@ -22,14 +22,58 @@ def check_assets(assets):
             )
 
 
+REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
+NATIVE_PACKAGES = {"figgy-renderer": "crates/renderer", "figgy-model": "crates/model"}
+
+
+def native_registry_packages(root):
+    # Source/release tooling uses Python 3.12. Keep this lazy: installed-wheel
+    # hash checks import this module on supported Python 3.8 installations.
+    import tomllib
+    root = Path(root)
+    cargo = tomllib.loads((root / "Cargo.toml").read_text())
+    lock = tomllib.loads((root / "Cargo.lock").read_text())
+    for overrides in cargo.get("patch", {}).values():
+        for alias, value in overrides.items():
+            if alias in NATIVE_PACKAGES or isinstance(value, dict) and value.get("package") in NATIVE_PACKAGES:
+                raise ValueError("Native renderer/model registry sources must not have patch overrides")
+    for name in cargo.get("replace", {}):
+        if name.split(":")[0] in NATIVE_PACKAGES:
+            raise ValueError("Native renderer/model registry sources must not have replace overrides")
+    packages = {}
+    for name in NATIVE_PACKAGES:
+        matches = [entry for entry in lock["package"] if entry["name"] == name]
+        if len(matches) != 1:
+            raise ValueError("Expected exactly one native registry package: " + name)
+        package = matches[0]
+        if package.get("source") != REGISTRY_SOURCE or not re.fullmatch(r"[0-9a-f]{64}", package.get("checksum", "")):
+            raise ValueError("Native registry source/checksum is invalid: " + name)
+        packages[name] = {key: package[key] for key in ("version", "source", "checksum")}
+    dependency = cargo.get("dependencies", {}).get("renderer", {})
+    if (not isinstance(dependency, dict) or dependency.get("package") != "figgy-renderer"
+            or dependency.get("version") != "=" + packages["figgy-renderer"]["version"]
+            or any(key in dependency for key in ("git", "path", "registry"))):
+        raise ValueError("Native renderer dependency must exactly pin its crates.io lockfile version")
+    return packages
+
+
 def check_renderer_revision(root):
     root = Path(root)
-    revision = json.loads((root / "python/figgyplot/assets/provenance.json").read_text())["upstream_revision"]
-    cargo = (root / "Cargo.toml").read_text()
-    for package in ("figgy-renderer", "figgy-model"):
-        found = re.search(r'^' + package + r'\s*=.*?rev\s*=\s*"([0-9a-f]+)"', cargo, re.MULTILINE)
-        if not found or found.group(1) != revision:
-            raise ValueError(f"Native {package} and browser WASM must pin the same upstream revision")
+    provenance = json.loads((root / "python/figgyplot/assets/provenance.json").read_text())
+    revision = provenance["upstream_revision"]
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("WASM upstream revision must be a full Git commit")
+    records = provenance.get("native_packages", {})
+    if set(records) != set(NATIVE_PACKAGES):
+        raise ValueError("WASM provenance must record both native registry packages")
+    for name, package in native_registry_packages(root).items():
+        record = records[name]
+        if any(record.get(key) != value for key, value in package.items()):
+            raise ValueError("Native registry lockfile and WASM provenance differ: " + name)
+        if record.get("upstream_revision") != revision or record.get("path_in_vcs") != NATIVE_PACKAGES[name]:
+            raise ValueError("Native registry packages and WASM must use the same upstream revision: " + name)
+    if provenance.get("renderer_version") != records["figgy-renderer"]["version"]:
+        raise ValueError("WASM renderer version differs from native registry provenance")
     script = (root / "scripts/build-wasm.sh").read_text()
     found = re.search(r'^revision=([0-9a-f]+)$', script, re.MULTILINE)
     if not found or found.group(1) != revision:

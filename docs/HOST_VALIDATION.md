@@ -138,6 +138,15 @@ This test-only budget accommodates cold SwiftShader compilation on shared CI
 CPUs; production browser configuration is unchanged. The saved `chromium.log`
 provides the GPU process diagnostic alongside the normal browser error records.
 
+Later hosted runs exposed a different startup failure: the chart and toolbar
+were visible with no GPU or JavaScript errors, but Playwright's frame-based
+button stability check timed out. Initialization now waits for the final
+CSS/device-pixel-sized surface before reporting Ready and avoids an immediate
+duplicate frame. The preparation-overlap test checks button visibility,
+geometry and hit targets with timer polling, then uses real mouse events.
+Its setup is also tested with animation-frame callbacks suppressed, so moving
+a frame-dependent `trial` click earlier cannot reintroduce the same failure.
+
 ## Remaining platform work
 
 Windows hardware surface/input/DPI, macOS Metal/event-loop behavior, Wayland,

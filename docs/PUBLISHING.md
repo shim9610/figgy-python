@@ -45,34 +45,37 @@ other branches before building. This does not change main's branch protection.
 
 | Component | This source release | Published version verified 2026-10-16 |
 | --- | --- | --- |
-| `figgy-model` | 0.11.0 | 0.10.0 |
-| `figgy-renderer` | 0.17.0 | 0.16.1 |
+| `figgy-model` | 0.11.0 | 0.11.0 |
+| `figgy-renderer` | 0.17.0 | 0.17.0 |
 | `figgyplot` | 0.3.0 | 0.2.1 |
 | `figgy` WASM wrapper | 0.14.0 | Not a crates.io package (`publish = false`) |
 
-For a coordinated release, publish model 0.11.0 before renderer 0.17.0, then
-validate and publish Python 0.3.0 through TestPyPI and PyPI below. Each package
+Model 0.11.0 and renderer 0.17.0 are published. Next, validate and publish
+Python 0.3.0 through TestPyPI and PyPI below. For future coordinated releases,
+publish the model before the renderer, then the Python package. Each package
 has its own version; the WASM wrapper's 0.14.0 is not the renderer version.
-The Python native dependencies and bundled WASM both use upstream revision
-`bf665c099e25a39ff2f7229f9ad4f4197d223e45`, recorded in `Cargo.toml`, `Cargo.lock`,
+The native extension consumes crates.io packages with versions and checksums
+pinned in `Cargo.lock`. The bundled WASM uses their upstream release revision
+`783353a5e3343f27a48da3b0aa1c67969c9d63ff`, recorded in
 `scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
 
-Do not delete the Git overrides alone: `scripts/check_assets.py` deliberately
-requires the native and WASM revisions to agree, so that would fail preflight.
-Registry-only dependencies need a separate, tested provenance migration that
-verifies the published crate sources against the WASM build revision. Keep the
-current pins until that migration exists; do not bypass the pairing check.
-Source builds fetch these public Git dependencies; compatible wheels contain
-the compiled extension and do not require Git or Cargo at installation time.
+When updating the renderer, update the registry dependency and lockfile, then
+rebuild WASM from the matching clean release checkout. The rebuild verifies the
+downloaded `.crate` checksums, `.cargo_vcs_info.json` source revision and Rust
+sources before recording provenance. Offline preflight checks that the native
+versions/checksums and WASM revision remain paired; Git/path overrides fail this
+gate. Do not edit provenance by hand to bypass a source mismatch.
+Python source builds fetch the Rust dependencies from crates.io; compatible
+wheels contain the compiled extension and need neither Git nor Cargo to install.
 
 ## Run publication
 
 1. Set the intended version in `Cargo.toml` (`[package] version`), the single version
    source. `pyproject.toml` keeps `dynamic = ["version"]` and `figgyplot.__version__`
    comes from the extension, so neither holds a version of its own. Keep the
-   immutable `[patch.crates-io]` renderer/model revisions and `Cargo.lock` paired
-   with the packaged WASM provenance. The current release builds those exact
-   public Git sources; publishing the Rust crates does not change these inputs.
+   exact renderer version and registry `Cargo.lock` entries paired with the
+   packaged WASM provenance. Publishing a new Rust version does not automatically
+   update these pinned dependencies or existing Python installations.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
 3. Select **main**, **target `testpypi`** and the exact source version (currently
    preparing **`0.3.0`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.

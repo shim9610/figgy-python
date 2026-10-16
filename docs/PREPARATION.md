@@ -53,7 +53,10 @@ deferred are applied when it starts.
 the binary columns, uses `FiggyChart.prewarm_all_with_progress` for Cartesian
 charts and awaits `first_frame_ready`. Radial, categorical and boxplot charts
 compile their pipelines asynchronously and also await the first GPU frame.
-Ready therefore requires GPU completion; preparation failures remain visible
+The browser sizes the surface to its displayed CSS size and device pixel ratio
+before awaiting the frame, repeating this if the display size changes during
+preparation. Ready therefore covers the displayed surface without immediately
+submitting a redundant, unawaited frame. Preparation failures remain visible
 in the status and propagate to Python. The browser shows upstream stage progress.
 Preparation, menu access and redraw/picking/export operations are serialized to
 protect the WASM chart.

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import figgyplot as figgy
 from test_radial_desktop import Inputs
-from jupyter_harness import notebook
+from jupyter_harness import notebook, button_point_without_frames
 
 ROOT = "document.querySelector('.figgy-editor').figgy"
 CASES = {
@@ -46,13 +46,9 @@ def check_bounded_menus_during_preparation(page, execute, kind):
     """Hold actual GPU completion so toolbar clicks overlap an async WASM borrow."""
     menu_points = []
     for selector in ('button[data-style]', 'button[data-visibility]'):
-        button = page.locator(selector)
-        # Complete normal actionability/scroll checks before holding the GPU
-        # fence; Locator.click's stable-position check itself waits for RAF.
-        button.click(trial=True)
-        box = button.bounding_box()
-        assert box is not None and button.is_visible() and button.is_enabled()
-        menu_points.append((selector, box['x']+box['width']/2, box['y']+box['height']/2))
+        # GPU presentation can delay RAF even before this artificial gate.
+        x, y = button_point_without_frames(page, selector)
+        menu_points.append((selector, x, y))
     page.evaluate("""()=>{
         const prototype=GPUQueue.prototype;
         const original=prototype.onSubmittedWorkDone;
@@ -95,11 +91,20 @@ def check_bounded_menus_during_preparation(page, execute, kind):
         assert page.locator('.figgy-menu').is_hidden()
         assert page.locator('.figgy-properties').is_hidden()
         assert page.locator('.figgy-error').inner_text()==''
+        # The display may resize while preparation owns the WASM chart. Ready
+        # must cover the new surface even if ResizeObserver is queued behind it.
+        before_size = page.locator('.figgy-editor canvas').evaluate('canvas=>[canvas.width,canvas.height]')
+        requested_size = page.locator('.figgy-editor canvas').evaluate("""canvas=>{
+            canvas.style.width='90%';const r=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
+            return [Math.round(r.width*dpr),Math.round(r.height*dpr)];
+        }""")
+        assert requested_size != before_size
     finally:
         page.evaluate('window.figgyPreparationGate.release()')
     report=json.loads(execute('print(json.dumps(await preparation))'))
     assert report['ready'] and report['backend']=='webgpu'
     page.evaluate(ROOT+'.flush()')
+    check_display_frame_ready(page)
     assert page.locator('.figgy-properties').is_visible()
     if kind=='radial':
         assert page.locator('[data-target]').input_value()=='chart_title'
@@ -115,6 +120,24 @@ def check_bounded_menus_during_preparation(page, execute, kind):
     page.locator('[data-close-properties]').click()
     assert page.locator('.figgy-menu').is_hidden()
     assert page.locator('.figgy-error').inner_text()==''
+
+
+def check_display_frame_ready(page):
+    initial = page.evaluate("""()=>{
+        const canvas=document.querySelector('.figgy-editor canvas'),r=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
+        const work=window.figgyGPUWork;
+        return {size:[canvas.width,canvas.height],display:[Math.round(r.width*dpr),Math.round(r.height*dpr)],
+            completed:work.completedCanvas,pending:work.submitted-work.completed,
+            frames:document.querySelector('.figgy-editor').figgy.stats.surface_frames};
+    }""")
+    assert initial['size'] == initial['display'] == initial['completed']
+    assert initial['pending'] == 0
+    assert initial['frames'] >= 1
+    # Ready must not leave a redundant/resized frame to submit on the next RAF.
+    page.evaluate("window.figgyReadyFrames=0;requestAnimationFrame(()=>{window.figgyReadyFrames++;requestAnimationFrame(()=>window.figgyReadyFrames++);})")
+    page.wait_for_function('window.figgyReadyFrames===2', polling=100)
+    assert page.evaluate(ROOT+'.stats.surface_frames') == initial['frames']
+    assert page.evaluate('window.figgyGPUWork.submitted-window.figgyGPUWork.completed') == 0
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
@@ -176,6 +199,7 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
             handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+CASES[kind]+"\nax.set_title('Shared interaction')\ndisplay(fig.widget())"
     with notebook(tmp_path/kind, source) as (page,execute):
+        check_display_frame_ready(page)
         panel=page.locator('.figgy-properties')
         assert panel.is_hidden()
         check_bounded_menus_during_preparation(page,execute,kind)

@@ -28,10 +28,6 @@ egui-winit = "0.36.2"
 lto = "thin"
 codegen-units = 1
 
-# Keep native renderer/model sources at the same immutable revision as packaged
-# WASM, including release builds. The asset gate verifies this pairing. Moving
-# to registry sources requires a coordinated provenance/guard migration; see
-# docs/PUBLISHING.md. Publishing the Rust crates alone does not remove this pin.
-[patch.crates-io]
-figgy-renderer = { git = "https://github.com/shim9610/figgy", rev = "bf665c099e25a39ff2f7229f9ad4f4197d223e45" }
-figgy-model = { git = "https://github.com/shim9610/figgy", rev = "bf665c099e25a39ff2f7229f9ad4f4197d223e45" }
+# Cargo.lock pins the crates.io renderer/model versions and checksums. The asset
+# gate pairs them with the published source revision used to build bundled WASM;
+# see python/figgyplot/assets/provenance.json and docs/PUBLISHING.md.

@@ -423,11 +423,11 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-This package targets **figgy-renderer 0.17.0** and **figgy-model 0.11.0** from the
-upstream [figgy repository](https://github.com/shim9610/figgy). Until those
-versions are on crates.io, the native extension and the packaged browser kernel
-are both built from figgy
-commit `bf665c0` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
+The native extension uses the published **figgy-renderer 0.17.0** and
+**figgy-model 0.11.0** crates from crates.io, pinned in `Cargo.lock`.
+The packaged browser kernel is built from their upstream release commit
+`783353a`. Asset provenance checks pair the registry versions and checksums
+with that source revision. Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 

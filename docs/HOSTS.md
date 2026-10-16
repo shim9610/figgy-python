@@ -1,9 +1,9 @@
 # Native surface / notebook WebGPU hosts
 
-The figgyplot 0.3.0 source targets `figgy-renderer 0.17.0` and
-`figgy-model 0.11.0`, both pinned to figgy commit `bf665c0` through a
-`[patch.crates-io]` override so native and packaged WASM use the same sources.
-Release builds retain this pairing; see [publishing](PUBLISHING.md).
+The figgyplot 0.3.0 source uses the published `figgy-renderer 0.17.0` and
+`figgy-model 0.11.0` crates from crates.io. `Cargo.lock` pins their versions
+and checksums; packaged WASM uses their release commit `783353a`.
+Provenance checks preserve this source pairing; see [publishing](PUBLISHING.md).
 Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
 vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
@@ -182,9 +182,12 @@ requires a usable kernel GPU and performs image transfers.
 ## Assets and builds
 
 `python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
-`crates/web` at commit `bf665c099e25a39ff2f7229f9ad4f4197d223e45` (renderer 0.17.0,
+`crates/web` at commit `783353a5e3343f27a48da3b0aa1c67969c9d63ff` (renderer 0.17.0,
 web example 0.14.0). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
-wasm-bindgen 0.2.129. `assets/provenance.json` records the versions and SHA-256.
+wasm-bindgen 0.2.129. `assets/provenance.json` records the versions, asset hashes
+and native registry package checksums. Rebuilding verifies the downloaded crate
+archives and their source commit against the WASM checkout. Offline preflight
+rejects native/WASM version, source or checksum mismatches and Git/path overrides.
 The script uses an external checkout; it does not copy Rust sources into this
 repository. It is a maintainer step; pip installation uses packaged artifacts.
 
