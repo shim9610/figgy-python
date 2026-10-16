@@ -949,10 +949,10 @@ impl FigureAccess<'_> {
     fn prepare(&mut self, py: Python<'_>) -> PyResult<String> {
         let report = py.detach(|| {
             let start = std::time::Instant::now();
-            if self.data.document.is_some() {
+            if let Some(family) = self.data.document.as_ref().map(|document| document.chart.family()) {
                 let _ = self.render(1.)?;
                 return Ok(json!({"backend":"native", "ready":true, "elapsed_ms":start.elapsed().as_secs_f64()*1000.,
-                    "target_format":"Rgba8Unorm", "stages":[{"scope":"radial", "stage":"first-frame", "phase":"Ready"}],
+                    "target_format":"Rgba8Unorm", "stages":[{"scope":family, "stage":"first-frame", "phase":"Ready"}],
                     "persistent_cache_supported":false}));
             }
             self.renderer.ensure_target_format(wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?;

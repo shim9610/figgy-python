@@ -17,6 +17,23 @@ CASES = [
     ('contourf', (np.array([[0., 1.], [2., 3.]]),), dict(levels=[.5, 1.5, 2.5]), 'HeatmapContour'),
 ]
 
+
+@pytest.mark.parametrize('family,method,args', [
+    ('radial', 'donut', ([1, 2, 3],)),
+    ('categorical', 'bar', (['A', 'B'], [2, 4])),
+    ('boxplot', 'boxplot', ([[1, 2, 3], [2, 4, 6]],)),
+])
+def test_native_bounded_preparation_reports_the_actual_chart_family(family, method, args):
+    with figgy.figure(backend='native') as figure:
+        getattr(figure.axes[0], method)(*args)
+        before, revision = figure.get_settings(), figure.revision
+        report = figure.prepare()
+        assert report['ready'] and report['backend'] == 'native'
+        assert report['stages'] == [{'scope': family, 'stage': 'first-frame', 'phase': 'Ready'}]
+        assert figure.info['preparation'] == report
+        assert figure.get_settings() == before and figure.revision == revision
+
+
 @pytest.mark.parametrize('method,args,kwargs,kind', CASES, ids=[c[0] for c in CASES])
 def test_all_constructors_share_native_browser_model_and_render(method, args, kwargs, kind):
     with figgy.figure(backend='native') as native, figgy.figure(backend='webgpu') as browser:
