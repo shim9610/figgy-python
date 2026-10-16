@@ -237,7 +237,12 @@ class Figure:
             return json.loads(self._native.settings_json())
 
     def apply_settings(self, settings, *, expected_revision=None, reset=False):
-        """Replace accepted settings for existing series; source arrays are not copied."""
+        """Replace accepted settings for existing series; source arrays are not copied.
+
+        Read the current SSOT with ``get_settings``, edit only the desired
+        fields, then submit it here for precise control. This does not choose
+        tick spacing, fit data ranges or enlarge the title band.
+        """
         with self._lock:
             self._require_open()
             if expected_revision is not None and expected_revision != self.revision:
@@ -370,13 +375,6 @@ class Figure:
                         node["offset_x"], node["offset_y"] = map(float, value)
                     elif key in node and key in ("visible", "line_width", "line_visible", "major_spacing", "min", "max"):
                         node[key] = value
-                        if key in ("min", "max") and "range_locked" in node:
-                            # An explicit range edit: later fits keep it. The
-                            # marker goes on both axes of the pair, as the
-                            # binding reads it from the primary axis.
-                            pair = ("bottom_x", "top_x") if node is cfg["bottom_x"] or node is cfg["top_x"] else ("left_y", "right_y")
-                            for axis in pair:
-                                cfg[axis]["range_locked"] = True
                     else:
                         raise ValueError(f"unsupported property for {target}: {key}")
                 # Like the renderer's title helpers, derive the title band from
@@ -432,6 +430,9 @@ class Figure:
         ``series`` maps stable series IDs to style patches. Source columns and
         series IDs remain owned by the existing Figure. ``reset`` resets layout
         to this Figure's defaults before applying the optional patches.
+        With the default ``reset=False``, a range-only patch preserves existing
+        ticks and labels. Use ``fit`` / ``set_xlim`` / ``set_ylim`` when their
+        automatic range or tick adjustments are wanted instead.
         """
         with self._lock:
             state = self.get_settings()
@@ -586,6 +587,7 @@ class Figure:
         return moved
 
     def fit(self, padding=0.05):
+        """Fit all axes to the data and derive tick/label settings with padding."""
         with self._lock:
             self._require_open()
             self._require_cartesian()
@@ -1011,6 +1013,11 @@ class Axes:
         return "log" if self.figure.get_settings()["config"]["left_y"]["scale"] == "Logarithmic" else "linear"
 
     def set_xlim(self, left, right):
+        """Set both X bounds and derive ticks/labels for the new range.
+
+        Use ``set_xlim_without_tick_auto`` or an SSOT config patch to keep
+        existing tick and label settings.
+        """
         self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
@@ -1019,6 +1026,7 @@ class Axes:
         return (left, right)
 
     def set_ylim(self, bottom, top):
+        """Set both Y bounds and derive ticks/labels, as ``set_xlim`` does."""
         self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
@@ -1036,7 +1044,6 @@ class Axes:
             for key in keys:
                 axis = state["config"][key]
                 axis["min"], axis["max"] = low, high
-                axis["range_locked"] = True
             self.figure.apply_settings(state)
         return (low, high)
 
@@ -1044,13 +1051,18 @@ class Axes:
         """Set the x range only; tick spacing and labels stay as configured.
 
         ``set_xlim`` re-derives readable ticks for the new range. Use this when
-        the tick settings were chosen explicitly and must be kept.
+        the tick settings were chosen explicitly and must be kept. This edits
+        the SSOT bounds without locking future fits: adding a series or calling
+        ``Figure.fit`` still derives bounds and ticks again.
         """
         self.figure._require_cartesian()
         return self._set_lim_keeping_ticks(("bottom_x", "top_x"), left, right)
 
     def set_ylim_without_tick_auto(self, bottom, top):
-        """Set the y range only; tick spacing and labels stay as configured."""
+        """Set the y range only; tick spacing and labels stay as configured.
+
+        Like ``set_xlim_without_tick_auto``, this does not lock future fits.
+        """
         self.figure._require_cartesian()
         return self._set_lim_keeping_ticks(("left_y", "right_y"), bottom, top)
 

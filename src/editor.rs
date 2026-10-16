@@ -752,17 +752,6 @@ impl Editor {
             let range_changed = number(ui, node, "min", "Minimum", "", &mut self.controls)
                 | number(ui, node, "max", "Maximum", "", &mut self.controls);
             changed |= range_changed;
-            if range_changed {
-                // A range typed here is fixed by the user, like set_xlim: both
-                // axes of the pair carry the SSOT marker.
-                let pair = match key {
-                    "bottom_x" | "top_x" => ["bottom_x", "top_x"],
-                    _ => ["left_y", "right_y"],
-                };
-                for axis in pair {
-                    config[axis]["range_locked"] = json!(true);
-                }
-            }
             let node = &mut config[key];
             changed |= number(
                 ui,

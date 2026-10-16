@@ -1329,6 +1329,11 @@ export class FiggyChart {
      * Replace the whole option SSoT from JSON. Marks everything dirty —
      * the next `frame()` re-rasters the chrome and refreshes the
      * transform, exactly like any other config edit.
+     * Use `get_config`, edit only the desired fields, then submit the
+     * complete config here for selective control. For example, writing
+     * only axis `min` / `max` preserves tick and label settings, whereas
+     * the auto-fit helpers derive those settings along with the range.
+     * This call does not auto-fit ranges or fit the title band.
      * JS: `chart.set_config(JSON.stringify(cfg));`
      * @param {string} json
      */
@@ -1457,6 +1462,9 @@ export class FiggyChart {
         }
     }
     /**
+     * Set plain title text and grow its band if needed. For a text-only
+     * edit that keeps the exact margin, use `get_config` / `set_config`
+     * and change only `chart_title.text`.
      * @param {string} text
      */
     set_title(text) {
@@ -3127,22 +3135,22 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 955, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 954, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 908, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 907, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 908, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 907, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__128);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 908, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 907, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__129);
             return ret;
         },

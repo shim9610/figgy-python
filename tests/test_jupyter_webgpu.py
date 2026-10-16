@@ -89,6 +89,22 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             page.locator('[data-fields] input[data-property=text]').fill('WebGPU edited title');page.locator('[data-fields] input[data-property=text]').press('Tab')
             page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'WebGPU edited title'")
             assert 'WebGPU edited title' in execute("await fig.sync(); print(fig.to_code())")
+            # Range edits cross the Python/browser boundary as plain SSOT
+            # fields; they preserve ticks and never introduce a lock marker.
+            execute("fig.configure(config={'bottom_x': {'major_spacing': 1.25, 'minor_count': 1}})")
+            page.wait_for_function(root+".snapshot().config.bottom_x.major_spacing === 1.25")
+            before_range=page.evaluate(root+'.snapshot().config')
+            page.locator('[data-target]').select_option('axis_bottom')
+            page.locator('[data-fields] input[data-property=min]').fill('2')
+            page.locator('[data-fields] input[data-property=min]').press('Tab')
+            page.wait_for_function(root+".snapshot().config.bottom_x.min === 2")
+            after_range=json.loads(execute("await fig.sync(); print(json.dumps(fig.get_settings()['config']))"))
+            before_range['bottom_x']['min']=2
+            assert after_range == before_range
+            # The explicit Fit helper still derives all bounds and ticks.
+            page.locator('[data-fit]').click()
+            page.wait_for_function(root+".snapshot().config.bottom_x.min < 0")
+            execute("await fig.sync(); c=fig.get_settings()['config']['bottom_x']; assert c['min'] < 0 and c['minor_count'] == 4 and c['major_spacing'] != 1.25")
             # GPU picker and layout/drag stay inside the browser. The kernel has no GPU.
             canvas=page.locator('.figgy-editor canvas');rect=canvas.bounding_box()
             page.mouse.move(rect['x']+rect['width']/2,rect['y']+12);page.mouse.down()

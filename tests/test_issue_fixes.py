@@ -1,4 +1,5 @@
 """Regressions for reported issues and the renderer features behind their fixes."""
+import copy
 import re
 import warnings
 from pathlib import Path
@@ -119,36 +120,49 @@ def test_title_alignment_is_editable_and_exported(plot):
         fig.update("chart_title", align="middle")
 
 
-def test_set_xlim_without_tick_auto_keeps_configured_ticks(plot):
-    fig, ax = plot
-    ax.plot(np.arange(100.0), np.arange(100.0))
-    fig.configure(config={"bottom_x": {"major_spacing": 25.0, "minor_count": 1}})
-    ax.set_xlim_without_tick_auto(0, 100)
-    config = fig.get_settings()["config"]
-    for key in ("bottom_x", "top_x"):
-        axis = config[key]
-        assert (axis["min"], axis["max"], axis["range_locked"]) == (0.0, 100.0, True)
-    assert (config["bottom_x"]["major_spacing"], config["bottom_x"]["minor_count"]) == (25.0, 1)
-
-    # set_xlim derives readable ticks for the new range, by design.
-    ax.set_xlim(0, 100)
-    assert fig.get_settings()["config"]["bottom_x"]["major_spacing"] == 20.0
+@pytest.fixture(params=["native", "webgpu"])
+def range_plot(request):
+    fig, ax = figgy.subplots(figsize=(6, 4), dpi=100, backend=request.param)
+    ax.plot(np.arange(1.0, 101.0), np.arange(1.0, 101.0))
+    yield fig, ax
+    fig.close()
 
 
-def test_a_fixed_range_survives_adding_a_series_until_an_explicit_fit(plot):
-    fig, ax = plot
-    ax.plot(np.arange(100.0), np.arange(100.0))
+@pytest.mark.parametrize("dimension,keys", [
+    ("x", ("bottom_x", "top_x")), ("y", ("left_y", "right_y")),
+])
+@pytest.mark.parametrize("scale", ["Linear", "Logarithmic"])
+def test_range_only_edits_keep_configured_ticks(range_plot, dimension, keys, scale):
+    fig, ax = range_plot
+    fig.configure(config={key: {
+        "scale": scale, "min": 1.0, "max": 1000.0,
+        "major_spacing": 2.0 + i, "minor_count": 1 + i,
+        "label_style": {"format": "Scientific", "significant_digits": 6},
+    } for i, key in enumerate(keys)})
+    expected = copy.deepcopy(fig.get_settings())
+    for key in keys:
+        expected["config"][key]["min"] = 10.0
+        expected["config"][key]["max"] = 100.0
+    getattr(ax, f"set_{dimension}lim_without_tick_auto")(10, 100)
+    assert fig.get_settings() == expected
+
+    # The automatic helper is deliberately allowed to derive new ticks.
+    getattr(ax, f"set_{dimension}lim")(10, 100)
+    axis = fig.get_settings()["config"][keys[0]]
+    assert axis["major_spacing"] == (10.0 if scale == "Linear" else 1.0)
+    assert axis["minor_count"] == (4 if scale == "Linear" else 8)
+
+
+def test_range_only_edit_does_not_lock_later_fit_helpers(range_plot):
+    fig, ax = range_plot
     ax.set_xlim_without_tick_auto(10, 50)
     ax.plot(np.arange(300.0), np.arange(300.0))
-    x = fig.get_settings()["config"]["bottom_x"]
-    assert (x["min"], x["max"]) == (10.0, 50.0)
-    # The y range was not fixed, so it fits the new data.
-    assert fig.get_settings()["config"]["left_y"]["max"] >= 299.0
-
-    fig.fit()
     config = fig.get_settings()["config"]
     assert config["bottom_x"]["max"] >= 299.0
-    assert not any(config[k]["range_locked"] for k in ("bottom_x", "top_x", "left_y", "right_y"))
+    assert config["left_y"]["max"] >= 299.0
+    ax.set_xlim_without_tick_auto(10, 50)
+    fig.fit()
+    assert fig.get_settings()["config"]["bottom_x"]["max"] >= 299.0
 
 
 def test_tick_substitution_warns_once_per_change(plot):
@@ -187,12 +201,12 @@ def test_to_code_replays_an_injected_title_margin(plot):
         target.close()
 
 
-def test_a_range_edit_on_a_secondary_axis_marks_the_pair(plot):
-    fig, ax = plot
-    ax.plot(np.arange(100.0), np.arange(100.0))
+def test_a_secondary_axis_edit_changes_only_requested_fields(range_plot):
+    fig, ax = range_plot
+    expected = copy.deepcopy(fig.get_settings())
+    expected["config"]["top_x"].update(min=5.0, max=40.0)
     fig.update("axis_top", min=5.0, max=40.0)
-    config = fig.get_settings()["config"]
-    assert config["top_x"]["range_locked"] and config["bottom_x"]["range_locked"]
+    assert fig.get_settings() == expected
 
 
 def test_scaled_exports_report_tick_substitutions(plot):

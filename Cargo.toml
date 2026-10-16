@@ -29,8 +29,8 @@ lto = "thin"
 codegen-units = 1
 
 # figgy-renderer 0.17.0 / figgy-model 0.11.0 are not on crates.io yet; until they
-# are, build them from the upstream branch. Remove this patch before a release
+# are, build them from the pinned upstream revision. Remove this patch before a release
 # (docs/PUBLISHING.md): a release builds against the published crates.
 [patch.crates-io]
-figgy-renderer = { git = "https://github.com/shim9610/figgy", branch = "claude/cool-lamport-ogcyzt" }
-figgy-model = { git = "https://github.com/shim9610/figgy", branch = "claude/cool-lamport-ogcyzt" }
+figgy-renderer = { git = "https://github.com/shim9610/figgy", rev = "632d1844f184f9e9a230867773ec1885e1557541" }
+figgy-model = { git = "https://github.com/shim9610/figgy", rev = "632d1844f184f9e9a230867773ec1885e1557541" }

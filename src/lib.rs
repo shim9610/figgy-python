@@ -656,28 +656,6 @@ fn draw_style_specs(
     }
 }
 
-/// Record in the SSOT that the host fixed this dimension's range, on both
-/// axes of the pair, so later fits (e.g. when a series is added) keep it.
-fn mark_range_fixed(config: &mut Config, axis: &str) {
-    let (a, b) = match axis {
-        "x" => (&mut config.bottom_x, &mut config.top_x),
-        _ => (&mut config.left_y, &mut config.right_y),
-    };
-    a.range_locked = true;
-    b.range_locked = true;
-}
-
-fn clear_range_fixed(config: &mut Config) {
-    for axis in [
-        &mut config.bottom_x,
-        &mut config.top_x,
-        &mut config.left_y,
-        &mut config.right_y,
-    ] {
-        axis.range_locked = false;
-    }
-}
-
 fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()> {
     use renderer::{DataRenderType, config::DrawStyle};
     // A stylized style silently skips series it has no entry point for; the
@@ -969,8 +947,6 @@ impl FigureAccess<'_> {
         bounds: Option<[f64; 4]>,
     ) -> PyResult<()> {
         let old = self.snapshot();
-        let preserve_x = old.config.bottom_x.range_locked;
-        let preserve_y = old.config.left_y.range_locked;
         let revision = self.data.revision;
         let result = (|| {
             if let Some(config) = config {
@@ -982,16 +958,6 @@ impl FigureAccess<'_> {
                 self.set_range("y", ymin, ymax)?;
             } else {
                 self.fit(py, 0.05)?;
-                let mut next = self.data.chart.config().clone();
-                if preserve_x {
-                    next.bottom_x = old.config.bottom_x.clone();
-                    next.top_x = old.config.top_x.clone();
-                }
-                if preserve_y {
-                    next.left_y = old.config.left_y.clone();
-                    next.right_y = old.config.right_y.clone();
-                }
-                self.commit_config(next)?;
             }
             validate_config(self.data.chart.config())?;
             Ok(())
@@ -1169,9 +1135,6 @@ impl FigureAccess<'_> {
                 .map_err(runtime)?;
             return Err(error);
         }
-        // An explicit fit fits every axis (renderer contract), so no range is
-        // host-fixed afterwards. add_series_fitted restores the fixed ones.
-        clear_range_fixed(&mut next);
         // Fitting changes axes only; keep the local document's selection ids.
         next.picked_data = self.data.chart.config().picked_data.clone();
         next.picked_points = self.data.chart.config().picked_points.clone();
@@ -1189,9 +1152,7 @@ impl FigureAccess<'_> {
             "y" => next.set_y_range(min, max),
             _ => return Err(invalid("axis must be x or y")),
         }
-        let mut config = next.config().clone();
-        mark_range_fixed(&mut config, axis);
-        self.commit_config(config)
+        self.commit_config(next.config().clone())
     }
     fn render_rgba<'py>(
         &mut self,

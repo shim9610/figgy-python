@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild packaged assets from the upstream public web host (no source vendoring).
 set -euo pipefail
-revision=fbcbc26d8a7f86bc96d97c819caf485672f149e6
+revision=632d1844f184f9e9a230867773ec1885e1557541
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 wasm_source=${FIGGY_WASM_SOURCE:-${TMPDIR:-/tmp}/figgy-web-kernel-$revision}
 if [ ! -d "$wasm_source/.git" ]; then

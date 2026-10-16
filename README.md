@@ -254,8 +254,24 @@ Ranges, ticks and titles:
 
 - `ax.set_xlim(a, b)` / `set_ylim` set the range and derive readable ticks for it.
   To keep tick spacing you chose explicitly, use `ax.set_xlim_without_tick_auto(a, b)`
-  / `set_ylim_without_tick_auto`. Either way the range stays fixed when more series are
-  added; `fig.fit()` fits all axes again.
+  / `set_ylim_without_tick_auto`. These change only the paired axes' SSOT bounds;
+  they do not create a persistent range lock. Plot-creation helpers fit the data
+  again when adding a series, and `fig.fit()` explicitly fits all axes. Apply
+  manual ranges after adding the series when they should be the final view.
+- For selective control, use `fig.configure(config={...})` or read the current
+  state with `fig.get_settings()`, edit only the intended fields, then submit it
+  through `fig.apply_settings(state)`. For example:
+
+  ```python
+  fig.configure(config={"bottom_x": {"min": 20.0, "max": 80.0}})
+  ```
+
+  This preserves that axis's tick and label settings and leaves the top axis
+  untouched. Include `top_x` too when the pair should share bounds. In contrast,
+  `set_xlim` / `set_ylim` choose ticks and label formatting, `fit` also derives
+  bounds from data, and title helpers can enlarge the title band. Direct SSOT
+  edits do not run these adjustments. Rendering still validates settings and
+  applies safety limits; visible tick positions and label counts depend on range.
 - A tick setting the renderer cannot draw as written is replaced: a spacing that
   would draw thousands of ticks falls back to automatic spacing, and `minor_count`
   is capped at 99. Each change is reported once as a `figgy.RenderWarning` by the next
@@ -391,7 +407,7 @@ rates are reported separately; they are not monitor FPS measurements.
 This package uses **figgy-renderer 0.17.0** from the upstream
 [figgy repository](https://github.com/shim9610/figgy). Until 0.17.0 is on crates.io,
 the native extension and the packaged browser kernel are both built from figgy
-commit `fbcbc26` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
+commit `632d184` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 

@@ -86,9 +86,6 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         lines.append(f"{axis}.set_{dimension}lim({primary['min']!r}, {primary['max']!r})")
         for key in keys:
             modeled[key]["min"], modeled[key]["max"] = primary["min"], primary["max"]
-            # set_xlim/set_ylim mark the range as fixed; a fitted original is
-            # restored by the patch below.
-            modeled[key]["range_locked"] = True
         if primary["scale"] in ("Linear", "Logarithmic") and all(cfg[k]["scale"] == primary["scale"] for k in keys):
             scale = "log" if primary["scale"] == "Logarithmic" else "linear"
             lines.append(f"{axis}.set_{dimension}scale({scale!r})")

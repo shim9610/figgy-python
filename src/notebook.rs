@@ -85,8 +85,6 @@ impl NotebookFigure {
         bounds: Option<[f64; 4]>,
     ) -> PyResult<()> {
         let old_config = self.chart.config().clone();
-        let preserve_x = old_config.bottom_x.range_locked;
-        let preserve_y = old_config.left_y.range_locked;
         let old_series = self.series.clone();
         let revision = self.revision;
         let result = (|| {
@@ -101,14 +99,6 @@ impl NotebookFigure {
                 self.set_range("y", ymin, ymax)?;
             } else {
                 self.fit(0.05)?;
-                if preserve_x {
-                    self.chart.config_mut().bottom_x = old_config.bottom_x.clone();
-                    self.chart.config_mut().top_x = old_config.top_x.clone();
-                }
-                if preserve_y {
-                    self.chart.config_mut().left_y = old_config.left_y.clone();
-                    self.chart.config_mut().right_y = old_config.right_y.clone();
-                }
             }
             validate_config(self.chart.config())?;
             Ok(())
@@ -177,7 +167,6 @@ impl NotebookFigure {
         let mut fitted = Chart::new(self.chart.config().clone());
         fitted.auto_fit_x_extent(&x, padding);
         fitted.auto_fit_y_extent(&y, padding);
-        clear_range_fixed(fitted.config_mut());
         validate_config(fitted.config())?;
         self.chart = fitted;
         self.revision += 1;
@@ -197,7 +186,6 @@ impl NotebookFigure {
             }
             _ => return Err(invalid("axis must be x or y")),
         };
-        mark_range_fixed(next.config_mut(), axis);
         validate_config(next.config())?;
         self.chart = next;
         self.revision += 1;
