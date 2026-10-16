@@ -504,12 +504,6 @@ export class FiggyChart {
         const ret = wasm.figgychart_cancel_stream_operation_and_wait(this.__wbg_ptr, handle.__wbg_ptr);
         return ret;
     }
-    cancel_streaming() {
-        const ret = wasm.figgychart_cancel_streaming(this.__wbg_ptr);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
-        }
-    }
     /**
      * Cancel this chart and resolve only after its submitted work and
      * retired renderer-owned surfaces have crossed the completion fence.
@@ -518,6 +512,12 @@ export class FiggyChart {
     cancel_streaming_and_wait() {
         const ret = wasm.figgychart_cancel_streaming_and_wait(this.__wbg_ptr);
         return ret;
+    }
+    cancel_streaming() {
+        const ret = wasm.figgychart_cancel_streaming(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Configure the total GPU budget and chart-local packed-view limit.
@@ -3127,7 +3127,7 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 951, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 955, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },

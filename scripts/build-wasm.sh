@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild packaged assets from the upstream public web host (no source vendoring).
 set -euo pipefail
-revision=3fbd423c37caa68f8962b7dbb53f7a4b76b351ce
+revision=fbcbc26d8a7f86bc96d97c819caf485672f149e6
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 wasm_source=${FIGGY_WASM_SOURCE:-${TMPDIR:-/tmp}/figgy-web-kernel-$revision}
 if [ ! -d "$wasm_source/.git" ]; then
@@ -23,6 +23,6 @@ chmod 644 "$repo_root"/python/figgyplot/assets/*
 python - "$repo_root/python/figgyplot/assets" "$revision" <<'PYPROVENANCE'
 import hashlib,json,pathlib,sys
 assets=pathlib.Path(sys.argv[1])
-data={'upstream_repository':'https://github.com/shim9610/figgy','upstream_revision':sys.argv[2],'renderer_version':'0.16.1','web_package_version':'0.13.1','wasm_bindgen_version':'0.2.129','assets':{p.name:{'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'bytes':p.stat().st_size} for p in assets.iterdir() if p.suffix in ('.js','.wasm')}}
+data={'upstream_repository':'https://github.com/shim9610/figgy','upstream_revision':sys.argv[2],'renderer_version':'0.17.0','web_package_version':'0.14.0','wasm_bindgen_version':'0.2.129','assets':{p.name:{'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'bytes':p.stat().st_size} for p in assets.iterdir() if p.suffix in ('.js','.wasm')}}
 (assets/'provenance.json').write_text(json.dumps(data,indent=2)+'\n')
 PYPROVENANCE

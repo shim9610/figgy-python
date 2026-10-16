@@ -70,7 +70,7 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
 
 /// Renderer version stamped into, and required from, Settings documents.
 /// It names the `figgy-renderer` pin in Cargo.toml; update both together.
-const RENDERER_VERSION: &str = "0.16.1";
+const RENDERER_VERSION: &str = "0.17.0";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

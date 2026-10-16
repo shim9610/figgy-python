@@ -46,7 +46,7 @@ other branches before building. This does not change main's branch protection.
    `figgy-renderer`.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
 3. Select **main**, **target `testpypi`** and the exact source version (currently
-   preparing **`0.2.2`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
+   preparing **`0.3.0`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
 4. Run it. This is an actual public TestPyPI upload, not a build-only dry run.
 
 The pipeline runs these gates in order:
@@ -106,7 +106,7 @@ under one version or use `skip-existing` to conceal mixed builds.
 ## Verify an already uploaded preview
 
 The following records the completed 0.2.1 recovery. For a new release such as
-0.2.2, use its own upload/verification run ID; old IDs cannot authorize it.
+0.3.0, use its own upload/verification run ID; old IDs cannot authorize it.
 
 If a successful upload's installation jobs were skipped, do **not** rebuild and
 upload the same version. Run the workflow on **main** with:
@@ -177,9 +177,11 @@ completed successfully, publishing all 74 wheels and one sdist to PyPI and
 passing all nine production-index installation jobs. PyPI's public JSON metadata
 also confirms version 0.2.1 with 75 distribution files.
 
-The prepared 0.2.2 release corrects the package description's installation
-instructions to use PyPI. It still requires a new TestPyPI build/upload and all
-installation checks before promotion; no 0.2.2 publication has occurred.
+The prepared 0.3.0 release moves to figgy-renderer 0.17.0 and fixes the issues
+reported against 0.2.1; it also carries the PyPI installation instructions that
+were prepared as 0.2.2, which was never uploaded. It needs figgy-renderer 0.17.0
+on crates.io (then the patch override is removed), a new TestPyPI build/upload
+and all installation checks before promotion; no 0.3.0 publication has occurred.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.

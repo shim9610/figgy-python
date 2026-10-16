@@ -1,6 +1,6 @@
 [package]
 name = "figgyplot"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.29", features = ["extension-module"] }
 numpy = "0.29"
-renderer = { package = "figgy-renderer", version = "=0.16.1", features = ["serde"] }
+renderer = { package = "figgy-renderer", version = "=0.17.0", features = ["serde"] }
 wgpu = "30"
 pollster = "1"
 serde = { version = "1", features = ["derive"] }
@@ -28,10 +28,9 @@ egui-winit = "0.36.2"
 lto = "thin"
 codegen-units = 1
 
-# Unreleased renderer changes under validation (font fallback and checks,
-# draw_style_supports, render warnings, RichText alignment, title band,
-# AxisOptions.range_locked, colourbar strip). Remove this patch and move the
-# pin above to the next figgy-renderer release once it is published.
+# figgy-renderer 0.17.0 / figgy-model 0.11.0 are not on crates.io yet; until they
+# are, build them from the upstream branch. Remove this patch before a release
+# (docs/PUBLISHING.md): a release builds against the published crates.
 [patch.crates-io]
 figgy-renderer = { git = "https://github.com/shim9610/figgy", branch = "claude/cool-lamport-ogcyzt" }
 figgy-model = { git = "https://github.com/shim9610/figgy", branch = "claude/cool-lamport-ogcyzt" }

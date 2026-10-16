@@ -40,7 +40,7 @@ export function render({model,el}) {
     const operation=queue.then(async()=>{if(disposed)throw Error('Widget disposed');busy++;try{return await fn();}finally{busy--;}});
     queue=operation.catch(fail);return propagate?operation:queue;
   };
-  function snapshot(){return {schema_version:1,renderer_version:'0.16.1',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
+  function snapshot(){return {schema_version:1,renderer_version:'0.17.0',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
   function clearColor(color){const c=color ?? {r:1,g:1,b:1,a:1};chart.set_clear_color(c.r,c.g,c.b,c.a);background=clone(color ?? null);}
   function checkNumbers(value,path='settings'){
     if(typeof value==='number' && !Number.isFinite(value))throw Error(`${path} must be finite`);
@@ -62,7 +62,7 @@ export function render({model,el}) {
     // Roll back both trees if either renderer validation rejects a local edit.
     const old=snapshot();
     try {
-      if(settings.schema_version!==1 || settings.renderer_version!=='0.16.1')throw Error('Unsupported settings/renderer version');
+      if(settings.schema_version!==1 || settings.renderer_version!=='0.17.0')throw Error('Unsupported settings/renderer version');
       checkNumbers(settings);
       const mode=settings.config?.draw_style?.mode;
       if(mode==='sketch' && settings.series.some(s=>s.render_type.Histogram||s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour))throw Error('Sketch draws line, scatter and errorbar series; bars, heatmaps and contours are not supported');

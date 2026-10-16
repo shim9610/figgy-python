@@ -146,12 +146,12 @@ export class FiggyChart {
      */
     begin_streaming(max_primitives_per_chunk: number): void;
     cancel_stream_operation_and_wait(handle: StreamingOperationHandle): Promise<void>;
-    cancel_streaming(): void;
     /**
      * Cancel this chart and resolve only after its submitted work and
      * retired renderer-owned surfaces have crossed the completion fence.
      */
     cancel_streaming_and_wait(): Promise<void>;
+    cancel_streaming(): void;
     /**
      * Configure the total GPU budget and chart-local packed-view limit.
      * Automatic streaming keeps original sources nonresident, then caches
