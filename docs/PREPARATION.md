@@ -47,9 +47,13 @@ occur. The kernel remains GPU-free. Python settings changes while preparation is
 deferred are applied when it starts.
 
 `prepare_async()` waits for a mounted frontend, initializes WASM/WebGPU, uploads
-the binary columns, uses `FiggyChart.prewarm_all_with_progress` and awaits
-`first_frame_ready`. The browser shows upstream stage progress. Preparation and
-redraw/picking/export operations are serialized to protect the WASM chart.
+the binary columns, uses `FiggyChart.prewarm_all_with_progress` for Cartesian
+charts and awaits `first_frame_ready`. Radial, categorical and boxplot charts
+compile their pipelines asynchronously and also await the first GPU frame.
+Ready therefore requires GPU completion; preparation failures remain visible
+in the status and propagate to Python. The browser shows upstream stage progress.
+Preparation, menu access and redraw/picking/export operations are serialized to
+protect the WASM chart.
 `elapsed_ms` covers the browser request, including initialization/upload when
 deferred; `prewarm_ms` separately measures prewarm plus first-frame readiness.
 Kernel/comm scheduling and outbound transfer before the request are not included.

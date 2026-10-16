@@ -252,9 +252,9 @@ export function render({model,el}) {
       (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;await queue;await flush();let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
           const start=performance.now(),stages=[];status.textContent='Preparing…';
-          try{if(kind){chart.frame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent="Preparing…";});await chart.first_frame_ready();}dirty=true;
+          try{if(kind){await chart.first_frame_ready();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent="Preparing…";});await chart.first_frame_ready();}dirty=true;status.textContent='Ready';
             return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
-          }finally{status.textContent='Ready';}
+          }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
         const data=message.action==='export'?await exporting(message.scale):null;model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);}catch(e){model.send({action:'result',id:message.id,error:String(e)});}})();
     }
@@ -290,8 +290,8 @@ export function render({model,el}) {
       for(const spec of specs[mode]){const row=document.createElement('label'),input=document.createElement('input');input.type='number';input.min=spec.min;input.max=spec.max;input.step=spec.integer?1:.05;input.value=local.config.draw_style[spec.key];input.dataset.styleParameter=spec.key;row.append(document.createTextNode(spec.key.replaceAll('_',' ')),input);input.addEventListener('change',()=>enqueue(()=>{const value=Number(input.value);if(!Number.isFinite(value)||value<spec.min||value>spec.max||(spec.integer&&!Number.isInteger(value)))throw Error(`${spec.key} must be in ${spec.min}..${spec.max}`);const state=snapshot();state.config.draw_style[spec.key]=value;install(state);commit();}));menu.append(row);}
     }
   }
-  root.querySelector('[data-style]').addEventListener('click',()=>openMenu('style'));
-  root.querySelector('[data-visibility]').addEventListener('click',()=>openMenu('visibility'));
+  root.querySelector('[data-style]').addEventListener('click',()=>enqueue(()=>openMenu('style')));
+  root.querySelector('[data-visibility]').addEventListener('click',()=>enqueue(()=>openMenu('visibility')));
   root.addEventListener('pointerdown',e=>{if(!menu.contains(e.target)&&!e.target.closest('[data-style],[data-visibility]'))menu.hidden=true;});
   const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
   function bounds(){return JSON.parse(chart.decoration_bounds('data_area')).rect;}
@@ -366,9 +366,9 @@ export function render({model,el}) {
       else throw Error(`Unsupported binary dtype: ${spec.dtype}`);
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
-    if(kind){chart.frame();}else{chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
-    clearColor(local.background);
-    await chart.first_frame_ready();}properties();observer.observe(canvas);resize();status.textContent='Ready';
+    if(!kind){chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
+    clearColor(local.background);}
+    await chart.first_frame_ready();properties();observer.observe(canvas);resize();status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);
     root.figgy={stats,snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};

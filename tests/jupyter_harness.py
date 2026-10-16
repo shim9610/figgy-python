@@ -55,7 +55,8 @@ def notebook(tmp_path, source):
                 browser_env['VK_DRIVER_FILES'] = os.environ['FIGGY_BROWSER_VK_DRIVER']
             browser = p.chromium.launch(headless=os.environ.get('FIGGY_TEST_HEADFUL') != '1', env=browser_env,
                 executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
-                args=['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface'])
+                args=['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface',
+                      '--enable-logging', f'--log-file={tmp_path / "chromium.log"}'])
             context = browser.new_context(viewport={'width': 1500, 'height': 1000}, permissions=['clipboard-read', 'clipboard-write'], accept_downloads=True)
             context.route('https://**/*', lambda route: route.abort())
             page = context.new_page()
@@ -83,7 +84,11 @@ def notebook(tmp_path, source):
                 page.evaluate('window.jupyterapp.restored')
                 page.wait_for_function('!!window.jupyterapp.shell.currentWidget?.sessionContext')
                 page.evaluate("""async()=>{const app=window.jupyterapp;await app.restored;const panel=app.shell.currentWidget;await panel.context.ready;await panel.sessionContext.ready;await app.commands.execute('notebook:run-all-cells');}""")
-                page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent==='Ready'", timeout=45000)
+                # Ready includes async pipeline compilation and GPU completion.
+                # Cold software-GPU startup has its own budget; gesture checks
+                # keep Playwright's normal timeout and strict result assertions.
+                page.wait_for_function("['Ready','WebGPU failed'].includes(document.querySelector('.figgy-editor [data-status]')?.textContent)", timeout=180000)
+                assert page.locator('.figgy-editor [data-status]').inner_text() == 'Ready', page.locator('.figgy-error').inner_text()
                 with urllib.request.urlopen(base+'/api/sessions') as response:
                     session = next(s for s in json.load(response) if s['path'] == 'check.ipynb')
                 client = BlockingKernelClient(connection_file=str(runtime/f"kernel-{session['kernel']['id']}.json"))

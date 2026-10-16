@@ -42,6 +42,55 @@ def browser_point(page, logical):
     return r['x']+logical[0]*r['width']/960, r['y']+logical[1]*r['height']/600
 
 
+def check_bounded_menus_during_preparation(page, execute, kind):
+    """Hold actual GPU completion so toolbar clicks overlap an async WASM borrow."""
+    page.evaluate("""()=>{
+        const prototype=GPUQueue.prototype;
+        const original=prototype.onSubmittedWorkDone;
+        let release;
+        const gate=new Promise(resolve=>{release=resolve;});
+        window.figgyPreparationGate={entered:false,release:()=>{
+            prototype.onSubmittedWorkDone=original;release();
+        }};
+        prototype.onSubmittedWorkDone=function(...args){
+            const completion=original.apply(this,args);
+            window.figgyPreparationGate.entered=true;
+            return completion.then(()=>gate);
+        };
+    }""")
+    try:
+        execute('import asyncio; preparation=asyncio.create_task(fig.prepare_async(timeout=60))')
+        page.wait_for_function('window.figgyPreparationGate.entered')
+        execute('assert not preparation.done()')
+        page.locator('button[data-style]').click()
+        page.locator('button[data-visibility]').click()
+        # Both menus read the chart document. They must wait for the pending
+        # renderer call, rather than borrowing the WASM chart a second time.
+        assert page.locator('.figgy-menu').is_hidden()
+        assert page.locator('.figgy-properties').is_hidden()
+        assert page.locator('.figgy-error').inner_text()==''
+    finally:
+        page.evaluate('window.figgyPreparationGate.release()')
+    report=json.loads(execute('print(json.dumps(await preparation))'))
+    assert report['ready'] and report['backend']=='webgpu'
+    page.evaluate(ROOT+'.flush()')
+    assert page.locator('.figgy-properties').is_visible()
+    if kind=='radial':
+        assert page.locator('[data-target]').input_value()=='chart_title'
+    else:
+        grid=page.locator('input[data-visibility="grid"]')
+        assert grid.is_visible()
+        original=grid.is_checked()
+        grid.set_checked(not original);page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+f'.snapshot().{kind}.grid')==(not original)
+        grid.set_checked(original);page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+f'.snapshot().{kind}.grid')==original
+        page.locator('button[data-visibility]').click();page.evaluate(ROOT+'.flush()')
+    page.locator('[data-close-properties]').click()
+    assert page.locator('.figgy-menu').is_hidden()
+    assert page.locator('.figgy-error').inner_text()==''
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
 @pytest.mark.parametrize('kind', CASES)
 def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
@@ -102,6 +151,8 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+CASES[kind]+"\nax.set_title('Shared interaction')\ndisplay(fig.widget())"
     with notebook(tmp_path/kind, source) as (page,execute):
         panel=page.locator('.figgy-properties')
+        assert panel.is_hidden()
+        check_bounded_menus_during_preparation(page,execute,kind)
         assert panel.is_hidden()
         assert page.locator('[data-layout] svg').count()==1
         for selector in ['data-fit','data-copy','data-save','data-properties']:
