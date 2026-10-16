@@ -987,6 +987,9 @@ impl Editor {
                 }
             }
         }
+        if changed {
+            crate::axis_edit::sync_linked_axis_edit(&state["config"], &mut config, target);
+        }
         state["config"] = config;
         if changed {
             match c.apply_settings(&state.to_string()) {

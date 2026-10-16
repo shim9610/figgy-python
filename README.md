@@ -252,6 +252,16 @@ ax.set_ylim(0.0, 2.7)
 
 Ranges, ticks and titles:
 
+- Property-panel edits and `fig.update("axis_bottom", major_spacing=2)` share
+  changed fields with the opposite axis when the pair had exactly equal `min`,
+  `max`, `scale` and `inverted` values before the edit. The same rule applies in
+  either direction to bottom/top and left/right, including `tick_labels_*` edits.
+  For example, `fig.update("tick_labels_right", format="Scientific",
+  significant_digits=4)` changes only those label fields on a matching left/right
+  pair. Unedited differences in fonts, colors or tick settings remain intact.
+  Axis-line visibility, titles, margins and offsets remain independent. Different
+  coordinate ranges/scales remain independent too; comparison uses exact values
+  without rounding. Use the raw SSOT APIs below for a deliberate one-sided edit.
 - `ax.set_xlim(a, b)` / `set_ylim` set the range and derive readable ticks for it.
   To keep tick spacing you chose explicitly, use `ax.set_xlim_without_tick_auto(a, b)`
   / `set_ylim_without_tick_auto`. These change only the paired axes' SSOT bounds;

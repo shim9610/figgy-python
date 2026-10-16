@@ -201,10 +201,11 @@ def test_to_code_replays_an_injected_title_margin(plot):
         target.close()
 
 
-def test_a_secondary_axis_edit_changes_only_requested_fields(range_plot):
+def test_a_secondary_axis_helper_edit_changes_only_requested_fields_on_the_pair(range_plot):
     fig, ax = range_plot
     expected = copy.deepcopy(fig.get_settings())
     expected["config"]["top_x"].update(min=5.0, max=40.0)
+    expected["config"]["bottom_x"].update(min=5.0, max=40.0)
     fig.update("axis_top", min=5.0, max=40.0)
     assert fig.get_settings() == expected
 

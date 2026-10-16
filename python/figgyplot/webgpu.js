@@ -16,6 +16,23 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
+// Properties controls edit both sides of an implicitly shared axis. Raw SSOT
+// installation deliberately bypasses this helper, preserving independent axes.
+function reconcilePairedAxisEdit(before,state,target){
+  const match=/^(?:axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
+  if(!match)return;
+  const key=side[match[1]],other={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[key];
+  const previous=before.config?.[key],peerBefore=before.config?.[other],axis=state.config?.[key],peer=state.config?.[other];
+  if(!previous||!peerBefore||!axis||!peer)return;
+  if(!['min','max','scale','inverted'].every(name=>previous[name]===peerBefore[name]))return;
+  const changed=(old,value)=>JSON.stringify(old)!==JSON.stringify(value);
+  for(const name of ['min','max','scale','inverted','major_spacing','minor_count','tick','major_tick_length','minor_tick_length','line_color','line_width','line_style']){
+    if(changed(previous[name],axis[name]))peer[name]=clone(axis[name]);
+  }
+  for(const [name,value] of Object.entries(axis.label_style??{})){
+    if(!['label_offset_x','label_offset_y'].includes(name)&&changed(previous.label_style?.[name],value))peer.label_style[name]=clone(value);
+  }
+}
 const ids = ['chart_title','legend','data_area','colorbar','colorbar_axis','colorbar_tick_labels','colorbar_title',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
 const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',label_format:'Number format',significant_digits:'Significant digits',font_size:'Font size',font:'Font family',line_width:'Line width'};
 const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
@@ -136,9 +153,15 @@ export function render({model,el}) {
     select.value=previous ?? 'chart_title';fields.replaceChildren();
     const target=select.value,cfg=local.config;
     const series=local.series.find(s=>s.series_id===target);
+    function applyProperty(apply,value){
+      const before=snapshot(),state=clone(before);
+      apply(state,value);
+      if(!kind)reconcilePairedAxisEdit(before,state,target);
+      install(state);commit();
+    }
     function field(label,value,type,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,type==='number'?Number(input.value):input.value);install(state);commit();}));row.append(input);fields.append(row);return input;
+      input.addEventListener('change',()=>enqueue(()=>{applyProperty(apply,type==='number'?Number(input.value):input.value);}));row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
@@ -147,7 +170,7 @@ export function render({model,el}) {
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
       for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Timestamp:'Timestamp (configured)'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());try{apply(state,input.value);install(state);commit();}catch(e){input.value=value;throw e;}}));row.append(input);fields.append(row);
+      input.addEventListener('change',()=>enqueue(()=>{try{applyProperty(apply,input.value);}catch(e){input.value=value;throw e;}}));row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
       choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
@@ -174,7 +197,7 @@ export function render({model,el}) {
         find(s).significant_digits=v;
       });digits.min='1';digits.max='15';digits.step='1';
     }
-    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,input.checked);install(state);commit();}));row.append(input);fields.append(row);}
+    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{applyProperty(apply,input.checked);}));row.append(input);fields.append(row);}
     function syncLegend(state){chart.set_series(JSON.stringify(state.series));chart.reset_legend_from_series_labels();state.config.legend.content=JSON.parse(chart.get_config()).legend.content;}
     function richControls(find,key,input){
       function remember(){textRanges.set(key,[Array.from(input.value.slice(0,input.selectionStart)).length,Array.from(input.value.slice(0,input.selectionEnd)).length]);}

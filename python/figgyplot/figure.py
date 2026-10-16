@@ -13,7 +13,7 @@ import weakref
 
 import numpy as np
 
-from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, text_segments_json
+from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 _NAMED = {"blue": "#0000ff", "red": "#ff0000", "green": "#008000", "black": "#000000", "white": "#ffffff", "orange": "#ffa500", "purple": "#800080", "gray": "#808080", "grey": "#808080", "b": "#0000ff", "r": "#ff0000", "g": "#008000", "k": "#000000", "w": "#ffffff"}
@@ -278,7 +278,14 @@ class Figure:
             _warn_external(message, RenderWarning)
 
     def update(self, target, **properties):
-        """Edit a stable series/decorative target using familiar property names."""
+        """Edit a stable series/decorative target using familiar property names.
+
+        Axis/tick-label edits also patch the opposite axis when both axes had
+        exactly equal min, max, scale and inverted fields before the edit.
+        Only changed tick/range/style fields are shared; untouched differences,
+        axis-line visibility, titles, margins and offsets stay independent.
+        Use configure/apply_settings for exact one-sided SSOT edits.
+        """
         if not isinstance(target, str) or not target:
             raise ValueError("editable target must be a non-empty string")
         kind = _family(self.get_settings())
@@ -299,6 +306,7 @@ class Figure:
             self._require_open()
             state = self.get_settings()
             cfg = state["config"]
+            before_config = copy.deepcopy(cfg)
             series = next((s for s in state["series"] if s["series_id"] == target), None)
             if series is not None:
                 style = next(iter(series["render_type"].values()))
@@ -372,7 +380,20 @@ class Figure:
                             raise ValueError(f"unsupported property for {target}: {key}")
                     elif key == "offset" and "offset_x" in node:
                         node["offset_x"], node["offset_y"] = map(float, value)
-                    elif key in node and key in ("visible", "line_width", "line_visible", "major_spacing", "min", "max"):
+                    elif key in ("format", "significant_digits") and "label_style" in node:
+                        node["label_style"][key] = copy.deepcopy(value)
+                    elif key == "label_style" and "label_style" in node:
+                        if not isinstance(value, dict):
+                            raise ValueError("label_style must be a settings dictionary")
+                        node["label_style"].update(copy.deepcopy(value))
+                    elif key == "scale" and "scale" in node:
+                        node[key] = {"linear": "Linear", "log": "Logarithmic"}.get(value, value)
+                    elif key in node and key in (
+                        "visible", "line_width", "line_visible", "line_color", "line_style",
+                        "major_spacing", "minor_count", "min", "max", "inverted", "tick",
+                        "major_tick_length", "minor_tick_length", "format", "significant_digits",
+                        "label_visible", "font_size", "label_font", "label_offset_x", "label_offset_y",
+                    ):
                         node[key] = value
                     else:
                         raise ValueError(f"unsupported property for {target}: {key}")
@@ -381,6 +402,15 @@ class Figure:
                 # enlarged) grows it instead of being clipped at the top.
                 if target == "chart_title" and {"text", "fontsize", "font", "visible"} & properties.keys():
                     cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
+                if target.startswith("axis_") and not target.startswith("axis_title_") and "scale" in properties:
+                    axis = _axis_key(target[len("axis_"):])
+                    node = cfg[axis]
+                    if node["scale"] == "Logarithmic" and before_config[axis]["scale"] != "Logarithmic" and node["min"] <= 0:
+                        node["min"], node["max"] = self._native.log_bounds("x" if axis.endswith("_x") else "y")
+                    if "major_spacing" not in properties:
+                        node["major_spacing"] = 1.0 if node["scale"] == "Logarithmic" else (node["max"] - node["min"]) / 5
+                state["config"] = json.loads(sync_linked_axis_edit_json(
+                    json.dumps(before_config, allow_nan=False), json.dumps(cfg, allow_nan=False), target))
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in state["series"]:
                 for style in spec["render_type"].values():

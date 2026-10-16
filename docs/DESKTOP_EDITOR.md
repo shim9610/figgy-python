@@ -246,7 +246,12 @@ for implementation details and test boundaries.
 In an axis property panel, **Axis line**, **Tick marks** and **Tick labels** are
 independent controls. Hiding the line keeps ticks if Tick marks is still enabled.
 Tick direction supports **Outside**, **Inside**, **Both sides** and **Hidden**.
-These controls patch the selected axis only; they preserve ranges and tick spacing.
+Tick and label edits also patch the opposite edge when both axes had exactly the
+same minimum, maximum, scale and inversion before the edit. Only changed fields
+are shared: a font-size change preserves an existing opposite-side color, for
+example. Axis-line visibility, titles, margins and offsets remain independent.
+Different coordinate systems remain independent; no rounded comparison or
+persistent link flag is used. Raw advanced settings preserve exact one-sided edits.
 The Jupyter property panel exposes the same fields and directions.
 
 Select characters in a title or axis-title text field, then use **B**, **I**,
@@ -260,7 +265,9 @@ rich segments for reuse; it does not flatten them into plain text.
 ## Axis and color scales
 
 Select an X/Y axis and use **Scale → Linear / Logarithmic (base 10)**.
-This edits the selected axis. Select **Color scale**, its axis, or a heatmap
+This edits the selected axis and its opposite when their pre-edit coordinate
+settings match, including any fitted positive bounds and derived tick spacing.
+Select **Color scale**, its axis, or a heatmap
 series to change the color scale independently of X/Y. Color-scale logarithms
 change the mapping of data values to colors as well as the colorbar ticks.
 

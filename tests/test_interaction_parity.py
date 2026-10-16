@@ -440,7 +440,7 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
             inputs.click_rect(inputs.info()['decorations']['axis_bottom'])
             before=fig.get_settings();choose('axis_scale','Logarithmic')
             assert_scale(fig.get_settings(),'bottom_x','Logarithmic')
-            assert fig.get_settings()['config']['top_x']==before['config']['top_x']
+            assert fig.get_settings()['config']['top_x']=={**before['config']['top_x'], **{key:fig.get_settings()['config']['bottom_x'][key] for key in ['min','max','scale','major_spacing']}}
             assert not inputs.info()['error']
             for target,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
                 inputs.click_rect(inputs.info()['decorations'][target])
@@ -469,7 +469,8 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         target.select_option('axis_bottom');before=page.evaluate(ROOT+'.snapshot()')
         choose('axis_scale','Logarithmic')
         assert_scale(page.evaluate(ROOT+'.snapshot()'),'bottom_x','Logarithmic')
-        assert page.evaluate(ROOT+'.snapshot().config.top_x')==before['config']['top_x']
+        current=page.evaluate(ROOT+'.snapshot()')
+        assert current['config']['top_x']=={**before['config']['top_x'], **{key:current['config']['bottom_x'][key] for key in ['min','max','scale','major_spacing']}}
         assert page.locator('[data-property=axis_scale]').input_value()=='Logarithmic'
         assert not page.locator('.figgy-error').inner_text()
         for name,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
@@ -750,3 +751,113 @@ def test_empty_titles_can_be_enabled_edited_and_restored_in_both_hosts(tmp_path)
             page.locator('button[data-visibility]').click()
         execute('await fig.sync()')
         assert page.locator('.figgy-error').inner_text()==''
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('dimension', ['x', 'y'])
+def test_matching_opposite_axes_share_only_ui_edited_fields(tmp_path, dimension):
+    """UI conveniences pair matching coordinates; raw SSOT and secondary axes remain exact."""
+    import copy
+    import subprocess
+    primary,opposite=('bottom_x','top_x') if dimension=='x' else ('left_y','right_y')
+    targets={'bottom_x':'axis_bottom','top_x':'axis_top','left_y':'axis_left','right_y':'axis_right'}
+    setup="""ax.plot([1,10,100],[1,10,100],id='signal')
+for key in ['bottom_x','top_x','left_y','right_y']:
+    fig.configure(config={key:{'min':1.,'max':100.,'scale':'Linear','major_spacing':10.}})
+for key in ['top_x','right_y']:
+    fig.configure(config={key:{'label_style':{'visible':False,'font_size':11.,'significant_digits':6},'title_option':{'offset_x':3.,'offset_y':4.}}})
+"""
+    axes=['bottom_x','top_x','left_y','right_y']
+    def check_edit(get_state, edit, source, field, value, linked=True):
+        before=get_state()['config']
+        edit(targets[source],field,value)
+        after=get_state()['config']
+        changed={'label_format':['label_style','format'],'significant_digits':['label_style','significant_digits'],
+                 'tick_labels_visible':['label_style','visible'],'tick_direction':['tick'],'axis_scale':['scale']}.get(field,[field])
+        destination=opposite if source==primary else primary
+        expected=copy.deepcopy({key:before[key] for key in axes})
+        for key in [source,destination] if linked else [source]:
+            node=expected[key]
+            for component in changed[:-1]: node=node[component]
+            node[changed[-1]]=value
+            if field=='axis_scale':
+                # The scale control also derives its tick step; no other style is copied.
+                expected[key]['major_spacing']=1. if value=='Logarithmic' else 20.
+        assert {key:after[key] for key in axes}==expected
+    def scenario(get_state,edit,apply_patch):
+        check_edit(get_state,edit,primary,'major_spacing',7.)
+        check_edit(get_state,edit,opposite,'tick_direction','Both')
+        check_edit(get_state,edit,primary,'label_format','Scientific')
+        check_edit(get_state,edit,opposite,'significant_digits',2)
+        check_edit(get_state,edit,opposite,'tick_labels_visible',True)
+        check_edit(get_state,edit,primary,'axis_scale','Logarithmic')
+        check_edit(get_state,edit,opposite,'max',101.)
+        # Raw settings can deliberately split the pair, without changing the other side.
+        before=get_state()['config'];apply_patch({opposite:{'max':201.}})
+        expected=copy.deepcopy(before);expected[opposite]['max']=201.
+        assert get_state()['config']==expected
+        check_edit(get_state,edit,primary,'major_spacing',3.,linked=False)
+        check_edit(get_state,edit,primary,'axis_scale','Linear',linked=False)
+        before=get_state()['config'];apply_patch({primary:{'label_style':{'format':'Power'}}})
+        expected=copy.deepcopy(before);expected[primary]['label_style']['format']='Power'
+        assert get_state()['config']==expected
+        return {key:get_state()['config'][key] for key in axes}
+    with figgy.figure(backend='native') as fig:
+        exec(setup,{'fig':fig,'ax':fig.axes[0]})
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            def click_control(key):
+                for _ in range(16):
+                    info=inputs.info();controls=info['controls'];rect=controls.get(key)
+                    header=controls['object'];footer=controls['advanced']
+                    top=header[1]+header[3]+30;bottom=footer[1]-40
+                    if rect and top<rect[1] and rect[1]+rect[3]<bottom:
+                        inputs.click(key);return
+                    panel=info['chart_panel']
+                    inputs.xdo('mousemove','--window',inputs.wid,round(panel[0]+panel[2]+150),350)
+                    inputs.xdo('click',4 if rect and rect[1]<=top else 5);inputs.pump()
+                raise AssertionError(f'Control not visible: {key}')
+            def edit(target,field,value):
+                inputs.click_rect(inputs.info()['decorations'][target])
+                assert inputs.info()['selected']==target
+                click_control(field)
+                if field in ['label_format','tick_direction','axis_scale']:
+                    prefix='tick' if field=='tick_direction' else field
+                    inputs.click(prefix+'_'+value)
+                elif field!='tick_labels_visible':
+                    inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers',str(value));inputs.key('Return')
+                assert not inputs.info()['error']
+            def patch(value):
+                fig.configure(config=value);inputs.pump()
+            native=scenario(fig.get_settings,edit,patch)
+            inputs.click('copy')
+            code=subprocess.check_output(['xclip','-selection','clipboard','-o'],text=True,timeout=3)
+            assert code==fig.to_code()
+            with figgy.figure(backend='native') as other:
+                other.axes[0].plot([1,10,100],[1,10,100],id='signal')
+                exec(code,{'fig':other})
+                assert other.get_settings()['config']==fig.get_settings()['config']
+        finally: handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"display(fig.widget())"
+    with notebook(tmp_path/('paired_'+dimension),source) as (page,execute):
+        page.locator('[data-properties]').click()
+        def edit(target,field,value):
+            page.locator('[data-target]').select_option(target)
+            control=page.locator(f'[data-property={field}]')
+            if field in ['label_format','tick_direction','axis_scale']: control.select_option(value)
+            elif field=='tick_labels_visible': control.set_checked(value)
+            else: control.fill(str(value));control.press('Tab')
+            page.evaluate(ROOT+'.flush()')
+            assert not page.locator('.figgy-error').inner_text()
+        def patch(value):
+            execute(f'fig.configure(config={value!r}); await fig.sync()')
+        browser=scenario(lambda:page.evaluate(ROOT+'.snapshot()'),edit,patch)
+        assert browser==native
+        execute('await fig.sync()')
+        kernel=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert {key:kernel['config'][key] for key in axes}==browser
+        page.locator('[data-copy]').click();page.evaluate(ROOT+'.flush()')
+        code=page.locator('textarea[data-code]').input_value()
+        assert code
+        execute(f"code={code!r}; assert code==fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.plot([1,10,100],[1,10,100],id='signal'); exec(code,{{'fig':other}}); assert other.get_settings()['config']==fig.get_settings()['config']; other.close()")
