@@ -8,6 +8,7 @@ pub struct NotebookFigure {
     series: Vec<SeriesConfig>,
     columns: HashMap<String, renderer::chart::FitExtent>,
     edge_samples: HashMap<String, renderer::chart::FitExtent>,
+    center_cells: HashMap<String, renderer::chart::FitExtent>,
     revision: u64,
     fit_extents: HashMap<String, [renderer::chart::FitExtent; 2]>,
 }
@@ -35,6 +36,7 @@ impl NotebookFigure {
             series: vec![],
             columns: HashMap::new(),
             edge_samples: HashMap::new(),
+            center_cells: HashMap::new(),
             revision: 0,
             fit_extents: HashMap::new(),
         })
@@ -53,22 +55,24 @@ impl NotebookFigure {
         if self.columns.contains_key(id) {
             return Err(invalid("column ID already exists"));
         }
-        let (ext, samples) = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
+        let (ext, samples, cells) = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
             let a = a.as_slice().map_err(invalid)?;
-            (extent(a)?, edge_sample_extent(a))
+            (extent(a)?, edge_sample_extent(a), center_cell_extent(a))
         } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
             let a = a.as_slice().map_err(invalid)?;
-            (extent(a)?, edge_sample_extent(a))
+            (extent(a)?, edge_sample_extent(a), center_cell_extent(a))
         } else {
             return Err(invalid("expected contiguous f32/f64"));
         };
         self.columns.insert(id.into(), ext);
         self.edge_samples.insert(id.into(), samples);
+        self.center_cells.insert(id.into(), cells);
         Ok(())
     }
     fn remove_column(&mut self, id: &str) {
         self.columns.remove(id);
         self.edge_samples.remove(id);
+        self.center_cells.remove(id);
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let s: SeriesConfig = parse(json)?;
@@ -259,15 +263,21 @@ impl NotebookFigure {
                 .get(&s.series_id)
                 .copied()
                 .unwrap_or([self.columns[&s.x_column], self.columns[&s.y_column]]);
-            // Interpolated edge grids render from first to last cell center.
-            // Keep only extent metadata; the binary transfer can be released.
-            // Read the current style so changing shading cannot stale this fit.
-            if matches!(&s.render_type, renderer::DataRenderType::Heatmap { matrix, fill }
-                if matches!(matrix.grid_layout, renderer::data_config::GridLayout::Edges)
-                && matches!(fill.shading, renderer::data_config::Shading::Interpolated))
+            // Use the renderer's fit-domain classification for every matrix
+            // family, including SSOT shading changes after transfer release.
+            use renderer::gpu_errorbar::{GpuFieldExtentMode, GpuSeriesFitMode};
+            if let Some(GpuSeriesFitMode::Field(mode)) =
+                GpuSeriesFitMode::from_render_type(&s.render_type)
             {
-                a = self.edge_samples[&s.x_column];
-                b = self.edge_samples[&s.y_column];
+                let columns = match mode {
+                    GpuFieldExtentMode::EdgesSamples => &self.edge_samples,
+                    GpuFieldExtentMode::CentersCells => &self.center_cells,
+                    GpuFieldExtentMode::EdgesCells | GpuFieldExtentMode::CentersSamples => {
+                        &self.columns
+                    }
+                };
+                a = columns[&s.x_column];
+                b = columns[&s.y_column];
             }
             if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
                 let base = renderer::chart::FitExtent {
@@ -338,6 +348,27 @@ fn edge_sample_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
         }
     }
     ext
+}
+
+fn center_cell_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
+    if a.len() < 2 {
+        return renderer::chart::FitExtent::EMPTY;
+    }
+    let mut result = edge_sample_extent(a);
+    let last = a.len() - 1;
+    for value in [
+        a[0].f64() + (a[0].f64() - a[1].f64()) * 0.5,
+        a[last].f64() + (a[last].f64() - a[last - 1].f64()) * 0.5,
+    ] {
+        if value.is_finite() {
+            result.min = result.min.min(value);
+            result.max = result.max.max(value);
+            if value > 0. {
+                result.min_positive = Some(result.min_positive.map_or(value, |old| old.min(value)));
+            }
+        }
+    }
+    result
 }
 
 fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {

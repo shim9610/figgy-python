@@ -258,6 +258,11 @@ Ranges, ticks and titles:
   they do not create a persistent range lock. Plot-creation helpers fit the data
   again when adding a series, and `fig.fit()` explicitly fits all axes. Apply
   manual ranges after adding the series when they should be the final view.
+- `fig.fit()` and both UI Fit buttons use zero padding for figures containing
+  only heatmaps, contours or filled contours, including combinations. Mixing in
+  lines, scatter or other Cartesian series uses 5%. Explicit padding overrides
+  either default: `fig.fit(padding=0.05)` adds 5%, while `fig.fit(padding=0)` fits
+  tightly to the rendered data extent.
 - For selective control, use `fig.configure(config={...})` or read the current
   state with `fig.get_settings()`, edit only the intended fields, then submit it
   through `fig.apply_settings(state)`. For example:
@@ -407,7 +412,7 @@ rates are reported separately; they are not monitor FPS measurements.
 This package uses **figgy-renderer 0.17.0** from the upstream
 [figgy repository](https://github.com/shim9610/figgy). Until 0.17.0 is on crates.io,
 the native extension and the packaged browser kernel are both built from figgy
-commit `165aa17` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
+commit `bf665c0` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 

@@ -1,17 +1,17 @@
 {
   "upstream_repository": "https://github.com/shim9610/figgy",
-  "upstream_revision": "165aa17c291b622da88dca5107369d5b6c7d6ddd",
+  "upstream_revision": "bf665c099e25a39ff2f7229f9ad4f4197d223e45",
   "renderer_version": "0.17.0",
   "web_package_version": "0.14.0",
   "wasm_bindgen_version": "0.2.129",
   "assets": {
     "figgy_bg.wasm": {
-      "sha256": "7fa1845da0cf279f1eb9d4b8310af3315d7bd2952a37f0ef0da5defad712c1d4",
-      "bytes": 8881287
+      "sha256": "5a5aae670cb31c3e94df0e4b9aeb7e244e1c002c732880190d35b38398910ef9",
+      "bytes": 8954014
     },
     "figgy.js": {
-      "sha256": "69d3deaeaf4b3dbce7bf72061fd06c393bf2e4954d2561143faf2155f4e8fa49",
-      "bytes": 161777
+      "sha256": "617c91e4c46e7a663d77094eae8636b2d8789916305776a042bc77c202cf8262",
+      "bytes": 162329
     }
   }
 }

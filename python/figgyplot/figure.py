@@ -611,8 +611,9 @@ class Figure:
     def fit(self, padding=None):
         """Fit axes and derive ticks/labels from the rendered data extent.
 
-        Heatmap-only figures default to zero padding; other Cartesian figures
-        use 5%. Pass an explicit padding fraction to override either default.
+        Figures containing only heatmaps, contours, or filled contours default
+        to zero padding. Other Cartesian figures use 5%. Pass an explicit
+        padding fraction to override either default.
         """
         with self._lock:
             self._require_open()
@@ -624,7 +625,10 @@ class Figure:
                 return self.apply_settings(state)
             if padding is None:
                 series = self.get_settings()['series']
-                padding = 0.0 if series and all('Heatmap' in s['render_type'] for s in series) else 0.05
+                padding = 0.0 if series and all(
+                    any(kind in s['render_type'] for kind in ('Heatmap', 'Contour', 'HeatmapContour'))
+                    for s in series
+                ) else 0.05
             self._native.fit(float(padding))
         self._changed()
         return self

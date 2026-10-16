@@ -109,3 +109,80 @@ def test_heatmap_fit_padding_and_mixed_series(backend, interpolation):
         assert limits()==pytest.approx((-2.5,2.5,-1.5,1.5))
         ax.plot([-5,5],[-4,4]);fig.fit()
         assert limits()==pytest.approx((-5.5,5.5,-4.4,4.4))
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('family', ['contour', 'contourf', 'matrix_overlay'])
+def test_contour_fit_defaults_and_mixed_series(backend, family):
+    with figgy.figure(backend=backend) as fig:
+        ax=fig.axes[0]
+        x=np.array([-3., -2.5, 0., 3.])
+        y=np.array([-2., -.5, 2.])
+        z=np.arange(12,dtype=float).reshape(3,4)
+        getattr(ax, 'contourf' if family=='matrix_overlay' else family)(x,y,z)
+        if family=='matrix_overlay':
+            ax.contour(x,y,z)
+            ax.imshow(z,extent=(-3,3,-2,2),origin='lower')
+        colorbar=fig.get_settings()['config']['colorbar']
+        def limits():
+            c=fig.get_settings()['config'];return tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])
+        fig.fit();assert limits()==pytest.approx((-3,3,-2,2))
+        fig.fit(padding=.1);assert limits()==pytest.approx((-3.6,3.6,-2.4,2.4))
+        if backend=='webgpu':
+            widget=fig.widget()
+            widget._command(widget, {'action':'ready','info':{'column_uploads':fig.info['columns']}}, [])
+            assert widget.columns == [] and fig._native.columns == {}
+        fig.fit();assert limits()==pytest.approx((-3,3,-2,2))
+        assert fig.get_settings()['config']['colorbar']==colorbar
+    with figgy.figure(backend=backend) as fig:
+        ax=fig.axes[0]
+        getattr(ax, 'contourf' if family=='matrix_overlay' else family)(x,y,z)
+        if family=='matrix_overlay':ax.imshow(z,extent=(-3,3,-2,2),origin='lower')
+        ax.plot([-5,5],[-4,4]);fig.fit()
+        c=fig.get_settings()['config']
+        assert tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])==pytest.approx((-5.5,5.5,-4.4,4.4))
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('family', ['Heatmap', 'Contour', 'HeatmapContour'])
+def test_matrix_fit_uses_rendered_grid_after_ssot_style_change(backend, family):
+    with figgy.figure(backend=backend) as fig:
+        ax=fig.axes[0]
+        ax.imshow(np.arange(12,dtype=float).reshape(3,4),extent=(-3,5,-2,4),origin='lower')
+        state=fig.get_settings()
+        field=state['series'][0]['render_type']['Heatmap']
+        contour={'levels':[3.,6.,9.], 'line':{'line_style':'Solid','line_color':{'r':0.,'g':0.,'b':0.,'a':1.},'line_width':1.}}
+        style={'matrix':field['matrix']}
+        if family!='Contour':style['fill']=field['fill']
+        if family!='Heatmap':style['contour']=contour
+        state['series'][0]['render_type']={family:style}
+        if family!='Contour':style['fill']['shading']='Interpolated'
+        fig.apply_settings(state)
+        if backend=='webgpu':
+            widget=fig.widget()
+            widget._command(widget, {'action':'ready','info':{'column_uploads':fig.info['columns']}}, [])
+        def limits():
+            c=fig.get_settings()['config'];return tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])
+        fig.fit();assert limits()==pytest.approx((-2,4,-1,3))
+        if family!='Contour':
+            state=fig.get_settings()
+            state['series'][0]['render_type'][family]['fill']['shading']='Flat'
+            fig.apply_settings(state);fig.fit()
+            assert limits()==pytest.approx((-3,5,-2,4))
+    if family=='Contour':return
+    # Center samples with flat shading cover extrapolated half-cells, unlike
+    # interpolated contourf. No source arrays are needed after browser upload.
+    with figgy.figure(backend=backend) as fig:
+        fig.axes[0].contourf([-3,-1,5],[-2,0,4],np.arange(9,dtype=float).reshape(3,3))
+        state=fig.get_settings()
+        field=state['series'][0]['render_type']['HeatmapContour']
+        field['fill']['shading']='Flat'
+        if family=='Heatmap':
+            field.pop('contour');state['series'][0]['render_type']={'Heatmap':field}
+        fig.apply_settings(state)
+        if backend=='webgpu':
+            widget=fig.widget()
+            widget._command(widget, {'action':'ready','info':{'column_uploads':fig.info['columns']}}, [])
+        fig.fit()
+        c=fig.get_settings()['config']
+        assert tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])==pytest.approx((-4,8,-3,6))

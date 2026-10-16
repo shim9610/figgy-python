@@ -17,7 +17,7 @@ const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
 const ids = ['chart_title','legend','data_area','colorbar','colorbar_axis','colorbar_tick_labels','colorbar_title',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
-const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',font_size:'Font size',font:'Font family',line_width:'Line width'};
+const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',label_format:'Number format',significant_digits:'Significant digits',font_size:'Font size',font:'Font family',line_width:'Line width'};
 const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
 export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
@@ -105,9 +105,32 @@ export function render({model,el}) {
   function flush(){post();return !inflight&&!pending ? Promise.resolve() : new Promise(resolve=>barriers.push(resolve));}
   let exportedCode=model.get('state').code ?? '';
   function code(){return exportedCode;}
+  const selectedData=document.createElement('section');selectedData.dataset.selectedData='';selectedData.hidden=true;
+  root.querySelector('[data-advanced]').before(selectedData);
+  let selectedDataKey=null;
+  function selectionProperties(){
+    if(kind)return;
+    const reference=local.config.picked_data?.refs?.[0]??null,key=JSON.stringify(reference);
+    if(key===selectedDataKey)return;
+    selectedDataKey=key;selectedData.replaceChildren();selectedData.hidden=!reference;
+    if(!reference)return;
+    const heading=document.createElement('strong');heading.textContent='SELECTED DATA';selectedData.append(heading);
+    enqueue(async()=>{
+      if(key!==selectedDataKey)return;
+      const value=JSON.parse(await chart.selection_details());
+      if(key!==selectedDataKey)return;
+      if(!value){selectedData.hidden=true;return;}
+      for(const name of ['index','x_index','y_index','bin_start','bin_end','x','y','value','orientation']){
+        if(value[name]===undefined)continue;
+        const row=document.createElement('div');row.dataset.selectedValue=name;row.textContent=`${caption(name)}: ${value[name]}`;selectedData.append(row);
+      }
+      const hint=document.createElement('small');hint.textContent='Arrows: move selection · Esc: clear';selectedData.append(hint);
+    });
+  }
   function properties(){
     if(!chart)return;
     local=snapshot();
+    selectionProperties();
     const previous=selected;select.replaceChildren();
     for(const id of (kind?['chart_title',...JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title'),...(kind==='radial'?local.radial.slices.map((_,i)=>`slice_0_${i}`):local[kind].series.map(s=>s.id))]:[...ids,...local.series.map(s=>s.series_id)])){const option=document.createElement('option');option.value=id;option.textContent=labels[id]??(text(local.series.find(s=>s.series_id===id)?.label)||caption(id));select.append(option);}
     select.value=previous ?? 'chart_title';fields.replaceChildren();
@@ -123,7 +146,7 @@ export function render({model,el}) {
     }
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
-      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Timestamp:'Timestamp (configured)'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
       input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());try{apply(state,input.value);install(state);commit();}catch(e){input.value=value;throw e;}}));row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
@@ -140,6 +163,16 @@ export function render({model,el}) {
       choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>s.config.colorbar.colormap=v);
       field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);
       field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);
+      numberFormat(cfg.colorbar.axis.label_style,s=>s.config.colorbar.axis.label_style);
+    }
+    function numberFormat(style,find){
+      const current=typeof style.format==='string'?style.format:'Timestamp';
+      choice('label_format',current,current==='Timestamp'?['Timestamp','Decimal','Scientific','Power']:['Decimal','Scientific','Power'],(s,v)=>{if(v!=='Timestamp')find(s).format=v;});
+      if(current==='Timestamp')return;
+      const digits=field('significant_digits',style.significant_digits,'number',(s,v)=>{
+        if(!Number.isInteger(v)||v<1||v>15)throw Error('Significant digits must be an integer from 1 to 15');
+        find(s).significant_digits=v;
+      });digits.min='1';digits.max='15';digits.step='1';
     }
     function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,input.checked);install(state);commit();}));row.append(input);fields.append(row);}
     function syncLegend(state){chart.set_series(JSON.stringify(state.series));chart.reset_legend_from_series_labels();state.config.legend.content=JSON.parse(chart.get_config()).legend.content;}
@@ -184,7 +217,7 @@ export function render({model,el}) {
       root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;
     }
     const visibility=target==='chart_title'?['chart_title','visible']:target==='legend'?['legend','visible']:target==='colorbar'?['colorbar','visible']:target.startsWith('axis_title_')?[side[target.slice(11)],'title_option','visible']:target.startsWith('tick_labels_')?[side[target.slice(12)],'label_style','visible']:target.startsWith('axis_')?[side[target.slice(5)],'line_visible']:null;
-    if(visibility){const read=s=>visibility.slice(0,-1).reduce((n,k)=>n?.[k],s.config);if(read(local))toggle('visible',read(local)[visibility.at(-1)],(s,v)=>read(s)[visibility.at(-1)]=v);}
+    if(visibility){const read=s=>visibility.slice(0,-1).reduce((n,k)=>n?.[k],s.config),isTitle=target==='chart_title'||target.startsWith('axis_title_');if(read(local))toggle('visible',read(local)[visibility.at(-1)]&&(!isTitle||Boolean(text(read(local).text).trim())),(s,v)=>{if(isTitle)titleVisibility(s,target,v);else read(s)[visibility.at(-1)]=v;});}
     let path;
     if(target==='chart_title')path=['chart_title','text'];
     else if(target.startsWith('axis_title_'))path=[side[target.slice(11)],'title_option','text'];
@@ -221,8 +254,9 @@ export function render({model,el}) {
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>s.config[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>s.config[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>s.config[key].tick=v);
+      numberFormat(cfg[key].label_style,s=>s.config[key].label_style);
       for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{s.config[key][name]=v;});color('color',cfg[key].line_color,s=>s.config[key].line_color);
-    }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>s.config[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>s.config[key].label_style.label_font=v);}
+    }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];numberFormat(cfg[key].label_style,s=>s.config[key].label_style);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>s.config[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>s.config[key].label_style.label_font=v);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
   function resize(){if(!chart || disposed)return;const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;const width=Math.max(1,Math.round(rect.width*dpr)),height=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;wheelArea=null;enqueue(()=>{chart.resize(width,height);dirty=true;});}}
@@ -263,7 +297,7 @@ export function render({model,el}) {
   select.addEventListener('change',()=>enqueue(()=>{selected=select.value;properties();}));
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
-  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot')s.boxplot.value_range=null;install(s);}else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap)?0:0.05);
+  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot')s.boxplot.value_range=null;install(s);}else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
     dirty=true;commit();}));
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
   root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
@@ -274,13 +308,28 @@ export function render({model,el}) {
   root.querySelector('[data-fullscreen]').addEventListener('click',()=>fullscreen().catch(fail));
   const menu=document.createElement('div');menu.className='figgy-menu';menu.hidden=true;root.querySelector('.figgy-toolbar').append(menu);
   let menuKind=null;
+  function titleVisibility(state,target,visible){
+    const node=target==='chart_title'?state.config.chart_title:state.config[side[target.slice(11)]].title_option;
+    node.visible=visible;
+    if(!visible)return;
+    if(!text(node.text).trim())node.text.segments=segments(labels[target]);
+    if(target==='chart_title'){
+      // Use the renderer's title-band helper, but preserve all existing rich segments.
+      const previous=chart.get_config();
+      try{chart.set_config(JSON.stringify(state.config));chart.set_title(text(node.text));node.top_margin=Math.max(node.top_margin,JSON.parse(chart.get_config()).chart_title.top_margin);}
+      finally{chart.set_config(previous);}
+    }else{
+      const axis=state.config[side[target.slice(11)]];
+      axis.out_margin=Math.max(axis.out_margin,node.text.font_size*2);
+    }
+  }
   function openMenu(name){
     if(menuKind===name&&!menu.hidden){menu.hidden=true;return;}
     menuKind=name;menu.replaceChildren();menu.hidden=false;local=snapshot();
-    function toggle(label,path){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.dataset.visibility=label;const node=s=>path.slice(0,-1).reduce((n,k)=>n[k],s);input.checked=node(local)[path.at(-1)];input.addEventListener('change',()=>enqueue(()=>{const state=snapshot();node(state)[path.at(-1)]=input.checked;install(state);commit();}));row.append(input,document.createTextNode(label));menu.append(row);}
+    function toggle(label,path,target=null){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.dataset.visibility=label;const node=s=>path.slice(0,-1).reduce((n,k)=>n[k],s);input.checked=node(local)[path.at(-1)]&&(!target||Boolean(text(node(local).text).trim()));input.addEventListener('change',()=>enqueue(()=>{const state=snapshot();if(target)titleVisibility(state,target,input.checked);else node(state)[path.at(-1)]=input.checked;install(state);if(target&&input.checked){selected=target;showProperties();}commit();}));row.append(input,document.createTextNode(label));menu.append(row);}
     if(name==='visibility'){
       if(kind){if(kind!=='radial')for(const key of ['legend','grid'])toggle(key,[kind,key]);else{showProperties();select.value='chart_title';properties();menu.hidden=true;}return;}
-      for(const [label,path] of [['Chart title',['chart_title','visible']],['Legend',['legend','visible']],...Object.entries(side).map(([k,v])=>[`${k} axis title`,[v,'title_option','visible']])])toggle(label,['config',...path]);
+      for(const [label,path,target] of [['Chart title',['chart_title','visible'],'chart_title'],['Legend',['legend','visible'],null],...Object.entries(side).map(([k,v])=>[labels[`axis_title_${k}`],[v,'title_option','visible'],`axis_title_${k}`])])toggle(label,['config',...path],target);
     }else if(kind){showProperties();menu.hidden=true;}
     else{
       const specs=model.get('draw_styles'),mode=local.config.draw_style?.mode??'precise';

@@ -490,6 +490,14 @@ export class FiggyChart {
      */
     resize(width: number, height: number): void;
     /**
+     * Inspect the first resident typed selection as JSON, or `"null"` when
+     * none is selected. Only selected GPU samples are read back. Histograms
+     * expose `bin_start`, `bin_end`, `value`, and `orientation`; the value
+     * is the stored height (also valid for weighted/density histograms).
+     * Point and matrix selections expose their coordinates and cell value.
+     */
+    selection_details(): Promise<string>;
+    /**
      * Report the effective primitive/grid extent currently drawn.
      */
     series_draw_info(series_id: string): string;
@@ -802,6 +810,7 @@ export interface InitOutput {
     readonly figgychart_request_stream_auto_fit: (a: number, b: number) => [number, number, number];
     readonly figgychart_reset_legend_from_series_labels: (a: number) => [number, number];
     readonly figgychart_resize: (a: number, b: number, c: number) => [number, number];
+    readonly figgychart_selection_details: (a: number) => any;
     readonly figgychart_series_draw_info: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_set_clear_color: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly figgychart_set_colorbar_axis: (a: number, b: number, c: number) => [number, number];
@@ -844,8 +853,8 @@ export interface InitOutput {
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__146: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__147: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__148: (a: number, b: number, c: any) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

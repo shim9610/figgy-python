@@ -644,7 +644,7 @@ checksum = "b97b65636e5b9ef369943878ac74335ba1c55c1cb6adbf1e2c293c624248d693"
 [[package]]
 name = "figgy-model"
 version = "0.11.0"
-source = "git+https://github.com/shim9610/figgy?rev=165aa17c291b622da88dca5107369d5b6c7d6ddd#165aa17c291b622da88dca5107369d5b6c7d6ddd"
+source = "git+https://github.com/shim9610/figgy?rev=bf665c099e25a39ff2f7229f9ad4f4197d223e45#bf665c099e25a39ff2f7229f9ad4f4197d223e45"
 dependencies = [
  "serde",
 ]
@@ -652,7 +652,7 @@ dependencies = [
 [[package]]
 name = "figgy-renderer"
 version = "0.17.0"
-source = "git+https://github.com/shim9610/figgy?rev=165aa17c291b622da88dca5107369d5b6c7d6ddd#165aa17c291b622da88dca5107369d5b6c7d6ddd"
+source = "git+https://github.com/shim9610/figgy?rev=bf665c099e25a39ff2f7229f9ad4f4197d223e45#bf665c099e25a39ff2f7229f9ad4f4197d223e45"
 dependencies = [
  "bytemuck",
  "concurrent-queue",

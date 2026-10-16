@@ -378,10 +378,16 @@ def test_cartesian_hosts_share_ticks_and_selected_character_formatting(tmp_path)
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
-@pytest.mark.parametrize('interpolation', ['nearest', 'bilinear'])
-def test_heatmap_fit_is_tight_in_both_hosts(tmp_path, interpolation):
-    setup=f"ax.imshow(np.arange(24,dtype=float).reshape(4,6),extent=(-3,3,-2,2),origin='lower',interpolation={interpolation!r})"
-    expected=(-3,3,-2,2) if interpolation=='nearest' else (-2.5,2.5,-1.5,1.5)
+@pytest.mark.parametrize('family', ['nearest', 'bilinear', 'contour', 'contourf', 'matrix_overlay'])
+def test_matrix_fit_is_tight_in_both_hosts(tmp_path, family):
+    if family in ('nearest', 'bilinear'):
+        setup=f"ax.imshow(np.arange(24,dtype=float).reshape(4,6),extent=(-3,3,-2,2),origin='lower',interpolation={family!r})"
+    else:
+        method='contourf' if family=='matrix_overlay' else family
+        setup=f"ax.{method}(np.linspace(-3,3,6),np.linspace(-2,2,4),np.arange(24,dtype=float).reshape(4,6))"
+        if family=='matrix_overlay':
+            setup+="; ax.contour(np.linspace(-3,3,6),np.linspace(-2,2,4),np.arange(24,dtype=float).reshape(4,6)); ax.imshow(np.arange(24,dtype=float).reshape(4,6),extent=(-3,3,-2,2),origin='lower')"
+    expected=(-2.5,2.5,-1.5,1.5) if family=='bilinear' else (-3,3,-2,2)
     def limits(state):
         c=state['config'];return tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])
     with figgy.figure(backend='native') as fig:
@@ -397,7 +403,7 @@ def test_heatmap_fit_is_tight_in_both_hosts(tmp_path, interpolation):
             assert fig.get_settings()['config']['colorbar']==colorbar
         finally:handle.close();Inputs.pump()
     source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nfig.fit(padding=.05)\ndisplay(fig.widget())"
-    with notebook(tmp_path/interpolation,source) as (page,execute):
+    with notebook(tmp_path/family,source) as (page,execute):
         page.locator('[data-fit]').click();execute('await fig.sync()')
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert limits(state)==pytest.approx(expected)
@@ -616,3 +622,131 @@ def test_log_axis_ui_breaks_lines_at_nonpositive_samples_in_both_hosts(tmp_path)
         check_pixels(Image.open(path).convert('RGB'),rect)
         execute('np.testing.assert_array_equal(x,np.arange(1.,7.)); np.testing.assert_array_equal(y,[1.,10.,-1.,0.,10.,100.])')
         assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('orientation', ['vertical','horizontal'])
+def test_histogram_selected_bin_readout_and_arrows_match_both_hosts(tmp_path, orientation):
+    setup=f"samples=np.array([.25,.5,1.5,3.5]); counts,edges,artist=ax.hist(samples,bins=[0,1,2,4],density=True,orientation={orientation!r},id='bins'); ax.grid(False)"
+    key='Right' if orientation=='vertical' else 'Up'
+    def logical_point(state, rect):
+        cfg=state['config'];x,y=(.5,.25) if orientation=='vertical' else (.25,.5)
+        xaxis,yaxis=cfg['bottom_x'],cfg['left_y']
+        return (rect[0]+rect[2]*(x-xaxis['min'])/(xaxis['max']-xaxis['min']),
+                rect[1]+rect[3]*(1-(y-yaxis['min'])/(yaxis['max']-yaxis['min'])))
+    def check(values,index):
+        assert int(values['index'])==index
+        assert float(values['bin_start'])==index
+        assert float(values['bin_end'])==index+1
+        assert float(values['value'])==pytest.approx(.5 if index==0 else .25)
+        assert values['orientation']==orientation.title()
+        assert 'count' not in values
+    with figgy.figure(backend='native') as fig:
+        namespace={'np':np,'ax':fig.axes[0]};exec(setup,namespace)
+        namespace['samples'][:]=-99
+        original_series=fig.get_settings()['series'];uploads=fig.info['column_uploads']
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            rect=json.loads(fig._native.bounds_json('data_area'))['rect']
+            point=native_point(inputs.info(),logical_point(fig.get_settings(),rect))
+            inputs.click_rect([*point,0,0])
+            assert inputs.info()['properties_open']
+            check(inputs.info()['picked_values'],0)
+            inputs.key(key);check(inputs.info()['picked_values'],1)
+            native=inputs.info()['picked_values']
+            assert not inputs.info()['error']
+            assert fig.get_settings()['series']==original_series
+            assert fig.info['column_uploads']==uploads
+            assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+            inputs.key('Escape');assert inputs.info()['picked_values'] is None
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nsamples[:]=-99\ndisplay(fig.widget())"
+    with notebook(tmp_path/('histogram-'+orientation),source) as (page,execute):
+        original_series=page.evaluate(ROOT+'.snapshot().series')
+        uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        box=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect')
+        width,height=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
+        rect=[box[0]*960/width,box[1]*600/height,box[2]*960/width,box[3]*600/height]
+        point=logical_point(page.evaluate(ROOT+'.snapshot()'),rect)
+        page.mouse.click(*browser_point(page,point))
+        page.locator('[data-selected-value=bin_start]').wait_for(state='visible')
+        def readout():
+            return page.locator('[data-selected-value]').evaluate_all("rows=>Object.fromEntries(rows.map(r=>[r.dataset.selectedValue,r.textContent.split(': ')[1]]))")
+        check(readout(),0)
+        page.locator('.figgy-editor canvas').press('Arrow'+key)
+        page.wait_for_function("document.querySelector('[data-selected-value=index]')?.textContent==='Index: 1'")
+        check(readout(),1)
+        for name in ['index','bin_start','bin_end','value']:
+            assert float(readout()[name])==pytest.approx(native[name])
+        execute('await fig.sync()')
+        assert page.evaluate(ROOT+'.snapshot().series')==original_series
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+        assert page.evaluate(ROOT+'.stats.png_exports')==0
+        assert not page.locator('.figgy-error').inner_text()
+        page.locator('.figgy-editor canvas').press('Escape');page.evaluate(ROOT+'.flush()')
+        assert page.locator('[data-selected-data]').is_hidden()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+def test_empty_titles_can_be_enabled_edited_and_restored_in_both_hosts(tmp_path):
+    titles=[('chart_title','Chart title',None),('axis_title_bottom','X axis title','bottom_x'),
+            ('axis_title_left','Y axis title','left_y'),('axis_title_top','Top axis title','top_x'),
+            ('axis_title_right','Right axis title','right_y')]
+    setup="ax.plot([0,1,2],[0,1,0]); s=fig.get_settings(); s['config']['chart_title']['top_margin']=0; s['config']['chart_title']['visible']=False; fig.apply_settings(s)"
+    def title(state,axis):
+        return state['config'][axis]['title_option'] if axis else state['config']['chart_title']
+    def check_enabled(state,axis,label):
+        value=title(state,axis)
+        assert value['visible']
+        assert ''.join(s['text'] for s in value['text']['segments'])==label
+        if axis: assert state['config'][axis]['out_margin']>=value['text']['font_size']*2
+        else: assert value['top_margin']>0
+    native={}
+    with figgy.figure(backend='native') as fig:
+        exec(setup,{'fig':fig,'ax':fig.axes[0]})
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            for target,label,axis in titles:
+                assert not title(fig.get_settings(),axis)['text']['segments']
+                inputs.click('visibility_menu');inputs.click('show_'+target);inputs.click('visibility_menu')
+                check_enabled(fig.get_settings(),axis,label)
+                assert inputs.info()['properties_open'] and 'text' in inputs.info()['controls']
+                box=inputs.info()['decorations'][target]
+                assert box[2]>0 and box[3]>0
+                inputs.click('text');inputs.key('ctrl+a');inputs.click('text_bold')
+                rich=title(fig.get_settings(),axis)['text']
+                assert all(s['bold'] for s in rich['segments'])
+                inputs.click('visibility_menu');inputs.click('show_'+target);inputs.click('visibility_menu')
+                assert not title(fig.get_settings(),axis)['visible']
+                inputs.click('visibility_menu');inputs.click('show_'+target);inputs.click('visibility_menu')
+                assert title(fig.get_settings(),axis)['text']==rich
+                native[target]=rich['segments']
+            assert not inputs.info()['error']
+        finally: handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'empty_titles',source) as (page,execute):
+        for target,label,axis in titles:
+            page.locator('button[data-visibility]').click()
+            toggle=page.locator(f'input[data-visibility="{label}"]')
+            assert not toggle.is_checked()
+            toggle.check();page.evaluate(ROOT+'.flush()')
+            page.locator('button[data-visibility]').click()
+            check_enabled(page.evaluate(ROOT+'.snapshot()'),axis,label)
+            assert page.locator('.figgy-properties').is_visible()
+            assert page.locator('[data-target]').input_value()==target
+            field=page.locator('[data-property=text]')
+            assert field.input_value()==label
+            field.focus();field.evaluate('(el)=>{el.select();el.dispatchEvent(new Event("select"));}')
+            page.locator(f'[data-format=bold][data-text-target={target}]').click()
+            page.evaluate(ROOT+'.flush()')
+            rich=title(page.evaluate(ROOT+'.snapshot()'),axis)['text']
+            assert rich['segments']==native[target]
+            page.locator('button[data-visibility]').click();toggle.uncheck();page.evaluate(ROOT+'.flush()')
+            assert not title(page.evaluate(ROOT+'.snapshot()'),axis)['visible']
+            toggle.check();page.evaluate(ROOT+'.flush()')
+            assert title(page.evaluate(ROOT+'.snapshot()'),axis)['text']==rich
+            page.locator('button[data-visibility]').click()
+        execute('await fig.sync()')
+        assert page.locator('.figgy-error').inner_text()==''

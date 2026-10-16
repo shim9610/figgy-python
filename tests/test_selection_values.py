@@ -52,3 +52,55 @@ def test_heatmap_cell_values_and_two_dimensional_navigation():
         assert not figure._native.move_data_selection(1, 1)
         assert figure.info['column_uploads'] == 4
         assert figure.info['rgba_readbacks'] == 0
+
+
+@pytest.mark.parametrize('orientation', ['vertical', 'horizontal'])
+@pytest.mark.parametrize('mode', ['counts', 'density', 'weighted', 'stairs'])
+def test_histogram_bin_values_and_navigation_survive_source_mutation(orientation, mode):
+    edges=np.array([0.,1.,2.,4.])
+    source=np.array([.25,.5,1.5,3.5])
+    weights=np.array([.5,1.5,3.,4.])
+    with figgy.Figure(backend='native') as figure:
+        ax=figure.axes[0]
+        if mode=='stairs':
+            values=np.array([2.25,-1.5,4.75])
+            ax.stairs(values,edges,orientation=orientation,id='bins')
+        else:
+            values,_,_=ax.hist(source,bins=edges,weights=weights if mode=='weighted' else None,
+                               density=mode=='density',orientation=orientation,id='bins')
+        expected=values.copy()
+        original_series=figure.get_settings()['series'];uploads=figure.info['column_uploads']
+        choose(figure,{'kind':'histogram_bin','series_id':'bins','bin_index':1})
+        source[:]=-99;weights[:]=-99;edges[:]=-99;values[:]=-99
+        selected=details(figure)
+        assert selected['identity']['kind']=='histogram_bin'
+        assert selected['index']==1
+        assert (selected['bin_start'],selected['bin_end'],selected['value'])==pytest.approx((1,2,expected[1]))
+        assert selected['orientation']==orientation.title()
+        assert 'count' not in selected  # Stored heights may be weighted, density or arbitrary stairs.
+        step=(1,0) if orientation=='vertical' else (0,1)
+        assert figure._native.move_data_selection(*step)
+        selected=details(figure)
+        assert selected['index']==2
+        assert (selected['bin_start'],selected['bin_end'],selected['value'])==pytest.approx((2,4,expected[2]))
+        assert not figure._native.move_data_selection(*step)
+        assert figure.get_settings()['series']==original_series
+        assert figure.info['column_uploads']==uploads
+        assert figure.info['rgba_readbacks']==figure.info['png_encodes']==0
+
+
+@pytest.mark.parametrize('orientation', ['vertical', 'horizontal'])
+def test_histogram_navigation_switches_compatible_series_and_clamps(orientation):
+    with figgy.Figure(backend='native') as figure:
+        ax=figure.axes[0]
+        ax.stairs([1.,2.,3.],[0.,1.,2.,3.],orientation=orientation,id='long')
+        ax.plot([0.,1.],[1.,2.],id='unrelated-line')
+        ax.stairs([99.],[0.,1.],orientation='horizontal' if orientation=='vertical' else 'vertical',id='other-direction')
+        ax.stairs([7.],[10.,20.],orientation=orientation,id='short')
+        choose(figure,{'kind':'histogram_bin','series_id':'long','bin_index':2})
+        series_step=(0,1) if orientation=='vertical' else (1,0)
+        assert figure._native.move_data_selection(*series_step)
+        selected=details(figure)
+        assert selected['series_id']=='short' and selected['index']==0
+        assert (selected['bin_start'],selected['bin_end'],selected['value'])==(10.,20.,7.)
+        assert not figure._native.move_data_selection(*series_step)

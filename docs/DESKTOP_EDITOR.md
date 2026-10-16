@@ -40,8 +40,8 @@ python examples/desktop_editor.py
 Source builds require Rust 1.99 or later and a system C/C++ toolchain: MSVC Build
 Tools on Windows, Xcode Command Line Tools on macOS, or a compiler/linker on
 Linux. The package has not been published on PyPI. Compatible prebuilt wheels
-do not require Rust. Automated CI is currently disabled while the package is
-being stabilized; see [validation records](HOST_VALIDATION.md) for tested builds.
+do not require Rust. PR CI checks native/Jupyter interaction parity and packaged assets; see
+[validation records](HOST_VALIDATION.md) for tested builds.
 
 A minimal script:
 
@@ -90,18 +90,29 @@ ratio with surrounding space. PNG document dimensions stay unchanged.
 | Properties / Close | Open or close properties |
 | Object list | Select named objects such as Chart title, X axis or a series |
 | Title, axis title, legend | Visibility, text, font family, size and color; individual legend labels |
-| Tick labels | Font family, size and color |
+| Tick labels | Decimal, scientific or power notation; significant digits; font family, size and color |
 | Line series | Color and width |
 | Scatter series | Color and marker size |
-| Heatmap series | Shared color limits and Viridis/Magma/Turbo/GrayScale/RdBu presets |
-| Axis | Limits, tick spacing, line width and color |
+| Matrix series / colorbar | Shared color limits, linear/log scale, palette, number format and significant digits |
+| Axis | Limits, scale, tick spacing/direction/visibility, number format, significant digits, line width and color |
 | Copy Python | Export common setters and readable `fig.configure(...)` patches |
 | Save PNG | Enter a path, then Save image; export the chart at document resolution |
 | Advanced settings… | Open full settings JSON in a separate OS window; Apply settings commits it |
 | Esc, empty-space click or repeated data click | Clear selection |
-| Arrow keys | Step samples, switch series, step matrix cells or nudge decorations |
+| Arrow keys | Step samples or histogram bins, switch compatible series, step matrix cells or nudge decorations |
 | Shift + arrow keys | Move samples or decorations by ten steps |
 | F11 | Toggle fullscreen |
+
+Enabling an empty chart or axis title creates visible default text and opens its
+Properties editor. Empty titles appear unchecked even if their visibility flag
+was already true. Existing text and rich formatting survive hide/show. This UI
+action fits the title band when needed; direct SSOT edits retain explicit layout.
+
+Number format and significant digits (1–15) are available from an axis, its tick
+labels, and a colorbar or matrix series in both desktop and Jupyter. Formatting
+changes preserve limits and tick spacing. Decimal labels use uniform precision
+with enough places to distinguish adjacent ticks; scientific and power notation
+help display wide value ranges. Copy Python retains these settings.
 
 Text, numeric and color changes immediately update the Figure. Numeric controls
 support dragging and double-click entry. Invalid advanced JSON preserves the
@@ -118,6 +129,13 @@ reuploading source arrays:
 
 ![Series properties](images/desktop-editor-series.png)
 
+Histogram selection shows the bin index, start, end and stored value in
+**SELECTED DATA** in both hosts. The value can be a count, weighted total, density
+or an explicit stairs height. Left/right moves through vertical bins; up/down
+moves through horizontal bins. The perpendicular arrows switch compatible
+histogram series; Esc clears the selection. Values come from resident GPU data,
+so changing the original NumPy array after upload does not change the readout.
+
 ## Zoom, pan and selection
 
 The window displays these instructions above the graph:
@@ -131,10 +149,17 @@ The window displays these instructions above the graph:
 
 Wheel zoom only applies while the pointer is inside the data area. Over titles,
 axes, colorbars or canvas margins, Jupyter keeps normal notebook scrolling.
-Fit uses zero padding for heatmap-only figures and 5% for other Cartesian
-figures. `fig.fit(padding=0.05)` explicitly requests 5% in either case.
-Interpolated heatmaps fit their rendered sample-center extent; flat heatmaps fit
-the cell edges. This policy is shared by both Fit buttons and `fig.fit()`.
+Fit uses zero padding when every series is a heatmap, contour or filled contour,
+including combinations of these matrix families. A figure containing a line,
+scatter or another Cartesian series uses 5% padding. An explicit argument such
+as `fig.fit(padding=0.05)` requests 5% for any of these figures; use `padding=0`
+to request a tight fit even with mixed series.
+
+Contours and interpolated fills fit the rendered sample extent. Flat fills fit
+the cell edges: edge grids use their supplied boundaries, while center grids
+extend by half the outer sample spacing. For a fill combined with contours, Fit
+covers both. Both Fit buttons and `fig.fit()` use the same policy, including
+after the browser releases its transfer buffers.
 
 Zoom supports linear, logarithmic and inverted axes. Movement and resize support
 depend on the selected object's renderer policies. Data selection edits series

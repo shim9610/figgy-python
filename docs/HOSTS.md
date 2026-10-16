@@ -1,7 +1,7 @@
 # Native surface / notebook WebGPU hosts
 
 The Python distribution uses `figgy-renderer 0.17.0`; until it is on crates.io it comes
-from figgy commit `165aa17` through a `[patch.crates-io]` override. Chart layout, styles, data
+from figgy commit `bf665c0` through a `[patch.crates-io]` override. Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
 vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
 
@@ -175,7 +175,7 @@ requires a usable kernel GPU and performs image transfers.
 ## Assets and builds
 
 `python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
-`crates/web` at commit `165aa17c291b622da88dca5107369d5b6c7d6ddd` (renderer 0.17.0,
+`crates/web` at commit `bf665c099e25a39ff2f7229f9ad4f4197d223e45` (renderer 0.17.0,
 web example 0.14.0). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
 wasm-bindgen 0.2.129. `assets/provenance.json` records the versions and SHA-256.
 The script uses an external checkout; it does not copy Rust sources into this
