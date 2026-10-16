@@ -231,3 +231,17 @@ button applies to the whole text. Superscript and subscript are mutually
 exclusive. Existing character formatting survives edits to other characters.
 Legend entries also support rich character formatting. Copy Python retains these
 rich segments for reuse; it does not flatten them into plain text.
+
+## Axis and color scales
+
+Select an X/Y axis and use **Scale → Linear / Logarithmic (base 10)**.
+This edits the selected axis. Select **Color scale**, its axis, or a heatmap
+series to change the color scale independently of X/Y. Color-scale logarithms
+change the mapping of data values to colors as well as the colorbar ticks.
+
+Logarithmic bounds must be positive. Set **Minimum** (or **vmin** for the color
+scale) above zero before switching; invalid changes show an error and preserve
+the current settings. Signed data does not support a symmetric-log mode here.
+Switching scale preserves the limits and selects a tick spacing of one decade
+for logarithmic scales, or one fifth of the range for linear scales. Copy Python
+preserves the chosen scales. Both desktop and Jupyter expose these controls.

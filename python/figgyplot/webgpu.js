@@ -16,8 +16,8 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
-const ids = ['chart_title','legend','data_area','colorbar',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
-const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',font_size:'Font size',font:'Font family',line_width:'Line width'};
+const ids = ['chart_title','legend','data_area','colorbar','colorbar_axis','colorbar_tick_labels','colorbar_title',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
+const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',font_size:'Font size',font:'Font family',line_width:'Line width'};
 const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
 export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
@@ -123,8 +123,23 @@ export function render({model,el}) {
     }
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
-      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,input.value);install(state);commit();}));row.append(input);fields.append(row);
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
+      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());try{apply(state,input.value);install(state);commit();}catch(e){input.value=value;throw e;}}));row.append(input);fields.append(row);
+    }
+    function scaleControl(label,axis,find){
+      choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
+        const a=find(s);
+        if(v==='Logarithmic'&&!(a.min>0&&a.max>a.min))throw Error('Log scale requires Minimum > 0. Set a positive range first.');
+        a.scale=v;a.major_spacing=v==='Logarithmic'?1:(a.max-a.min)/5;
+      });
+      if(axis.min<=0){const note=document.createElement('p');note.textContent='Log scale requires Minimum > 0. Set a positive range first.';fields.append(note);}
+    }
+    function colorScale(){
+      if(!cfg.colorbar)return;
+      scaleControl('color_scale',cfg.colorbar.axis,s=>s.config.colorbar.axis);
+      choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>s.config.colorbar.colormap=v);
+      field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);
+      field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);
     }
     function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,input.checked);install(state);commit();}));row.append(input);fields.append(row);}
     function syncLegend(state){chart.set_series(JSON.stringify(state.series));chart.reset_legend_from_series_labels();state.config.legend.content=JSON.parse(chart.get_config()).legend.content;}
@@ -199,8 +214,10 @@ export function render({model,el}) {
       if(style.scatter){color('color',style.scatter.point_color,s=>find(s).scatter.point_color);field('point_size',style.scatter.point_size,'number',(s,v)=>find(s).scatter.point_size=v);}
       if(style.bar){color('color',style.bar.fill_color,s=>find(s).bar.fill_color);field('border_width',style.bar.border_width,'number',(s,v)=>find(s).bar.border_width=v);}
       if(style.err_style){color('error_color',style.err_style.error_bar_color,s=>find(s).err_style.error_bar_color);field('error_width',style.err_style.error_bar_width,'number',(s,v)=>find(s).err_style.error_bar_width=v);}
-      if(style.matrix){choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>s.config.colorbar.colormap=v);field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);}
+      if(style.matrix)colorScale();
+    }else if(target==='colorbar'||target.startsWith('colorbar_')){colorScale();
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
+      scaleControl('axis_scale',cfg[key],s=>s.config[key]);
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>s.config[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>s.config[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>s.config[key].tick=v);

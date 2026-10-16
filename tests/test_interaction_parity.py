@@ -357,3 +357,85 @@ def test_heatmap_fit_is_tight_in_both_hosts(tmp_path, interpolation):
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert limits(state)==pytest.approx(expected)
         assert state['config']['colorbar']==colorbar
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
+    setup="ax.imshow(np.array([[1.,10.],[100.,1000.]]),extent=(1,3,1,3),origin='lower',cmap='gray',vmin=1,vmax=1000,id='field')"
+    def sample(pixels, rect):
+        x,y,w,h=rect
+        return float(np.asarray(pixels)[round(y+h*.75),round(x+w*.75),:3].mean())
+    def color_min(fig, value):
+        state=fig.get_settings();state['config']['colorbar']['axis']['min']=value;fig.apply_settings(state)
+    def assert_scale(state, key, scale):
+        axis=state['config']['colorbar']['axis'] if key=='colorbar' else state['config'][key]
+        assert axis['scale']==scale
+        lo,hi=(1,1000) if key=='colorbar' else (1,3)
+        assert (axis['min'],axis['max'])==pytest.approx((lo,hi))
+        assert axis['major_spacing']==pytest.approx(1 if scale=='Logarithmic' else (hi-lo)/5)
+    with figgy.figure(backend='native') as fig:
+        ax=fig.axes[0];exec(setup,{'np':np,'ax':ax});ax.set_xlim(-1,3)
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            def choose(control, value):
+                inputs.click(control);inputs.click(control+'_'+value)
+            inputs.click_rect(inputs.info()['decorations']['axis_bottom'])
+            before=fig.get_settings();choose('axis_scale','Logarithmic')
+            assert fig.get_settings()==before
+            assert 'positive' in inputs.info()['error']
+            ax.set_xlim(1,3);inputs.pump()
+            for target,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
+                inputs.click_rect(inputs.info()['decorations'][target])
+                for scale in ['Logarithmic','Linear']:
+                    choose('axis_scale',scale);assert_scale(fig.get_settings(),key,scale)
+            inputs.click_rect(inputs.info()['decorations']['colorbar'])
+            color_min(fig,0);inputs.pump();before=fig.get_settings()
+            choose('color_scale','Logarithmic')
+            assert fig.get_settings()==before and 'positive' in inputs.info()['error']
+            color_min(fig,1);inputs.pump()
+            bounds=json.loads(fig._native.bounds_json('data_area'))['rect']
+            linear=sample(fig.render_rgba(),bounds)
+            choose('color_scale','Logarithmic');assert_scale(fig.get_settings(),'colorbar','Logarithmic')
+            logarithmic=sample(fig.render_rgba(),bounds)
+            assert logarithmic>linear+30  # Value 10 moves from 9/999 to 1/3 of the colormap.
+            native=fig.get_settings()['config']['colorbar']['axis']
+            assert not inputs.info()['error']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.set_xlim(-1,3)\ndisplay(fig.widget())"
+    with notebook(tmp_path/'scales',source) as (page,execute):
+        page.locator('[data-properties]').click()
+        target=page.locator('[data-target]')
+        def choose(control, value):
+            page.locator(f'[data-property={control}]').select_option(value);page.evaluate(ROOT+'.flush()')
+        target.select_option('axis_bottom');before=page.evaluate(ROOT+'.snapshot()')
+        choose('axis_scale','Logarithmic')
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        assert page.locator('[data-property=axis_scale]').input_value()=='Linear'
+        assert 'positive' in page.locator('.figgy-error').inner_text()
+        execute('ax.set_xlim(1,3); await fig.sync()')
+        for name,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
+            target.select_option(name)
+            for scale in ['Logarithmic','Linear']:
+                choose('axis_scale',scale);assert_scale(page.evaluate(ROOT+'.snapshot()'),key,scale)
+        # Both the field series and the colorbar itself expose the same controls.
+        target.select_option('field');assert page.locator('[data-property=color_scale]').count()==1
+        target.select_option('colorbar')
+        execute("s=fig.get_settings(); s['config']['colorbar']['axis']['min']=0; fig.apply_settings(s); await fig.sync()")
+        before=page.evaluate(ROOT+'.snapshot()');choose('color_scale','Logarithmic')
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        assert page.locator('[data-property=color_scale]').input_value()=='Linear'
+        execute("s=fig.get_settings(); s['config']['colorbar']['axis']['min']=1; fig.apply_settings(s); await fig.sync()")
+        from PIL import Image
+        path=tmp_path/'linear.png';execute(f'await fig.savefig_async({str(path)!r})')
+        box=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect')
+        width,height=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
+        rect=[box[0]*960/width,box[1]*600/height,box[2]*960/width,box[3]*600/height]
+        linear=sample(Image.open(path).convert('RGB'),rect)
+        choose('color_scale','Logarithmic');execute('await fig.sync()')
+        assert_scale(page.evaluate(ROOT+'.snapshot()'),'colorbar','Logarithmic')
+        path=tmp_path/'logarithmic.png';execute(f'await fig.savefig_async({str(path)!r})')
+        assert sample(Image.open(path).convert('RGB'),rect)>linear+30
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert state['config']['colorbar']['axis']==native
+        execute("code=fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.imshow(np.ones((2,2)),id='field'); exec(code,{'fig':other}); assert other.get_settings()['config']['colorbar']['axis']['scale']=='Logarithmic'; other.close()")

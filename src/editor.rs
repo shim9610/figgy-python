@@ -776,47 +776,14 @@ impl Editor {
                 );
             }
             if style["matrix"].is_object() {
-                let bar = &mut config["colorbar"];
-                ui.label(RichText::new("COLOR SCALE").size(11.).weak());
-                changed |= number(
-                    ui,
-                    &mut bar["axis"],
-                    "min",
-                    "Minimum",
-                    "",
-                    &mut self.controls,
-                );
-                changed |= number(
-                    ui,
-                    &mut bar["axis"],
-                    "max",
-                    "Maximum",
-                    "",
-                    &mut self.controls,
-                );
-                ui.label("Color map");
-                let previous = bar["colormap"].as_str().unwrap_or("Custom").to_owned();
-                let mut value = previous.clone();
-                let response = egui::ComboBox::from_id_salt("colormap")
-                    .width(ui.available_width())
-                    .selected_text(&value)
-                    .show_ui(ui, |ui| {
-                        for name in ["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"] {
-                            let response = ui.selectable_value(&mut value, name.to_owned(), name);
-                            self.controls
-                                .insert(format!("colormap_{name}"), response.rect);
-                        }
-                    });
-                self.controls
-                    .insert("colormap".into(), response.response.rect);
-                if value != previous {
-                    bar["colormap"] = json!(value);
-                    changed = true;
-                }
+                changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
             }
+        } else if target == "colorbar" || target.starts_with("colorbar_") {
+            changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
             let node = &mut config[key];
+            changed |= scale_control(ui, node, "axis_scale", &mut self.controls);
             let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
             let response = ui.checkbox(&mut labels, "Tick labels");
             self.controls
@@ -951,6 +918,79 @@ fn text_field(
     }
     response.changed()
 }
+fn color_scale_properties(
+    ui: &mut egui::Ui,
+    bar: &mut Value,
+    controls: &mut HashMap<String, egui::Rect>,
+) -> bool {
+    if !bar.is_object() {
+        ui.label("No color scale is configured.");
+        return false;
+    }
+    let mut changed = scale_control(ui, &mut bar["axis"], "color_scale", controls);
+    ui.label(RichText::new("COLOR SCALE").size(11.).weak());
+    changed |= number(ui, &mut bar["axis"], "min", "Minimum", "", controls);
+    changed |= number(ui, &mut bar["axis"], "max", "Maximum", "", controls);
+    ui.label("Color map");
+    let previous = bar["colormap"].as_str().unwrap_or("Custom").to_owned();
+    let mut value = previous.clone();
+    let response = egui::ComboBox::from_id_salt("colormap")
+        .width(ui.available_width())
+        .selected_text(&value)
+        .show_ui(ui, |ui| {
+            for name in ["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"] {
+                let response = ui.selectable_value(&mut value, name.to_owned(), name);
+                controls.insert(format!("colormap_{name}"), response.rect);
+            }
+        });
+    controls.insert("colormap".into(), response.response.rect);
+    if value != previous {
+        bar["colormap"] = json!(value);
+        changed = true;
+    }
+    changed
+}
+
+fn scale_control(
+    ui: &mut egui::Ui,
+    axis: &mut Value,
+    id: &str,
+    controls: &mut HashMap<String, egui::Rect>,
+) -> bool {
+    ui.label("Scale");
+    let previous = axis["scale"].as_str().unwrap_or("Linear");
+    let mut value = previous.to_owned();
+    let response = egui::ComboBox::from_id_salt(id)
+        .selected_text(if previous == "Logarithmic" {
+            "Logarithmic (base 10)"
+        } else {
+            "Linear"
+        })
+        .show_ui(ui, |ui| {
+            for (name, label) in [
+                ("Linear", "Linear"),
+                ("Logarithmic", "Logarithmic (base 10)"),
+            ] {
+                let response = ui.selectable_value(&mut value, name.to_owned(), label);
+                controls.insert(format!("{id}_{name}"), response.rect);
+            }
+        });
+    controls.insert(id.into(), response.response.rect);
+    if axis["min"].as_f64().is_some_and(|v| v <= 0.) {
+        ui.label("Log scale requires Minimum > 0. Set a positive range first.");
+    }
+    if value == previous {
+        return false;
+    }
+    axis["scale"] = json!(value);
+    axis["major_spacing"] = json!(if value == "Logarithmic" {
+        1.0
+    } else {
+        (axis["max"].as_f64().unwrap() - axis["min"].as_f64().unwrap()) / 5.0
+    });
+    true
+}
+
 fn number(
     ui: &mut egui::Ui,
     node: &mut Value,
