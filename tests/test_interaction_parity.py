@@ -71,7 +71,9 @@ def check_bounded_menus_during_preparation(page, execute, kind):
         };
     }""")
     try:
-        execute('import asyncio; preparation=asyncio.create_task(fig.prepare_async(timeout=60))')
+        # Preparation includes the original and resized surface. Use the public
+        # API's 180-second default; export keeps its separate 60-second budget.
+        execute('import asyncio; preparation=asyncio.create_task(fig.prepare_async())')
         try:
             # This is a GPU-fence handshake, not a visual condition. Poll on a
             # timer so delayed software-GPU presentation cannot stall RAF polling.
