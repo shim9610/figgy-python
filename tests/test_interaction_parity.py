@@ -44,6 +44,15 @@ def browser_point(page, logical):
 
 def check_bounded_menus_during_preparation(page, execute, kind):
     """Hold actual GPU completion so toolbar clicks overlap an async WASM borrow."""
+    menu_points = []
+    for selector in ('button[data-style]', 'button[data-visibility]'):
+        button = page.locator(selector)
+        # Complete normal actionability/scroll checks before holding the GPU
+        # fence; Locator.click's stable-position check itself waits for RAF.
+        button.click(trial=True)
+        box = button.bounding_box()
+        assert box is not None and button.is_visible() and button.is_enabled()
+        menu_points.append((selector, box['x']+box['width']/2, box['y']+box['height']/2))
     page.evaluate("""()=>{
         const prototype=GPUQueue.prototype;
         const original=prototype.onSubmittedWorkDone;
@@ -73,8 +82,14 @@ def check_bounded_menus_during_preparation(page, execute, kind):
             })"""))
             raise
         execute('assert not preparation.done()')
-        page.locator('button[data-style]').click()
-        page.locator('button[data-visibility]').click()
+        for selector, x, y in menu_points:
+            # Keep real mouse input and verify the hit rather than forcing a
+            # locator click or waiting for presentation while its fence is held.
+            assert page.evaluate("""([selector,x,y])=>{
+                const button=document.querySelector(selector);
+                return !button.disabled && document.elementFromPoint(x,y)?.closest('button')===button;
+            }""", [selector, x, y])
+            page.mouse.click(x, y)
         # Both menus read the chart document. They must wait for the pending
         # renderer call, rather than borrowing the WASM chart a second time.
         assert page.locator('.figgy-menu').is_hidden()
