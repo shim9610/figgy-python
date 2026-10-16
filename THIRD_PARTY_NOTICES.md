@@ -7,8 +7,8 @@ and the separation of accepted model state from UI drafts in shim9610/figgy-web
 Studio application are not copied into this package.
 
 figgy-renderer and its bundled fonts retain their MIT/Apache-2.0 and OFL notices.
-The font notices are shipped in `figgy/licenses/LICENSE-LiberationSans.txt` and
-`figgy/licenses/LICENSE-ComicNeue.txt`, including when fonts are embedded in the
+The font notices are shipped in `figgyplot/licenses/LICENSE-LiberationSans.txt` and
+`figgyplot/licenses/LICENSE-ComicNeue.txt`, including when fonts are embedded in the
 native extension.
 The native desktop uses winit/wgpu and egui. PySide6 is optional benchmark-only tooling.
 The notebook extra uses anywidget and ipywidgets under their respective licenses.

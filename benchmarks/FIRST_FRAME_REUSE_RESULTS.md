@@ -1,5 +1,9 @@
 # Native sharing: completed first-frame measurements
 
+Historical 0.2 measurement report. These numbers have not been remeasured for
+`figgyplot 0.3.0` / renderer `0.17.0` / model `0.11.0`; the source revision below
+defines the measured implementation.
+
 Measured on the native implementation at `cb252ebc9bb82e40fda1b4060d06e6789b38b562`,
 Figgy Python 0.2.0 / figgy-renderer 0.16.1. Linux, CPython 3.12.14, Vulkan llvmpipe
 LLVM 19.1.7 **software GPU**, no physical GPU. These are not new Windows RTX 4070 Ti
@@ -24,7 +28,7 @@ The fresh-process comparison includes more process-local first-use effects such
 as font initialization. Reset-following versus shared-following is the closer
 control for resource sharing: both run after a first chart, with process/font
 caches available. Reset-following explicitly calls `release_gpu()` after closing
-each Figure; it is a control using the current implementation, not a measurement
+each Figure; it is a control using the implementation at that checkpoint, not a measurement
 of an older Git commit.
 
 ## Where time changes

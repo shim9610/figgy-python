@@ -276,7 +276,10 @@ are omitted from the log view; the original data is preserved. If the current
 limits cross zero, the scale selector fits the positive data range automatically.
 With no positive samples it opens an empty log view from 1 to 10. Existing
 positive limits are preserved. The same rule applies to color values and to
-Python's `set_xscale("log")` / `set_yscale("log")` helpers.
+Python's `set_xscale("log")` / `set_yscale("log")` helpers. These Python axis
+helpers explicitly update both edges of their dimension. For a selected-object
+edit with the conditional pairing rule, use `fig.update("axis_bottom",
+scale="Logarithmic")`; for exact one-sided settings use `fig.configure(...)`.
 
 Switching scale selects a tick spacing of one decade for logarithmic scales,
 or one fifth of the range for linear scales. Direct SSOT range edits still

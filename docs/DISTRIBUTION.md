@@ -13,7 +13,8 @@ import figgyplot as plt
 import figgyplot.pyplot as pyplot
 ```
 
-Publication is pending. The GitHub repository remains `shim9610/figgy-python`.
+Version 0.2.1 is published; this source tree prepares 0.3.0 (registry status
+checked 2026-10-16). The GitHub repository remains `shim9610/figgy-python`.
 No `figgy` compatibility package is shipped: that name belongs to an unrelated
 PyPI package. Existing source users should change `import figgy` to
 `import figgyplot as figgy`, or update their aliases. New Copy Python exports
@@ -68,12 +69,14 @@ Native input remains f32/f64 with the existing hi/lo staging path. This packagin
 update does not introduce downsampling, streaming, automatic eviction or permanent
 native CPU copies of source arrays.
 
-## Manual CI only
+## Manual wheel builds and publication
 
 [The wheel workflow](../.github/workflows/wheels.yml) accepts `workflow_dispatch`
 and reuse through `workflow_call` from the manual publication workflow.
-There are no push, pull-request, tag, release or scheduled triggers. Adding the
-configuration does not run it. [Manual TestPyPI publication](PUBLISHING.md) builds
+That wheel workflow has no push, pull-request, tag, release or scheduled triggers.
+The separate `pr-tests.yml` workflow runs automatically for pull requests,
+including native/X11 and real Jupyter/WebGPU interaction checks.
+[Manual TestPyPI publication](PUBLISHING.md) builds
 and validates the full distribution set before upload and installation checks.
 Manual production PyPI promotion reuses the exact successful TestPyPI artifacts;
 see the separate `pypi` publisher/environment and run-ID setup in that guide.
@@ -167,15 +170,21 @@ the distinction between executed software-GPU tests and pending GitHub runs.
 
 To test the repair in GitHub, choose **Run workflow** on **main** after pulling
 the fix. **Re-run jobs** retains that run's original commit and workflow.
-Automatic triggers remain disabled; TestPyPI publication is a separate manual action.
+Wheel builds and publication remain manual; PR validation runs automatically.
 
-## Release gates
+## Release gates and version-specific evidence
+
+Completed 0.2.1 build/install checks below are historical evidence. Version 0.3.0
+must build and verify its own 74 wheels and sdist, then pass both indices'
+installation checks. Its native and WASM renderer sources remain pinned together
+as described in [publishing](PUBLISHING.md#versions-and-coordinated-release-order).
 
 - [x] Confirm Trusted Publishing works for `figgyplot` on PyPI/TestPyPI.
 - [x] Run the manual workflow and review all 74 configured wheel results (0.2.1).
 - [ ] Verify Windows/macOS and ARM64 window creation, DPI, editing, close/reopen
       and PNG export on actual target hosts.
-- [ ] Verify browser editing in actual JupyterLab after installation.
+- [x] Verify native/X11 and actual JupyterLab editing for the 0.3.0 PR on Linux
+      software GPUs: [246-test run at 07b3786](https://github.com/shim9610/figgy-python/actions/runs/38886971056).
 - [ ] Install matching artifacts on clean hosts without Rust and ensure `pip`
       selects wheels rather than silently falling back to source builds.
 - [x] Prepare the manual TestPyPI workflow with OIDC and installation checks.
@@ -233,4 +242,7 @@ jobs passed. Install with `python -m pip install figgyplot`, or
 
 Version **0.3.0** is prepared: figgy-renderer 0.17.0, the fixes reported against
 0.2.1, and the corrected installation instructions first prepared as 0.2.2 (never
-uploaded). It has not been uploaded; it needs its own full release checks.
+uploaded). It adds native/Jupyter editing parity, bounded-chart constructors,
+selected histogram values, numeric label controls and paired-axis convenience
+edits. It has not been uploaded as of 2026-10-16; it needs its own full wheel and
+index installation checks. Passing PR tests does not publish a package.

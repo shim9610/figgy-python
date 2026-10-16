@@ -120,8 +120,8 @@ python scripts/render_gallery.py                 # Reproduce all 17 gallery imag
 
 [Example index and commands](examples/README.md) ·
 [Rendering provenance](docs/images/gallery/manifest.json).
-[Chart and style API](docs/CHART_TYPES.md) documents pies, donuts, materials and
-draw modes, including the line-only Milkyway restriction.
+[Chart and style API](docs/CHART_TYPES.md) documents every exposed constructor,
+host coverage, materials and draw modes, including the line-only Milkyway restriction.
 
 ## What you can do
 
@@ -136,6 +136,10 @@ draw modes, including the line-only Milkyway restriction.
   Jupyter renders through WASM/WebGPU in the browser.
 
 ## Install
+
+This checkout documents **figgyplot 0.3.0**. Before that release is published,
+PyPI installs the previous release (0.2.1); use the source-checkout instructions
+below to try the features described here.
 
 Install from **PyPI** with **Python 3.8–3.15**:
 
@@ -419,16 +423,17 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-This package uses **figgy-renderer 0.17.0** from the upstream
-[figgy repository](https://github.com/shim9610/figgy). Until 0.17.0 is on crates.io,
-the native extension and the packaged browser kernel are both built from figgy
+This package targets **figgy-renderer 0.17.0** and **figgy-model 0.11.0** from the
+upstream [figgy repository](https://github.com/shim9610/figgy). Until those
+versions are on crates.io, the native extension and the packaged browser kernel
+are both built from figgy
 commit `bf665c0` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 
 - [Desktop editor guide](docs/DESKTOP_EDITOR.md) — controls and screenshots
 - [Documentation index](docs/README.md) — user guides and validation reports
-- [Chart and style API](docs/CHART_TYPES.md) — pies, donuts, materials and draw modes
+- [Chart and style API](docs/CHART_TYPES.md) — chart constructors, materials and draw modes
 - [Host architecture](docs/HOSTS.md) — native and notebook integration
 - [GPU preparation](docs/PREPARATION.md) — explicit first-use preparation
 - [Native resource sharing](docs/NATIVE_SHARING.md) — ownership and memory limits

@@ -1,5 +1,9 @@
 # Windows GPU library comparison
 
+Historical hardware report for Figgy 0.1.0. These figures have not been
+remeasured for `figgyplot 0.3.0` / renderer `0.17.0` / model `0.11.0`, and do not
+validate the current desktop or Jupyter interaction paths.
+
 2026-10-14 (Asia/Seoul). Follow-up measurements adding fastplotlib, VisPy and
 actual pyqtgraph OpenGL rendering.
 

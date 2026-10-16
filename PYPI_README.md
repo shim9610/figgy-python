@@ -2,7 +2,8 @@
 
 **Plot NumPy data on the GPU. Edit directly. Reuse the settings in Python.**
 
-Explore signals, scatter populations and heatmaps in native windows or Jupyter.
+Explore lines, scatter, errorbars, histograms, heatmaps, contours, categorical
+bars, boxplots, pies and donuts in native windows or Jupyter.
 Adjust the axes, text, colors and layout, then copy executable Python to reuse
 the result across datasets. Export the edited chart directly to PNG.
 
@@ -75,6 +76,10 @@ separately. These measurements include RGBA readback and do not measure UI FPS.
 
 ## Install
 
+This description covers **figgyplot 0.3.0**. Until that version is published,
+PyPI provides 0.2.1; use the [source-checkout instructions](https://github.com/shim9610/figgy-python#install)
+for the upcoming features.
+
 Install from PyPI:
 
 ```sh
@@ -109,7 +114,13 @@ finally:
 ```
 
 In Jupyter, use `plt.subplots(backend="webgpu")` and display `fig.widget()`.
-Selection and editing run in the notebook's browser.
+Selection and editing run in the notebook's browser. Both hosts expose tick
+visibility/direction, numeric notation/significant digits, rich text editing,
+axis/color logarithms and histogram-bin values. Matching opposite axes share
+only the fields you edit; direct SSOT patches remain exact. Log views omit
+nonpositive samples without changing the source arrays. See the
+[editor guide](https://github.com/shim9610/figgy-python/blob/main/docs/DESKTOP_EDITOR.md)
+for these controls and matrix Fit behavior.
 
 ## Compatibility
 

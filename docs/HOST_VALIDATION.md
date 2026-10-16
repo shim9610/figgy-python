@@ -1,4 +1,24 @@
-# 0.2 host verification
+# Host verification history
+
+## Current 0.3 validation setup
+
+The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.17.0`
+and `figgy-model 0.11.0`. The dated measurements and test totals below belong
+to earlier checkpoints; they are not a test count or performance claim for the
+current release candidate.
+
+Automatic pull-request checks are enabled in
+[PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
+integration. The [interaction parity guard](../scripts/check_interaction_parity.py)
+rejects changes to only one host without the corresponding host/test updates.
+[Shared interaction tests](../tests/test_interaction_parity.py) cover native and
+real Jupyter WebGPU controls. Pies/donuts, categorical bars and boxplots now use
+both hosts; the historical native-only radial limitation below no longer applies.
+See [chart types](CHART_TYPES.md) and [desktop editing](DESKTOP_EDITOR.md) for
+current supported controls. A configured check or an earlier passing run does
+not establish the result of a later commit; inspect that commit's CI result.
+
+## Historical 0.2 checkpoints (2026-10-14)
 
 2026-10-14 (Asia/Seoul), based on main `294b270a2b2e6645056278b3ef035e5199a5f658`.
 
@@ -151,8 +171,9 @@ snapshots are released on ready; creating/discarding an unprepared additional
 view does not request an adapter. Automatic mode remains covered separately.
 
 The wheel includes `figgy.prepare`, both preparation APIs, and local JS/WASM.
-The sdist includes `docs/PREPARATION.md`; strict twine checks pass. Automatic CI
-remains paused (`workflow_dispatch` only).
+The sdist included `docs/PREPARATION.md`; strict twine checks passed. At this
+checkpoint automatic CI was paused (`workflow_dispatch` only); current PR checks
+are described above.
 
 **No persistent shader cache was saved or restored.** Renderer 0.16.1 exposes
 prewarming but no public pipeline-cache injection. Reports explicitly return
@@ -199,7 +220,8 @@ Report charts, when generated, continue to use Figgy.
 Release/locked wheel/sdist builds and strict twine metadata checks passed. All
 shared resources remain native-process local. Windows/macOS hardware behavior,
 different surface formats and physical VRAM pressure remain unverified here.
-Automatic CI is still disabled; pipeline disk-cache persistence remains absent.
+Automatic CI was still disabled at that checkpoint. Pipeline disk-cache
+persistence was not implemented by that change.
 
 ## Contextual desktop editor, vector toolbar and repaint scheduling
 
@@ -391,6 +413,8 @@ donut, paper/wood/hatch/pearl, Sketch handwriting, Constellation and line-only
 Milkyway. Every variant was reproduced in an independent CLI process with exact
 PNG SHA-256 agreement. English Markdown, example links, Python code-block syntax,
 manifest hashes/dimensions, Rust formatting and browser JS syntax were checked.
-Browser model/transport support for Cartesian styles is included, but actual
-browser style pixels were not rerun. Interactive browser radial bindings remain
-unexposed; radial windows/PNG export require the native backend.
+Browser model/transport support for Cartesian styles was included, but actual
+browser style pixels were not rerun at that checkpoint. Interactive browser
+radial bindings were not yet exposed then; radial windows/PNG export required
+the native backend. The current 0.3 binding supports interactive radial charts
+and browser PNG export in Jupyter as well.

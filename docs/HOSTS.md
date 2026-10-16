@@ -1,7 +1,10 @@
 # Native surface / notebook WebGPU hosts
 
-The Python distribution uses `figgy-renderer 0.17.0`; until it is on crates.io it comes
-from figgy commit `bf665c0` through a `[patch.crates-io]` override. Chart layout, styles, data
+The figgyplot 0.3.0 source targets `figgy-renderer 0.17.0` and
+`figgy-model 0.11.0`, both pinned to figgy commit `bf665c0` through a
+`[patch.crates-io]` override so native and packaged WASM use the same sources.
+Release builds retain this pairing; see [publishing](PUBLISHING.md).
+Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
 vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
 
@@ -39,7 +42,8 @@ it does not read the whole frame. PNG export alone uses renderer readback.
 The chart-centered toolbar uses vector icons with tooltips and leaves properties
 hidden until an element is selected.
 The contextual panel edits title/axis/legend text, font size/family and color, axes and series
-styles, tick-label font size/family/color, and heatmap color range/presets. The font entry is a family name,
+styles, tick-label format/significant digits/font size/family/color, and matrix
+color range, logarithmic mapping and palettes. The font entry is a family name,
 not a TTF path. Native uses renderer system/registered fonts; a missing family
 falls back to the bundled font.
 Chrome/series selection, renderer drag/resize policies, wheel zoom, Copy Python
@@ -102,10 +106,13 @@ resize handles. See [chart and style API](CHART_TYPES.md) for constructors and l
 Use `Figure(backend="webgpu")` explicitly in shared scripts. Its PyO3
 `NotebookFigure` constructs only the common renderer's `Chart`/settings model;
 it creates no adapter, device or native GPU pool. Initial min/max metadata is
-computed while scanning inputs; renderer `Chart.auto_fit_*_extent` owns range
-fitting. The browser Fit action uses upstream GPU fit. This initial metadata path
-covers plot/scatter/errorbar/histogram/heatmap/contour APIs; it is not a general errorbar fit
-engine.
+computed while scanning inputs; errorbar endpoint extents and positive bounds
+are retained as metadata after upload buffers are released. The renderer's
+`Chart.auto_fit_*_extent` helpers own range/tick fitting. The browser Fit action
+uses upstream GPU fit. Both paths cover plot/scatter/errorbar/histogram/heatmap/
+contour APIs and use zero padding for matrix-only figures, or 5% when other
+Cartesian series are present. An explicit `fig.fit(padding=...)` overrides this
+binding default.
 
 The browser creates upstream `FiggyChart` on a real WebGPU canvas. Float32 and
 float64 NumPy snapshots cross anywidget as binary buffers, then typed arrays

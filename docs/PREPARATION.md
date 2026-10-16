@@ -2,14 +2,17 @@
 
 The wrapper exposes `Figure.prepare()` for native rendering and
 `await Figure.prepare_async(timeout=180)` for a mounted WebGPU widget. Both call
-the **public upstream renderer prewarm API**; this repository contains no shader
-engine or renderer source copy.
+the public upstream renderer APIs: Cartesian pipeline prewarming or bounded-chart
+first-frame preparation. This repository contains no shader engine or renderer
+source copy.
 
 ## Native
 
 Construct the Figure, register the actual series, then call `prepare()` before
-timing/drawing. It calls `Renderer.prewarm_all_observed`, waits for submitted GPU
-work and completes one RGBA render of the current document. It releases the GIL,
+timing/drawing. For Cartesian charts it calls `Renderer.prewarm_all_observed`
+and waits for submitted GPU work. Pie/donut, categorical and boxplot charts
+prepare their own bounded renderer through the current document render. Both
+paths complete one RGBA render of the current document. The call releases the GIL,
 reuses resident columns, preserves settings/revision, and does not encode PNG.
 Allocation/validation errors propagate as Python exceptions. The completed
 readback is temporary, not a retained CPU copy of the original arrays.
@@ -73,7 +76,7 @@ Its Figure is closed on exit; it is a diagnostic command, not a reliable cache
 producer for later processes. There is no GPU installation hook.
 
 **Persistent pipeline cache save/restore is not implemented.** All current reports
-set `persistent_cache_supported=False`. Renderer 0.16.1's public construction
+set `persistent_cache_supported=False`. Renderer 0.17.0's public construction
 path provides no cache injection; its pipeline descriptors use `cache: None`.
 Creating an unrelated wgpu cache in the wrapper would not cache those pipelines.
 

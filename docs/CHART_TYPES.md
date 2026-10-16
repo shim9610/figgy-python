@@ -82,16 +82,18 @@ that override. Advanced `fig.configure_radial(...)` patches expose the upstream
 serialized fields. Its `slices={index: patch}` changes appearance/labels; category
 values are replaced explicitly through `set_values()`.
 
-Click a slice in a native window to select/clear it. Left/Right cycle visible
-slices; Esc clears selection. Properties edit the title, pie/donut shape, hole,
-material, camera, texture, lighting-related settings, labels and the selected
-slice's name/value/color/explode. Properties expand a normal window; maximized
-or fullscreen windows use an overlay. Advanced settings uses a separate window.
-Copy Python and Save PNG use the same document as the native preview.
+Click a slice in a native window or Jupyter WebGPU widget to select/clear it.
+Left/Right cycle visible slices; Esc clears selection. Properties edit the title,
+pie/donut shape, hole, material, camera, texture, lighting-related settings,
+labels and the selected
+slice's name/value/color/explode. Native properties expand a normal window;
+maximized or fullscreen windows use an overlay. Native Advanced settings uses a
+separate window; Jupyter exposes the JSON in its property panel. Copy Python and
+Save PNG use the same document as the preview in either host.
 
-`fig.select(x, y)` also picks a slice at logical document coordinates and returns
-its index, label and value. Picking and window redraw do not read back a full
-RGBA image. PNG/RGBA export is an explicit operation.
+On the native backend, `fig.select(x, y)` also picks a slice at logical document
+coordinates and returns its index, label and value. On WebGPU, pick in the widget.
+Picking and window redraw do not read back a full RGBA image. PNG/RGBA export is an explicit operation.
 
 ## Handwriting, constellation and Milkyway
 
@@ -150,9 +152,10 @@ materials. Radial exports contain appearance and label patches, not category
 values: recreate a pie/donut with the same slice count and DPI, then apply the
 code. Transient radial hover and slice selection are cleared in exported
 style code, so a selected source slice can become zero-valued in a new dataset.
-Cartesian exports preserve uploaded series data and require matching IDs and
-kinds. Stylized patterns use stable user series IDs even when independent
-Figures share a GPU, so replay does not reroll stars or handwriting.
+Cartesian style exports do not serialize source arrays. They require matching
+series IDs and kinds and preserve the destination's uploaded data. Stylized
+patterns use stable user series IDs even when independent Figures share a GPU,
+so replay does not reroll stars or handwriting.
 
 Cartesian styles are exposed in native and WebGPU document models and their
 Style menus. Unsupported chart/style combinations are rejected in both hosts.
@@ -202,7 +205,9 @@ ax.bxp([dict(q1=1, med=2, q3=3, whislo=0, whishi=4, fliers=[7])])
 `errorbar` accepts scalar, N-element symmetric or 2-by-N asymmetric magnitudes;
 errors must be finite and nonnegative. `linestyle=None` omits connecting lines.
 `hist` delegates bin calculation to NumPy; `stairs` accepts explicit edges and
-counts. Contours accept a 2-D scalar array with optional 1-D x/y center coordinates.
+counts. Selecting a histogram bin shows its index, start/end bounds and stored
+value (count, weighted total, density or stairs height) in both hosts. Contours
+accept a 2-D scalar array with optional 1-D x/y center coordinates.
 
 `bar` accepts one value per category or a series-by-category matrix. `None`
 is missing, zero is a real value. Modes are `grouped`, `stacked` and

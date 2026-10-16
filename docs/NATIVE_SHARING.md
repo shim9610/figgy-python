@@ -1,15 +1,17 @@
 # Process-wide native GPU sharing
 
 The first native Figure creates one process-local GPU instance, adapter, device,
-queue and `figgy-renderer 0.16.1` renderer. Later Figures register independent
-charts in that renderer and allocate their columns in its resident pool.
+queue and `figgy-renderer 0.17.0` renderer (`figgyplot 0.3.0`, model `0.11.0`).
+Later Figures register independent charts in that renderer and allocate their
+columns in its resident pool.
 There is no renderer source copy and no change to the borrowed f32/f64 → hi/lo
 upload path. Cartesian input arrays are not retained in a permanent native CPU cache.
 
-Pies/donuts share this device/queue but use their own upstream radial renderer
-and immutable frame cache. Their bounded model retains up to 64 category values
-on CPU and uses no Cartesian source columns. Window previews draw to a GPU
-texture without RGBA/PNG transfer; native export uses explicit readback.
+Pies/donuts, categorical bars and boxplots share this device/queue but use their
+upstream bounded renderers. Their bounded models retain category or summary
+values on CPU and use no Cartesian source columns. Pies/donuts retain at most
+64 slice values per group. Window previews draw to a GPU texture without
+RGBA/PNG transfer; native export uses explicit readback.
 
 Each Figure owns its document, revision, metadata, chart id, column ownership and
 offscreen export target. Window views reference that document weakly. Each window
@@ -77,12 +79,14 @@ target; do not add it across Figures as independent VRAM. Window info exposes th
 same context/Figure ids. Desktop cached styles refresh when pool growth changes
 its generation.
 
-Jupyter remains a separate browser GPU domain, with one upstream `FiggyChart`
-device/pool per view. Native global sharing does not share kernel/browser memory
-or alter notebook binary transfers. Disk shader-cache persistence is also
+Jupyter remains a separate browser GPU domain, using an upstream `FiggyChart`
+for Cartesian charts or `FiggyBoundedChart` for radial, categorical and boxplot
+documents. Each view owns its browser GPU resources. Native global sharing does
+not share kernel/browser memory or alter notebook binary transfers. Disk shader-cache persistence is also
 separate and remains unsupported by the current renderer API.
 
-The [first-frame experiment](../benchmarks/FIRST_FRAME_REUSE_RESULTS.md) measures
+The historical [0.2 first-frame experiment](../benchmarks/FIRST_FRAME_REUSE_RESULTS.md) measures
 new Figures without explicit preparation, including upload/fit and completed
 RGBA readback. It separates process-first, reset-following and shared-following
 costs; constructor timing alone is not treated as first-frame performance.
+Those recorded timings have not been remeasured for the 0.3 binding here.

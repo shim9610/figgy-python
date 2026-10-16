@@ -1,5 +1,11 @@
 # Randomized input, state and concurrency validation
 
+This is a historical campaign report for the checkpoint below. Its call counts,
+wheel contents and timing results have not been rerun or relabeled as results
+for `figgyplot 0.3.0` / renderer `0.17.0` / model `0.11.0`. Current pull-request
+checks are enabled in [PR tests](../.github/workflows/pr-tests.yml); current host
+coverage is described in [host validation](HOST_VALIDATION.md).
+
 2026-10-14, Linux x86_64, public `figgy-renderer 0.16.1`. Native checks used
 Vulkan llvmpipe; notebook checks used actual JupyterLab, headed Chromium and
 SwiftShader WebGPU. These are not Windows/macOS hardware results.
@@ -10,7 +16,8 @@ SwiftShader WebGPU. These are not Windows/macOS hardware results.
 Rust reproduction and native stack/CPU evidence. The reproduction is also in
 [scripts/repro_upstream_colorbar](../scripts/repro_upstream_colorbar/).
 
-Upstream `Config::validate()` accepts a heatmap with
+At the recorded renderer 0.16.1 checkpoint, upstream `Config::validate()` accepted
+a heatmap with
 `chart_title.top_margin = -1e38`. On a 320×240 canvas, `data_area()` height
 saturates at `u32::MAX`, and `draw_colorbar_strip()` attempts approximately
 4.3 billion CPU bands. Native stacks at 25/50/75/100 seconds remained in
@@ -25,8 +32,9 @@ renders are not interrupted at an arbitrary deadline. User-configurable notebook
 comm timeouts such as `prepare_async(timeout=...)` are separate and do not
 forcibly stop browser rendering.
 
-Pending an upstream fix, negative title margins are rejected with `ValueError`
-before commit. Common-model `Config::validate()` checks other layout rules. Use
+The binding workaround rejected negative title margins with `ValueError`
+before commit. That guard remains in the binding; common-model
+`Config::validate()` checks other layout rules. Use
 `offset_y` to move a title upward. No arbitrary 8192-pixel font/line cap was
 introduced; existing canvas-size limits remain.
 
@@ -141,5 +149,5 @@ Reproduce one seed with, for example,
 `--seed N --seeds 1 --backend native --phase concurrent`. Inputs are reproducible;
 thread scheduling can vary. This campaign does not prove deadlock absence for
 all inputs/drivers. Actual VRAM exhaustion, large OS-memory exhaustion, all
-browsers and Windows/macOS hardware were outside its scope. Automated CI remains
-disabled.
+browsers and Windows/macOS hardware were outside its scope. Automated CI was
+disabled at this checkpoint; the current PR workflow is enabled.

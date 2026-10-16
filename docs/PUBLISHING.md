@@ -7,7 +7,11 @@ production index. `target=verify-testpypi` checks an already uploaded release
 without rebuilding or uploading it. The default is TestPyPI. There are no automatic push, PR, tag
 or release publication triggers. No API token or password needs to be added to GitHub.
 
-## Complete the pending Trusted Publisher form
+## Trusted Publisher setup
+
+The 0.2.1 publication already verified the TestPyPI and PyPI publishers below.
+Retain those registrations for 0.3.0; this setup is needed only when configuring
+or repairing a publisher.
 
 On [TestPyPI's publishing page](https://test.pypi.org/manage/account/publishing/),
 use the GitHub tab:
@@ -37,13 +41,38 @@ the **`main` branch**. Required reviewers are optional; configuring one introduc
 an approval step before the upload. The workflow also rejects dispatches from
 other branches before building. This does not change main's branch protection.
 
+## Versions and coordinated release order
+
+| Component | This source release | Published version verified 2026-10-16 |
+| --- | --- | --- |
+| `figgy-model` | 0.11.0 | 0.10.0 |
+| `figgy-renderer` | 0.17.0 | 0.16.1 |
+| `figgyplot` | 0.3.0 | 0.2.1 |
+| `figgy` WASM wrapper | 0.14.0 | Not a crates.io package (`publish = false`) |
+
+For a coordinated release, publish model 0.11.0 before renderer 0.17.0, then
+validate and publish Python 0.3.0 through TestPyPI and PyPI below. Each package
+has its own version; the WASM wrapper's 0.14.0 is not the renderer version.
+The Python native dependencies and bundled WASM both use upstream revision
+`bf665c099e25a39ff2f7229f9ad4f4197d223e45`, recorded in `Cargo.toml`, `Cargo.lock`,
+`scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
+
+Do not delete the Git overrides alone: `scripts/check_assets.py` deliberately
+requires the native and WASM revisions to agree, so that would fail preflight.
+Registry-only dependencies need a separate, tested provenance migration that
+verifies the published crate sources against the WASM build revision. Keep the
+current pins until that migration exists; do not bypass the pairing check.
+Source builds fetch these public Git dependencies; compatible wheels contain
+the compiled extension and do not require Git or Cargo at installation time.
+
 ## Run publication
 
 1. Set the intended version in `Cargo.toml` (`[package] version`), the single version
    source. `pyproject.toml` keeps `dynamic = ["version"]` and `figgyplot.__version__`
-   comes from the extension, so neither holds a version of its own. Remove any
-   `[patch.crates-io]` renderer override first: a release builds against a published
-   `figgy-renderer`.
+   comes from the extension, so neither holds a version of its own. Keep the
+   immutable `[patch.crates-io]` renderer/model revisions and `Cargo.lock` paired
+   with the packaged WASM provenance. The current release builds those exact
+   public Git sources; publishing the Rust crates does not change these inputs.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
 3. Select **main**, **target `testpypi`** and the exact source version (currently
    preparing **`0.3.0`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
@@ -112,7 +141,7 @@ If a successful upload's installation jobs were skipped, do **not** rebuild and
 upload the same version. Run the workflow on **main** with:
 
 - **target:** `verify-testpypi`
-- **version:** the uploaded version, currently `0.2.1`
+- **version:** the uploaded version (`0.2.1` in this historical example)
 - **testpypi-run-id:** the original upload's numeric ID, **`38605305486`** for the
   first 0.2.1 upload (from its `/actions/runs/38605305486` URL, not the label `#2`).
 
@@ -130,9 +159,9 @@ now explicitly uses `always()`, cancellation handling and success of the selecte
 preparation/upload branch. The failed PyPI run `38612755099` had an empty source
 run-ID input and stopped in the gate; it made no production upload.
 
-The Codex connector in this session can prepare/validate workflows and read CI
-results, but has no workflow-dispatch operation. The owner clicks **Run workflow**;
-OIDC then lets GitHub Actions publish without sharing an API key with Codex.
+An authorized maintainer dispatches the workflow through GitHub Actions or an
+authenticated GitHub CLI. OIDC supplies the registry identity; no PyPI API key
+needs to be placed in the repository.
 
 The free-threaded wheels may enable the GIL on import, as declared by the native
 extension. That warning is expected. Native/browser GPU behavior still depends
@@ -162,13 +191,13 @@ The workflow, ShellCheck, reusable-build contract and release regressions are
 checked locally. Existing real glibc/musl wheels and a newly built sdist are
 inspected with the release validator; no filenames or binary tags are repaired.
 Local tests cannot prove GitHub OIDC issuance or TestPyPI upload/index behavior.
-Those require completing the pending publisher and executing this workflow.
+Those require the configured publisher and an actual workflow execution.
 
 The [first complete TestPyPI publication run](https://github.com/shim9610/figgy-python/actions/runs/38590006371)
 at `35200d1` subsequently succeeded, including all build gates, upload and the
 nine post-upload installation jobs. That run published `0.2.0`.
-In this cloud environment, a fresh-venv installation from TestPyPI was attempted
-but its CONNECT tunnel is blocked with HTTP 403 by the network proxy. This is not
+During that initial 0.2.0 release session, a fresh-venv installation from TestPyPI
+was blocked with HTTP 403 by that environment's network proxy. It was not
 reported as a successful local index install; the actual nine GitHub index
 installation results are the remote evidence. The [0.2.1 recovery run](https://github.com/shim9610/figgy-python/actions/runs/38618489720)
 subsequently passed all nine TestPyPI installation jobs. The
@@ -179,9 +208,10 @@ also confirms version 0.2.1 with 75 distribution files.
 
 The prepared 0.3.0 release moves to figgy-renderer 0.17.0 and fixes the issues
 reported against 0.2.1; it also carries the PyPI installation instructions that
-were prepared as 0.2.2, which was never uploaded. It needs figgy-renderer 0.17.0
-on crates.io (then the patch override is removed), a new TestPyPI build/upload
-and all installation checks before promotion; no 0.3.0 publication has occurred.
+were prepared as 0.2.2, which was never uploaded. Follow the coordinated version
+order above while retaining the native/WASM source pins. It needs a new TestPyPI
+build/upload and all installation checks before promotion; no 0.3.0 publication
+has occurred as of 2026-10-16.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.
