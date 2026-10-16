@@ -9,7 +9,7 @@ import tarfile
 import tomllib
 from urllib.request import urlopen
 
-from check_assets import NATIVE_PACKAGES, native_registry_packages
+from check_assets import NATIVE_PACKAGES, host_patch_record, native_registry_packages
 
 
 def verify_archive(data, name, package, upstream, revision):
@@ -56,6 +56,7 @@ def verify_registry_sources(root, upstream, revision):
         raise ValueError("WASM checkout is not at the requested upstream revision")
     # Include staged edits; never attest a patched tree merely because HEAD matches.
     subprocess.run(["git", "-C", str(upstream), "diff", "--quiet", "HEAD", "--"], check=True)
+    patch = host_patch_record(root)
     records = {}
     for name, package in native_registry_packages(root).items():
         url = "https://static.crates.io/crates/{0}/{0}-{1}.crate".format(name, package["version"])
@@ -69,6 +70,7 @@ def verify_registry_sources(root, upstream, revision):
         "renderer_version": records["figgy-renderer"]["version"],
         "web_package_version": web["package"]["version"],
         "native_packages": records,
+        "wasm_host_patch": patch,
     }
 
 

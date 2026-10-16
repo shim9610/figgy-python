@@ -19,15 +19,23 @@
       "path_in_vcs": "crates/model"
     }
   },
+  "wasm_host_patch": {
+    "path": "scripts/wasm-host.patch",
+    "sha256": "bdf219145c81cf1087443aa4820c0c8163a101748da5ad9ce08fae4267f99a6f",
+    "files": [
+      "crates/web/src/bounded.rs",
+      "crates/web/src/lib.rs"
+    ]
+  },
   "wasm_bindgen_version": "0.2.129",
   "assets": {
     "figgy_bg.wasm": {
-      "sha256": "5a5aae670cb31c3e94df0e4b9aeb7e244e1c002c732880190d35b38398910ef9",
-      "bytes": 8954014
+      "sha256": "bd794e856cd309de758518dd3afa2c857b29d7840f6f4230631b9551152c4878",
+      "bytes": 8965423
     },
     "figgy.js": {
-      "sha256": "617c91e4c46e7a663d77094eae8636b2d8789916305776a042bc77c202cf8262",
-      "bytes": 162329
+      "sha256": "1c22229a01186c8e8b3ef09384b4dfbeb61c3b9febedd4abb3e7d1ebfb6bb657",
+      "bytes": 163258
     }
   }
 }

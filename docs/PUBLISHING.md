@@ -64,7 +64,11 @@ rebuild WASM from the matching clean release checkout. The rebuild verifies the
 downloaded `.crate` checksums, `.cargo_vcs_info.json` source revision and Rust
 sources before recording provenance. Offline preflight checks that the native
 versions/checksums and WASM revision remain paired; Git/path overrides fail this
-gate. Do not edit provenance by hand to bypass a source mismatch.
+gate. The build then applies `scripts/wasm-host.patch` to a disposable copy of
+the web host. This additive binding patch exposes non-borrowing GPU completion;
+it does not change renderer/model sources. Provenance records its hash, and
+preflight rejects a mismatched patch or changes outside the two web host files.
+Do not edit provenance by hand to bypass a source mismatch.
 Python source builds fetch the Rust dependencies from crates.io; compatible
 wheels contain the compiled extension and need neither Git nor Cargo to install.
 

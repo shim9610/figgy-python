@@ -56,7 +56,7 @@ export function render({model,el}) {
   const textRanges=new Map();
   function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;}
   function layoutMode(enabled){if(!enabled&&kind&&chart&&selected==='data_area')enqueue(()=>{chart.clear_selection();selected=null;dirty=true;commit();});root.querySelector('[data-area]').checked=enabled;root.querySelector('[data-layout]').setAttribute('aria-pressed',String(enabled));root.querySelector('[data-select]').setAttribute('aria-pressed',String(!enabled));}
-  let inputAt=null,busy=0,startInit;
+  let inputAt=null,busy=0,startInit,pendingFrame=null,frameError=null;
   const requested=new Promise(resolve=>{startInit=resolve;});
   let initializedResolve,initializedReject;
   const initialized=new Promise((resolve,reject)=>{initializedResolve=resolve;initializedReject=reject;});
@@ -144,12 +144,13 @@ export function render({model,el}) {
       const hint=document.createElement('small');hint.textContent='Arrows: move selection · Esc: clear';selectedData.append(hint);
     });
   }
-  function properties(){
+  let decorationIds=[],inspectorTarget=null,inspectorGeneration=0;
+  function properties(refresh=true){
     if(!chart)return;
-    local=snapshot();
+    if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
     selectionProperties();
-    const previous=selected;select.replaceChildren();
-    for(const id of (kind?['chart_title',...JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title'),...(kind==='radial'?local.radial.slices.map((_,i)=>`slice_0_${i}`):local[kind].series.map(s=>s.id))]:[...ids,...local.series.map(s=>s.series_id)])){const option=document.createElement('option');option.value=id;option.textContent=labels[id]??(text(local.series.find(s=>s.series_id===id)?.label)||caption(id));select.append(option);}
+    const previous=inspectorTarget??selected;select.replaceChildren();
+    for(const id of (kind?['chart_title',...decorationIds,...(kind==='radial'?local.radial.slices.map((_,i)=>`slice_0_${i}`):local[kind].series.map(s=>s.id))]:[...ids,...local.series.map(s=>s.series_id)])){const option=document.createElement('option');option.value=id;option.textContent=labels[id]??(text(local.series.find(s=>s.series_id===id)?.label)||caption(id));select.append(option);}
     select.value=previous ?? 'chart_title';fields.replaceChildren();
     const target=select.value,cfg=local.config;
     const series=local.series.find(s=>s.series_id===target);
@@ -293,19 +294,33 @@ export function render({model,el}) {
   }
   const observer=new ResizeObserver(resize);
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
+  async function waitForFrame(){
+    if(frameError)throw frameError;
+    await pendingFrame;
+    if(disposed)throw Error('Widget disposed');
+    if(frameError)throw frameError;
+  }
   function frame(now=0){if(disposed)return;
-    if(kind&&chart&&!busy){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
-    if(chart&&dirty&&!busy)enqueue(async()=>{
-      if(!dirty)return;
-      // Keep only one display frame in flight. Otherwise animation/input can
-      // build a GPU backlog that delays readback long after export is requested.
-      const ready=chart.first_frame_ready();
-      if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}
-      await ready;if(disposed)return;recordFrame();
+    if(kind&&chart&&!busy&&!pendingFrame&&!frameError){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
+    if(chart&&dirty&&!busy&&!pendingFrame&&!frameError)enqueue(()=>{
+      if(!dirty||pendingFrame||frameError)return;
+      try{
+        chart.frame();
+        if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}
+        recordFrame();
+        // GPU completion owns no chart borrow and must not hold the edit/ack
+        // queue. Only further display submissions wait for this fence.
+        const completion=Promise.resolve(chart.gpu_ready()).catch(e=>{
+          frameError=e;if(!disposed)fail(e);throw e;
+        }).finally(()=>{if(pendingFrame===completion)pendingFrame=null;});
+        pendingFrame=completion;
+        completion.catch(()=>{}); // Export/prepare also observe the rejection.
+      }catch(e){frameError=e;throw e;}
+      // Later edits may set dirty while the GPU runs. Completion never clears it.
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1){await flush();return enqueue(async()=>{stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
+  async function exporting(scale=1){await flush();return enqueue(async()=>{await waitForFrame();stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
@@ -327,7 +342,7 @@ export function render({model,el}) {
       (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;await queue;await flush();let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
           const start=performance.now(),stages=[];status.textContent='Preparing…';
-          try{if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';
+          try{await waitForFrame();if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';
             return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
           }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
@@ -335,7 +350,14 @@ export function render({model,el}) {
     }
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
-  select.addEventListener('change',()=>enqueue(()=>{selected=select.value;properties();}));
+  // Present the chosen inspector immediately without borrowing the renderer.
+  // Apply interaction selection in event order so older keys/picks keep their
+  // original target and cannot overwrite a newer pending inspector choice.
+  select.addEventListener('change',()=>{
+    const target=select.value,generation=++inspectorGeneration;
+    inspectorTarget=target;properties(false);
+    enqueue(()=>{selected=target;if(generation===inspectorGeneration)inspectorTarget=null;properties();});
+  });
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot')s.boxplot.value_range=null;install(s);}else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
@@ -469,6 +491,6 @@ export function render({model,el}) {
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(()=>{chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

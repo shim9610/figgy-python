@@ -84,6 +84,13 @@ export class FiggyBoundedChart {
     first_frame_ready(): Promise<void>;
     frame(): void;
     get_document(): string;
+    /**
+     * Observe completion of work already submitted to this chart's GPU queue.
+     * The returned Promise owns a queue clone, not a borrow of this chart.
+     * Hosts may keep processing edits while waiting, and should coalesce
+     * display submissions until it settles. Device loss rejects the Promise.
+     */
+    gpu_ready(): Promise<any>;
     hit_decoration(x: number, y: number, edit_area: boolean): string | undefined;
     hover(x: number | null | undefined, y: number | null | undefined, dt: number): boolean;
     pick(x: number, y: number, toggle: boolean): string;
@@ -286,6 +293,13 @@ export class FiggyChart {
      * queue completion callback fires.
      */
     gpu_memory_status(): string;
+    /**
+     * Observe completion of work already submitted to this chart's GPU queue.
+     * The returned Promise owns a queue clone, not a borrow of this chart.
+     * Hosts may keep processing edits while waiting, and should coalesce
+     * display submissions until it settles. Device loss rejects the Promise.
+     */
+    gpu_ready(): Promise<any>;
     has_selection(): boolean;
     /**
      * Hit-test the chart chrome at canvas pixel `(x, y)` — returns the
@@ -737,6 +751,7 @@ export interface InitOutput {
     readonly figgyboundedchart_first_frame_ready: (a: number) => any;
     readonly figgyboundedchart_frame: (a: number) => [number, number];
     readonly figgyboundedchart_get_document: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_gpu_ready: (a: number) => any;
     readonly figgyboundedchart_hit_decoration: (a: number, b: number, c: number, d: number) => [number, number];
     readonly figgyboundedchart_hover: (a: number, b: number, c: number, d: number) => number;
     readonly figgyboundedchart_pick: (a: number, b: number, c: number, d: number) => [number, number, number, number];
@@ -779,6 +794,7 @@ export interface InitOutput {
     readonly figgychart_get_config: (a: number) => [number, number, number, number];
     readonly figgychart_get_series: (a: number) => [number, number, number, number];
     readonly figgychart_gpu_memory_status: (a: number) => [number, number];
+    readonly figgychart_gpu_ready: (a: number) => any;
     readonly figgychart_has_selection: (a: number) => number;
     readonly figgychart_hit_test: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_inspect_column_admission: (a: number, b: number, c: number) => [number, number, number, number];
@@ -853,8 +869,8 @@ export interface InitOutput {
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__147: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__148: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150: (a: number, b: number, c: any) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

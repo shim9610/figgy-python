@@ -58,11 +58,17 @@ before awaiting the frame, repeating this if the display size changes during
 preparation. Ready therefore covers the displayed surface without immediately
 submitting a redundant, unawaited frame. Preparation failures remain visible
 in the status and propagate to Python. The browser shows upstream stage progress.
-Preparation, menu access and redraw/picking/export operations are serialized to
-protect the WASM chart.
-Ordinary browser redraws also await GPU completion before submitting another
-surface frame. Input received during that wait is applied before the next
-redraw, so exports do not queue behind a burst of obsolete animation frames.
+Preparation and renderer reads/mutations, including picking and export, are
+serialized to protect the WASM chart. Choosing an inspector target immediately
+renders its controls from the last accepted settings without borrowing the chart;
+edits still enter the renderer queue.
+Ordinary browser redraws submit synchronously and retain a separate GPU completion
+Promise that owns no chart borrow. Only the next display submission waits for
+that Promise; input, accepted settings and Python edit acknowledgements continue
+through the operation queue. `fig.sync()` acknowledges edits without waiting for
+display completion. Export and explicit preparation wait for the outstanding
+frame before starting their own GPU work. Edits made during a frame remain dirty
+until a later submission, so completion cannot discard a newer redraw.
 `elapsed_ms` covers the browser request, including initialization/upload when
 deferred; `prewarm_ms` separately measures prewarm plus first-frame readiness.
 Kernel/comm scheduling and outbound transfer before the request are not included.

@@ -24,6 +24,29 @@ def check_assets(assets):
 
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 NATIVE_PACKAGES = {"figgy-renderer": "crates/renderer", "figgy-model": "crates/model"}
+HOST_PATCH = "scripts/wasm-host.patch"
+HOST_PATCH_FILES = {"crates/web/src/lib.rs", "crates/web/src/bounded.rs"}
+
+
+def host_patch_record(root):
+    """Allow only additive changes to the two unpublished WASM bridge files."""
+    import subprocess
+    path = Path(root) / HOST_PATCH
+    data = path.read_bytes()
+    if b"\r" in data or any(line.startswith((b"old mode ", b"new mode ", b"new file ",
+            b"deleted file ", b"rename ", b"copy ", b"GIT binary patch")) for line in data.splitlines()):
+        raise ValueError("WASM host patch must contain only LF text additions to existing bridge files")
+    result = subprocess.run(["git", "apply", "--numstat", "-z", str(path.resolve())], cwd=root,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode:
+        raise ValueError("WASM host patch is not a valid Git patch")
+    entries = [entry.split("\t", 2) for entry in result.stdout.decode().split("\0") if entry]
+    if (len(entries) != len(HOST_PATCH_FILES) or any(len(entry) != 3 or not entry[0].isdigit()
+            or int(entry[0]) == 0 or entry[1] != "0" for entry in entries)
+            or {entry[2] for entry in entries} != HOST_PATCH_FILES):
+        raise ValueError("WASM host patch may only add code to the two unpublished bridge files")
+    return {"path": HOST_PATCH, "sha256": hashlib.sha256(data).hexdigest(),
+            "files": sorted(HOST_PATCH_FILES)}
 
 
 def native_registry_packages(root):
@@ -78,6 +101,8 @@ def check_renderer_revision(root):
     found = re.search(r'^revision=([0-9a-f]+)$', script, re.MULTILINE)
     if not found or found.group(1) != revision:
         raise ValueError("WASM rebuild script and asset provenance must pin the same upstream revision")
+    if provenance.get("wasm_host_patch") != host_patch_record(root):
+        raise ValueError("WASM host patch and asset provenance differ; rebuild the packaged assets")
 
 
 if __name__ == "__main__":

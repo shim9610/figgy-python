@@ -231,7 +231,7 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
         page.mouse.move(*browser_point(page,(x,y)))
         page.wait_for_function(ROOT+f".snapshot().{kind}."+('interaction.hovered' if kind=='radial' else 'hovered')+" !== null")
         page.mouse.click(*browser_point(page,(x,y)))
-        # The click waits for an in-flight GPU frame's mutable WASM borrow.
+        # Picking and opening the editor run through the operation queue.
         panel.wait_for(state='visible')
         assert panel.is_visible()
         # Hover and click do not recreate columns or encode images.
@@ -258,6 +258,8 @@ def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
     """Slow GPU completion must not build a frame backlog ahead of PNG export."""
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\nax.bar(['A','B'],[3,5])\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
     with notebook(tmp_path/'frame-backpressure', source) as (page,execute):
+        page.locator('[data-properties]').click()
+        page.locator('.figgy-properties').wait_for(state='visible')
         box=page.evaluate("async()=> (await "+ROOT+".decorations()).find(v=>v.id==='chart_title').rect")
         logical=(box[0]+box[2]/2,box[1]+box[3]/2)
         start=browser_point(page,logical)
@@ -286,15 +288,82 @@ def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
             # Subsequent RAF callbacks must coalesce redraws, not submit them.
             page.mouse.move(*end, steps=5)
             page.mouse.up()
+            # Changing the inspector target is pure DOM work. Its controls must
+            # match the dropdown immediately, even while renderer work is held.
+            target=page.locator('[data-target]')
+            series_id=page.evaluate(ROOT+'.snapshot().categorical.series[0].id')
+            target.select_option(series_id)
+            assert page.locator('[data-property=label]').count() == 1
+            target.select_option('chart_title')
+            assert page.locator('[data-property=label]').count() == 0
+            # An earlier queued Arrow still belongs to the title, even when
+            # the inspector has already presented the later series choice.
+            page.locator('canvas').press('ArrowRight')
+            target.select_option(series_id)
+            # Likewise an older queued canvas pick must not replace a newer
+            # inspector choice when the GPU fence releases and work drains.
+            page.mouse.click(*start)
+            target.select_option('chart_title')
+            target.select_option(series_id)
+            assert page.locator('[data-property=label]').count() == 1
             page.evaluate("window.figgyHeldFrames=0;requestAnimationFrame(()=>{window.figgyHeldFrames++;requestAnimationFrame(()=>window.figgyHeldFrames++);})")
             page.wait_for_function('window.figgyHeldFrames===2', polling=100)
             assert page.evaluate('window.figgyGPUWork.submitted') == submitted
+            # Sync acknowledges edits; it must not await display-GPU completion.
+            # Keep the actual completion fence held until this barrier returns.
+            execute('await fig.sync(timeout=5)')
+            accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+            assert offset(accepted['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2)
+            assert target.input_value() == series_id
         finally:
             page.evaluate('window.figgyFrameGate.release()')
+        page.wait_for_function('before=>window.figgyGPUWork.submitted>before',arg=submitted,polling=100)
         execute('await fig.sync()')
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
-        assert offset(state['categorical'],'ChartTitle') == pytest.approx([12,6],abs=1.2)
+        assert offset(state['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2), target.input_value()
+        assert target.input_value() == series_id
         path=tmp_path/'coalesced-export.png'
+        execute(f'await fig.savefig_async({str(path)!r})')
+        from PIL import Image
+        pixels=np.asarray(Image.open(path).convert('RGB'))
+        assert pixels.shape == (600,960,3)
+        assert np.count_nonzero(np.any(pixels<200,axis=2)) > 500
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+def test_cartesian_sync_accepts_edits_while_display_gpu_is_pending(tmp_path):
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\nax.plot([0,1],[1,2])\nax.set_title('Before')\ndisplay(fig.widget())"
+    with notebook(tmp_path/'cartesian-frame-barrier',source) as (page,execute):
+        page.locator('[data-properties]').click()
+        page.locator('[data-target]').select_option('chart_title')
+        page.evaluate(ROOT+'.flush()')
+        page.evaluate("""()=>{
+            const prototype=GPUQueue.prototype,original=prototype.onSubmittedWorkDone;
+            let release;const held=new Promise(resolve=>{release=resolve;});
+            window.figgyFrameGate={entered:false,release:()=>{
+                prototype.onSubmittedWorkDone=original;release();
+            }};
+            prototype.onSubmittedWorkDone=function(...args){
+                const completion=original.apply(this,args);
+                window.figgyFrameGate.entered=true;
+                return completion.then(()=>held);
+            };
+        }""")
+        try:
+            title=page.locator('[data-property=text]')
+            title.fill('First edit');title.press('Tab')
+            page.wait_for_function('window.figgyFrameGate.entered',polling=100)
+            submitted=page.evaluate('window.figgyGPUWork.submitted')
+            title.fill('Accepted during GPU work');title.press('Tab')
+            execute('await fig.sync(timeout=5)')
+            settings=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+            assert ''.join(s['text'] for s in settings['config']['chart_title']['text']['segments']) == 'Accepted during GPU work'
+            assert page.evaluate('window.figgyGPUWork.submitted') == submitted
+        finally:
+            page.evaluate('window.figgyFrameGate.release()')
+        page.wait_for_function('before=>window.figgyGPUWork.submitted>before',arg=submitted,polling=100)
+        execute('await fig.sync()')
+        path=tmp_path/'cartesian-after-barrier.png'
         execute(f'await fig.savefig_async({str(path)!r})')
         from PIL import Image
         pixels=np.asarray(Image.open(path).convert('RGB'))

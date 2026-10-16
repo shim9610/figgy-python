@@ -89,15 +89,69 @@ def registry_pairing(tmp_path):
     (tmp_path / "Cargo.lock").write_text(lock)
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/build-wasm.sh").write_text("revision=" + revision + "\n")
+    shutil.copyfile(ROOT / "scripts/wasm-host.patch", tmp_path / "scripts/wasm-host.patch")
+    patch = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"](tmp_path)
     assets = tmp_path / "python/figgyplot/assets"
     assets.mkdir(parents=True)
     (assets / "provenance.json").write_text(json.dumps({
-        "upstream_revision": revision, "renderer_version": "0.17.0", "native_packages": packages}))
+        "upstream_revision": revision, "renderer_version": "0.17.0", "native_packages": packages,
+        "wasm_host_patch": patch}))
     return tmp_path
 
 
 def check_pairing(root):
     runpy.run_path(str(ROOT / "scripts/check_assets.py"))["check_renderer_revision"](root)
+
+
+def test_host_patch_check_does_not_depend_on_callers_git_subdirectory(registry_pairing, monkeypatch):
+    monkeypatch.chdir(ROOT / "scripts")
+    check_pairing(registry_pairing)
+
+
+@pytest.mark.parametrize("change", ["bytes", "missing", "hash", "path", "files"])
+def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
+    import json
+    check_pairing(registry_pairing)
+    path = registry_pairing / "python/figgyplot/assets/provenance.json"
+    provenance = json.loads(path.read_text())
+    if change == "bytes":
+        patch = registry_pairing / "scripts/wasm-host.patch"
+        patch.write_text(patch.read_text().replace("Observe completion", "Await completion"))
+    elif change == "missing":
+        del provenance["wasm_host_patch"]
+    elif change == "hash":
+        provenance["wasm_host_patch"]["sha256"] = "0" * 64
+    elif change == "path":
+        provenance["wasm_host_patch"]["path"] = "scripts/another.patch"
+    else:
+        provenance["wasm_host_patch"]["files"] = ["crates/renderer/src/lib.rs"]
+    path.write_text(json.dumps(provenance))
+    with pytest.raises(ValueError, match="host patch.*provenance"):
+        check_pairing(registry_pairing)
+
+
+@pytest.mark.parametrize("change", ["renderer", "model", "manifest", "mode", "crlf", "deletion", "invalid"])
+def test_host_patch_cannot_change_native_sources_or_build_configuration(registry_pairing, change):
+    patch = registry_pairing / "scripts/wasm-host.patch"
+    data = patch.read_text()
+    if change in ("renderer", "model", "manifest"):
+        destination = "Cargo.toml" if change == "manifest" else "crates/" + change + "/src/lib.rs"
+        data = data.replace("crates/web/src/lib.rs", destination)
+    elif change == "mode":
+        data = data.replace("--- a/", "old mode 100644\nnew mode 100755\n--- a/", 1)
+    elif change == "crlf":
+        data = data.replace("\n", "\r\n")
+    elif change == "deletion":
+        # A syntactically valid patch that removes existing bridge code is
+        # outside this deliberately additive host extension's scope.
+        data = data.replace("@@ -5756,6 +5756,20 @@", "@@ -5756,6 +5756,19 @@")
+        data = data.replace("             Ok(())\n", "-            Ok(())\n", 1)
+    else:
+        data = "not a patch\n"
+    patch.write_bytes(data.encode())
+    checker = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"]
+    with pytest.raises(ValueError, match="host patch"):
+        checker(registry_pairing)
 
 
 @pytest.mark.parametrize("package", ["figgy-model", "figgy-renderer"])

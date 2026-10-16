@@ -151,10 +151,56 @@ The subsequent hosted run reached PNG export but exceeded its 60-second
 deadline. Reproduction with the hosted Chromium 156/SwiftShader build recorded
 three unfinished surface frames when export began: those frames took about
 31.7 seconds to finish, export rendering/readback took another 12.9 seconds,
-and PNG encoding/result transmission took about 42 milliseconds. Ordinary
-redraws now wait for GPU completion before submitting the next surface frame.
+and PNG encoding/result transmission took about 42 milliseconds. This reproduces
+GPU queue latency, but the original hosted timeout did not record per-stage
+timestamps and is not itself proof of the same timing breakdown.
+
+Comparison with figgy-web `18cdff3` (also renderer 0.17.0) identified the missing host boundary:
+`app/js/bounded-studio.js` submits with `render()` and waits separately on
+`BoundedCanvas.gpu_ready()`. That Promise retains no chart borrow. Python's first
+backpressure fix instead awaited `first_frame_ready(&mut self)` inside its
+edit/acknowledgement queue, adding GPU latency to the edit-only `fig.sync()`
+contract. It has been replaced with a synchronous `frame()` submission and a
+separate non-borrowing `gpu_ready()` fence. New display submissions wait for the
+fence; edits and acknowledgements continue. Export and preparation wait explicitly.
+The completion bridge is recorded in `scripts/wasm-host.patch`; renderer/model
+sources remain identical to their published crates.
+
 A held-completion regression sends a burst of real pointer input and checks
 that submissions stay bounded while the final drag and PNG remain correct.
+It also switches inspector targets while completion is held and checks that
+controls immediately match the selected target, without waiting for a WASM borrow.
+An edit barrier must return with accepted final settings while the GPU fence is
+still held; this fails with the previous shared-queue implementation.
+Validation of the replacement on Chromium 156.0.8078.4/SwiftShader: **326 tests
+passed** in the complete local integration run, including native and Jupyter
+interaction cases; preflight **107 passed**. The radial export took **24.1 s**:
+12.1 s waiting for the one outstanding display frame, 11.9 s rendering/readback,
+and approximately 0.04 s encoding/transmission. These software-GPU measurements
+are not physical-GPU frame-rate or export-latency claims. No hosted CI run has
+been performed for this unpushed correction.
+
+A separate standalone comparison removed Jupyter from both paths and rendered
+the same three-slice donut with figgy-web `18cdff3` and the Python WASM host.
+Both used renderer 0.17.0, Chromium 156.0.8078.4, DPR 1 and the actual
+Google/SwiftShader fallback adapter. After one cold frame, the mean of two
+completed warm frames and a subsequent export with no pending display work were:
+
+| 960 x 600 material | Web frame | Python frame | Web PNG | Python PNG |
+| --- | ---: | ---: | ---: | ---: |
+| Flat | 11.94 s | 11.96 s | 12.95 s | 11.20 s |
+| Ceramic | 12.38 s | 13.43 s | 13.70 s | 12.78 s |
+
+At 480 x 300, warm frames took approximately 2.8-3.6 seconds, consistent with
+cost increasing with pixel count. CPU submission at 960 x 600 took only
+0.25-1.3 milliseconds; export GPU readback waiting accounted for all but
+37-41 milliseconds. Decoded PNG pixels were identical between hosts in all
+four size/material pairs. This establishes that the slow single-frame workload
+also occurs in figgy-web on this software adapter, independently of Python's
+frame scheduling. It does not establish hardware-GPU latency or identify a
+specific shader instruction as the bottleneck. Depth was zero and shadows were
+disabled, so this case did not execute the depth raymarch or shadow path.
+
 The export deadline is unchanged. Use the browser and bundled driver selected
 by `scripts/ci_gpu_env.py` when reproducing hosted failures; a system Chromium
 installation can be a different version from Playwright's CI browser.
