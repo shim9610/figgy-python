@@ -49,18 +49,29 @@ def check_bounded_menus_during_preparation(page, execute, kind):
         const original=prototype.onSubmittedWorkDone;
         let release;
         const gate=new Promise(resolve=>{release=resolve;});
-        window.figgyPreparationGate={entered:false,release:()=>{
+        window.figgyPreparationGate={entered:false,armedAt:performance.now(),release:()=>{
             prototype.onSubmittedWorkDone=original;release();
         }};
         prototype.onSubmittedWorkDone=function(...args){
             const completion=original.apply(this,args);
             window.figgyPreparationGate.entered=true;
+            window.figgyPreparationGate.enteredAt=performance.now();
             return completion.then(()=>gate);
         };
     }""")
     try:
         execute('import asyncio; preparation=asyncio.create_task(fig.prepare_async(timeout=60))')
-        page.wait_for_function('window.figgyPreparationGate.entered')
+        try:
+            # This is a GPU-fence handshake, not a visual condition. Poll on a
+            # timer so delayed software-GPU presentation cannot stall RAF polling.
+            page.wait_for_function('window.figgyPreparationGate.entered', polling=100)
+        except Exception:
+            print('Preparation gate diagnostic:', page.evaluate("""()=>({
+                gate:window.figgyPreparationGate,now:performance.now(),
+                status:document.querySelector('.figgy-editor [data-status]')?.textContent,
+                stats:document.querySelector('.figgy-editor')?.figgy?.stats
+            })"""))
+            raise
         execute('assert not preparation.done()')
         page.locator('button[data-style]').click()
         page.locator('button[data-visibility]').click()
@@ -571,7 +582,12 @@ def test_log_axis_ui_breaks_lines_at_nonpositive_samples_in_both_hosts(tmp_path)
         assert axis['scale']=='Logarithmic'
         assert (axis['min'],axis['max'])==pytest.approx((1,100))
         assert state['series']==before['series']
-        for key in ('bottom_x','top_x','right_y'):
+        # The matched Y pair shares the fitted positive minimum, scale and
+        # derived tick step; every other field on each edge stays unchanged.
+        for key in ('left_y','right_y'):
+            assert state['config'][key]=={**before['config'][key],
+                                         'min':1.,'scale':'Logarithmic','major_spacing':1.}
+        for key in ('bottom_x','top_x'):
             assert state['config'][key]==before['config'][key]
     def check_pixels(pixels, rect):
         x,y,w,h=rect

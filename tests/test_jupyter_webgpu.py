@@ -90,8 +90,9 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             page.locator('[data-fields] input[data-property=text]').fill('WebGPU edited title');page.locator('[data-fields] input[data-property=text]').press('Tab')
             page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'WebGPU edited title'")
             assert 'WebGPU edited title' in execute("await fig.sync(); print(fig.to_code())")
-            # Range edits cross the Python/browser boundary as plain SSOT
-            # fields; they preserve ticks and never introduce a lock marker.
+            # A raw SSOT patch stays one-sided. The later UI range edit shares
+            # only its changed minimum with the matching opposite coordinate
+            # range, preserving the deliberately different tick settings.
             execute("fig.configure(config={'bottom_x': {'major_spacing': 1.25, 'minor_count': 1}})")
             page.wait_for_function(root+".snapshot().config.bottom_x.major_spacing === 1.25")
             before_range=page.evaluate(root+'.snapshot().config')
@@ -101,6 +102,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             page.wait_for_function(root+".snapshot().config.bottom_x.min === 2")
             after_range=json.loads(execute("await fig.sync(); print(json.dumps(fig.get_settings()['config']))"))
             before_range['bottom_x']['min']=2
+            before_range['top_x']['min']=2
             assert after_range == before_range
             # The explicit Fit helper still derives all bounds and ticks.
             page.locator('[data-fit]').click()
