@@ -1,7 +1,7 @@
 # Native surface / notebook WebGPU hosts
 
 The Python distribution uses `figgy-renderer 0.17.0`; until it is on crates.io it comes
-from figgy commit `632d184` through a `[patch.crates-io]` override. Chart layout, styles, data
+from figgy commit `6aee54b` through a `[patch.crates-io]` override. Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
 vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
 
@@ -13,10 +13,11 @@ f32/f64 → hi/lo staging path. `NativeFigure` and the desktop host share one
 All native Figures in this process now share one GPU instance/adapter,
 device/queue, renderer, resident column pool and pipeline/picking resources.
 Each Figure owns its chart registration, settings, columns and export target.
-Pie/donut Figures additionally own an upstream bounded radial model/renderer.
-They share the device/queue but use no Cartesian source columns. Native radial
+Pie/donut, categorical-bar and boxplot Figures own the corresponding upstream
+bounded model/renderer.
+They share the device/queue but use no Cartesian source columns. Native bounded-chart
 windows paint upstream frames to a GPU texture embedded in egui, without PNG or
-RGBA transfer during redraw. Small category values remain in the radial CPU model.
+RGBA transfer during redraw. Small category values and box summaries remain in the bounded CPU model.
 Cartesian uploads retain no CPU array copy. See [native sharing](NATIVE_SHARING.md)
 for ownership, capacity, synchronization and explicit release behavior.
 
@@ -78,7 +79,7 @@ The process keeps one reusable main-thread winit loop for close/reopen. These
 APIs do not integrate automatically with a foreign Qt/Tk event loop or `%gui qt`.
 
 Native `fig.info` counts `column_uploads`, `rgba_readbacks`, `png_encodes`.
-For pie/donut Figures, `allocation_mode="bounded"`; their retained radial export
+For bounded-chart Figures, `allocation_mode="bounded"`; their retained export
 resources are included in `known_gpu_bytes`. Cartesian figures use `resident`.
 These counters and `columns`/`figure_column_bytes` are per Figure. The
 `gpu_context_id`, `gpu_sharing="process"`, `active_figures`, `pool_capacity_bytes`
@@ -93,8 +94,9 @@ readback. Do not compare the two as the same FPS metric.
 
 ## Jupyter
 
-Pie/donut editing currently requires the native host. See
-[chart and style API](CHART_TYPES.md) for static notebook output and style limits.
+Native and Jupyter WebGPU hosts support Cartesian, radial, categorical and boxplot
+charts. Both expose click selection, hover, decoration dragging and plot-area
+resize handles. See [chart and style API](CHART_TYPES.md) for constructors and limits.
 
 `backend="auto"` selects `webgpu` inside an IPython kernel and `native` elsewhere.
 Use `Figure(backend="webgpu")` explicitly in shared scripts. Its PyO3
@@ -102,7 +104,7 @@ Use `Figure(backend="webgpu")` explicitly in shared scripts. Its PyO3
 it creates no adapter, device or native GPU pool. Initial min/max metadata is
 computed while scanning inputs; renderer `Chart.auto_fit_*_extent` owns range
 fitting. The browser Fit action uses upstream GPU fit. This initial metadata path
-covers the exposed plot/scatter/heatmap APIs; it is not a general errorbar fit
+covers plot/scatter/errorbar/histogram/heatmap/contour APIs; it is not a general errorbar fit
 engine.
 
 The browser creates upstream `FiggyChart` on a real WebGPU canvas. Float32 and
@@ -173,7 +175,7 @@ requires a usable kernel GPU and performs image transfers.
 ## Assets and builds
 
 `python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
-`crates/web` at commit `632d1844f184f9e9a230867773ec1885e1557541` (renderer 0.17.0,
+`crates/web` at commit `6aee54b885fdfc18a119a084f8277a5453b39658` (renderer 0.17.0,
 web example 0.14.0). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
 wasm-bindgen 0.2.129. `assets/provenance.json` records the versions and SHA-256.
 The script uses an external checkout; it does not copy Rust sources into this

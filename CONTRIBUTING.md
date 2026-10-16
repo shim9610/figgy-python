@@ -63,3 +63,29 @@ Dependency updates should respect the pinned renderer and matching wgpu/egui
 versions. Dependabot's regular update PRs are paused initially. No automatic merge
 or PyPI publication is configured.
 
+
+## Native/Jupyter synchronization contract
+
+Interaction changes must update both the native desktop host and Jupyter WebGPU
+host in the same PR, with a corresponding scenario in
+`tests/test_interaction_parity.py`. The PR preflight diffs the full base/head SHAs
+(including deletes/renames) and rejects one-sided host changes or changes without
+shared behavior coverage. Shared Python chart API changes also require coverage.
+Documentation-only changes do not require artificial host edits.
+
+Linux integration runs the same selection, hover, drag, resize, keyboard, export,
+zoom/pan and toolbar expectations against real X11 windows and real JupyterLab
+WebGPU. `FIGGY_REQUIRE_INTERACTION_PARITY=1` makes missing UI prerequisites an
+error instead of a skip. Both existing required PR checks cover this contract. Asset preflight also
+requires the native renderer/model pins, WASM provenance and rebuild script to
+use the same upstream revision.
+File pairing is a review guard; behavioral scenarios are the runtime evidence.
+When adding a gesture or chart family, extend the shared scenarios as well.
+
+```sh
+python scripts/check_interaction_parity.py --base <PR-base-SHA> --head <PR-head-SHA>
+FIGGY_REQUIRE_INTERACTION_PARITY=1 FIGGY_TEST_JUPYTER=1 FIGGY_TEST_HEADFUL=1 \
+  python -m pytest -q tests/test_interaction_parity.py
+```
+
+Run the second command inside an X11 session with the dependencies listed above.

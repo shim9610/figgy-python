@@ -6,11 +6,13 @@ pub const INSPECTOR_WIDTH: f32 = 320.;
 
 pub(crate) struct Editor {
     pub inspector_open: bool,
+    pub edit_area: bool,
     pub error: String,
     pub advanced_requested: bool,
     pub picked: Option<Value>,
     save_path: String,
     raw: String,
+    text_ranges: HashMap<String, std::ops::Range<usize>>,
     notice: String,
     pub stage: egui::Rect,
     pub controls: HashMap<String, egui::Rect>,
@@ -20,11 +22,13 @@ impl Default for Editor {
     fn default() -> Self {
         Self {
             inspector_open: false,
+            edit_area: false,
             error: String::new(),
             advanced_requested: false,
             picked: None,
             save_path: "figure.png".into(),
             raw: String::new(),
+            text_ranges: HashMap::new(),
             notice: String::new(),
             stage: egui::Rect::NOTHING,
             controls: HashMap::new(),
@@ -528,6 +532,66 @@ impl Editor {
             });
     }
 
+    fn rich_text_editor(&mut self, ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
+        let mut text = display_text(&node["segments"]);
+        ui.label("Text (select characters to format)");
+        let output = egui::TextEdit::singleline(&mut text)
+            .id_salt(key)
+            .desired_width(f32::INFINITY)
+            .show(ui);
+        self.controls.insert(key.to_owned(), output.response.rect);
+        if let Some(range) = output.cursor_range {
+            if output.response.has_focus() || output.response.lost_focus() {
+                let chars = range.as_sorted_char_range();
+                self.text_ranges
+                    .insert(key.to_owned(), chars.start.0..chars.end.0);
+            }
+        }
+        let mut changed = output.response.changed();
+        if changed {
+            let fresh =
+                serde_json::to_value(renderer::text::rich_segments_from_text(&text)).unwrap();
+            node["segments"] = preserve_segment_styles(&node["segments"], fresh);
+        }
+        let segments = node["segments"].as_array_mut().unwrap();
+        let count = segments.len();
+        let range = self
+            .text_ranges
+            .get(key)
+            .filter(|r| r.start < r.end)
+            .cloned()
+            .unwrap_or(0..count);
+        let range = range.start.min(count)..range.end.min(count);
+        ui.horizontal_wrapped(|ui| {
+            for (flag, label) in [
+                ("bold", "B"),
+                ("italic", "I"),
+                ("underline", "U"),
+                ("superscript", "x²"),
+                ("subscript", "x₂"),
+                ("greek", "αβ"),
+            ] {
+                let active =
+                    !range.is_empty() && segments[range.clone()].iter().all(|s| s[flag] == true);
+                let response = ui.selectable_label(active, label).on_hover_text(flag);
+                self.controls.insert(format!("{key}_{flag}"), response.rect);
+                if response.clicked() {
+                    for segment in &mut segments[range.clone()] {
+                        segment[flag] = json!(!active);
+                        if !active && flag == "superscript" {
+                            segment["subscript"] = json!(false);
+                        }
+                        if !active && flag == "subscript" {
+                            segment["superscript"] = json!(false);
+                        }
+                    }
+                    changed = true;
+                }
+            }
+        });
+        changed
+    }
+
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
         let mut state = serde_json::to_value(c.snapshot()).unwrap();
         let mut changed = false;
@@ -553,7 +617,12 @@ impl Editor {
         };
         if let Some((node, key)) = visibility {
             if let Some(mut value) = node[key].as_bool() {
-                let response = ui.checkbox(&mut value, "Visible");
+                let label = if key == "line_visible" {
+                    "Axis line"
+                } else {
+                    "Visible"
+                };
+                let response = ui.checkbox(&mut value, label);
                 self.controls.insert("visible".into(), response.rect);
                 if response.changed() {
                     node[key] = json!(value);
@@ -578,19 +647,8 @@ impl Editor {
                     if !series["label"].is_object() {
                         continue;
                     }
-                    let mut text = display_text(&series["label"]["segments"]);
-                    let response =
-                        ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
-                    self.controls.insert(
-                        format!("legend_label_{}", series["series_id"].as_str().unwrap()),
-                        response.rect,
-                    );
-                    if response.changed() {
-                        series["label"]["segments"] =
-                            serde_json::to_value(renderer::text::rich_segments_from_text(&text))
-                                .unwrap();
-                        labels_changed = true;
-                    }
+                    let key = format!("legend_label_{}", series["series_id"].as_str().unwrap());
+                    labels_changed |= self.rich_text_editor(ui, &mut series["label"], &key);
                 }
                 if labels_changed {
                     let mut content: renderer::text::RichText =
@@ -610,17 +668,7 @@ impl Editor {
                     changed = true;
                 }
             } else {
-                let mut text = display_text(&node["segments"]);
-                ui.label("Text");
-                let response =
-                    ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
-                self.controls.insert("text".into(), response.rect);
-                if response.changed() {
-                    node["segments"] =
-                        serde_json::to_value(renderer::text::rich_segments_from_text(&text))
-                            .unwrap();
-                    changed = true;
-                }
+                changed |= self.rich_text_editor(ui, node, "text");
             }
             changed |= text_field(
                 ui,
@@ -639,6 +687,18 @@ impl Editor {
                 &mut self.controls,
             );
             changed |= color(ui, node, "color", "Text color", &mut self.controls);
+            let previous = node["align"].as_str().unwrap_or("Left").to_owned();
+            let mut align = previous.clone();
+            ui.horizontal(|ui| {
+                for name in ["Left", "Center", "Right"] {
+                    let response = ui.selectable_value(&mut align, name.to_owned(), name);
+                    self.controls.insert(format!("align_{name}"), response.rect);
+                }
+            });
+            if align != previous {
+                node["align"] = json!(align);
+                changed = true;
+            }
         } else if target.starts_with("tick_labels_") {
             let key = axis_key(target.trim_start_matches("tick_labels_"));
             let node = &mut config[key]["label_style"];
@@ -749,6 +809,47 @@ impl Editor {
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
             let node = &mut config[key];
+            let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
+            let response = ui.checkbox(&mut labels, "Tick labels");
+            self.controls
+                .insert("tick_labels_visible".into(), response.rect);
+            if response.changed() {
+                node["label_style"]["visible"] = json!(labels);
+                changed = true;
+            }
+            let mut ticks = node["tick"] != "None";
+            let response = ui.checkbox(&mut ticks, "Tick marks");
+            self.controls.insert("ticks_visible".into(), response.rect);
+            if response.changed() {
+                node["tick"] = json!(if ticks { "Outside" } else { "None" });
+                changed = true;
+            }
+            ui.label("Tick direction / visibility");
+            let previous = node["tick"].as_str().unwrap_or("Outside").to_owned();
+            let mut direction = previous.clone();
+            let response = egui::ComboBox::from_id_salt("tick_direction")
+                .selected_text(if direction == "None" {
+                    "Hidden"
+                } else {
+                    &direction
+                })
+                .show_ui(ui, |ui| {
+                    for (value, label) in [
+                        ("None", "Hidden"),
+                        ("Outside", "Outside"),
+                        ("Inside", "Inside"),
+                        ("Both", "Both sides"),
+                    ] {
+                        let response = ui.selectable_value(&mut direction, value.to_owned(), label);
+                        self.controls.insert(format!("tick_{value}"), response.rect);
+                    }
+                });
+            self.controls
+                .insert("tick_direction".into(), response.response.rect);
+            if direction != previous {
+                node["tick"] = json!(direction);
+                changed = true;
+            }
             let range_changed = number(ui, node, "min", "Minimum", "", &mut self.controls)
                 | number(ui, node, "max", "Maximum", "", &mut self.controls);
             changed |= range_changed;
@@ -1055,3 +1156,24 @@ fn toolbar_icon(
 
 #[path = "radial_editor.rs"]
 mod radial_editor;
+
+// Preserve unchanged rich characters when editing the plain text input.
+fn preserve_segment_styles(old: &Value, mut fresh: Value) -> Value {
+    let (Some(old), Some(next)) = (old.as_array(), fresh.as_array_mut()) else {
+        return fresh;
+    };
+    let mut prefix = 0;
+    while prefix < old.len().min(next.len()) && old[prefix]["text"] == next[prefix]["text"] {
+        next[prefix] = old[prefix].clone();
+        prefix += 1;
+    }
+    let mut suffix = 0;
+    while suffix < old.len().min(next.len()) - prefix
+        && old[old.len() - 1 - suffix]["text"] == next[next.len() - 1 - suffix]["text"]
+    {
+        let index = next.len() - 1 - suffix;
+        next[index] = old[old.len() - 1 - suffix].clone();
+        suffix += 1;
+    }
+    fresh
+}

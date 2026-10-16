@@ -376,19 +376,19 @@ commands and expected outputs.
 
 ## Scope and performance
 
-The Python API provides **line plots, scatter plots, heatmaps, pies and donuts**, with
+The Python API provides **line/scatter/errorbar plots, histograms, heatmaps, contours, categorical bars, boxplots, pies and donuts**, with
 multiple series on one Axes, linear/log and inverted axes, picking, editable
 text/legend/styles, and PNG export. Cartesian plots support Precise, Sketch,
 Constellation and Milkyway draw modes. **Milkyway accepts line-only series;
 scatter and marker lines are intentionally disabled.** Constellation uses
 marker lines so stars remain at source samples.
 
-Native pies/donuts expose 11 upstream materials, camera tilt, extrusion, rounded
+Pies/donuts on both native and browser WebGPU hosts expose 11 upstream materials, camera tilt, extrusion, rounded
 corners, textures and slice editing. Their bounded model contains up to 64
 categories and uses the upstream radial renderer on the shared GPU device.
-Pie/donut windows and PNG export are native; browser WebGPU radial editing is
-not yet exposed. Multi-panel figures and high-level bar/box-plot/contour APIs
-remain outside the Python API.
+All chart families support native desktop and Jupyter WebGPU editing and PNG export.
+Categorical bars and boxplots use their upstream bounded models; histograms and
+contours use resident Cartesian columns. Multi-panel figures remain unsupported.
 
 `figsize` is in inches; `fontsize`, `linewidth` and `markersize` use points.
 Native Cartesian arrays are uploaded to a resident GPU column pool and reused during edits.
@@ -407,7 +407,7 @@ rates are reported separately; they are not monitor FPS measurements.
 This package uses **figgy-renderer 0.17.0** from the upstream
 [figgy repository](https://github.com/shim9610/figgy). Until 0.17.0 is on crates.io,
 the native extension and the packaged browser kernel are both built from figgy
-commit `632d184` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
+commit `6aee54b` (a `[patch.crates-io]` override in `Cargo.toml`). Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,
 native editing host, browser widgets and Python settings export.
 

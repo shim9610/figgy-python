@@ -13,3 +13,28 @@
 .figgy-error { color: #b42318; white-space: pre-wrap; margin-top: 8px; }
 .figgy-editor [data-status] { color: #54677f; }
 @media(max-width: 700px) { .figgy-body { flex-direction: column; } .figgy-properties { width: 100%; } .figgy-stage { width: 100%; } }
+/* Shared chart-first interaction layout for the browser host. */
+.figgy-webgpu .figgy-toolbar { background: white; padding: 8px; gap: 6px; }
+.figgy-webgpu .figgy-toolbar strong { color: #1e5ba6; font-size: 19px; margin-right: 12px; }
+.figgy-webgpu .figgy-toolbar button:has(svg) { border-color: transparent; background: transparent; width: 36px; height: 36px; padding: 7px; }
+.figgy-webgpu .figgy-toolbar button:hover, .figgy-webgpu .figgy-toolbar button[aria-pressed=true] { background: #ddeafa; }
+.figgy-webgpu svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.figgy-webgpu .figgy-body { position: relative; display: block; }
+.figgy-webgpu .figgy-stage { width: 100%; }
+.figgy-webgpu .figgy-properties { position: absolute; top: 8px; right: 8px; width: 290px; max-height: calc(100% - 32px); overflow: auto; padding: 12px; background: white; border: 1px solid #d5deeb; border-radius: 6px; box-shadow: 0 4px 18px #172b4422; }
+.figgy-webgpu [hidden] { display: none !important; }
+.figgy-webgpu .figgy-properties header { display: flex; justify-content: space-between; align-items: center; }
+.figgy-webgpu [data-hint] { font-size: 12px; color: #54677f; padding: 8px 4px 0; }
+.figgy-webgpu:fullscreen { background: #f7f9fc; box-sizing: border-box; overflow: auto; }
+.figgy-webgpu:fullscreen .figgy-stage { max-width: calc((100vh - 120px) * 1.6); margin: auto; }
+.figgy-webgpu canvas:focus-visible { outline: 2px solid #2663ad; outline-offset: 2px; }
+
+.figgy-webgpu .figgy-toolbar { position: relative; }
+.figgy-menu { position: absolute; z-index: 5; top: 48px; left: 140px; width: 270px; padding: 12px; background: white; border: 1px solid #bbcadd; border-radius: 6px; box-shadow: 0 4px 18px #172b4422; }
+.figgy-menu label { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.figgy-menu input[type=number] { width: 90px; margin-left: auto; }
+.figgy-menu button:disabled { opacity: .45; cursor: default; }
+
+.figgy-text-format { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 10px; }
+.figgy-text-format button { padding: 4px 8px; }
+.figgy-text-format button[aria-pressed=true] { background: #ddeafa; }

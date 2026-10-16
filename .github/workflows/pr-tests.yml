@@ -23,6 +23,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Require native and Jupyter interaction changes together
+        if: github.event_name == 'pull_request'
+        env:
+          PARITY_BASE: ${{ github.event.pull_request.base.sha }}
+          PARITY_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/check_interaction_parity.py --base "$PARITY_BASE" --head "$PARITY_HEAD"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: PyO3/maturin-action
@@ -42,6 +49,7 @@ jobs:
       WGPU_BACKEND: vulkan
       FIGGY_TEST_JUPYTER: '1'
       FIGGY_TEST_HEADFUL: '1'
+      FIGGY_REQUIRE_INTERACTION_PARITY: '1'
       FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

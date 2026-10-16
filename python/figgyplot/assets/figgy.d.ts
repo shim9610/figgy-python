@@ -61,6 +61,36 @@ export enum ColorCycle {
     Monochrome = 4,
 }
 
+export class FiggyBoundedChart {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    clear_selection(): void;
+    /**
+     * One GPU surface; no kernel PNG transport is used for interactive frames.
+     */
+    static create(canvas: HTMLCanvasElement, family: string, value: string, width: number, height: number): Promise<FiggyBoundedChart>;
+    /**
+     * Renderer-measured logical pixel bounds and resize handles.
+     */
+    decorations(): string;
+    drag(target: string, dx: number, dy: number, handle?: string | null): boolean;
+    export_png(scale: number): Promise<Uint8Array>;
+    frame(): void;
+    get_document(): string;
+    hit_decoration(x: number, y: number, edit_area: boolean): string | undefined;
+    hover(x: number | null | undefined, y: number | null | undefined, dt: number): boolean;
+    pick(x: number, y: number, toggle: boolean): string;
+    resize(width: number, height: number): void;
+    resize_handle(target: string, x: number, y: number): string | undefined;
+    select_decoration(target?: string | null): void;
+    /**
+     * Validate and prepare before replacing the SSOT, retaining the old chart on failure.
+     */
+    set_document(value: string, width: number, height: number): void;
+    step_selection(backwards: boolean): void;
+}
+
 export class FiggyChart {
     private constructor();
     free(): void;
@@ -177,6 +207,10 @@ export class FiggyChart {
      * from the callback.
      */
     static create_with_progress(canvas: HTMLCanvasElement, on_event: Function): Promise<FiggyChart>;
+    /**
+     * Renderer-measured decoration bounds in physical canvas pixels.
+     */
+    decoration_bounds(target: string): string;
     /**
      * Normalize a complete referenced-column closure from resident or
      * mixed authority to exact streamed metadata. The typed arrays are
@@ -537,6 +571,10 @@ export class FiggyChart {
     set_title(text: string): void;
     set_x_title(text: string): void;
     set_y_title(text: string): void;
+    /**
+     * Move the resident typed data selection using source indices.
+     */
+    step_selection(dx: number, dy: number): boolean;
     stream_operation_request_ranges(handle: StreamingOperationHandle): AutoStreamingRangeRequestResult;
     stream_operation_submit_ranges(handle: StreamingOperationHandle, ids: string[], revisions: Float64Array, source_lengths: Float64Array, offsets: Float64Array, sources: Array<any>): StreamingStepResult;
     /**
@@ -649,6 +687,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_autostreamingrangerequestresult_free: (a: number, b: number) => void;
     readonly __wbg_autostreamingrequestresult_free: (a: number, b: number) => void;
+    readonly __wbg_figgyboundedchart_free: (a: number, b: number) => void;
     readonly __wbg_figgychart_free: (a: number, b: number) => void;
     readonly __wbg_streamingoperationhandle_free: (a: number, b: number) => void;
     readonly __wbg_streamingstepresult_free: (a: number, b: number) => void;
@@ -676,6 +715,21 @@ export interface InitOutput {
     readonly color_cycle_css: (a: number) => [number, number];
     readonly draw_style_modes: () => [number, number, number, number];
     readonly draw_style_param_specs: (a: number, b: number) => [number, number, number, number];
+    readonly figgyboundedchart_clear_selection: (a: number) => void;
+    readonly figgyboundedchart_create: (a: any, b: number, c: number, d: number, e: number, f: number, g: number) => any;
+    readonly figgyboundedchart_decorations: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_drag: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly figgyboundedchart_export_png: (a: number, b: number) => any;
+    readonly figgyboundedchart_frame: (a: number) => [number, number];
+    readonly figgyboundedchart_get_document: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_hit_decoration: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly figgyboundedchart_hover: (a: number, b: number, c: number, d: number) => number;
+    readonly figgyboundedchart_pick: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly figgyboundedchart_resize: (a: number, b: number, c: number) => void;
+    readonly figgyboundedchart_resize_handle: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly figgyboundedchart_select_decoration: (a: number, b: number, c: number) => [number, number];
+    readonly figgyboundedchart_set_document: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly figgyboundedchart_step_selection: (a: number, b: number) => void;
     readonly figgychart_add_line_series: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number];
     readonly figgychart_apply_axis_preset: (a: number, b: number) => [number, number];
     readonly figgychart_apply_color_cycle: (a: number, b: number) => [number, number];
@@ -697,6 +751,7 @@ export interface InitOutput {
     readonly figgychart_configure_streaming: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
     readonly figgychart_create: (a: any) => any;
     readonly figgychart_create_with_progress: (a: any, b: any) => any;
+    readonly figgychart_decoration_bounds: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_demote_auto_resident_columns: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number];
     readonly figgychart_discard_stream_selection_request: (a: number, b: number) => [number, number];
     readonly figgychart_ensure_extent_engine: (a: number) => any;
@@ -756,6 +811,7 @@ export interface InitOutput {
     readonly figgychart_set_title: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_x_title: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_y_title: (a: number, b: number, c: number) => [number, number];
+    readonly figgychart_step_selection: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_stream_operation_request_ranges: (a: number, b: number) => [number, number, number];
     readonly figgychart_stream_operation_submit_ranges: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: any) => [number, number, number];
     readonly figgychart_stream_selection_request_ranges: (a: number) => [number, number, number];
@@ -781,8 +837,8 @@ export interface InitOutput {
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__128: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__129: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__145: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__146: (a: number, b: number, c: any) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

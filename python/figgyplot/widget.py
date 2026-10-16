@@ -92,6 +92,7 @@ class FigureWidget(anywidget.AnyWidget):
     wasm_js = traitlets.Unicode().tag(sync=True)
     status = traitlets.Unicode("initializing").tag(sync=True)
     browser_info = traitlets.Dict().tag(sync=True)
+    draw_styles = traitlets.Dict().tag(sync=True)
     auto_prepare = traitlets.Bool(True).tag(sync=True)
 
     def __init__(self, figure, *, auto_prepare=True):
@@ -104,7 +105,9 @@ class FigureWidget(anywidget.AnyWidget):
         self._closed = False
         manifest, buffers = figure._native.payload()
         assets = Path(__file__).with_name("assets")
+        from ._native import draw_style_specs_json
         super().__init__(auto_prepare=auto_prepare, manifest=manifest, columns=buffers,
+                         draw_styles=json.loads(draw_style_specs_json()),
                          wasm=(assets / "figgy_bg.wasm").read_bytes(),
                          wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"))
         self.refresh()

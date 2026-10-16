@@ -17,6 +17,20 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         settings = json.loads(settings)
     if isinstance(defaults, str):
         defaults = json.loads(defaults)
+    for kind in ('categorical', 'boxplot'):
+        if settings.get(kind) is not None:
+            chart = copy.deepcopy(settings[kind])
+            chart['hovered'] = chart['selected'] = None
+            chart['decorations']['selected'] = None
+            chart['expected_categories'] = [c['id'] for c in chart['categories']]
+            chart['expected_series'] = [s['id'] for s in chart['series']]
+            chart['series'] = {s['id']: {k: v for k, v in s.items() if k not in ('id', 'values')} for s in chart['series']}
+            args = pprint.pformat(chart, width=96, sort_dicts=False)
+            canvas = pprint.pformat({'chart_area': settings['config']['chart_area']})
+            return (f"# Apply to an existing {kind} chart with matching category/series IDs and DPI.\n"
+                    f"# Existing data values are preserved.\n"
+                    f"{variable}.configure(config={canvas})\n"
+                    f"{variable}.configure_bounded({kind!r}, **{args})\n")
     if settings.get("radial") is not None:
         chart = copy.deepcopy(settings["radial"])
         chart["interaction"] = {"hovered": None, "selected": None, "hover_progress": 0.0}

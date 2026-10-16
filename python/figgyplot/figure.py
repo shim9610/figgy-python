@@ -212,8 +212,8 @@ class Figure:
             raise RuntimeError("Figure is closed")
 
     def _require_cartesian(self):
-        if self.get_settings().get("radial") is not None:
-            raise ValueError("pie/donut charts have no Cartesian axes; use radial properties or slice selection")
+        if _family(self.get_settings()) is not None:
+            raise ValueError("bounded charts have no Cartesian axes; use their chart properties or data selection")
 
     @property
     def revision(self):
@@ -281,21 +281,20 @@ class Figure:
         """Edit a stable series/decorative target using familiar property names."""
         if not isinstance(target, str) or not target:
             raise ValueError("editable target must be a non-empty string")
-        radial_document = self.get_settings().get("radial") is not None
-        if radial_document and target != "chart_title":
-            raise ValueError("use radial properties or set_slice() to edit a pie/donut")
-        if radial_document and target == "chart_title":
-            radial = {}
+        kind = _family(self.get_settings())
+        if kind is not None:
+            patch = {}
+            titles = {'chart_title': 'title', 'axis_title_bottom': 'category_title', 'axis_title_left': 'value_title'}
+            if kind != 'radial' and self.get_settings()[kind]['direction'] == 'Horizontal':
+                titles.update(axis_title_bottom='value_title', axis_title_left='category_title')
+            if target not in titles or (kind == 'radial' and target != 'chart_title'):
+                raise ValueError('use the chart artist or configure_bounded/configure_radial for data properties')
             for key, value in properties.items():
-                if key == "text":
-                    radial["title"] = str(value)
-                elif key == "fontsize":
-                    radial["font_size"] = float(value) * self.dpi / 72
-                elif key == "font":
-                    radial["font_family"] = self._check_font(value)
-                else:
-                    raise ValueError(f"unsupported radial title property: {key}")
-            return self.configure_radial(**radial)
+                if key == 'text': patch[titles[target]] = str(value)
+                elif key == 'fontsize': patch['font_size'] = float(value)*self.dpi/72
+                elif key == 'font': patch['font_family'] = self._check_font(value)
+                else: raise ValueError(f'unsupported bounded title property: {key}')
+            return self.configure_radial(**patch) if kind == 'radial' else self.configure_bounded(kind, **patch)
         with self._lock:
             self._require_open()
             state = self.get_settings()
@@ -457,8 +456,8 @@ class Figure:
         """Set the chart background for native and browser rendering/export."""
         with self._lock:
             state = self.get_settings()
-            if state.get("radial") is not None:
-                state["radial"]["background"] = _color(color)
+            if _family(state) is not None:
+                state[_family(state)]["background"] = _color(color)
             else:
                 rgba = _color(color)
                 if rgba == _color("white"):
@@ -477,8 +476,8 @@ class Figure:
         """
         if mode not in ("precise", "sketch", "milkyway", "constellation"):
             raise ValueError("draw style must be precise, sketch, milkyway or constellation")
-        if self.get_settings().get("radial") is not None:
-            raise ValueError("use set_radial_style(material=...) for pie/donut charts")
+        if _family(self.get_settings()) is not None:
+            raise ValueError("bounded charts use their own material/style properties")
         with self._lock:
             self.configure(config={"draw_style": {"mode": mode, **options}})
             # The style changes the title's font (sketch draws Comic Neue), so
@@ -520,6 +519,33 @@ class Figure:
                     _merge(chart["slices"][index], patch)
             return self.apply_settings(state)
 
+    def configure_bounded(self, kind=None, *, style=None, series=None, expected_categories=None, expected_series=None, **properties):
+        """Patch a categorical/box chart SSOT without changing unspecified fields.
+
+        ``series`` maps stable series IDs to patches. Values are only replaced
+        when explicitly supplied; Copy Python preserves the destination data.
+        """
+        with self._lock:
+            state = self.get_settings()
+            kind = kind or _family(state)
+            if kind not in ('categorical', 'boxplot') or state.get(kind) is None:
+                raise ValueError('create the corresponding bounded chart first')
+            chart = state[kind]
+            if expected_categories is not None and [c['id'] for c in chart['categories']] != expected_categories:
+                raise ValueError('style replay requires matching category IDs')
+            if expected_series is not None and [s['id'] for s in chart['series']] != expected_series:
+                raise ValueError('style replay requires matching series IDs')
+            _merge(chart, properties)
+            if style is not None:
+                _merge(chart['style'], style)
+            if series is not None:
+                existing = {s['id']: s for s in chart['series']}
+                for sid, patch in series.items():
+                    if sid not in existing or 'id' in patch:
+                        raise ValueError('series patches must address existing IDs')
+                    _merge(existing[sid], patch)
+            return self.apply_settings(state)
+
     def set_radial_style(self, *, material=None, **properties):
         """Edit upstream radial material, texture, camera, corners and outlines."""
         if material is not None:
@@ -540,9 +566,7 @@ class Figure:
             self._require_open()
             if self.backend != "native":
                 raise RuntimeError("select requires backend='native'; pick data in the WebGPU widget")
-            if self.get_settings().get("radial") is not None:
-                if edit_area:
-                    raise ValueError("radial selection addresses slices, not Cartesian plot-area handles")
+            if _family(self.get_settings()) is not None and not edit_area:
                 self._selection = json.loads(self._native.pick_json(float(x), float(y)))
                 self._changed()
                 return self._selection
@@ -558,7 +582,6 @@ class Figure:
     def select_object(self, target):
         with self._lock:
             self._require_open()
-            self._require_cartesian()
             if self.backend != "native":
                 raise RuntimeError("select_object requires backend='native'; select objects in the WebGPU widget")
             if not any(s["series_id"] == target for s in self.get_settings()["series"]):
@@ -569,7 +592,7 @@ class Figure:
     def selection_bounds(self):
         with self._lock:
             self._require_open()
-            if self.get_settings().get("radial") is not None:
+            if isinstance(self._selection, dict):
                 return None
             if self._selection is None or any(s["series_id"] == self._selection for s in self.get_settings()["series"]):
                 return None
@@ -578,7 +601,6 @@ class Figure:
     def drag(self, target, dx, dy, *, handle=None):
         with self._lock:
             self._require_open()
-            self._require_cartesian()
             if self.backend != "native":
                 raise RuntimeError("drag requires backend='native'; drag objects in the WebGPU widget")
             moved = self._native.drag(target, float(dx), float(dy), handle)
@@ -590,7 +612,12 @@ class Figure:
         """Fit all axes to the data and derive tick/label settings with padding."""
         with self._lock:
             self._require_open()
-            self._require_cartesian()
+            kind = _family(self.get_settings())
+            if kind:
+                state = self.get_settings()
+                state[kind]['decorations']['data_area'] = None
+                if kind == 'boxplot': state[kind]['value_range'] = None
+                return self.apply_settings(state)
             self._native.fit(float(padding))
         self._changed()
         return self
@@ -601,8 +628,6 @@ class Figure:
         Display the returned widget, then await prepare_async(). Repeated calls
         reuse the same widget and its original auto_prepare choice.
         """
-        if self.get_settings().get("radial") is not None:
-            raise RuntimeError("Pie/donut editing uses native show(); use to_png() for static notebook output")
         self._require_open()
         if backend not in (None, "webgpu", "png"):
             raise ValueError("widget backend must be webgpu or png")
@@ -678,7 +703,7 @@ class Figure:
             path.write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
-        if self.get_settings().get("radial") is not None:
+        if _family(self.get_settings()) is not None:
             return {"image/png": self.to_png()}
         # Keep a live widget referenced; Jupyter displays the model once per output.
         return self.widget()._repr_mimebundle_(**kwargs)
@@ -785,7 +810,10 @@ def _material(value):
     return names[value.lower().replace("-", "_")]
 
 
-class Axes:
+from ._charts import ChartMethods, family as _family
+
+
+class Axes(ChartMethods):
     def __init__(self, figure):
         self.figure = figure
 
@@ -802,8 +830,6 @@ class Axes:
         ``startangle=90`` starts at the top; slices proceed clockwise.
         """
         fig = self.figure
-        if fig.backend != "native":
-            raise RuntimeError("Pie/donut charts currently require backend='native'")
         values = _array(values)
         count = values.size
         if not 1 <= count <= 64 or not np.isfinite(values).all() or (values < 0).any() or not np.isfinite(values.sum()) or values.sum() <= 0:
@@ -843,7 +869,7 @@ class Axes:
         fig = self.figure
         with fig._lock:
             fig._require_open()
-            if fig.get_settings().get("radial") is not None:
+            if _family(fig.get_settings()) is not None:
                 raise ValueError("create a separate Figure for Cartesian series")
             mode = fig.get_settings()["config"].get("draw_style", {}).get("mode", "precise")
             if mode == "milkyway" and "Line" not in render_type:
@@ -973,11 +999,9 @@ class Axes:
         return self.figure.update("chart_title", text=text, **kwargs)
 
     def set_xlabel(self, text, **kwargs):
-        self.figure._require_cartesian()
         return self.figure.update("axis_title_bottom", text=text, **kwargs)
 
     def set_ylabel(self, text, **kwargs):
-        self.figure._require_cartesian()
         return self.figure.update("axis_title_left", text=text, **kwargs)
 
     def _set_scale(self, axis, scale):
@@ -1067,6 +1091,9 @@ class Axes:
         return self._set_lim_keeping_ticks(("left_y", "right_y"), bottom, top)
 
     def grid(self, visible=True):
+        kind = _family(self.figure.get_settings())
+        if kind in ('categorical', 'boxplot'):
+            return self.figure.configure_bounded(kind, grid=bool(visible))
         self.figure._require_cartesian()
         state = self.figure.get_settings()
         state["config"]["grid"]["show_major_x"] = bool(visible)
@@ -1074,6 +1101,9 @@ class Axes:
         self.figure.apply_settings(state)
 
     def legend(self, visible=True):
+        kind = _family(self.figure.get_settings())
+        if kind in ('categorical', 'boxplot'):
+            return self.figure.configure_bounded(kind, legend=bool(visible))
         self.figure._require_cartesian()
         from ._native import rebuild_legend_json
         state = self.figure.get_settings()

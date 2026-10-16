@@ -42,7 +42,6 @@ def test_radial_invalid_edits_are_atomic_and_families_cannot_mix():
                      lambda: fig.axes[0].set_ylabel("Ignored"),
                      lambda: fig.axes[0].legend(),
                      lambda: fig.update("axis_left", color="red"),
-                     lambda: fig.fit(),
                      lambda: fig.set_draw_style("sketch")]:
             with pytest.raises(ValueError): edit()
             assert fig.get_settings() == before and fig.revision == revision
@@ -56,7 +55,9 @@ def test_radial_invalid_edits_are_atomic_and_families_cannot_mix():
         with pytest.raises(ValueError, match="separate Figure"): fig.axes[0].pie([1, 2])
         assert fig.get_settings() == before
     with figgy.Figure(backend="webgpu") as fig:
-        with pytest.raises(RuntimeError, match="native"): fig.axes[0].pie([1, 2])
+        fig.axes[0].pie([1, 2])
+        fig.axes[0].set_title("Browser radial")
+        assert fig.get_settings()["radial"]["title"] == "Browser radial"
 
 
 @pytest.mark.parametrize("values", [[-1, 2], [0, 0], [1, float("nan")], [1]*65])

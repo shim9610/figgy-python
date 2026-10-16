@@ -154,11 +154,76 @@ Cartesian exports preserve uploaded series data and require matching IDs and
 kinds. Stylized patterns use stable user series IDs even when independent
 Figures share a GPU, so replay does not reroll stars or handwriting.
 
-Cartesian styles are exposed in native and WebGPU document models. Native
-rendering, high-DPI replay and actual X11 style-menu input are tested. Browser
-model/transport changes are included; real browser pixel validation of the new
-styles has not been rerun in this checkpoint.
+Cartesian styles are exposed in native and WebGPU document models and their
+Style menus. Unsupported chart/style combinations are rejected in both hosts.
+Pies, donuts, categorical bars and boxplots also support browser WebGPU editing
+and async PNG export. An explicit native `widget(backend="png")` remains available
+as a kernel-GPU fallback; it uses the separate PNG transport editor.
 
-Pie/donut editing and export currently require `backend="native"`. A native
-radial Figure can display a static PNG in a notebook when the kernel has a GPU;
-interactive browser WebGPU radial bindings are not exposed yet.
+## Python constructors and host coverage
+
+Every row below is available on native desktop and Jupyter WebGPU. The browser
+uses the same pinned upstream Rust models/renderers compiled to WASM. Neither
+host transports a PNG for ordinary redraws.
+
+| Python API | Upstream family |
+| --- | --- |
+| `plot`, `scatter` | Line, Scatter, ScatterLine |
+| `errorbar(..., xerr=..., yerr=...)` | ScatterErrorbarX/Y/XY, LineScatterErrorbarX/Y/XY |
+| `hist`, `stairs` | Histogram |
+| `imshow` | Heatmap |
+| `contour`, `contourf` | Contour, HeatmapContour |
+| `pie`, `donut` | RadialChart |
+| `bar`, `barh` | CategoricalChart |
+| `boxplot`, `bxp` | BoxPlotChart |
+
+```python
+fig, ax = figgy.subplots()  # auto: Jupyter WebGPU in a kernel, native elsewhere
+bars = ax.bar(["A", "B", "C"], [[4, 2, 6], [3, 5, 1]],
+              label=["Before", "After"], mode="grouped")
+ax.set_title("Category comparison")
+ax.set_ylabel("Count")
+# Choose fig.show() on desktop or display(fig.widget()) in Jupyter.
+```
+
+Use separate Figures for these examples (bounded families cannot mix with
+Cartesian series):
+
+```python
+ax.errorbar([1, 2, 3], [2, 4, 3], yerr=[[.1, .2, .3], [.2, .1, .2]], xerr=.1)
+counts, edges, artist = ax.hist(samples, bins=20)
+artist = ax.stairs([2, 5, 3], [0, 1, 2, 4], baseline=0)
+ax.contour(z, levels=[.2, .4, .6])
+ax.contourf(x_centers, y_centers, z, levels=[.2, .4, .6])
+ax.boxplot([[1, 2, 3, 8], [2, 4, 5]])
+ax.bxp([dict(q1=1, med=2, q3=3, whislo=0, whishi=4, fliers=[7])])
+```
+
+`errorbar` accepts scalar, N-element symmetric or 2-by-N asymmetric magnitudes;
+errors must be finite and nonnegative. `linestyle=None` omits connecting lines.
+`hist` delegates bin calculation to NumPy; `stairs` accepts explicit edges and
+counts. Contours accept a 2-D scalar array with optional 1-D x/y center coordinates.
+
+`bar` accepts one value per category or a series-by-category matrix. `None`
+is missing, zero is a real value. Modes are `grouped`, `stacked` and
+`percent_stacked`; horizontal direction is available through `barh`. Upstream
+bounds are 64 categories, 16 series and 512 bars. `boxplot` treats a 1-D array as
+one box and a sequence of arrays as one box per array; it computes NumPy linear
+quartiles, actual sample whiskers within `whis * IQR` (default 1.5), and all
+outliers. It does not silently drop outliers to fit the bounded limits (128 per
+box, 4096 total). `bxp` uses supplied statistics without recomputing them.
+
+Use `fig.configure_bounded(style={...}, ...)` or the returned artist's
+`set`/`set_style` for selective SSOT patches. Unspecified fields are preserved;
+these setters do not perform automatic layout or adjust ticks. Constructors and
+`fit()` are convenience helpers that may compute statistics, ranges, ticks or
+layout. Copy Python replays style/configuration against matching category and
+series IDs, preserving the destination's data values.
+
+Both hosts open the property panel on selection. Drag annotations to move them;
+use Layout and plot-area handles to resize; Fit restores automatic plot layout.
+Left/right arrows step through bounded data selections, Escape clears selection,
+and arrows move a selected decoration (Shift uses ten-pixel steps). Cartesian
+wheel zoom anchors at the pointer; Ctrl restricts X, Shift restricts Y, and a
+left-button drag inside the plot pans. CI exercises these shared contracts;
+see [contributing](../CONTRIBUTING.md#nativejupyter-synchronization-contract).

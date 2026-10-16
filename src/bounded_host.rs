@@ -1,24 +1,24 @@
 //! Radial frames are rendered to a GPU texture embedded in the native egui host.
 //! There is no PNG/RGBA round trip during window interaction.
 use super::*;
-use renderer::radial::{RadialFrame, RadialRenderer};
+use crate::bounded::{DocumentFrame, DocumentRenderer};
 
-pub(super) struct RadialSurface {
-    renderer: RadialRenderer,
+pub(super) struct BoundedSurface {
+    renderer: DocumentRenderer,
     texture: wgpu::Texture,
     id: egui::TextureId,
     size: (u32, u32),
-    frame: Arc<RadialFrame>,
+    frame: DocumentFrame,
 }
 
 impl SurfaceWindow {
-    pub(super) fn frame_radial(&mut self, c: &mut FigureAccess<'_>) -> PyResult<()> {
+    pub(super) fn frame_bounded(&mut self, c: &mut FigureAccess<'_>) -> PyResult<()> {
         let input = self.input.take_egui_input(&self.window);
         let ctx = self.ctx.clone();
         let overlay = self.inspector_overlay();
         let mut error = None;
         let output = ctx.run_ui(input, |root| {
-            self.editor.show_radial(root, c, overlay);
+            self.editor.show_bounded(root, c, overlay);
             let (_, panel, scale) = self.display(c);
             self.panel = panel;
             self.scale = scale;
@@ -35,20 +35,24 @@ impl SurfaceWindow {
                     (logical_size.0 as f32 * scale).round() as u32,
                     (logical_size.1 as f32 * scale).round() as u32,
                 );
-                if self.radial_surface.as_ref().is_none_or(|s| s.size != size) {
-                    if let Some(old) = self.radial_surface.take() {
+                if self.bounded_surface.as_ref().is_none_or(|s| s.size != size) {
+                    if let Some(old) = self.bounded_surface.take() {
                         self.ui_renderer.free_texture(&old.id);
                     }
-                    let mut renderer = RadialRenderer::new(
+                    let mut renderer = DocumentRenderer::new(
                         RendererDevice::new(
                             c.renderer.device().clone(),
                             c.renderer.queue().clone(),
                         ),
-                        wgpu::TextureFormat::Rgba8Unorm,
+                        &c.data.document.as_ref().unwrap().chart,
                     )
                     .map_err(runtime)?;
                     let frame = renderer
-                        .prepare(&c.data.radial.as_ref().unwrap().chart, logical_size, scale)
+                        .prepare(
+                            &c.data.document.as_ref().unwrap().chart,
+                            logical_size,
+                            scale,
+                        )
                         .map_err(runtime)?;
                     let texture = c
                         .renderer
@@ -73,7 +77,7 @@ impl SurfaceWindow {
                         &texture.create_view(&Default::default()),
                         wgpu::FilterMode::Linear,
                     );
-                    self.radial_surface = Some(RadialSurface {
+                    self.bounded_surface = Some(BoundedSurface {
                         renderer,
                         texture,
                         id,
@@ -81,10 +85,14 @@ impl SurfaceWindow {
                         frame,
                     });
                 }
-                let surface = self.radial_surface.as_mut().unwrap();
+                let surface = self.bounded_surface.as_mut().unwrap();
                 surface.frame = surface
                     .renderer
-                    .prepare(&c.data.radial.as_ref().unwrap().chart, logical_size, scale)
+                    .prepare(
+                        &c.data.document.as_ref().unwrap().chart,
+                        logical_size,
+                        scale,
+                    )
                     .map_err(runtime)?;
                 root.painter().image(
                     surface.id,
@@ -95,27 +103,106 @@ impl SurfaceWindow {
                 let response = root.interact(
                     image_rect,
                     egui::Id::new("radial_image"),
-                    egui::Sense::click(),
+                    egui::Sense::click_and_drag(),
                 );
-                if response.clicked() {
-                    if let Some(pointer) = response.interact_pointer_pos() {
-                        let position = [
-                            (pointer.x - image_rect.min.x) * logical_size.0 as f32
-                                / image_rect.width(),
-                            (pointer.y - image_rect.min.y) * logical_size.1 as f32
-                                / image_rect.height(),
-                        ];
-                        let picked = surface.frame.hit_test(position);
-                        let mut chart = c.data.radial.as_ref().unwrap().chart.clone();
-                        chart.interaction.selected = if picked == chart.interaction.selected {
-                            None
-                        } else {
-                            picked
-                        };
-                        c.set_radial(&serde_json::to_string(&chart).map_err(runtime)?)?;
-                        self.editor.inspector_open |= picked.is_some();
-                        ctx.request_repaint();
+                let map = surface.frame.decorations();
+                let to_local = |p: egui::Pos2| {
+                    [
+                        (p.x - image_rect.min.x) * logical_size.0 as f32 / image_rect.width(),
+                        (p.y - image_rect.min.y) * logical_size.1 as f32 / image_rect.height(),
+                    ]
+                };
+                let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                let before = chart.clone();
+                let decoration = response.interact_pointer_pos().and_then(|p| {
+                    let point = to_local(p);
+                    let hit = map.hit_test(point)?;
+                    let key = map.element(hit)?.id.clone();
+                    if key == renderer::DecorationId::DataArea
+                        && !self.editor.edit_area
+                        && chart.decorations().selected != Some(key.clone())
+                        && surface.frame.has_data(point)
+                    {
+                        return None;
                     }
+                    Some(key)
+                });
+                if response.drag_started() {
+                    self.handle = ctx.input(|i| i.pointer.press_origin()).and_then(|p| {
+                        let selected = chart.decorations().selected.as_ref()?;
+                        let (id, _) = map.entries().find(|(_, e)| &e.id == selected)?;
+                        map.hit_resize_handle(id, to_local(p))
+                            .map(|h| format!("{h:?}"))
+                    });
+                }
+                if (response.clicked() || response.drag_started()) && self.handle.is_none() {
+                    chart.decorations_mut().selected = decoration.clone();
+                    if decoration.is_some() {
+                        match &mut chart {
+                            crate::bounded::DocumentChart::Radial(c) => {
+                                c.interaction.selected = None
+                            }
+                            crate::bounded::DocumentChart::Categorical(c) => c.selected = None,
+                            crate::bounded::DocumentChart::BoxPlot(c) => c.selected = None,
+                        }
+                    }
+                }
+                if response.dragged() {
+                    if let Some(selected) = chart.decorations().selected.clone() {
+                        if let Some((id, _)) = map.entries().find(|(_, e)| e.id == selected) {
+                            let d = ctx.input(|i| {
+                                if response.drag_started() {
+                                    i.pointer
+                                        .interact_pos()
+                                        .zip(i.pointer.press_origin())
+                                        .map(|(now, start)| now - start)
+                                        .unwrap_or_default()
+                                } else {
+                                    i.pointer.delta()
+                                }
+                            });
+                            let dx = d.x * logical_size.0 as f32 / image_rect.width();
+                            let dy = d.y * logical_size.1 as f32 / image_rect.height();
+                            if let Some(h) = self.handle.as_ref().and_then(|name| {
+                                ALL_HANDLES.into_iter().find(|h| format!("{h:?}") == *name)
+                            }) {
+                                map.resize_by(chart.decorations_mut(), id, h, dx, dy);
+                            } else {
+                                map.drag_by(chart.decorations_mut(), id, dx, dy);
+                            }
+                        }
+                    }
+                }
+                if response.drag_stopped() {
+                    self.handle = None;
+                }
+                let hover = response
+                    .hover_pos()
+                    .filter(|_| decoration.is_none() && !response.dragged())
+                    .map(to_local);
+                if response.clicked() && decoration.is_none() {
+                    if let Some(p) = response.interact_pointer_pos() {
+                        chart.select_at(&surface.frame, to_local(p), true);
+                    }
+                }
+                if chart.hover(&surface.frame, hover, ctx.input(|i| i.stable_dt).min(0.1)) {
+                    ctx.request_repaint();
+                }
+                if chart != before {
+                    match surface.renderer.prepare(&chart, logical_size, scale) {
+                        Ok(frame) => {
+                            surface.frame = frame;
+                            c.set_document(chart)?;
+                            self.editor.error.clear();
+                        }
+                        Err(e) => self.editor.error = e.to_string(),
+                    }
+                    if response.clicked() {
+                        let chart = &c.data.document.as_ref().unwrap().chart;
+                        self.editor.inspector_open |= !chart.selected_json().is_null()
+                            || chart.decorations().selected.is_some();
+                    }
+                    ctx.request_repaint();
                 }
                 Ok(())
             })();
@@ -147,7 +234,7 @@ impl SurfaceWindow {
             .renderer
             .device()
             .create_command_encoder(&Default::default());
-        let radial = self.radial_surface.as_ref().unwrap();
+        let radial = self.bounded_surface.as_ref().unwrap();
         let radial_view = radial.texture.create_view(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -236,14 +323,17 @@ impl SurfaceWindow {
             })
             .collect::<serde_json::Map<_, _>>();
         *self.control.stats.lock().unwrap() = json!({
-            "host":"winit-wgpu", "window_role":"chart", "chart_family":"radial",
+            "host":"winit-wgpu", "window_role":"chart", "chart_family":c.data.document.as_ref().unwrap().chart.family(),
             "controls":controls, "error":self.editor.error, "properties_open":self.editor.inspector_open,
-            "inspector_overlay":self.inspector_overlay(), "selected":c.data.radial.as_ref().unwrap().chart.interaction.selected,
+            "inspector_overlay":self.inspector_overlay(), "selected":c.data.document.as_ref().unwrap().chart.selected_json(),
             "chart_panel":[self.panel.x,self.panel.y,self.panel.width,self.panel.height],
             "surface_size":[self.config.width,self.config.height], "scale_factor":self.window.scale_factor(),
             "surface_frames":self.frames, "gpu_context_id":c.context.id, "figure_id":c.data.figure_id,
             "column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,
             "revision":c.data.revision,
+            "decorations":self.bounded_surface.as_ref().map(|s|s.frame.decorations().entries().filter_map(|(id,e)|s.frame.decorations().bounds(id).map(|r|(e.id.element_id(),json!([r.x,r.y,r.width,r.height])))).collect::<serde_json::Map<_,_>>()),
+            "decoration_selected":c.data.document.as_ref().unwrap().chart.decorations().selected,
+
         });
         Ok(())
     }

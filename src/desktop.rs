@@ -92,10 +92,10 @@ struct SurfaceWindow {
     pending_chart_width: Option<u32>,
     last_pick: Option<renderer::config::PickedDataRef>,
     modifiers: ModifiersState,
-    radial_surface: Option<radial_host::RadialSurface>,
+    bounded_surface: Option<bounded_host::BoundedSurface>,
 }
-#[path = "radial_host.rs"]
-mod radial_host;
+#[path = "bounded_host.rs"]
+mod bounded_host;
 
 impl SurfaceWindow {
     fn new(
@@ -208,7 +208,7 @@ impl SurfaceWindow {
             pending_chart_width: None,
             last_pick: None,
             modifiers: ModifiersState::empty(),
-            radial_surface: None,
+            bounded_surface: None,
         })
     }
     fn resize(&mut self, w: u32, h: u32) {
@@ -307,30 +307,26 @@ impl SurfaceWindow {
         let gpu = Arc::clone(&data.gpu);
         let mut renderer = gpu::lock(&gpu)?;
         let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
-        if c.data.radial.is_some() {
+        if c.data.document.is_some() {
+            let mut chart = c.data.document.as_ref().unwrap().chart.clone();
             if *key == NamedKey::Escape {
-                c.clear_data_selection()?;
+                chart.clear_selection();
+            } else if let Some(selected) = chart.decorations().selected.clone() {
+                let step = if self.modifiers.shift_key() { 10. } else { 1. };
+                let (dx, dy) = match key {
+                    NamedKey::ArrowLeft => (-step, 0.),
+                    NamedKey::ArrowRight => (step, 0.),
+                    NamedKey::ArrowUp => (0., -step),
+                    NamedKey::ArrowDown => (0., step),
+                    _ => return Ok(()),
+                };
+                c.document_drag(&selected.element_id(), dx, dy, None)?;
+                self.window.request_redraw();
+                return Ok(());
             } else if matches!(key, NamedKey::ArrowLeft | NamedKey::ArrowRight) {
-                let mut chart = c.data.radial.as_ref().unwrap().chart.clone();
-                let indices = chart
-                    .slices
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, s)| s.value > 0.)
-                    .map(|(i, _)| i)
-                    .collect::<Vec<_>>();
-                let n = indices.len() as i64;
-                let index = chart
-                    .interaction
-                    .selected
-                    .and_then(|t| indices.iter().position(|i| *i == t.index))
-                    .unwrap_or(0) as i64;
-                let delta = if *key == NamedKey::ArrowLeft { -1 } else { 1 };
-                chart.interaction.selected = Some(renderer::radial::RadialTarget::main(
-                    indices[(index + delta).rem_euclid(n) as usize],
-                ));
-                c.set_radial(&serde_json::to_string(&chart).map_err(runtime)?)?;
+                chart.step(*key == NamedKey::ArrowLeft);
             }
+            c.set_document(chart)?;
             self.window.request_redraw();
             return Ok(());
         }
@@ -412,7 +408,7 @@ impl SurfaceWindow {
         let gpu = Arc::clone(&data.gpu);
         let mut renderer = gpu::lock(&gpu)?;
         let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
-        if c.data.radial.is_some() {
+        if c.data.document.is_some() {
             self.window.request_redraw();
             return Ok(());
         }
@@ -622,8 +618,8 @@ impl SurfaceWindow {
         let gpu = Arc::clone(&data.gpu);
         let mut renderer = gpu::lock(&gpu)?;
         let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
-        if c.data.radial.is_some() && !self.settings_only {
-            return self.frame_radial(&mut c);
+        if c.data.document.is_some() && !self.settings_only {
+            return self.frame_bounded(&mut c);
         }
         c.renderer
             .ensure_target_format(self.config.format)

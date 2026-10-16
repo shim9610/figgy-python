@@ -54,7 +54,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             page.wait_for_function('!!window.jupyterapp')
             page.evaluate('''async()=>{const app=window.jupyterapp;await app.restored;const panel=app.shell.currentWidget;await panel.context.ready;await panel.sessionContext.ready;await app.commands.execute('notebook:run-all-cells');}''')
             try:
-                page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes(" + ("'resident'" if auto_prepare else "'not prepared'") + ")",timeout=30000)
+                page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes(" + ("'Ready'" if auto_prepare else "'Not prepared'") + ")",timeout=30000)
             except Exception:
                 page.screenshot(path=str(tmp_path/'failed.png'))
                 raise AssertionError(str(page.locator('.jp-OutputArea').all_text_contents()) + str(errors))
@@ -78,7 +78,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             report=json.loads(execute("import json; print(json.dumps(await fig.prepare_async()))"))
             assert report['ready'] and report['backend']=='webgpu' and report['stages']
             assert report['persistent_cache_supported'] is False and report['elapsed_ms'] > 0
-            page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes('resident')")
+            page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes('Ready')")
             assert page.evaluate('window.figgyAdapterRequests') >= 1
             root="document.querySelector('.figgy-editor').figgy"
             if not auto_prepare:
@@ -86,6 +86,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             stats=page.evaluate(root+'.stats')
             assert stats['binary_upload_bytes']==samples*8 and stats['column_uploads']==2 and stats['png_exports']==0
             assert 'True' in execute("print(widget.status == 'ready' and not fig._native.columns and not widget.columns)")
+            page.locator('[data-properties]').click()
             page.locator('[data-fields] input[data-property=text]').fill('WebGPU edited title');page.locator('[data-fields] input[data-property=text]').press('Tab')
             page.wait_for_function(root+".snapshot().config.chart_title.text.segments.map(s=>s.text).join('') === 'WebGPU edited title'")
             assert 'WebGPU edited title' in execute("await fig.sync(); print(fig.to_code())")
@@ -118,7 +119,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             canvas_pixels=np.asarray(Image.open(io.BytesIO(canvas.screenshot())).convert('RGB'))
             assert np.count_nonzero((canvas_pixels[:,:,0]>150)&(canvas_pixels[:,:,1]<100)&(canvas_pixels[:,:,2]<100))>100
             # Initial picker hit at a real line point, through the actual browser GPU API.
-            picked=page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy,c=f.snapshot().config;return await f.pick(100,100,10000);}''')
+            picked=page.evaluate('''async()=>{const f=document.querySelector('.figgy-editor').figgy,c=f.snapshot().config,r=f.decorations().data_area.rect;return await f.pick(r[0]+(0-c.bottom_x.min)/(c.bottom_x.max-c.bottom_x.min)*r[2],r[1]+c.left_y.max/(c.left_y.max-c.left_y.min)*r[3],12);}''')
             assert picked is not None
             if auto_prepare and os.environ.get('FIGGY_FUZZ_BROWSER') == '1':
                 from scripts.check_randomized import mutate

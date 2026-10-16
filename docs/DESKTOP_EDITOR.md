@@ -154,8 +154,10 @@ See [edit and reuse](README_DEMO.md) for the complete workflow.
 ## Multiple windows and resource lifetime
 
 Pies and donuts use a dedicated native property form for slice values/colors,
-materials, textures, camera tilt and extrusion. They also support selection,
-Copy Python and Save PNG. See [chart and style API](CHART_TYPES.md) and the
+materials, textures, camera tilt and extrusion. They support hover, click/toggle selection, arrow-key navigation, title/label
+dragging, plot-area resizing, Copy Python and Save PNG. Categorical bars and
+boxplots use the same bounded-chart interaction host. These gestures also apply
+in the Jupyter WebGPU widget, with properties initially hidden until selection. See [chart and style API](CHART_TYPES.md) and the
 [gallery recipes](../examples/README.md) for construction and host coverage.
 
 ```python
@@ -206,3 +208,19 @@ native Figures, `figgy.release_gpu()` releases the shared context.
 See [host architecture](HOSTS.md), [native sharing](NATIVE_SHARING.md),
 [GPU preparation](PREPARATION.md) and [randomized validation](RANDOMIZED_VALIDATION.md)
 for implementation details and test boundaries.
+
+## Axis ticks and character formatting
+
+In an axis property panel, **Axis line**, **Tick marks** and **Tick labels** are
+independent controls. Hiding the line keeps ticks if Tick marks is still enabled.
+Tick direction supports **Outside**, **Inside**, **Both sides** and **Hidden**.
+These controls patch the selected axis only; they preserve ranges and tick spacing.
+The Jupyter property panel exposes the same fields and directions.
+
+Select characters in a title or axis-title text field, then use **B**, **I**,
+**U**, **x²**, **x₂** or **αβ** for bold, italic, underline, superscript,
+subscript or the renderer's Latin-to-Greek mapping. With no selected range, the
+button applies to the whole text. Superscript and subscript are mutually
+exclusive. Existing character formatting survives edits to other characters.
+Legend entries also support rich character formatting. Copy Python retains these
+rich segments for reuse; it does not flatten them into plain text.

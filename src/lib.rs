@@ -83,6 +83,26 @@ struct Settings {
     radial: Option<renderer::radial::RadialChart>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     background: Option<Color>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    categorical: Option<renderer::categorical::CategoricalChart>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    boxplot: Option<renderer::boxplot::BoxPlotChart>,
+}
+
+impl Settings {
+    fn document(&self) -> PyResult<Option<bounded::DocumentChart>> {
+        let docs = [
+            self.radial.clone().map(bounded::DocumentChart::Radial),
+            self.categorical
+                .clone()
+                .map(bounded::DocumentChart::Categorical),
+            self.boxplot.clone().map(bounded::DocumentChart::BoxPlot),
+        ];
+        if docs.iter().filter(|v| v.is_some()).count() > 1 {
+            return Err(invalid("settings must contain one chart family"));
+        }
+        Ok(docs.into_iter().flatten().next())
+    }
 }
 
 trait Number: Copy {
@@ -159,7 +179,7 @@ struct FigureCore {
     selection_value_readbacks: u64,
     preparation: Option<Value>,
     target: Option<RenderTarget>,
-    radial: Option<radial::RadialDocument>,
+    document: Option<bounded::BoundedDocument>,
     /// Tick-guard warnings of the last rebuilt axis raster, and the messages
     /// not yet handed to Python. The renderer re-derives them only when the
     /// raster is rebuilt; a changed list is reported once.
@@ -259,8 +279,8 @@ impl FigureAccess<'_> {
         }
     }
     fn render_inner(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
-        if self.data.radial.is_some() {
-            return self.render_radial(scale);
+        if self.data.document.is_some() {
+            return self.render_document(scale);
         }
         self.renderer
             .ensure_target_format(wgpu::TextureFormat::Rgba8Unorm)
@@ -554,7 +574,25 @@ impl FigureAccess<'_> {
             renderer_version: RENDERER_VERSION.into(),
             config: self.data.chart.config().clone(),
             series: self.data.series.clone(),
-            radial: self.data.radial.as_ref().map(|r| r.chart.clone()),
+            radial: self
+                .data
+                .document
+                .as_ref()
+                .and_then(|r| r.chart.radial().cloned()),
+            categorical: self.data.document.as_ref().and_then(|r| {
+                if let bounded::DocumentChart::Categorical(c) = &r.chart {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            }),
+            boxplot: self.data.document.as_ref().and_then(|r| {
+                if let bounded::DocumentChart::BoxPlot(c) = &r.chart {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            }),
             background: self.data.background,
         }
     }
@@ -841,7 +879,7 @@ impl FigureCore {
                 selection_value_readbacks: 0,
                 preparation: None,
                 target: None,
-                radial: None,
+                document: None,
                 render_warnings: Vec::new(),
                 pending_warnings: Vec::new(),
                 warnings_revision: None,
@@ -854,7 +892,7 @@ impl FigureAccess<'_> {
     fn prepare(&mut self, py: Python<'_>) -> PyResult<String> {
         let report = py.detach(|| {
             let start = std::time::Instant::now();
-            if self.data.radial.is_some() {
+            if self.data.document.is_some() {
                 let _ = self.render(1.)?;
                 return Ok(json!({"backend":"native", "ready":true, "elapsed_ms":start.elapsed().as_secs_f64()*1000.,
                     "target_format":"Rgba8Unorm", "stages":[{"scope":"radial", "stage":"first-frame", "phase":"Ready"}],
@@ -912,7 +950,7 @@ impl FigureAccess<'_> {
         serde_json::to_string(&self.snapshot()).map_err(runtime)
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
-        if self.data.radial.is_some() {
+        if self.data.document.is_some() {
             return Err(invalid(
                 "a pie/donut Figure cannot contain Cartesian series",
             ));
@@ -991,16 +1029,19 @@ impl FigureAccess<'_> {
         validate_config(&next.config)?;
         validate_background(next.background)?;
         validate_draw_style(&next.config, &next.series)?;
-        if next.radial.is_some() != self.data.radial.is_some() {
+        let document = next.document()?;
+        if document.as_ref().map(|d| d.family())
+            != self.data.document.as_ref().map(|d| d.chart.family())
+        {
             return Err(invalid("settings cannot change the Figure's chart family"));
         }
-        if let Some(radial) = &next.radial {
+        if let Some(chart) = &document {
             if !matches!(next.config.draw_style, renderer::config::DrawStyle::Precise) {
                 return Err(invalid(
-                    "pie/donut charts use radial materials, not Cartesian draw styles",
+                    "bounded charts use materials, not Cartesian draw styles",
                 ));
             }
-            radial::validate(radial, next.config.chart_area.0)?;
+            chart.validate(next.config.chart_area.0)?;
         }
         for series in &next.series {
             validate_model_numbers(series, "series")?;
@@ -1023,7 +1064,7 @@ impl FigureAccess<'_> {
                 &next.series,
             );
         }
-        let radial_changed = next.radial.as_ref() != self.data.radial.as_ref().map(|r| &r.chart);
+        let radial_changed = document.as_ref() != self.data.document.as_ref().map(|r| &r.chart);
         if next.config == *self.data.chart.config()
             && !series_changed
             && !radial_changed
@@ -1053,8 +1094,8 @@ impl FigureAccess<'_> {
         self.data.chart = Chart::new(next.config);
         self.data.series = next.series;
         self.data.background = next.background;
-        if let Some(chart) = next.radial {
-            self.data.radial.as_mut().unwrap().chart = chart;
+        if let Some(chart) = document {
+            self.data.document.as_mut().unwrap().chart = chart;
         }
         self.data.revision += 1;
         Ok(())
@@ -1176,8 +1217,17 @@ impl FigureAccess<'_> {
         })?;
         Ok(PyBytes::new(py, &bytes))
     }
-    fn hit_test(&self, x: f32, y: f32) -> Option<String> {
-        self.data
+    fn hit_test(&mut self, x: f32, y: f32) -> PyResult<Option<String>> {
+        if self.data.document.is_some() {
+            let frame = self.document_frame()?;
+            let map = frame.decorations();
+            return Ok(map
+                .hit_test([x, y])
+                .and_then(|id| map.element(id))
+                .map(|e| e.id.element_id()));
+        }
+        Ok(self
+            .data
             .hitmap
             .hit_test(
                 self.data.chart.config(),
@@ -1186,9 +1236,19 @@ impl FigureAccess<'_> {
                 y,
             )
             .and_then(|id| self.data.hitmap.get(id))
-            .map(|el| el.element_id())
+            .map(|el| el.element_id()))
     }
-    fn bounds_json(&self, target: &str) -> PyResult<String> {
+    fn bounds_json(&mut self, target: &str) -> PyResult<String> {
+        if self.data.document.is_some() {
+            let frame = self.document_frame()?;
+            let map = frame.decorations();
+            let (id, _) = map
+                .entries()
+                .find(|(_, e)| e.id.element_id() == target)
+                .ok_or_else(|| invalid("unknown decoration"))?;
+            let value=map.selection_box(id).map(|b|json!({"rect":[b.rect.x,b.rect.y,b.rect.width,b.rect.height],"handles":b.handles.iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>()}));
+            return serde_json::to_string(&value).map_err(runtime);
+        }
         let id = self.element(target)?;
         let measure = CpuTextMeasure::for_style(&self.data.chart.config().draw_style);
         let value = self.data.hitmap.selection_box(id, self.data.chart.config(), &measure).map(|b| json!({
@@ -1218,6 +1278,9 @@ impl FigureAccess<'_> {
         if !dx.is_finite() || !dy.is_finite() {
             return Err(invalid("drag must be finite"));
         }
+        if self.data.document.is_some() {
+            return self.document_drag(target, dx, dy, handle);
+        }
         let id = self.element(target)?;
         let el = self.data.hitmap.get(id).unwrap();
         let mut cfg = self.data.chart.config().clone();
@@ -1242,8 +1305,8 @@ impl FigureAccess<'_> {
         }
     }
     fn pick_json(&mut self, py: Python<'_>, x: f32, y: f32) -> PyResult<String> {
-        if self.data.radial.is_some() {
-            return py.detach(|| self.pick_radial(x, y));
+        if self.data.document.is_some() {
+            return py.detach(|| self.pick_document(x, y));
         }
         let picked = py.detach(|| {
             self.renderer.enable_gpu_picking().map_err(runtime)?;
@@ -1280,8 +1343,10 @@ impl FigureAccess<'_> {
         serde_json::to_string(&value).map_err(runtime)
     }
     fn clear_data_selection(&mut self) -> PyResult<()> {
-        if let Some(radial) = self.data.radial.as_mut() {
-            if radial.chart.interaction.selected.take().is_some() {
+        if let Some(radial) = self.data.document.as_mut() {
+            let old = radial.chart.clone();
+            radial.chart.clear_selection();
+            if radial.chart != old {
                 self.data.revision += 1;
             }
             return Ok(());
@@ -1318,15 +1383,15 @@ impl FigureAccess<'_> {
         });
         json!({"adapter": self.context.adapter_info, "gpu_context_id":self.context.id,"figure_id":self.data.figure_id,"gpu_sharing":"process","active_figures":self.renderer.chart_order().len(),"figure_column_bytes":self.data.columns.values().map(|v|v.0 as u64 * 8).sum::<u64>(), "revision": self.data.revision, "column_uploads": self.data.uploads, "rgba_readbacks": self.data.readbacks, "png_encodes": self.data.png_encodes, "columns": self.data.columns.len(),
             "selection_value_readbacks":self.data.selection_value_readbacks,"pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
-            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes + self.data.radial.as_ref().map_or(0, |r| r.gpu_bytes()), "allocation_mode": if self.data.radial.is_some() { "bounded" } else { "resident" }, "preparation": self.data.preparation}).to_string()
+            "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes + self.data.document.as_ref().map_or(0, |r| r.gpu_bytes()), "allocation_mode": if self.data.document.is_some() { "bounded" } else { "resident" }, "preparation": self.data.preparation}).to_string()
     }
 }
 
+mod bounded;
 mod desktop;
 mod editor;
 mod gpu;
 mod notebook;
-mod radial;
 mod selection;
 
 #[pyclass(module = "figgyplot._native")]
@@ -1384,6 +1449,9 @@ impl NativeFigure {
     fn apply_settings(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.apply_settings(json))
     }
+    fn set_bounded(&self, family: &str, json: &str) -> PyResult<()> {
+        self.with(|core| core.set_bounded(family, json))
+    }
     fn set_radial(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.set_radial(json))
     }
@@ -1431,7 +1499,7 @@ impl NativeFigure {
         self.with(|core| core.render_png(py, scale))
     }
     fn hit_test(&self, x: f32, y: f32) -> PyResult<Option<String>> {
-        self.with(|core| Ok(core.hit_test(x, y)))
+        self.with(|core| core.hit_test(x, y))
     }
     fn info_json(&self) -> PyResult<String> {
         self.with(|core| Ok(core.info_json()))
@@ -1463,7 +1531,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(desktop::run_events, m)?)?;
     m.add_function(wrap_pyfunction!(default_colorbar_json, m)?)?;
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
-    m.add_function(wrap_pyfunction!(radial::default_radial_json, m)?)?;
+    m.add_function(wrap_pyfunction!(bounded::default_radial_json, m)?)?;
+    m.add_function(wrap_pyfunction!(bounded::default_bounded_json, m)?)?;
     m.add_function(wrap_pyfunction!(draw_style_specs_json, m)?)?;
     m.add_function(wrap_pyfunction!(font_family_available, m)?)?;
     m.add_function(wrap_pyfunction!(text_segments_json, m)?)?;

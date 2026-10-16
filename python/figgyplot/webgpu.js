@@ -16,10 +16,14 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
-const ids = ['chart_title','axis_title_bottom','axis_title_left','legend','axis_bottom','axis_left','tick_labels_bottom','tick_labels_left','data_area','colorbar'];
+const ids = ['chart_title','legend','data_area','colorbar',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
+const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',font_size:'Font size',font:'Font family',line_width:'Line width'};
+const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
 export function render({model,el}) {
-  const root=document.createElement('div');root.className='figgy-editor';
-  root.innerHTML=`<div class="figgy-toolbar"><strong>Browser WebGPU</strong><button data-fit>Fit</button><label><input type="checkbox" data-area> Edit plot area</label><button data-copy>Copy Python</button><button data-save>Save PNG</button><span data-status>Initializing WebGPU…</span></div><div class="figgy-body"><div class="figgy-stage"><canvas></canvas></div><div class="figgy-properties"><label>Object <select data-target></select></label><div data-fields></div><details><summary>SSOT settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div><div class="figgy-error" role="alert"></div>`;
+  const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
+  const paths={fit:'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l5 5m11-5-5 5m5 11-5-5M4 20l5-5',select:'M6 3v17l5-5 4 7 3-2-4-6h7Z',layout:'M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4',copy:'M8 3h9l4 4v14H8ZM8 7H3v14h2M13 11l-2 3 2 3m3-6 2 3-2 3',save:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',properties:'M3 5h18M3 12h18M3 19h18M8 2v6M16 9v6M10 16v6',fullscreen:'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6'};
+  const icon=(name,label)=>`<button data-${name} title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name]}"/></svg></button>`;
+  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<span data-status>Preparing…</span></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><label>Object <select data-target></select></label><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
   el.append(root);
   const canvas=root.querySelector('canvas'), select=root.querySelector('[data-target]'), fields=root.querySelector('[data-fields]');
   const error=root.querySelector('.figgy-error'), status=root.querySelector('[data-status]');
@@ -30,17 +34,22 @@ export function render({model,el}) {
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
   let background=clone(local.background ?? null);
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
+  const kind=['radial','categorical','boxplot'].find(k=>local[k]);
+  let hoverPoint=null,lastFrame=0;
+  const textRanges=new Map();
+  function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;}
+  function layoutMode(enabled){if(!enabled&&kind&&chart&&selected==='data_area')enqueue(()=>{chart.clear_selection();selected=null;dirty=true;commit();});root.querySelector('[data-area]').checked=enabled;root.querySelector('[data-layout]').setAttribute('aria-pressed',String(enabled));root.querySelector('[data-select]').setAttribute('aria-pressed',String(!enabled));}
   let inputAt=null,busy=0,startInit;
   const requested=new Promise(resolve=>{startInit=resolve;});
   let initializedResolve,initializedReject;
   const initialized=new Promise((resolve,reject)=>{initializedResolve=resolve;initializedReject=reject;});
   initialized.catch(()=>{});
-  const fail=e=>{error.textContent=String(e?.message ?? e);};
+  const fail=e=>{error.textContent=String(e?.message ?? e);stats.last_error=error.textContent;};
   const enqueue=(fn,propagate=false)=>{
     const operation=queue.then(async()=>{if(disposed)throw Error('Widget disposed');busy++;try{return await fn();}finally{busy--;}});
     queue=operation.catch(fail);return propagate?operation:queue;
   };
-  function snapshot(){return {schema_version:1,renderer_version:'0.17.0',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
+  function snapshot(){if(kind)return {...clone(local),[kind]:JSON.parse(chart.get_document())};return {schema_version:1,renderer_version:'0.17.0',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
   function clearColor(color){const c=color ?? {r:1,g:1,b:1,a:1};chart.set_clear_color(c.r,c.g,c.b,c.a);background=clone(color ?? null);}
   function checkNumbers(value,path='settings'){
     if(typeof value==='number' && !Number.isFinite(value))throw Error(`${path} must be finite`);
@@ -54,11 +63,23 @@ export function render({model,el}) {
   function checkNumericConversion(requested,accepted,path='settings'){
     if(typeof requested==='number' && typeof accepted!=='number')throw Error(`${path} exceeds the renderer floating-point range`);
     if(requested && typeof requested==='object')for(const [key,item] of Object.entries(requested)){
-      if(!accepted || !(key in accepted))throw Error(`Unknown settings field: ${path}.${key}`);
+      if(!accepted || !(key in accepted)){
+        const omittedDefault=(key==='align'&&item==='Left')||(key==='draw_style'&&item?.mode==='precise'&&Object.keys(item).length===1)||(key==='picked_data'&&item===null);
+        if(omittedDefault)continue;
+        throw Error(`Unknown settings field: ${path}.${key}`);
+      }
       checkNumericConversion(item,accepted[key],`${path}.${key}`);
     }
   }
   function install(settings){
+    if(kind){
+      if(settings.schema_version!==1||settings.renderer_version!=='0.17.0'||!settings[kind]||settings.series.length)throw Error('Unsupported chart settings');
+      checkNumbers(settings);
+      const old=snapshot();
+      try{chart.set_document(JSON.stringify(settings[kind]),settings.config.chart_area.width,settings.config.chart_area.height);checkNumericConversion(settings[kind],JSON.parse(chart.get_document()));}
+      catch(e){chart.set_document(JSON.stringify(old[kind]),old.config.chart_area.width,old.config.chart_area.height);throw e;}
+      local=clone(settings);dirty=true;error.textContent='';return;
+    }
     // Roll back both trees if either renderer validation rejects a local edit.
     const old=snapshot();
     try {
@@ -88,18 +109,67 @@ export function render({model,el}) {
     if(!chart)return;
     local=snapshot();
     const previous=selected;select.replaceChildren();
-    for(const id of [...ids,...local.series.map(s=>s.series_id)]){const option=document.createElement('option');option.value=id;option.textContent=id;select.append(option);}
+    for(const id of (kind?['chart_title',...JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title'),...(kind==='radial'?local.radial.slices.map((_,i)=>`slice_0_${i}`):local[kind].series.map(s=>s.id))]:[...ids,...local.series.map(s=>s.series_id)])){const option=document.createElement('option');option.value=id;option.textContent=labels[id]??(text(local.series.find(s=>s.series_id===id)?.label)||caption(id));select.append(option);}
     select.value=previous ?? 'chart_title';fields.replaceChildren();
     const target=select.value,cfg=local.config;
     const series=local.series.find(s=>s.series_id===target);
     function field(label,value,type,apply){
-      const row=document.createElement('label');row.append(document.createTextNode(label));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,type==='number'?Number(input.value):input.value);install(state);commit();}));row.append(input);fields.append(row);
+      const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
+      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,type==='number'?Number(input.value):input.value);install(state);commit();}));row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
       field(label,hex,'color',(s,v)=>{const c=find(s);['r','g','b'].forEach((k,i)=>c[k]=parseInt(v.slice(i*2+1,i*2+3),16)/255);});
     }
+    function choice(label,value,values,apply){
+      const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v;input.append(opt);}input.value=value;
+      input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,input.value);install(state);commit();}));row.append(input);fields.append(row);
+    }
+    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());apply(state,input.checked);install(state);commit();}));row.append(input);fields.append(row);}
+    function syncLegend(state){chart.set_series(JSON.stringify(state.series));chart.reset_legend_from_series_labels();state.config.legend.content=JSON.parse(chart.get_config()).legend.content;}
+    function richControls(find,key,input){
+      function remember(){textRanges.set(key,[Array.from(input.value.slice(0,input.selectionStart)).length,Array.from(input.value.slice(0,input.selectionEnd)).length]);}
+      input.addEventListener('select',remember);input.addEventListener('keyup',remember);input.addEventListener('mouseup',remember);
+      const bar=document.createElement('div');bar.className='figgy-text-format';
+      for(const [flag,label] of [['bold','B'],['italic','I'],['underline','U'],['superscript','x²'],['subscript','x₂'],['greek','αβ']]){
+        const button=document.createElement('button');button.textContent=label;button.title=flag;button.dataset.format=flag;button.dataset.textTarget=key;
+        const value=find(local).segments,r=textRanges.get(key),range=r&&r[0]!==r[1]?r:[0,value.length];
+        button.setAttribute('aria-pressed',String(value.slice(...range).length>0&&value.slice(...range).every(s=>s[flag])));
+        button.addEventListener('pointerdown',e=>e.preventDefault());
+        button.addEventListener('click',()=>enqueue(()=>{const state=snapshot(),chars=find(state).segments,r=textRanges.get(key),range=r&&r[0]!==r[1]?r:[0,chars.length],part=chars.slice(...range),active=part.length>0&&part.every(s=>s[flag]);for(const char of part){char[flag]=!active;if(!active&&flag==='superscript')char.subscript=false;if(!active&&flag==='subscript')char.superscript=false;}if(key.startsWith('legend_label_'))syncLegend(state);install(state);commit();}));bar.append(button);
+      }
+      input.parentElement.after(bar);
+    }
+    function preserve(old,next){let start=0,end=0;while(start<Math.min(old.length,next.length)&&old[start].text===next[start].text){next[start]=clone(old[start]);start++;}while(end<Math.min(old.length,next.length)-start&&old.at(-1-end).text===next.at(-1-end).text){next[next.length-1-end]=clone(old.at(-1-end));end++;}return next;}
+    if(kind){
+      const c=local[kind];
+      field('title',c.title,'text',(s,v)=>s[kind].title=v);
+      field('font_size',c.font_size,'number',(s,v)=>s[kind].font_size=v);
+      field('font',c.font_family,'text',(s,v)=>s[kind].font_family=v);
+      if(kind==='radial'){
+        choice('material',c.style.material,['Flat','Matte','Ceramic','BrushedMetal','Paper','Wood','SatinMetal','Toon','Enamel','Hatch','Pearl'],(s,v)=>s.radial.style.material=v);
+        for(const name of ['tilt_degrees','depth','texture_strength','texture_scale','roughness','gloss','gap_degrees','inner_corner','outer_corner'])field(name,c.style[name],'number',(s,v)=>s.radial.style[name]=v);
+        toggle('shadow',c.style.shadow,(s,v)=>s.radial.style.shadow=v);
+        choice('labels',c.labels,['None','Inside','Outside'],(s,v)=>s.radial.labels=v);
+        if(c.kind?.Donut)field('inner_radius',c.kind.Donut.inner_radius,'number',(s,v)=>s.radial.kind.Donut.inner_radius=v);
+        const selectedSlice=/^slice_(\d+)_(\d+)$/.exec(target);
+        const t=selectedSlice?{group:Number(selectedSlice[1]),index:Number(selectedSlice[2])}:c.interaction.selected;
+        if(t){const find=s=>t.group?s.radial.split.children[t.index]:s.radial.slices[t.index];const item=find(local);
+          field('label',item.label,'text',(s,v)=>find(s).label=v);field('value',item.value,'number',(s,v)=>find(s).value=v);field('explode',item.explode,'number',(s,v)=>find(s).explode=v);color('color',item.color,s=>find(s).color);
+        }
+      }else{
+        for(const name of ['category_title','value_title'])field(name,c[name],'text',(s,v)=>s[kind][name]=v);
+        for(const name of ['grid','legend'])toggle(name,c[name],(s,v)=>s[kind][name]=v);
+        const item=c.series.find(s=>s.id===target)||c.series.find(s=>s.id===c.selected?.series_id);
+        if(item){const find=s=>s[kind].series.find(v=>v.id===item.id);field('label',item.label,'text',(s,v)=>find(s).label=v);color('color',item.color,s=>find(s).color);
+          if(c.selected && kind==='categorical'){const i=c.categories.findIndex(v=>v.id===c.selected.category_id);field('value',item.values[i],'number',(s,v)=>find(s).values[i]=v);}
+        }
+      }
+      root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;
+    }
+    const visibility=target==='chart_title'?['chart_title','visible']:target==='legend'?['legend','visible']:target==='colorbar'?['colorbar','visible']:target.startsWith('axis_title_')?[side[target.slice(11)],'title_option','visible']:target.startsWith('tick_labels_')?[side[target.slice(12)],'label_style','visible']:target.startsWith('axis_')?[side[target.slice(5)],'line_visible']:null;
+    if(visibility){const read=s=>visibility.slice(0,-1).reduce((n,k)=>n?.[k],s.config);if(read(local))toggle('visible',read(local)[visibility.at(-1)],(s,v)=>read(s)[visibility.at(-1)]=v);}
     let path;
     if(target==='chart_title')path=['chart_title','text'];
     else if(target.startsWith('axis_title_'))path=[side[target.slice(11)],'title_option','text'];
@@ -112,18 +182,28 @@ export function render({model,el}) {
       // Titles go through the renderer's title helpers: its super/subscript
       // mapping, and set_title's title-band fit.
       const helper={chart_title:'set_title',axis_title_bottom:'set_x_title',axis_title_left:'set_y_title'}[target];
-      field('text',shown,'text',(s,v)=>{
-        if(!helper){find(s).segments=segments(v);return;}
-        chart[helper](v);const live=JSON.parse(chart.get_config());
-        if(target==='chart_title')s.config.chart_title=live.chart_title;else find(s).segments=path.reduce((n,k)=>n[k],live).segments;
+      if(target==='legend')for(const item of local.series.filter(s=>s.label)){
+        const findLabel=s=>s.series.find(v=>v.series_id===item.series_id).label,key=`legend_label_${item.series_id}`;
+        const input=field(key,text(item.label),'text',(s,v)=>{findLabel(s).segments=preserve(findLabel(s).segments,segments(v));syncLegend(s);});richControls(findLabel,key,input);
+      }
+      const textInput=field('text',shown,'text',(s,v)=>{
+        if(!helper){find(s).segments=preserve(find(s).segments,segments(v));return;}
+        const old=clone(find(s).segments);chart[helper](v);const live=JSON.parse(chart.get_config());
+        if(target==='chart_title')s.config.chart_title=live.chart_title;else find(s).segments=path.reduce((n,k)=>n[k],live).segments;find(s).segments=preserve(old,find(s).segments);
       });
+      richControls(find,target,textInput);
       field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
-      field('font',rich.font,'text',(s,v)=>find(s).font=v);
+      field('font',rich.font,'text',(s,v)=>find(s).font=v);choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
     }else if(series){const kind=Object.keys(series.render_type)[0],style=series.render_type[kind];const find=s=>s.series.find(v=>v.series_id===target).render_type[kind];
       if(style.line){color('color',style.line.line_color,s=>find(s).line.line_color);field('line_width',style.line.line_width,'number',(s,v)=>find(s).line.line_width=v);}
       if(style.scatter){color('color',style.scatter.point_color,s=>find(s).scatter.point_color);field('point_size',style.scatter.point_size,'number',(s,v)=>find(s).scatter.point_size=v);}
-      if(style.matrix){field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);}
+      if(style.bar){color('color',style.bar.fill_color,s=>find(s).bar.fill_color);field('border_width',style.bar.border_width,'number',(s,v)=>find(s).bar.border_width=v);}
+      if(style.err_style){color('error_color',style.err_style.error_bar_color,s=>find(s).err_style.error_bar_color);field('error_width',style.err_style.error_bar_width,'number',(s,v)=>find(s).err_style.error_bar_width=v);}
+      if(style.matrix){choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>s.config.colorbar.colormap=v);field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);}
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
+      toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>s.config[key].label_style.visible=v);
+      toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>s.config[key].tick=v?'Outside':'None');
+      choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>s.config[key].tick=v);
       for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{s.config[key][name]=v;});color('color',cfg[key].line_color,s=>s.config[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>s.config[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>s.config[key].label_style.label_font=v);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
@@ -131,7 +211,8 @@ export function render({model,el}) {
   function resize(){if(!chart || disposed)return;const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;const width=Math.max(1,Math.round(rect.width*dpr)),height=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;enqueue(()=>{chart.resize(width,height);dirty=true;});}}
   const observer=new ResizeObserver(resize);
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
-  function frame(){if(disposed)return;if(chart && dirty && !busy){try{chart.frame();dirty=false;stats.surface_frames++;if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}}catch(e){fail(e);}}raf=requestAnimationFrame(frame);}
+  function frame(now=0){if(disposed)return;
+    if(kind&&chart&&!busy){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;}lastFrame=now;if(chart && dirty && !busy){try{chart.frame();if(kind)local=snapshot();dirty=false;stats.surface_frames++;if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}}catch(e){fail(e);}}raf=requestAnimationFrame(frame);}
   async function exporting(scale=1){await flush();return enqueue(async()=>{stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
@@ -153,10 +234,10 @@ export function render({model,el}) {
       // Do not block the serialized queue while waiting for an ack processed by it.
       (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;await queue;await flush();let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
-          const start=performance.now(),stages=[];status.textContent='Preparing GPU shaders…';
-          try{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent=`Preparing GPU: ${event.stage}`;});await chart.first_frame_ready();dirty=true;
+          const start=performance.now(),stages=[];status.textContent='Preparing…';
+          try{if(kind){chart.frame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);status.textContent="Preparing…";});await chart.first_frame_ready();}dirty=true;
             return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
-          }finally{status.textContent='Browser GPU · resident data';}
+          }finally{status.textContent='Ready';}
         },true);
         const data=message.action==='export'?await exporting(message.scale):null;model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);}catch(e){model.send({action:'result',id:message.id,error:String(e)});}})();
     }
@@ -165,25 +246,89 @@ export function render({model,el}) {
   select.addEventListener('change',()=>enqueue(()=>{selected=select.value;properties();}));
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
-  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{await chart.auto_fit_all(0.05);
+  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot')s.boxplot.value_range=null;install(s);}else await chart.auto_fit_all(0.05);
     dirty=true;commit();}));
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
-  canvas.addEventListener('pointerdown',e=>{if(!chart)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const [x,y]=position(e);pointer=[x,y];inputAt=performance.now();enqueue(async()=>{
-    const hit=chart.hit_test(x,y);selected=hit;
-    if((hit===null || hit==='data_area')&&!root.querySelector('[data-area]').checked){chart.on_press(-100,-100);chart.on_release();const picked=await chart.pick_data(x,y,6);const identity=picked?JSON.parse(picked):null;selected=identity?.series_id??null;chart.set_picked_data(JSON.stringify(identity?{refs:[Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px'))]}:null));}
-    else {chart.set_picked_data('null');chart.on_press(x,y);}
+  root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
+  root.querySelector('[data-close-properties]').addEventListener('click',()=>showProperties(false));
+  root.querySelector('[data-select]').addEventListener('click',()=>layoutMode(false));
+  root.querySelector('[data-layout]').addEventListener('click',()=>layoutMode(true));
+  const fullscreen=()=>{if(document.fullscreenElement===root)return document.exitFullscreen();return root.requestFullscreen();};
+  root.querySelector('[data-fullscreen]').addEventListener('click',()=>fullscreen().catch(fail));
+  const menu=document.createElement('div');menu.className='figgy-menu';menu.hidden=true;root.querySelector('.figgy-toolbar').append(menu);
+  let menuKind=null;
+  function openMenu(name){
+    if(menuKind===name&&!menu.hidden){menu.hidden=true;return;}
+    menuKind=name;menu.replaceChildren();menu.hidden=false;local=snapshot();
+    function toggle(label,path){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.dataset.visibility=label;const node=s=>path.slice(0,-1).reduce((n,k)=>n[k],s);input.checked=node(local)[path.at(-1)];input.addEventListener('change',()=>enqueue(()=>{const state=snapshot();node(state)[path.at(-1)]=input.checked;install(state);commit();}));row.append(input,document.createTextNode(label));menu.append(row);}
+    if(name==='visibility'){
+      if(kind){if(kind!=='radial')for(const key of ['legend','grid'])toggle(key,[kind,key]);else{showProperties();select.value='chart_title';properties();menu.hidden=true;}return;}
+      for(const [label,path] of [['Chart title',['chart_title','visible']],['Legend',['legend','visible']],...Object.entries(side).map(([k,v])=>[`${k} axis title`,[v,'title_option','visible']])])toggle(label,['config',...path]);
+    }else if(kind){showProperties();menu.hidden=true;}
+    else{
+      const specs=model.get('draw_styles'),mode=local.config.draw_style?.mode??'precise';
+      for(const name of ['precise','sketch','milkyway','constellation']){const b=document.createElement('button');b.textContent=name;b.dataset.styleMode=name;b.setAttribute('aria-pressed',String(mode===name));
+        const types=local.series.map(s=>Object.keys(s.render_type)[0]);b.disabled=name==='sketch'?types.some(t=>['Histogram','Heatmap','Contour','HeatmapContour'].includes(t)):name==='milkyway'?types.some(t=>t!=='Line'):name==='constellation'?types.some(t=>t!=='ScatterLine'):false;
+        b.addEventListener('click',()=>enqueue(()=>{const state=snapshot();state.config.draw_style={mode:name,...Object.fromEntries(specs[name].map(p=>[p.key,p.default]))};install(state);commit();menu.hidden=true;openMenu('style');}));menu.append(b);}
+      for(const spec of specs[mode]){const row=document.createElement('label'),input=document.createElement('input');input.type='number';input.min=spec.min;input.max=spec.max;input.step=spec.integer?1:.05;input.value=local.config.draw_style[spec.key];input.dataset.styleParameter=spec.key;row.append(document.createTextNode(spec.key.replaceAll('_',' ')),input);input.addEventListener('change',()=>enqueue(()=>{const value=Number(input.value);if(!Number.isFinite(value)||value<spec.min||value>spec.max||(spec.integer&&!Number.isInteger(value)))throw Error(`${spec.key} must be in ${spec.min}..${spec.max}`);const state=snapshot();state.config.draw_style[spec.key]=value;install(state);commit();}));menu.append(row);}
+    }
+  }
+  root.querySelector('[data-style]').addEventListener('click',()=>openMenu('style'));
+  root.querySelector('[data-visibility]').addEventListener('click',()=>openMenu('visibility'));
+  root.addEventListener('pointerdown',e=>{if(!menu.contains(e.target)&&!e.target.closest('[data-style],[data-visibility]'))menu.hidden=true;});
+  const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
+  function bounds(){return JSON.parse(chart.decoration_bounds('data_area')).rect;}
+  function navigate(a,factor,anchor,shift=0){
+    const log=a.scale==='Logarithmic';let lo=log?Math.log10(a.min):a.min,hi=log?Math.log10(a.max):a.max;
+    const span=hi-lo;if(a.inverted){anchor=1-anchor;shift=-shift;}const pivot=lo+span*anchor;
+    const low=pivot+(lo-pivot)*factor+shift*span,high=pivot+(hi-pivot)*factor+shift*span;
+    a.min=log?10**low:low;a.max=log?10**high:high;
+  }
+  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e);pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
+    const [x,y]=point;
+    if(kind){
+      gesture.handle=selected?chart.resize_handle(selected,x,y):null;
+      gesture.target=gesture.handle?selected:chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
+      selected=gesture.target;
+      if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
+    }else{
+      const hit=chart.hit_test(x,y);selected=hit;stats.last_pointer_hit=hit;
+      const area=bounds(),inside=x>=area[0]&&x<=area[0]+area[2]&&y>=area[1]&&y<=area[1]+area[3];
+      gesture.pan=(hit==='data_area'||(hit===null&&inside))&&!root.querySelector('[data-area]').checked;
+      stats.last_pointer_pan=gesture.pan;
+      if((hit===null||gesture.pan)){chart.on_press(-100,-100);chart.on_release();const picked=await chart.pick_data(x,y,6);const identity=picked?JSON.parse(picked):null;const ref=identity?Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px')):null;
+        const old=JSON.parse(chart.get_config()).picked_data?.refs?.[0];const same=ref&&JSON.stringify(ref)===JSON.stringify(old);
+        selected=same?null:identity?.series_id??null;chart.set_picked_data(JSON.stringify(!same&&ref?{refs:[ref]}:null));
+      }else{chart.set_picked_data('null');chart.on_press(x,y);}
+    }
     dirty=true;properties();
   });});
-  canvas.addEventListener('pointermove',e=>{if(!pointer || !chart)return;const next=position(e),old=pointer;pointer=next;inputAt=performance.now();enqueue(()=>{chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;});});
-  function release(){if(!pointer)return;pointer=null;enqueue(()=>{chart.on_release();commit();});}
-  canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
-  canvas.addEventListener('wheel',e=>{e.preventDefault();if(!chart)return;inputAt=performance.now();enqueue(()=>{
-    const s=snapshot(),factor=Math.exp(e.deltaY*0.001);for(const key of Object.values(side)){const a=s.config[key];if(a.scale==='Linear'){const mid=(a.min+a.max)/2,half=(a.max-a.min)*factor/2;a.min=mid-half;a.max=mid+half;}}
+  canvas.addEventListener('pointermove',e=>{if(!chart)return;const next=localPoint(e);hoverPoint=next;if(!pointer)return;const gesture=pointer;inputAt=performance.now();enqueue(()=>{
+    const distance=Math.hypot(next[0]-gesture.origin[0],next[1]-gesture.origin[1]);if(distance>=3)gesture.moved=true;
+    const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
+    if(kind){if(gesture.target&&gesture.moved)chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
+    else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;for(const k of ['bottom_x','top_x'])navigate(s.config[k],1,.5,-(next[0]-old[0])/r[2]);for(const k of ['left_y','right_y'])navigate(s.config[k],1,.5,(next[1]-old[1])/r[3]);install(s);}}
+    else chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
+  });});
+  function release(){if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved)showProperties();commit();});}
+  canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
+  canvas.addEventListener('wheel',e=>{if(!chart||kind)return;e.preventDefault();inputAt=performance.now();const point=position(e),ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX;enqueue(()=>{
+    const s=snapshot(),r=bounds(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
+    if(!shift||ctrl)for(const key of ['bottom_x','top_x'])navigate(s.config[key],factor,x);
+    if(!ctrl||shift)for(const key of ['left_y','right_y'])navigate(s.config[key],factor,y);
     install(s);commit();
   });},{passive:false});
+  canvas.addEventListener('keydown',e=>{if(!chart)return;if(e.key==='F11'){e.preventDefault();fullscreen().catch(fail);return;}if(e.key!=='Escape'&&!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?10:1;enqueue(()=>{
+    if(e.key==='Escape'){selected=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}
+    else{const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0,dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
+      if(kind){if(selected&&!selected.startsWith('slice_')&&!local[kind].series?.some(s=>s.id===selected))chart.drag(selected,dx,dy,undefined);else if(dx!==0)chart.step_selection(dx<0);}
+      else{const cfg=JSON.parse(chart.get_config());if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected){const b=JSON.parse(chart.decoration_bounds(selected));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx,dy);chart.on_release();}}}
+    }dirty=true;commit();
+  });});
+  layoutMode(false);
   model.send({action:'mounted',client});
   (async()=>{try{
-    if(!model.get('auto_prepare')){status.textContent='GPU not prepared · run await fig.prepare_async()';await requested;}
+    if(!model.get('auto_prepare')){status.textContent='Not prepared';await requested;}
     if(disposed)return;
     await enqueue(async()=>{
     if(!navigator.gpu)throw Error('WebGPU is unavailable. Use a supported browser/secure origin; kernel PNG fallback requires an explicit native Figure.widget(backend="png").');
@@ -191,7 +336,7 @@ export function render({model,el}) {
     const module=await loadKernel(model);if(disposed)return;
     canvas.width=local.config.chart_area.width;canvas.height=local.config.chart_area.height;
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
-    chart=await module.FiggyChart.create(canvas);chart.set_pool_auto_growth(true);
+    chart=kind?await module.FiggyBoundedChart.create(canvas,kind,JSON.stringify(local[kind]),local.config.chart_area.width,local.config.chart_area.height):await module.FiggyChart.create(canvas);if(!kind)chart.set_pool_auto_growth(true);
     if(disposed)return;
     const manifest=model.get('manifest'),buffers=model.get('columns');
     if(manifest.length!==buffers.length)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
@@ -204,12 +349,12 @@ export function render({model,el}) {
       else throw Error(`Unsupported binary dtype: ${spec.dtype}`);
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
-    chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
+    if(kind){chart.frame();}else{chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
     clearColor(local.background);
-    await chart.first_frame_ready();properties();observer.observe(canvas);resize();status.textContent='Browser GPU · resident data';
+    await chart.first_frame_ready();}properties();observer.observe(canvas);resize();status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);
-    root.figgy={stats,snapshot:()=>clone(local),flush,resize,pick:(x,y,distance)=>enqueue(()=>chart.pick_data(x,y,distance),true)};
+    root.figgy={stats,snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))]))};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();

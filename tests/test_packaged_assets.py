@@ -53,3 +53,19 @@ def test_git_autocrlf_checkout_preserves_manifest_bytes(tmp_path, with_attribute
     else:
         with pytest.raises(ValueError, match=r"figgy\.js.*CRLF"):
             check_assets(checked)
+
+
+@pytest.mark.parametrize("changed", ["Cargo.toml", "scripts/build-wasm.sh", "python/figgyplot/assets/provenance.json"])
+def test_one_sided_renderer_revision_update_is_rejected(tmp_path, changed):
+    check = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["check_renderer_revision"]
+    for name in ("Cargo.toml", "scripts/build-wasm.sh", "python/figgyplot/assets/provenance.json"):
+        destination = tmp_path / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, destination)
+    check(tmp_path)
+    import json
+    revision = json.loads((ASSETS / "provenance.json").read_text())["upstream_revision"]
+    path = tmp_path / changed
+    path.write_text(path.read_text().replace(revision, "0" * 40, 1))
+    with pytest.raises(ValueError, match="same upstream revision"):
+        check(tmp_path)

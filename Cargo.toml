@@ -32,5 +32,5 @@ codegen-units = 1
 # are, build them from the pinned upstream revision. Remove this patch before a release
 # (docs/PUBLISHING.md): a release builds against the published crates.
 [patch.crates-io]
-figgy-renderer = { git = "https://github.com/shim9610/figgy", rev = "632d1844f184f9e9a230867773ec1885e1557541" }
-figgy-model = { git = "https://github.com/shim9610/figgy", rev = "632d1844f184f9e9a230867773ec1885e1557541" }
+figgy-renderer = { git = "https://github.com/shim9610/figgy", rev = "6aee54b885fdfc18a119a084f8277a5453b39658" }
+figgy-model = { git = "https://github.com/shim9610/figgy", rev = "6aee54b885fdfc18a119a084f8277a5453b39658" }
