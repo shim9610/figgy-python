@@ -382,18 +382,19 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
                 inputs.click(control);inputs.click(control+'_'+value)
             inputs.click_rect(inputs.info()['decorations']['axis_bottom'])
             before=fig.get_settings();choose('axis_scale','Logarithmic')
-            assert fig.get_settings()==before
-            assert 'positive' in inputs.info()['error']
-            ax.set_xlim(1,3);inputs.pump()
+            assert_scale(fig.get_settings(),'bottom_x','Logarithmic')
+            assert fig.get_settings()['config']['top_x']==before['config']['top_x']
+            assert not inputs.info()['error']
             for target,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
                 inputs.click_rect(inputs.info()['decorations'][target])
                 for scale in ['Logarithmic','Linear']:
                     choose('axis_scale',scale);assert_scale(fig.get_settings(),key,scale)
             inputs.click_rect(inputs.info()['decorations']['colorbar'])
-            color_min(fig,0);inputs.pump();before=fig.get_settings()
+            color_min(fig,0);inputs.pump()
             choose('color_scale','Logarithmic')
-            assert fig.get_settings()==before and 'positive' in inputs.info()['error']
-            color_min(fig,1);inputs.pump()
+            assert_scale(fig.get_settings(),'colorbar','Logarithmic')
+            assert not inputs.info()['error']
+            choose('color_scale','Linear')
             bounds=json.loads(fig._native.bounds_json('data_area'))['rect']
             linear=sample(fig.render_rgba(),bounds)
             choose('color_scale','Logarithmic');assert_scale(fig.get_settings(),'colorbar','Logarithmic')
@@ -410,10 +411,10 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
             page.locator(f'[data-property={control}]').select_option(value);page.evaluate(ROOT+'.flush()')
         target.select_option('axis_bottom');before=page.evaluate(ROOT+'.snapshot()')
         choose('axis_scale','Logarithmic')
-        assert page.evaluate(ROOT+'.snapshot()')==before
-        assert page.locator('[data-property=axis_scale]').input_value()=='Linear'
-        assert 'positive' in page.locator('.figgy-error').inner_text()
-        execute('ax.set_xlim(1,3); await fig.sync()')
+        assert_scale(page.evaluate(ROOT+'.snapshot()'),'bottom_x','Logarithmic')
+        assert page.evaluate(ROOT+'.snapshot().config.top_x')==before['config']['top_x']
+        assert page.locator('[data-property=axis_scale]').input_value()=='Logarithmic'
+        assert not page.locator('.figgy-error').inner_text()
         for name,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
             target.select_option(name)
             for scale in ['Logarithmic','Linear']:
@@ -422,10 +423,11 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         target.select_option('field');assert page.locator('[data-property=color_scale]').count()==1
         target.select_option('colorbar')
         execute("s=fig.get_settings(); s['config']['colorbar']['axis']['min']=0; fig.apply_settings(s); await fig.sync()")
-        before=page.evaluate(ROOT+'.snapshot()');choose('color_scale','Logarithmic')
-        assert page.evaluate(ROOT+'.snapshot()')==before
-        assert page.locator('[data-property=color_scale]').input_value()=='Linear'
-        execute("s=fig.get_settings(); s['config']['colorbar']['axis']['min']=1; fig.apply_settings(s); await fig.sync()")
+        choose('color_scale','Logarithmic')
+        assert_scale(page.evaluate(ROOT+'.snapshot()'),'colorbar','Logarithmic')
+        assert page.locator('[data-property=color_scale]').input_value()=='Logarithmic'
+        assert not page.locator('.figgy-error').inner_text()
+        choose('color_scale','Linear')
         from PIL import Image
         path=tmp_path/'linear.png';execute(f'await fig.savefig_async({str(path)!r})')
         box=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect')
@@ -439,3 +441,127 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert state['config']['colorbar']['axis']==native
         execute("code=fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.imshow(np.ones((2,2)),id='field'); exec(code,{'fig':other}); assert other.get_settings()['config']['colorbar']['axis']['scale']=='Logarithmic'; other.close()")
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('positive_samples', [True, False])
+def test_log_color_ui_masks_nonpositive_samples_in_both_hosts(tmp_path, positive_samples):
+    """Noisy or entirely nonpositive data must never block the log selector."""
+    values=[[-2.,0.,10.],[100.,1000.,10000.]] if positive_samples else [[-2.,0.,-1.],[-3.,0.,-4.]]
+    expected=(10,10000) if positive_samples else (1,10)
+    setup=f"data=np.array({values!r}); ax.imshow(data,extent=(0,3,0,2),origin='lower',cmap='gray',id='field'); ax.grid(False)"
+    def check_state(state, original_series):
+        axis=state['config']['colorbar']['axis']
+        assert axis['scale']=='Logarithmic'
+        assert (axis['min'],axis['max'])==pytest.approx(expected)
+        assert state['series']==original_series
+    def check_pixels(pixels, rect):
+        x,y,w,h=rect
+        def pixel(fx,fy):
+            return np.asarray(pixels)[round(y+h*fy),round(x+w*fx),:3]
+        # Negative and zero cells disappear, revealing the white chart background.
+        assert np.all(pixel(1/6,.75)>245)
+        assert np.all(pixel(.5,.75)>245)
+        if positive_samples:
+            # Value 1000 is two of three logarithmic decades above the lower bound.
+            assert 150<float(pixel(.5,.25).mean())<190
+        else:
+            assert np.all(pixel(.5,.25)>245)
+    with figgy.figure(backend='native') as fig:
+        namespace={'np':np,'ax':fig.axes[0]};exec(setup,namespace)
+        original_series=fig.get_settings()['series'];uploads=fig.info['column_uploads']
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            inputs.click_rect(inputs.info()['decorations']['colorbar'])
+            inputs.click('color_scale');inputs.click('color_scale_Logarithmic')
+            check_state(fig.get_settings(),original_series)
+            assert not inputs.info()['error']
+            check_pixels(fig.render_rgba(),json.loads(fig._native.bounds_json('data_area'))['rect'])
+            np.testing.assert_array_equal(namespace['data'],values)
+            assert fig.info['column_uploads']==uploads
+            native_axis=fig.get_settings()['config']['colorbar']['axis']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/('noisy' if positive_samples else 'nonpositive'),source) as (page,execute):
+        original_series=page.evaluate(ROOT+'.snapshot().series')
+        uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        page.locator('[data-properties]').click()
+        page.locator('[data-target]').select_option('colorbar')
+        page.locator('[data-property=color_scale]').select_option('Logarithmic')
+        page.evaluate(ROOT+'.flush()');execute('await fig.sync()')
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        check_state(state,original_series)
+        assert state['config']['colorbar']['axis']==native_axis
+        assert not page.locator('.figgy-error').inner_text()
+        from PIL import Image
+        path=tmp_path/'log-masked.png';execute(f'await fig.savefig_async({str(path)!r})')
+        box=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect')
+        width,height=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
+        rect=[box[0]*960/width,box[1]*600/height,box[2]*960/width,box[3]*600/height]
+        check_pixels(Image.open(path).convert('RGB'),rect)
+        execute(f'np.testing.assert_array_equal(data,{values!r})')
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+def test_log_axis_ui_breaks_lines_at_nonpositive_samples_in_both_hosts(tmp_path):
+    """A log view keeps valid segments without connecting across masked samples."""
+    setup="x=np.arange(1.,7.); y=np.array([1.,10.,-1.,0.,10.,100.]); ax.plot(x,y,color='blue',linewidth=3,id='noisy'); ax.set_xlim(.5,6.5); ax.set_ylim(-5,100); ax.grid(False)"
+    def check_state(state, before):
+        axis=state['config']['left_y']
+        assert axis['scale']=='Logarithmic'
+        assert (axis['min'],axis['max'])==pytest.approx((1,100))
+        assert state['series']==before['series']
+        for key in ('bottom_x','top_x','right_y'):
+            assert state['config'][key]==before['config'][key]
+    def check_pixels(pixels, rect):
+        x,y,w,h=rect
+        pixels=np.asarray(pixels)
+        def point(vx,vy):
+            return round(x+w*(vx-.5)/6),round(y+h*(1-np.log10(vy)/2))
+        for vx,vy in [(1.5,np.sqrt(10)),(5.5,np.sqrt(1000))]:
+            px,py=point(vx,vy)
+            region=pixels[py-4:py+5,px-4:px+5,:3]
+            assert np.any((region[:,:,2]>150)&(region[:,:,0]<100)), 'positive line segment disappeared'
+        # The old clamp-to-tiny-positive behavior left downward strokes near
+        # x=2 and x=5. This rectangle excludes both valid positive segments.
+        x0,y0=point(1.9,5)
+        x1,y1=point(5.1,1.5)
+        gap=pixels[y0:y1,x0:x1,:3]
+        assert gap.size and np.all(gap>245), 'nonpositive samples produced a false connecting stroke'
+    with figgy.figure(backend='native') as fig:
+        namespace={'np':np,'ax':fig.axes[0]};exec(setup,namespace)
+        before=fig.get_settings();uploads=fig.info['column_uploads']
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            inputs.click_rect(inputs.info()['decorations']['axis_left'])
+            inputs.click('axis_scale');inputs.click('axis_scale_Logarithmic')
+            check_state(fig.get_settings(),before)
+            assert not inputs.info()['error']
+            check_pixels(fig.render_rgba(),json.loads(fig._native.bounds_json('data_area'))['rect'])
+            np.testing.assert_array_equal(namespace['x'],np.arange(1.,7.))
+            np.testing.assert_array_equal(namespace['y'],[1.,10.,-1.,0.,10.,100.])
+            assert fig.info['column_uploads']==uploads
+            native_axis=fig.get_settings()['config']['left_y']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'line-log-gap',source) as (page,execute):
+        before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        page.locator('[data-properties]').click()
+        page.locator('[data-target]').select_option('axis_left')
+        page.locator('[data-property=axis_scale]').select_option('Logarithmic')
+        page.evaluate(ROOT+'.flush()');execute('await fig.sync()')
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        check_state(state,before)
+        assert state['config']['left_y']==native_axis
+        assert not page.locator('.figgy-error').inner_text()
+        from PIL import Image
+        path=tmp_path/'line-log-gap.png';execute(f'await fig.savefig_async({str(path)!r})')
+        box=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect')
+        width,height=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
+        rect=[box[0]*960/width,box[1]*600/height,box[2]*960/width,box[3]*600/height]
+        check_pixels(Image.open(path).convert('RGB'),rect)
+        execute('np.testing.assert_array_equal(x,np.arange(1.,7.)); np.testing.assert_array_equal(y,[1.,10.,-1.,0.,10.,100.])')
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads

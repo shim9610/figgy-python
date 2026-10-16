@@ -126,17 +126,17 @@ export function render({model,el}) {
       for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
       input.addEventListener('change',()=>enqueue(()=>{const state=clone(snapshot());try{apply(state,input.value);install(state);commit();}catch(e){input.value=value;throw e;}}));row.append(input);fields.append(row);
     }
-    function scaleControl(label,axis,find){
+    function scaleControl(label,axis,find,dimension){
       choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
         const a=find(s);
-        if(v==='Logarithmic'&&!(a.min>0&&a.max>a.min))throw Error('Log scale requires Minimum > 0. Set a positive range first.');
+        if(v==='Logarithmic'&&a.min<=0){const r=model.get('state').log_bounds[dimension];[a.min,a.max]=r;}
         a.scale=v;a.major_spacing=v==='Logarithmic'?1:(a.max-a.min)/5;
       });
-      if(axis.min<=0){const note=document.createElement('p');note.textContent='Log scale requires Minimum > 0. Set a positive range first.';fields.append(note);}
+      const note=document.createElement('p');note.textContent='Log view omits zero and negative values; source data is preserved.';fields.append(note);
     }
     function colorScale(){
       if(!cfg.colorbar)return;
-      scaleControl('color_scale',cfg.colorbar.axis,s=>s.config.colorbar.axis);
+      scaleControl('color_scale',cfg.colorbar.axis,s=>s.config.colorbar.axis,'z');
       choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>s.config.colorbar.colormap=v);
       field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>s.config.colorbar.axis.min=v);
       field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>s.config.colorbar.axis.max=v);
@@ -217,7 +217,7 @@ export function render({model,el}) {
       if(style.matrix)colorScale();
     }else if(target==='colorbar'||target.startsWith('colorbar_')){colorScale();
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
-      scaleControl('axis_scale',cfg[key],s=>s.config[key]);
+      scaleControl('axis_scale',cfg[key],s=>s.config[key],key.endsWith('_x')?'x':'y');
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>s.config[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>s.config[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>s.config[key].tick=v);

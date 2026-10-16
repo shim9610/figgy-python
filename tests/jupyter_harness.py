@@ -20,12 +20,19 @@ def notebook(tmp_path, source):
     tmp_path.mkdir(parents=True, exist_ok=True)
     runtime = tmp_path / 'runtime'
     runtime.mkdir()
+    # Configure first-run announcements before Jupyter starts. Clicking the
+    # transient news toast races its animation/expiry and can fail an otherwise
+    # healthy chart interaction test (or leave the toast over the canvas).
+    settings = tmp_path / 'settings'
+    notifications = settings / '@jupyterlab' / 'apputils-extension' / 'notification.jupyterlab-settings'
+    notifications.parent.mkdir(parents=True)
+    notifications.write_text(json.dumps({'fetchNews': 'false', 'checkForUpdates': False}))
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     nbformat.write(nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell(source)], metadata={
         'kernelspec': {'display_name': 'Python 3', 'language': 'python', 'name': 'python3'}}), tmp_path / 'check.ipynb')
-    env = dict(os.environ, JUPYTER_RUNTIME_DIR=str(runtime))
+    env = dict(os.environ, JUPYTER_RUNTIME_DIR=str(runtime), JUPYTERLAB_SETTINGS_DIR=str(settings))
     log = open(tmp_path / 'server.log', 'w')
     server = subprocess.Popen([sys.executable, '-m', 'jupyterlab', '--no-browser', '--expose-app-in-browser',
         '--ip=127.0.0.1', f'--port={port}', f'--ServerApp.root_dir={tmp_path}', '--IdentityProvider.token='],
@@ -53,7 +60,22 @@ def notebook(tmp_path, source):
             context.route('https://**/*', lambda route: route.abort())
             page = context.new_page()
             errors = []
-            page.on('pageerror', lambda e: errors.append(str(e)))
+            console_errors = []
+            page.on('pageerror', lambda e: errors.append(e.stack or str(e)))
+            page.on('console', lambda m: console_errors.append(m.text) if m.type == 'error' else None)
+            page.add_init_script("""if(navigator.gpu){
+                const requestAdapter=navigator.gpu.requestAdapter.bind(navigator.gpu);
+                navigator.gpu.requestAdapter=async(...args)=>{
+                    const adapter=await requestAdapter(...args);
+                    if(adapter){const requestDevice=adapter.requestDevice.bind(adapter);
+                        adapter.requestDevice=async(...args)=>{
+                            const device=await requestDevice(...args);
+                            device.lost.then(info=>console.error('WebGPU device lost:',info.reason,info.message));
+                            return device;
+                        };
+                    }return adapter;
+                };
+            }""")
             try:
                 page.goto(base+'/lab/workspaces/'+uuid.uuid4().hex+'/tree/check.ipynb')
                 page.locator('.jp-CodeCell .cm-content').wait_for(timeout=45000)
@@ -64,10 +86,6 @@ def notebook(tmp_path, source):
                 page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent==='Ready'", timeout=45000)
                 with urllib.request.urlopen(base+'/api/sessions') as response:
                     session = next(s for s in json.load(response) if s['path'] == 'check.ipynb')
-                # Dismiss Jupyter's first-run news prompt before canvas gestures.
-                notice = page.get_by_role('button', name='No', exact=True)
-                if notice.is_visible():
-                    notice.click()
                 client = BlockingKernelClient(connection_file=str(runtime/f"kernel-{session['kernel']['id']}.json"))
                 client.load_connection_file()
                 client.start_channels()
@@ -92,7 +110,12 @@ def notebook(tmp_path, source):
                 import traceback
                 (tmp_path/'failure.txt').write_text(traceback.format_exc())
                 (tmp_path/'browser-errors.json').write_text(json.dumps(errors))
+                (tmp_path/'console-errors.json').write_text(json.dumps(console_errors))
                 try:
+                    (tmp_path/'widget-state.json').write_text(json.dumps(page.evaluate("""()=>{
+                        const f=document.querySelector('.figgy-editor')?.figgy;
+                        return f?{stats:f.stats,state:f.snapshot()}:null;
+                    }""")))
                     page.screenshot(path=str(tmp_path/'failure.png'), timeout=5000)
                 except Exception:
                     pass

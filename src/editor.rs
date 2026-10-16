@@ -858,6 +858,46 @@ impl Editor {
                 config["chart_title"]["top_margin"] = json!(parsed.chart_title.top_margin);
             }
         }
+        if changed {
+            // A scale switch is a view helper: use the positive data domain if
+            // the old linear limits cross zero, without editing source arrays.
+            for (key, dimension) in [
+                ("bottom_x", "x"),
+                ("top_x", "x"),
+                ("left_y", "y"),
+                ("right_y", "y"),
+                ("colorbar", "z"),
+            ] {
+                if !config[key].is_object() {
+                    continue;
+                }
+                let old = if key == "colorbar" {
+                    &state["config"][key]["axis"]
+                } else {
+                    &state["config"][key]
+                };
+                let axis = if key == "colorbar" {
+                    &mut config[key]["axis"]
+                } else {
+                    &mut config[key]
+                };
+                if axis["scale"] == "Logarithmic"
+                    && old["scale"] != "Logarithmic"
+                    && axis["min"].as_f64().is_some_and(|v| v <= 0.)
+                {
+                    match c.log_bounds(dimension) {
+                        Ok((min, max)) => {
+                            axis["min"] = json!(min);
+                            axis["max"] = json!(max);
+                        }
+                        Err(e) => {
+                            self.error = e.to_string();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
         state["config"] = config;
         if changed {
             match c.apply_settings(&state.to_string()) {
@@ -976,9 +1016,7 @@ fn scale_control(
             }
         });
     controls.insert(id.into(), response.response.rect);
-    if axis["min"].as_f64().is_some_and(|v| v <= 0.) {
-        ui.label("Log scale requires Minimum > 0. Set a positive range first.");
-    }
+    ui.label("Log view omits zero and negative values; source data is preserved.");
     if value == previous {
         return false;
     }

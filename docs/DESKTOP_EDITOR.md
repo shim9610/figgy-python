@@ -239,9 +239,14 @@ This edits the selected axis. Select **Color scale**, its axis, or a heatmap
 series to change the color scale independently of X/Y. Color-scale logarithms
 change the mapping of data values to colors as well as the colorbar ticks.
 
-Logarithmic bounds must be positive. Set **Minimum** (or **vmin** for the color
-scale) above zero before switching; invalid changes show an error and preserve
-the current settings. Signed data does not support a symmetric-log mode here.
-Switching scale preserves the limits and selects a tick spacing of one decade
-for logarithmic scales, or one fifth of the range for linear scales. Copy Python
-preserves the chosen scales. Both desktop and Jupyter expose these controls.
+Zero or negative samples do not prevent switching to logarithmic display. They
+are omitted from the log view; the original data is preserved. If the current
+limits cross zero, the scale selector fits the positive data range automatically.
+With no positive samples it opens an empty log view from 1 to 10. Existing
+positive limits are preserved. The same rule applies to color values and to
+Python's `set_xscale("log")` / `set_yscale("log")` helpers.
+
+Switching scale selects a tick spacing of one decade for logarithmic scales,
+or one fifth of the range for linear scales. Direct SSOT range edits still
+require positive bounds for a logarithmic axis. Copy Python preserves the
+chosen scales. Both desktop and Jupyter expose these controls.

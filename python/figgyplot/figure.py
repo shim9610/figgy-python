@@ -1019,20 +1019,20 @@ class Axes(ChartMethods):
         with self.figure._lock:
             state = self.figure.get_settings()
             keys = ("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")
-            if scale == "log" and any(state["config"][key]["min"] <= 0 for key in keys):
-                raise ValueError(f"log scale requires positive bounds; call set_{axis}lim first")
             for key in keys:
                 node = state["config"][key]
+                if scale == "log" and node["min"] <= 0:
+                    node["min"], node["max"] = self.figure._native.log_bounds(axis)
                 node["scale"] = scales[scale]
                 node["major_spacing"] = 1.0 if scale == "log" else (node["max"] - node["min"]) / 5
             self.figure.apply_settings(state)
 
     def set_xscale(self, scale):
-        """Choose linear/log scaling; logarithmic bounds must already be positive."""
+        """Choose linear/log scaling; fit positive data if current limits cross zero."""
         return self._set_scale("x", scale)
 
     def set_yscale(self, scale):
-        """Choose linear/log scaling; logarithmic bounds must already be positive."""
+        """Choose linear/log scaling; fit positive data if current limits cross zero."""
         return self._set_scale("y", scale)
 
     def get_xscale(self):

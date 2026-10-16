@@ -220,6 +220,33 @@ impl NotebookFigure {
         self.fit_extents.insert(id, [make(x)?, make(y)?]);
         Ok(())
     }
+    fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
+        let mut extra = renderer::chart::FitExtent::EMPTY;
+        if matches!(axis, "x" | "y") {
+            for series in &self.series {
+                if !matches!(
+                    series.render_type,
+                    renderer::DataRenderType::ScatterErrorbarX { .. }
+                        | renderer::DataRenderType::ScatterErrorbarY { .. }
+                        | renderer::DataRenderType::ScatterErrorbarXY { .. }
+                        | renderer::DataRenderType::LineScatterErrorbarX { .. }
+                        | renderer::DataRenderType::LineScatterErrorbarY { .. }
+                        | renderer::DataRenderType::LineScatterErrorbarXY { .. }
+                ) {
+                    continue;
+                }
+                if let Some(bounds) = self.fit_extents.get(&series.series_id) {
+                    extra.union(&bounds[usize::from(axis == "y")]);
+                }
+            }
+        }
+        positive_data_bounds(axis, &self.series, extra, |id| {
+            self.columns
+                .get(id)
+                .copied()
+                .ok_or_else(|| invalid("unknown column"))
+        })
+    }
     fn fit(&mut self, padding: f64) -> PyResult<()> {
         if !padding.is_finite() || padding < 0. {
             return Err(invalid("padding must be finite and non-negative"));

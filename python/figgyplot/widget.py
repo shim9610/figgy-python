@@ -117,7 +117,8 @@ class FigureWidget(anywidget.AnyWidget):
         if not self._handling:
             settings = self.figure.get_settings()
             self.state = {"settings": settings, "revision": self.figure.revision, "code": self.figure.to_code(),
-                          "texts": _display_texts(settings)}
+                          "texts": _display_texts(settings),
+                          "log_bounds": {axis: self.figure._native.log_bounds(axis) for axis in ("x", "y", "z")}}
 
     def _command(self, widget, content, buffers):
         action = content.get("action")

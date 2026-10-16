@@ -602,7 +602,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -644,7 +644,7 @@ checksum = "b97b65636e5b9ef369943878ac74335ba1c55c1cb6adbf1e2c293c624248d693"
 [[package]]
 name = "figgy-model"
 version = "0.11.0"
-source = "git+https://github.com/shim9610/figgy?rev=6aee54b885fdfc18a119a084f8277a5453b39658#6aee54b885fdfc18a119a084f8277a5453b39658"
+source = "git+https://github.com/shim9610/figgy?rev=ae892177a6a3d1cd3a48367b4a1a4fc26d119c14#ae892177a6a3d1cd3a48367b4a1a4fc26d119c14"
 dependencies = [
  "serde",
 ]
@@ -652,7 +652,7 @@ dependencies = [
 [[package]]
 name = "figgy-renderer"
 version = "0.17.0"
-source = "git+https://github.com/shim9610/figgy?rev=6aee54b885fdfc18a119a084f8277a5453b39658#6aee54b885fdfc18a119a084f8277a5453b39658"
+source = "git+https://github.com/shim9610/figgy?rev=ae892177a6a3d1cd3a48367b4a1a4fc26d119c14#ae892177a6a3d1cd3a48367b4a1a4fc26d119c14"
 dependencies = [
  "bytemuck",
  "concurrent-queue",
@@ -2252,7 +2252,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3291,7 +3291,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

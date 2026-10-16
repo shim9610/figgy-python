@@ -45,6 +45,28 @@ def test_native_notebook_fallback_is_explicit():
         fig.to_png()
     fig.close()
 
+
+def test_positive_log_bounds_survive_binary_transfer_release():
+    fig, ax = subplots(backend='webgpu')
+    try:
+        ax.imshow(np.array([[-2., 0.], [10., 1000.]]), extent=(-1, 3, -2, 4), origin='lower')
+        widget = fig.widget()
+        bounds = widget.state['log_bounds']
+        assert bounds['z'] == pytest.approx((10., 1000.))
+        series = fig.get_settings()['series']
+        widget._command(widget, {'action':'ready','info':{'column_uploads':4}}, [])
+        assert widget.columns == [] and fig._native.columns == {}
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        assert widget.state['log_bounds'] == bounds
+        config = fig.get_settings()['config']
+        for axis, dimension in [('bottom_x', 'x'), ('left_y', 'y')]:
+            assert (config[axis]['min'], config[axis]['max']) == pytest.approx(bounds[dimension])
+            assert config[axis]['scale'] == 'Logarithmic'
+        assert fig.get_settings()['series'] == series
+    finally:
+        fig.close()
+
 def test_manual_preparation_requires_a_mounted_view_and_propagates_result():
     fig, ax = subplots(backend='webgpu')
     ax.plot([0, 1], [1, 0])

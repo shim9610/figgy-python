@@ -598,6 +598,63 @@ impl FigureAccess<'_> {
     }
 }
 
+/// Positive range metadata only: source samples remain untouched, including noise.
+fn positive_data_bounds(
+    axis: &str,
+    series: &[SeriesConfig],
+    mut extent: renderer::chart::FitExtent,
+    mut column: impl FnMut(&str) -> PyResult<renderer::chart::FitExtent>,
+) -> PyResult<(f64, f64)> {
+    if !matches!(axis, "x" | "y" | "z") {
+        return Err(invalid("log bounds axis must be x, y or z"));
+    }
+    for s in series {
+        match axis {
+            "x" => extent.union(&column(&s.x_column)?),
+            "y" => extent.union(&column(&s.y_column)?),
+            "z" => {
+                let matrix = match &s.render_type {
+                    renderer::DataRenderType::Heatmap { matrix, .. }
+                    | renderer::DataRenderType::Contour { matrix, .. }
+                    | renderer::DataRenderType::HeatmapContour { matrix, .. } => matrix,
+                    _ => continue,
+                };
+                for id in &matrix.columns {
+                    extent.union(&column(id)?);
+                }
+            }
+            _ => return Err(invalid("log bounds axis must be x, y or z")),
+        }
+        if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
+            let dimension = match bar.orientation {
+                renderer::data_config::BarOrientation::Vertical => "y",
+                renderer::data_config::BarOrientation::Horizontal => "x",
+            };
+            if axis == dimension {
+                extent.union(&renderer::chart::FitExtent {
+                    min: bar.baseline,
+                    max: bar.baseline,
+                    min_positive: (bar.baseline > 0.).then_some(bar.baseline),
+                });
+            }
+        }
+    }
+    let Some(min) = extent.min_positive.filter(|v| *v > 0.) else {
+        // A valid empty logarithmic view, not a fabricated data point.
+        return Ok((1., 10.));
+    };
+    if extent.max > min {
+        Ok((min, extent.max))
+    } else {
+        let lower = min / 10.;
+        let upper = min * 10.;
+        Ok((
+            if lower > 0. { lower } else { min },
+            if upper.is_finite() { upper } else { min },
+        ))
+    }
+}
+
 fn validate_config(config: &Config) -> PyResult<()> {
     validate_model_numbers(config, "config")?;
     let rect = config.chart_area.0;
@@ -1100,6 +1157,52 @@ impl FigureAccess<'_> {
         self.data.revision += 1;
         Ok(())
     }
+    fn log_bounds(&mut self, axis: &str) -> PyResult<(f64, f64)> {
+        let mut extra = renderer::chart::FitExtent::EMPTY;
+        if matches!(axis, "x" | "y") {
+            let errorbars: Vec<_> = gpu::series(self.data.figure_id, &self.data.series)
+                .into_iter()
+                .filter(|s| {
+                    matches!(
+                        s.render_type,
+                        renderer::DataRenderType::ScatterErrorbarX { .. }
+                            | renderer::DataRenderType::ScatterErrorbarY { .. }
+                            | renderer::DataRenderType::ScatterErrorbarXY { .. }
+                            | renderer::DataRenderType::LineScatterErrorbarX { .. }
+                            | renderer::DataRenderType::LineScatterErrorbarY { .. }
+                            | renderer::DataRenderType::LineScatterErrorbarXY { .. }
+                    )
+                })
+                .collect();
+            if !errorbars.is_empty() {
+                pollster::block_on(self.renderer.ensure_errorbar_extent_engine())
+                    .map_err(runtime)?;
+                let jobs = errorbars
+                    .iter()
+                    .map(|s| self.renderer.begin_series_fit_extent(s))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(runtime)?;
+                self.renderer.wait_idle();
+                for job in jobs.into_iter().flatten() {
+                    if let Some(bounds) = pollster::block_on(job.resolve()).map_err(runtime)? {
+                        let bounds = if axis == "x" { bounds.x } else { bounds.y };
+                        extra.union(&renderer::chart::FitExtent {
+                            min: bounds.min,
+                            max: bounds.max,
+                            min_positive: bounds.min_positive,
+                        });
+                    }
+                }
+            }
+        }
+        positive_data_bounds(axis, &self.data.series, extra, |id| {
+            Chart::slot_extent(
+                self.renderer.pool(),
+                &gpu::column_id(self.data.figure_id, id),
+            )
+            .map_err(runtime)
+        })
+    }
     fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
         if !padding.is_finite() || padding < 0.0 {
             return Err(invalid("padding must be finite and non-negative"));
@@ -1457,6 +1560,9 @@ impl NativeFigure {
     }
     fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.with(|core| core.fit(py, padding))
+    }
+    fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
+        self.with(|core| core.log_bounds(axis))
     }
     fn prepare_json(&self, py: Python<'_>) -> PyResult<String> {
         self.with(|core| core.prepare(py))
