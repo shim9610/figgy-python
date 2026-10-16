@@ -129,6 +129,13 @@ The window displays these instructions above the graph:
 - **Drag a title, axis title or legend:** move that element.
 - **Layout mode:** move or resize the plot area with the renderer's handles.
 
+Wheel zoom only applies while the pointer is inside the data area. Over titles,
+axes, colorbars or canvas margins, Jupyter keeps normal notebook scrolling.
+Fit uses zero padding for heatmap-only figures and 5% for other Cartesian
+figures. `fig.fit(padding=0.05)` explicitly requests 5% in either case.
+Interpolated heatmaps fit their rendered sample-center extent; flat heatmaps fit
+the cell edges. This policy is shared by both Fit buttons and `fig.fit()`.
+
 Zoom supports linear, logarithmic and inverted axes. Movement and resize support
 depend on the selected object's renderer policies. Data selection edits series
 appearance; dragging samples does not modify their source values.

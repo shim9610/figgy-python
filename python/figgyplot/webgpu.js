@@ -35,7 +35,7 @@ export function render({model,el}) {
   let background=clone(local.background ?? null);
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
   const kind=['radial','categorical','boxplot'].find(k=>local[k]);
-  let hoverPoint=null,lastFrame=0;
+  let hoverPoint=null,lastFrame=0,wheelArea=null;
   const textRanges=new Map();
   function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;}
   function layoutMode(enabled){if(!enabled&&kind&&chart&&selected==='data_area')enqueue(()=>{chart.clear_selection();selected=null;dirty=true;commit();});root.querySelector('[data-area]').checked=enabled;root.querySelector('[data-layout]').setAttribute('aria-pressed',String(enabled));root.querySelector('[data-select]').setAttribute('aria-pressed',String(!enabled));}
@@ -208,11 +208,11 @@ export function render({model,el}) {
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>s.config[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>s.config[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>s.config[key].label_style.label_font=v);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
-  function resize(){if(!chart || disposed)return;const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;const width=Math.max(1,Math.round(rect.width*dpr)),height=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;enqueue(()=>{chart.resize(width,height);dirty=true;});}}
+  function resize(){if(!chart || disposed)return;const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;const width=Math.max(1,Math.round(rect.width*dpr)),height=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;wheelArea=null;enqueue(()=>{chart.resize(width,height);dirty=true;});}}
   const observer=new ResizeObserver(resize);
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
   function frame(now=0){if(disposed)return;
-    if(kind&&chart&&!busy){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;}lastFrame=now;if(chart && dirty && !busy){try{chart.frame();if(kind)local=snapshot();dirty=false;stats.surface_frames++;if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}}catch(e){fail(e);}}raf=requestAnimationFrame(frame);}
+    if(kind&&chart&&!busy){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;}lastFrame=now;if(chart && dirty && !busy){try{chart.frame();if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;if(inputAt!==null){stats.last_input_to_submit_ms=performance.now()-inputAt;inputAt=null;}}catch(e){fail(e);}}raf=requestAnimationFrame(frame);}
   async function exporting(scale=1){await flush();return enqueue(async()=>{stats.png_exports++;return bytes(await chart.export_png(scale));},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
@@ -246,7 +246,7 @@ export function render({model,el}) {
   select.addEventListener('change',()=>enqueue(()=>{selected=select.value;properties();}));
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
-  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot')s.boxplot.value_range=null;install(s);}else await chart.auto_fit_all(0.05);
+  root.querySelector('[data-fit]').addEventListener('click',()=>enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot')s.boxplot.value_range=null;install(s);}else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap)?0:0.05);
     dirty=true;commit();}));
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
   root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
@@ -312,7 +312,7 @@ export function render({model,el}) {
   });});
   function release(){if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved)showProperties();commit();});}
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
-  canvas.addEventListener('wheel',e=>{if(!chart||kind)return;e.preventDefault();inputAt=performance.now();const point=position(e),ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX;enqueue(()=>{
+  canvas.addEventListener('wheel',e=>{if(!chart||kind||!wheelArea)return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX;enqueue(()=>{
     const s=snapshot(),r=bounds(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
     if(!shift||ctrl)for(const key of ['bottom_x','top_x'])navigate(s.config[key],factor,x);
     if(!ctrl||shift)for(const key of ['left_y','right_y'])navigate(s.config[key],factor,y);

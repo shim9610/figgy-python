@@ -84,3 +84,28 @@ def test_horizontal_bounded_axis_titles_follow_orientation(backend):
         ax.barh(['A','B'],[2,3]);ax.set_xlabel('Value');ax.set_ylabel('Category')
         chart=fig.get_settings()['categorical']
         assert chart['value_title']=='Value' and chart['category_title']=='Category'
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('interpolation', ['nearest', 'bilinear'])
+def test_heatmap_fit_padding_and_mixed_series(backend, interpolation):
+    with figgy.figure(backend=backend) as fig:
+        ax=fig.axes[0]
+        ax.imshow(np.arange(24,dtype=float).reshape(4,6),extent=(-3,3,-2,2),origin='lower',interpolation=interpolation)
+        expected=(-3,3,-2,2) if interpolation=='nearest' else (-2.5,2.5,-1.5,1.5)
+        def limits():
+            c=fig.get_settings()['config'];return tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])
+        fig.fit();assert limits()==pytest.approx(expected)
+        fig.fit(padding=.1)
+        x0,x1,y0,y1=expected
+        assert limits()==pytest.approx((x0-(x1-x0)*.1,x1+(x1-x0)*.1,y0-(y1-y0)*.1,y1+(y1-y0)*.1))
+        state=fig.get_settings()
+        state['series'][0]['render_type']['Heatmap']['fill']['shading']='Flat'
+        fig.apply_settings(state);fig.fit()
+        assert limits()==pytest.approx((-3,3,-2,2))
+        state=fig.get_settings()
+        state['series'][0]['render_type']['Heatmap']['fill']['shading']='Interpolated'
+        fig.apply_settings(state);fig.fit()
+        assert limits()==pytest.approx((-2.5,2.5,-1.5,1.5))
+        ax.plot([-5,5],[-4,4]);fig.fit()
+        assert limits()==pytest.approx((-5.5,5.5,-4.4,4.4))

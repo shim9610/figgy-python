@@ -212,6 +212,10 @@ one box and a sequence of arrays as one box per array; it computes NumPy linear
 quartiles, actual sample whiskers within `whis * IQR` (default 1.5), and all
 outliers. It does not silently drop outliers to fit the bounded limits (128 per
 box, 4096 total). `bxp` uses supplied statistics without recomputing them.
+The hollow circles beyond the whiskers are these individual outlier values.
+They are data points, not extra boxes or selection handles. With the default
+`whis=1.5`, the fences are `Q1 - 1.5*IQR` and `Q3 + 1.5*IQR`; whiskers extend
+to the most extreme observations inside those fences.
 
 Use `fig.configure_bounded(style={...}, ...)` or the returned artist's
 `set`/`set_style` for selective SSOT patches. Unspecified fields are preserved;

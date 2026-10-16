@@ -608,8 +608,12 @@ class Figure:
             self._changed()
         return moved
 
-    def fit(self, padding=0.05):
-        """Fit all axes to the data and derive tick/label settings with padding."""
+    def fit(self, padding=None):
+        """Fit axes and derive ticks/labels from the rendered data extent.
+
+        Heatmap-only figures default to zero padding; other Cartesian figures
+        use 5%. Pass an explicit padding fraction to override either default.
+        """
         with self._lock:
             self._require_open()
             kind = _family(self.get_settings())
@@ -618,6 +622,9 @@ class Figure:
                 state[kind]['decorations']['data_area'] = None
                 if kind == 'boxplot': state[kind]['value_range'] = None
                 return self.apply_settings(state)
+            if padding is None:
+                series = self.get_settings()['series']
+                padding = 0.0 if series and all('Heatmap' in s['render_type'] for s in series) else 0.05
             self._native.fit(float(padding))
         self._changed()
         return self

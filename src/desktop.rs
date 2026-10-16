@@ -568,6 +568,18 @@ impl SurfaceWindow {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
+                // Decorations and the surrounding canvas do not own plot zoom.
+                let Ok(area) = display.data_area() else {
+                    return Ok(());
+                };
+                let area = area.0;
+                if self.cursor.0 < area.x as f32
+                    || self.cursor.0 >= (area.x + area.width) as f32
+                    || self.cursor.1 < area.y as f32
+                    || self.cursor.1 >= (area.y + area.height) as f32
+                {
+                    return Ok(());
+                }
                 let (dx, dy) = match delta {
                     MouseScrollDelta::LineDelta(x, y) => (*x as f64, *y as f64),
                     MouseScrollDelta::PixelDelta(p) => (p.x / 40., p.y / 40.),

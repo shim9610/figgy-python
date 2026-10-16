@@ -151,7 +151,15 @@ impl Editor {
                     );
                     self.controls.insert("fit".into(), response.rect);
                     if response.clicked() {
-                        match Python::attach(|py| c.fit(py, 0.05)) {
+                        let padding = if !c.data.series.is_empty()
+                            && c.data.series.iter().all(|s| {
+                                matches!(s.render_type, renderer::DataRenderType::Heatmap { .. })
+                            }) {
+                            0.0
+                        } else {
+                            0.05
+                        };
+                        match Python::attach(|py| c.fit(py, padding)) {
                             Ok(()) => self.notice = "View fitted".into(),
                             Err(e) => self.error = e.to_string(),
                         }

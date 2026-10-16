@@ -188,6 +188,12 @@ def test_cartesian_hosts_share_pointer_anchored_zoom_pan_and_toolbar(tmp_path, t
             assert span(after[key])==pytest.approx(span(before[key]),rel=2e-5)
             assert after[key]['min']!=before[key]['min']
         assert not after.get('picked_data')
+        # The plot owns wheel zoom, not titles, ticks, or canvas margins.
+        r=rect()
+        for x,y in [(r[0]-8,r[1]+r[3]/2),(r[0]+r[2]+8,r[1]+r[3]/2),
+                    (r[0]+r[2]/2,r[1]-8),(r[0]+r[2]/2,r[1]+r[3]+8)]:
+            move(round(x),round(y));before=config();wheel(None,-1)
+            assert config()==before
 
     with figgy.figure(backend='native') as fig:
         exec(setup, {'fig':fig,'ax':fig.axes[0]})
@@ -227,6 +233,30 @@ def test_cartesian_hosts_share_pointer_anchored_zoom_pan_and_toolbar(tmp_path, t
             page.evaluate(ROOT+'.flush()')
             (tmp_path/'pan-state.json').write_text(json.dumps({'stats':page.evaluate(ROOT+'.stats'),'state':page.evaluate(ROOT+'.snapshot()'),'error':page.locator('.figgy-error').inner_text()}))
         check_navigation(config,rect,page.mouse.move,wheel,pan)
+        # A cancelable wheel outside the plot must retain its browser default.
+        assert page.locator('.figgy-editor canvas').evaluate('''canvas=>{
+            const r=canvas.getBoundingClientRect();
+            const e=new WheelEvent('wheel',{clientX:r.x+3,clientY:r.y+3,deltaY:100,bubbles:true,cancelable:true});
+            canvas.dispatchEvent(e);return !e.defaultPrevented;
+        }''')
+        # Verify real wheel input scrolls the notebook, not just a synthetic flag.
+        page.locator('.figgy-editor').evaluate('''el=>{
+            const spacer=document.createElement('div');spacer.style.height='1800px';
+            spacer.dataset.wheelSpacer='';el.closest('.jp-Notebook').append(spacer);
+            for(let n=el;n;n=n.parentElement){
+                if(/auto|scroll/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight){
+                    n.dataset.wheelScroll='';return;
+                }
+            }
+            throw Error('Notebook scroll container not found');
+        }''')
+        scroll=page.locator('[data-wheel-scroll]')
+        old_scroll=scroll.evaluate('(el)=>el.scrollTop')
+        canvas=page.locator('.figgy-editor canvas').bounding_box()
+        before=config();page.mouse.move(canvas['x']+5,canvas['y']+5);page.mouse.wheel(0,160)
+        page.wait_for_function('(old)=>document.querySelector("[data-wheel-scroll]").scrollTop>old',arg=old_scroll)
+        assert config()==before
+        scroll.evaluate('(el,old)=>{el.scrollTop=old;document.querySelector("[data-wheel-spacer]").remove();}',old_scroll)
         page.locator('button[data-visibility]').click();page.locator('[data-visibility="Chart title"]').uncheck()
         assert not config()['chart_title']['visible']
         page.locator('[data-style]').click();page.locator('[data-style-mode=sketch]').click()
@@ -294,3 +324,36 @@ def test_cartesian_hosts_share_ticks_and_selected_character_formatting(tmp_path)
         assert state['config']['chart_title']['text']['segments']==native
         # Copy/replay must preserve character formatting, not flatten it to text.
         execute("copy=fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.plot([0,1,2],[2,1,2],id='signal'); exec(copy,{'fig':other}); assert other.get_settings()['config']['chart_title']['text']['segments']==fig.get_settings()['config']['chart_title']['text']['segments']; other.close()")
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('interpolation', ['nearest', 'bilinear'])
+def test_heatmap_fit_is_tight_in_both_hosts(tmp_path, interpolation):
+    setup=f"ax.imshow(np.arange(24,dtype=float).reshape(4,6),extent=(-3,3,-2,2),origin='lower',interpolation={interpolation!r})"
+    expected=(-3,3,-2,2) if interpolation=='nearest' else (-2.5,2.5,-1.5,1.5)
+    def limits(state):
+        c=state['config'];return tuple(c[k][b] for k in ['bottom_x','left_y'] for b in ['min','max'])
+    with figgy.figure(backend='native') as fig:
+        exec(setup, {'np':np,'ax':fig.axes[0]})
+        colorbar=fig.get_settings()['config']['colorbar']
+        fig.fit();assert limits(fig.get_settings())==pytest.approx(expected)
+        fig.fit(padding=.05)
+        assert limits(fig.get_settings())[0]<expected[0]
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('fit')
+            assert limits(fig.get_settings())==pytest.approx(expected)
+            assert fig.get_settings()['config']['colorbar']==colorbar
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nfig.fit(padding=.05)\ndisplay(fig.widget())"
+    with notebook(tmp_path/interpolation,source) as (page,execute):
+        page.locator('[data-fit]').click();execute('await fig.sync()')
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert limits(state)==pytest.approx(expected)
+        execute('fig.fit(padding=.05); await fig.sync()')
+        assert page.evaluate(ROOT+'.snapshot().config.bottom_x.min')<expected[0]
+        # Kernel metadata remains sufficient after binary transfer release.
+        execute('fig.fit(); await fig.sync()')
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert limits(state)==pytest.approx(expected)
+        assert state['config']['colorbar']==colorbar

@@ -7,6 +7,7 @@ pub struct NotebookFigure {
     chart: Chart,
     series: Vec<SeriesConfig>,
     columns: HashMap<String, renderer::chart::FitExtent>,
+    edge_samples: HashMap<String, renderer::chart::FitExtent>,
     revision: u64,
     fit_extents: HashMap<String, [renderer::chart::FitExtent; 2]>,
 }
@@ -33,6 +34,7 @@ impl NotebookFigure {
             chart: Chart::new(config),
             series: vec![],
             columns: HashMap::new(),
+            edge_samples: HashMap::new(),
             revision: 0,
             fit_extents: HashMap::new(),
         })
@@ -51,18 +53,22 @@ impl NotebookFigure {
         if self.columns.contains_key(id) {
             return Err(invalid("column ID already exists"));
         }
-        let ext = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
-            extent(a.as_slice().map_err(invalid)?)?
+        let (ext, samples) = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
+            let a = a.as_slice().map_err(invalid)?;
+            (extent(a)?, edge_sample_extent(a))
         } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
-            extent(a.as_slice().map_err(invalid)?)?
+            let a = a.as_slice().map_err(invalid)?;
+            (extent(a)?, edge_sample_extent(a))
         } else {
             return Err(invalid("expected contiguous f32/f64"));
         };
         self.columns.insert(id.into(), ext);
+        self.edge_samples.insert(id.into(), samples);
         Ok(())
     }
     fn remove_column(&mut self, id: &str) {
         self.columns.remove(id);
+        self.edge_samples.remove(id);
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let s: SeriesConfig = parse(json)?;
@@ -226,6 +232,16 @@ impl NotebookFigure {
                 .get(&s.series_id)
                 .copied()
                 .unwrap_or([self.columns[&s.x_column], self.columns[&s.y_column]]);
+            // Interpolated edge grids render from first to last cell center.
+            // Keep only extent metadata; the binary transfer can be released.
+            // Read the current style so changing shading cannot stale this fit.
+            if matches!(&s.render_type, renderer::DataRenderType::Heatmap { matrix, fill }
+                if matches!(matrix.grid_layout, renderer::data_config::GridLayout::Edges)
+                && matches!(fill.shading, renderer::data_config::Shading::Interpolated))
+            {
+                a = self.edge_samples[&s.x_column];
+                b = self.edge_samples[&s.y_column];
+            }
             if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
                 let base = renderer::chart::FitExtent {
                     min: bar.baseline,
@@ -282,6 +298,21 @@ impl NotebookFigure {
         json!({"backend":"webgpu","kernel_gpu":false,"columns":self.columns.len(),"allocation_mode":"resident","revision":self.revision,"rgba_readbacks":0,"png_encodes":0}).to_string()
     }
 }
+fn edge_sample_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
+    let mut ext = renderer::chart::FitExtent::EMPTY;
+    for pair in a.windows(2) {
+        let value = (pair[0].f64() + pair[1].f64()) * 0.5;
+        if value.is_finite() {
+            ext.min = ext.min.min(value);
+            ext.max = ext.max.max(value);
+            if value > 0. {
+                ext.min_positive = Some(ext.min_positive.map_or(value, |old| old.min(value)));
+            }
+        }
+    }
+    ext
+}
+
 fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
     let mut ext = renderer::chart::FitExtent::EMPTY;
     for (index, n) in a.iter().enumerate() {
