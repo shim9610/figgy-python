@@ -104,6 +104,20 @@ the production Python wrapper does not set it. `BROWSER_EXECUTABLE_PATH` can
 select Chromium. Headed mode requires a working `DISPLAY`/Xvfb. Test screenshots
 and raw browser metrics are emitted into pytest's temporary directory.
 
+When `FIGGY_BROWSER_VK_DRIVER` selects the software-GPU verification driver, the
+shared Jupyter harness sets Chromium's GPU watchdog to 180 seconds, matching the
+existing first-frame startup deadline. The watchdog remains enabled; device-loss
+errors, gesture deadlines, and interaction assertions still fail the test.
+[CI run 38883720288](https://github.com/shim9610/figgy-python/actions/runs/38883720288)
+recorded the ceramic donut failing before its first frame: Chromium terminated
+its GPU process after about 30 seconds with raw POSIX exit status 512, which is
+Chromium's `RESULT_CODE_HUNG` (2), and WebGPU reported a lost external Instance.
+Chromium's `gpu/ipc/service/gpu_watchdog_thread.cc` terminates a hung GPU process
+with that result code and accepts the `--gpu-watchdog-timeout-seconds` override.
+This test-only budget accommodates cold SwiftShader compilation on shared CI
+CPUs; production browser configuration is unchanged. The saved `chromium.log`
+provides the GPU process diagnostic alongside the normal browser error records.
+
 ## Remaining platform work
 
 Windows hardware surface/input/DPI, macOS Metal/event-loop behavior, Wayland,

@@ -51,12 +51,17 @@ def notebook(tmp_path, source):
                 time.sleep(.1)
         with sync_playwright() as p:
             browser_env = dict(os.environ)
+            browser_args = ['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface',
+                            '--enable-logging', f'--log-file={tmp_path / "chromium.log"}']
             if os.environ.get('FIGGY_BROWSER_VK_DRIVER'):
                 browser_env['VK_DRIVER_FILES'] = os.environ['FIGGY_BROWSER_VK_DRIVER']
+                # Cold SwiftShader compilation can exceed Chromium's GPU watchdog
+                # budget on CI (raw POSIX exit 512 = RESULT_CODE_HUNG). Keep the
+                # watchdog enabled, aligned with the existing startup deadline.
+                browser_args.append('--gpu-watchdog-timeout-seconds=180')
             browser = p.chromium.launch(headless=os.environ.get('FIGGY_TEST_HEADFUL') != '1', env=browser_env,
                 executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
-                args=['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface',
-                      '--enable-logging', f'--log-file={tmp_path / "chromium.log"}'])
+                args=browser_args)
             context = browser.new_context(viewport={'width': 1500, 'height': 1000}, permissions=['clipboard-read', 'clipboard-write'], accept_downloads=True)
             context.route('https://**/*', lambda route: route.abort())
             page = context.new_page()
