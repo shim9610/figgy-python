@@ -13,6 +13,8 @@ async function loadKernel(model) {
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
 const clone = value => JSON.parse(JSON.stringify(value));
+const rendererVersion = '0.18.0';
+const supportedSettings = settings => settings.schema_version === 1 && ['0.17.0',rendererVersion].includes(settings.renderer_version);
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
@@ -74,7 +76,7 @@ export function render({model,el}) {
     const operation=queue.then(async()=>{queuedOperations--;if(disposed)throw Error('Widget disposed');busy++;trace('queue.started',{operationId});try{return await fn();}finally{busy--;trace('queue.finished',{operationId});}});
     queue=operation.catch(fail);return propagate?operation:queue;
   };
-  function snapshot(){if(kind)return {...clone(local),[kind]:JSON.parse(chart.get_document())};return {schema_version:1,renderer_version:'0.17.0',config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
+  function snapshot(){if(kind)return {...clone(local),renderer_version:rendererVersion,[kind]:JSON.parse(chart.get_document())};return {schema_version:1,renderer_version:rendererVersion,config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
   function clearColor(color){const c=color ?? {r:1,g:1,b:1,a:1};chart.set_clear_color(c.r,c.g,c.b,c.a);background=clone(color ?? null);}
   function checkNumbers(value,path='settings'){
     if(typeof value==='number' && !Number.isFinite(value))throw Error(`${path} must be finite`);
@@ -98,7 +100,7 @@ export function render({model,el}) {
   }
   function install(settings){
     if(kind){
-      if(settings.schema_version!==1||settings.renderer_version!=='0.17.0'||!settings[kind]||settings.series.length)throw Error('Unsupported chart settings');
+      if(!supportedSettings(settings)||!settings[kind]||settings.series.length)throw Error('Unsupported chart settings');
       checkNumbers(settings);
       const old=snapshot();
       try{chart.set_document(JSON.stringify(settings[kind]),settings.config.chart_area.width,settings.config.chart_area.height);checkNumericConversion(settings[kind],JSON.parse(chart.get_document()));}
@@ -108,7 +110,7 @@ export function render({model,el}) {
     // Roll back both trees if either renderer validation rejects a local edit.
     const old=snapshot();
     try {
-      if(settings.schema_version!==1 || settings.renderer_version!=='0.17.0')throw Error('Unsupported settings/renderer version');
+      if(!supportedSettings(settings))throw Error('Unsupported settings/renderer version');
       checkNumbers(settings);
       const mode=settings.config?.draw_style?.mode;
       if(mode==='sketch' && settings.series.some(s=>s.render_type.Histogram||s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour))throw Error('Sketch draws line, scatter and errorbar series; bars, heatmaps and contours are not supported');

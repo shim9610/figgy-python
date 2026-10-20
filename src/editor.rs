@@ -755,7 +755,15 @@ impl Editor {
                         if let Some(label) = &series.label {
                             renderer::legend::append_legend_entry_rich(
                                 &mut content,
-                                renderer::legend::series_symbol_segments(&series),
+                                renderer::legend::series_symbol_segments(
+                                    &series,
+                                    c.data
+                                        .chart
+                                        .config()
+                                        .colorbar
+                                        .as_ref()
+                                        .map(|bar| &bar.colormap),
+                                ),
                                 label.segments.clone(),
                             );
                         }

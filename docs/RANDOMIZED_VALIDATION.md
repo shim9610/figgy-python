@@ -2,7 +2,7 @@
 
 This is a historical campaign report for the checkpoint below. Its call counts,
 wheel contents and timing results have not been rerun or relabeled as results
-for `figgyplot 0.3.0` / renderer `0.17.0` / model `0.11.0`. Current pull-request
+for `figgyplot 0.3.0` / renderer `0.18.0` / model `0.12.0`. Current pull-request
 checks are enabled in [PR tests](../.github/workflows/pr-tests.yml); current host
 coverage is described in [host validation](HOST_VALIDATION.md).
 

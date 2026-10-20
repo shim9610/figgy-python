@@ -240,7 +240,7 @@ All 74 wheels and one sdist were uploaded; all nine production-index installatio
 jobs passed. Install with `python -m pip install figgyplot`, or
 `python -m pip install 'figgyplot[notebook]'` for Jupyter.
 
-Version **0.3.0** is prepared: figgy-renderer 0.17.0, the fixes reported against
+Version **0.3.0** is prepared: figgy-renderer 0.18.0, the fixes reported against
 0.2.1, and the corrected installation instructions first prepared as 0.2.2 (never
 uploaded). It adds native/Jupyter editing parity, bounded-chart constructors,
 selected histogram values, numeric label controls and paired-axis convenience

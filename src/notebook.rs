@@ -152,7 +152,7 @@ impl NotebookFigure {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut s: Settings = parse(json)?;
-        if s.schema_version != 1 || s.renderer_version != RENDERER_VERSION {
+        if !supported_settings_version(s.schema_version, &s.renderer_version) {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&s.config)?;
@@ -182,10 +182,19 @@ impl NotebookFigure {
                 "settings must address the same ordered series and source columns",
             ));
         }
-        if s.series != self.series {
+        if s.series != self.series
+            || s.config.colorbar.as_ref().map(|bar| &bar.colormap)
+                != self
+                    .chart
+                    .config()
+                    .colorbar
+                    .as_ref()
+                    .map(|bar| &bar.colormap)
+        {
             renderer::legend::update_legend_symbols_preserving_text(
                 &mut s.config.legend.content,
                 &s.series,
+                s.config.colorbar.as_ref().map(|bar| &bar.colormap),
             );
         }
         if s.series != self.series

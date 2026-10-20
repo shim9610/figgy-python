@@ -643,18 +643,18 @@ checksum = "b97b65636e5b9ef369943878ac74335ba1c55c1cb6adbf1e2c293c624248d693"
 
 [[package]]
 name = "figgy-model"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfe6ecfc08bc01d34090859b494aa9c071aeeb73442b5ac84a1947cf5a2cf0b0"
+checksum = "854378aecdefaa81fbafce80d70d8143ad1f39fefd20723de9a186c5506f7977"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "figgy-renderer"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4425da64c26b5e11f9ddc09dc539cf43a41d42ea2faf898624a0aab3cb199f8"
+checksum = "a1366ff8934883eda159462aa792e4404b46a3cd92f24b5aee0f36b8522d4eb5"
 dependencies = [
  "bytemuck",
  "concurrent-queue",

@@ -22,7 +22,7 @@ def _bar_series(ax):
     bar = {"fill_color": _color("#336699"), "border_color": _color("#ffffff"),
            "border_width": 0.0, "baseline": 0.0, "gap_px": 2.0,
            "width_ratio": 1.0, "orientation": "Vertical"}
-    # No public bar API yet; the bar branch of update() is still supported.
+    # Reproduce the original histogram-model report, independently of bar().
     return ax._add(np.arange(4.0), np.array([1.0, 2.0, 3.0]), {"Histogram": {"bar": bar}}, id="h")
 
 
@@ -72,6 +72,44 @@ def test_unknown_font_family_is_rejected(plot):
     assert fig.get_settings()["config"]["chart_title"]["text"]["font"] == ""
     fig.update("chart_title", font="Liberation Sans")
     fig.update("chart_title", font="")
+
+
+def test_grayscale_colorbar_has_no_interior_brightness_reversals(plot):
+    import json
+
+    fig, ax = plot
+    ax.imshow(np.tile(np.linspace(0, 1, 64), (8, 1)), cmap="gray", vmin=0, vmax=1, id="z")
+    x, y, width, height = json.loads(fig._native.bounds_json("colorbar"))["rect"]
+    pixels = fig.render_rgba()
+    strip = pixels[int(y)+3:int(y+height)-3, round(x+width/2), :3].astype(int)
+    brightness = strip.mean(axis=1)
+    assert brightness[0] - brightness[-1] > 150
+    assert np.max(np.diff(brightness)) <= 1
+
+
+def test_handwritten_greek_uses_glyph_fallback_instead_of_notdef(plot):
+    fig, ax = plot
+    ax.plot([0, 1, 2], [0, 1, 0])
+    # Sketch's bundled Comic Neue lacks Greek. A real alpha must differ from
+    # an unassigned Unicode character, for which every face uses .notdef.
+    fig.set_draw_style("sketch")
+    images = []
+    for text in ("α", "\u0378"):
+        ax.set_title(text, fontsize=28)
+        fig.configure(config={"chart_title": {"top_margin": 80}})
+        images.append(fig.render_rgba()[:80])
+    assert np.any(images[0][:, :, :3] < 128)
+    assert not np.array_equal(*images)
+
+
+def test_sketch_rejects_an_existing_histogram_without_changing_the_plot(plot):
+    fig, ax = plot
+    _bar_series(ax)
+    before, settings = fig.render_rgba(), fig.get_settings()
+    with pytest.raises(ValueError, match="Sketch"):
+        fig.set_draw_style("sketch")
+    assert fig.get_settings() == settings
+    assert np.array_equal(fig.render_rgba(), before)
 
 
 def test_unicode_superscripts_use_the_renderer_mapping(plot):

@@ -43,20 +43,20 @@ other branches before building. This does not change main's branch protection.
 
 ## Versions and coordinated release order
 
-| Component | This source release | Published version verified 2026-10-16 |
+| Component | This source release | Published version verified 2026-10-20 |
 | --- | --- | --- |
-| `figgy-model` | 0.11.0 | 0.11.0 |
-| `figgy-renderer` | 0.17.0 | 0.17.0 |
+| `figgy-model` | 0.12.0 | 0.12.0 |
+| `figgy-renderer` | 0.18.0 | 0.18.0 |
 | `figgyplot` | 0.3.0 | 0.2.1 |
-| `figgy` WASM wrapper | 0.14.0 | Not a crates.io package (`publish = false`) |
+| `figgy` WASM wrapper | 0.15.0 | Not a crates.io package (`publish = false`) |
 
-Model 0.11.0 and renderer 0.17.0 are published. Next, validate and publish
+Model 0.12.0 and renderer 0.18.0 are published. Next, validate and publish
 Python 0.3.0 through TestPyPI and PyPI below. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
-has its own version; the WASM wrapper's 0.14.0 is not the renderer version.
+has its own version; the WASM wrapper's 0.15.0 is not the renderer version.
 The native extension consumes crates.io packages with versions and checksums
 pinned in `Cargo.lock`. The bundled WASM uses their upstream release revision
-`783353a5e3343f27a48da3b0aa1c67969c9d63ff`, recorded in
+`3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04`, recorded in
 `scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
 
 When updating the renderer, update the registry dependency and lockfile, then
@@ -213,7 +213,7 @@ completed successfully, publishing all 74 wheels and one sdist to PyPI and
 passing all nine production-index installation jobs. PyPI's public JSON metadata
 also confirms version 0.2.1 with 75 distribution files.
 
-The prepared 0.3.0 release moves to figgy-renderer 0.17.0 and fixes the issues
+The prepared 0.3.0 release moves to figgy-renderer 0.18.0 and fixes the issues
 reported against 0.2.1; it also carries the PyPI installation instructions that
 were prepared as 0.2.2, which was never uploaded. Follow the coordinated version
 order above while retaining the native/WASM source pins. It needs a new TestPyPI

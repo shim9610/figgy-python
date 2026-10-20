@@ -282,6 +282,104 @@ export class FiggyBoundedChart {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_figgyboundedchart_free(ptr, 0);
     }
+    /**
+     * The layer that receives pointer interaction, as JSON.
+     * @returns {string}
+     */
+    active_layer() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgyboundedchart_active_layer(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * Append an `Annotation` JSON value and return its index.
+     * @param {string} json
+     * @returns {number}
+     */
+    add_annotation(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_add_annotation(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
+     * The compass name of the annotation's live handle under a point.
+     * @param {number} index
+     * @param {number} x
+     * @param {number} y
+     * @returns {string | undefined}
+     */
+    annotation_handle(index, x, y) {
+        const ret = wasm.figgyboundedchart_annotation_handle(this.__wbg_ptr, index, x, y);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]);
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * Annotations the current frame skipped, as `[{index, reason}]`.
+     * @returns {string}
+     */
+    annotation_warnings() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgyboundedchart_annotation_warnings(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * The drawn annotations as JSON: `index`, `id`, `kind`, the selection
+     * box `rect` and `handles`, and `selected`. Skipped items are listed by
+     * `annotation_warnings` instead.
+     * @returns {string}
+     */
+    annotations() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgyboundedchart_annotations(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
     clear_selection() {
         wasm.figgyboundedchart_clear_selection(this.__wbg_ptr);
     }
@@ -337,6 +435,24 @@ export class FiggyBoundedChart {
         var ptr1 = isLikeNone(handle) ? 0 : passStringToWasm0(handle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len1 = WASM_VECTOR_LEN;
         const ret = wasm.figgyboundedchart_drag(this.__wbg_ptr, ptr0, len0, dx, dy, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
+     * Move an annotation, or one of its handles, by a pointer delta.
+     * Returns `false` for a rejected move; the document is unchanged then.
+     * @param {number} index
+     * @param {number} dx
+     * @param {number} dy
+     * @param {string | null} [handle]
+     * @returns {boolean}
+     */
+    drag_annotation(index, dx, dy, handle) {
+        var ptr0 = isLikeNone(handle) ? 0 : passStringToWasm0(handle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_drag_annotation(this.__wbg_ptr, index, dx, dy, ptr0, len0);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -399,6 +515,20 @@ export class FiggyBoundedChart {
         return ret;
     }
     /**
+     * The topmost drawn annotation under a point, as its index.
+     * @param {number} x
+     * @param {number} y
+     * @returns {number | undefined}
+     */
+    hit_annotation(x, y) {
+        const ret = wasm.figgyboundedchart_hit_annotation(this.__wbg_ptr, x, y);
+        return ret === Number.MAX_SAFE_INTEGER ? undefined : ret;
+    }
+    /**
+     * The topmost decoration under a point, as its stable id. While the
+     * annotation layer is active (and shown) its drawn items sit on top of
+     * every decoration and answer as `"annotation_<n>"`; on the base layer
+     * they are not registered and clicks pass through them.
      * @param {number} x
      * @param {number} y
      * @param {boolean} edit_area
@@ -448,6 +578,45 @@ export class FiggyBoundedChart {
         }
     }
     /**
+     * The `Anchor` JSON at a point for `"Data"` or `"Ratio"`; `null` when
+     * the point has no such position (a radial chart has no data anchors).
+     * @param {number} x
+     * @param {number} y
+     * @param {string} kind
+     * @returns {string}
+     */
+    pointer_to_anchor(x, y, kind) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(kind, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgyboundedchart_pointer_to_anchor(this.__wbg_ptr, x, y, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * Remove the annotation at `index`; later indices move down one and the
+     * selection follows or clears.
+     * @param {number} index
+     */
+    remove_annotation(index) {
+        const ret = wasm.figgyboundedchart_remove_annotation(this.__wbg_ptr, index);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * @param {number} width
      * @param {number} height
      */
@@ -472,12 +641,87 @@ export class FiggyBoundedChart {
         return v2;
     }
     /**
+     * Select one annotation (`decorations.selected = Annotation(index)`) or
+     * none. Clears the data and decoration selections like
+     * `select_decoration`.
+     * @param {number | null} [index]
+     */
+    select_annotation(index) {
+        const ret = wasm.figgyboundedchart_select_annotation(this.__wbg_ptr, isLikeNone(index) ? Number.MAX_SAFE_INTEGER : (index) >>> 0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Select a decoration by the id `hit_decoration` reported, or none.
+     * An `"annotation_<n>"` id selects that drawn annotation
+     * (`decorations.selected = Annotation(n)`).
      * @param {string | null} [target]
      */
     select_decoration(target) {
         var ptr0 = isLikeNone(target) ? 0 : passStringToWasm0(target, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len0 = WASM_VECTOR_LEN;
         const ret = wasm.figgyboundedchart_select_decoration(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {number | undefined}
+     */
+    selected_annotation() {
+        const ret = wasm.figgyboundedchart_selected_annotation(this.__wbg_ptr);
+        return ret === Number.MAX_SAFE_INTEGER ? undefined : ret;
+    }
+    /**
+     * Set the layer that receives pointer interaction: `"Base"` or
+     * `"Annotations"` as JSON (bounded charts have no overlays, so an
+     * `{ "Overlay": n }` is stored as `"Base"`). A change clears the
+     * decoration selection (`decorations.selected`, an annotation
+     * included); the data selection is kept. Returns the stored layer as
+     * JSON. Drawn pixels never depend on it.
+     * @param {string} json
+     * @returns {string}
+     */
+    set_active_layer(json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgyboundedchart_set_active_layer(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * Replace the annotation at `index`.
+     * @param {number} index
+     * @param {string} json
+     */
+    set_annotation(index, json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_set_annotation(this.__wbg_ptr, index, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Show or hide the whole annotation layer without re-rasterizing it.
+     * @param {boolean} visible
+     */
+    set_annotations_visible(visible) {
+        const ret = wasm.figgyboundedchart_set_annotations_visible(this.__wbg_ptr, visible);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -523,6 +767,45 @@ export class FiggyChart {
         wasm.__wbg_figgychart_free(ptr, 0);
     }
     /**
+     * The layer that receives pointer interaction, as JSON, with the
+     * out-of-range fallback applied.
+     * JS: `JSON.parse(chart.active_layer())`
+     * @returns {string}
+     */
+    active_layer() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgychart_active_layer(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * Append an `Annotation` (JSON, the same shape as in `get_config`)
+     * and return its index.
+     * @param {string} json
+     * @returns {number}
+     */
+    add_annotation(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_add_annotation(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
      * Register or update a line series over two registered columns.
      *
      * Upsert by `series_id`: a new id takes the next color of the active
@@ -549,6 +832,74 @@ export class FiggyChart {
         }
     }
     /**
+     * The compass name (`"W"`, `"E"`, ...) of the annotation's handle
+     * under a point, or none. Only the handles `annotations` lists are
+     * live: a span's two edges, a line's two value handles, an arrow's
+     * two endpoints.
+     * @param {number} index
+     * @param {number} x
+     * @param {number} y
+     * @returns {string | undefined}
+     */
+    annotation_handle(index, x, y) {
+        const ret = wasm.figgychart_annotation_handle(this.__wbg_ptr, index, x, y);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]);
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * Annotations the current raster skipped, as `[{index, reason}]`
+     * with `reason` one of `NonFinite`, `NoValueAxis`, `OutOfRange`,
+     * `EmptyText`.
+     * @returns {string}
+     */
+    annotation_warnings() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgychart_annotation_warnings(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * The drawn annotations of the current frame as JSON: `index`, `id`,
+     * `kind`, the selection box `rect` and its `handles` in physical
+     * canvas pixels, and `selected`. Items the raster skipped are
+     * absent here and listed by `annotation_warnings`.
+     * @returns {string}
+     */
+    annotations() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgychart_annotations(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
      * Apply an axis frame preset to all four axes (decoration-only).
      * @param {AxisPreset} preset
      */
@@ -570,12 +921,26 @@ export class FiggyChart {
         }
     }
     /**
-     * Fit BOTH axes to the union of every registered series, leaving a
-     * uniform `padding` fraction of the data span as margin on each
-     * side (`0.0` = no padding, `0.05` = 5% top/bottom/left/right).
-     * This is the whole fit policy — no rounding of the range ends;
-     * ticks land on nice values inside the range by themselves. Hosts
-     * should call this instead of re-deriving ranges.
+     * Fit the axes of the active layer to the union of that layer's
+     * series, leaving a uniform `padding` fraction of the data span as
+     * margin on each side (`0.0` = no padding, `0.05` = 5%
+     * top/bottom/left/right). This is the whole fit policy — no rounding
+     * of the range ends; ticks land on nice values inside the range by
+     * themselves. Hosts should call this instead of re-deriving ranges.
+     *
+     * The active layer (`set_active_layer`) decides which axes move:
+     * `Base` and `Annotations` fit the parent's `bottom_x` and `left_y`,
+     * `Subplot(i)` fits subplot `i`'s, and `Overlay(n)` /
+     * `SubplotOverlay(i, n)` fit that overlay's Y axis only. An axis fits
+     * every series drawn against it (`Config::layer_of_series`). A linked
+     * axis (`link_x`, `link_y`) is one axis shared by its link group: it
+     * fits the series of every chart in the group and the range moves
+     * the whole group, whichever member is active. X and Y links are
+     * followed separately. An overlay shares its chart's X axis and has
+     * its own Y axis, so its series count towards that X axis and not
+     * towards `left_y`. An axis that is not linked fits its own chart's
+     * series only; to fit every layer, set each layer active in turn and
+     * call this again.
      *
      * Each series contributes its exact original GPU primitive domain:
      * valid adjacent segments for line-only mode, paired finite points
@@ -594,12 +959,51 @@ export class FiggyChart {
         return ret;
     }
     /**
-     * Fit the shared z axis to every matrix value column in the chart.
-     * A chart without a colourbar is left unchanged.
+     * Fit the shared z axis to every column the colourbar maps: matrix
+     * value columns, scatter `point_color_map` columns and vector colour
+     * maps. A chart without a colourbar is left unchanged.
      * @param {number} padding
      */
     auto_fit_colorbar(padding) {
         const ret = wasm.figgychart_auto_fit_colorbar(this.__wbg_ptr, padding);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Fit overlay layer `layer`'s Y axis to a column's cached statistics
+     * with proportional padding, the overlay counterpart of `auto_fit_y`.
+     * A layer index past the overlay list is an error.
+     * JS: `chart.auto_fit_overlay_y(0, "pressure", 0.05)`
+     * @param {number} layer
+     * @param {string} column
+     * @param {number} padding
+     */
+    auto_fit_overlay_y(layer, column, padding) {
+        const ptr0 = passStringToWasm0(column, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_auto_fit_overlay_y(this.__wbg_ptr, layer, ptr0, len0, padding);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Fit subplot `index`'s X (`axis = "x"`) or Y (`axis = "y"`) axis to
+     * the union of the given columns' cached statistics with
+     * proportional padding. A linked axis moves its whole link group.
+     * An index past the subplot list or another axis name is an error.
+     * JS: `chart.auto_fit_subplot(0, "y", ["flow"], 0.05)`
+     * @param {number} index
+     * @param {string} axis
+     * @param {string[]} columns
+     * @param {number} padding
+     */
+    auto_fit_subplot(index, axis, columns, padding) {
+        const ptr0 = passStringToWasm0(axis, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayJsValueToWasm0(columns, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_auto_fit_subplot(this.__wbg_ptr, index, ptr0, len0, ptr1, len1, padding);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -744,6 +1148,12 @@ export class FiggyChart {
         const ret = wasm.figgychart_cancel_stream_operation_and_wait(this.__wbg_ptr, handle.__wbg_ptr);
         return ret;
     }
+    cancel_streaming() {
+        const ret = wasm.figgychart_cancel_streaming(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
     /**
      * Cancel this chart and resolve only after its submitted work and
      * retired renderer-owned surfaces have crossed the completion fence.
@@ -752,12 +1162,6 @@ export class FiggyChart {
     cancel_streaming_and_wait() {
         const ret = wasm.figgychart_cancel_streaming_and_wait(this.__wbg_ptr);
         return ret;
-    }
-    cancel_streaming() {
-        const ret = wasm.figgychart_cancel_streaming(this.__wbg_ptr);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
-        }
     }
     /**
      * Configure the total GPU budget and chart-local packed-view limit.
@@ -814,6 +1218,8 @@ export class FiggyChart {
     }
     /**
      * Renderer-measured decoration bounds in physical canvas pixels.
+     * An `"annotation_<n>"` id that `hit_test` reports resolves to the
+     * drawn item's selection box.
      * @param {string} target
      * @returns {string}
      */
@@ -867,6 +1273,27 @@ export class FiggyChart {
         }
     }
     /**
+     * Move an annotation, or one of its handles, by a pointer delta in
+     * physical canvas pixels. The delta is converted back into the
+     * item's anchors through the frame's anchor space and written to
+     * the config; a move that would leave the plot or panel is rejected
+     * and returns `false`.
+     * @param {number} index
+     * @param {number} dx
+     * @param {number} dy
+     * @param {string | null} [handle]
+     * @returns {boolean}
+     */
+    drag_annotation(index, dx, dy, handle) {
+        var ptr0 = isLikeNone(handle) ? 0 : passStringToWasm0(handle, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_drag_annotation(this.__wbg_ptr, index, dx, dy, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
      * Compile the drawable-series fit-bound engine without drawing. On wasm
      * this uses `createComputePipelineAsync`. Series registration does
      * not do this; `auto_fit_all` does.
@@ -877,7 +1304,10 @@ export class FiggyChart {
         return ret;
     }
     /**
-     * Export the panel as PNG bytes at `scale ×` resolution.
+     * Export the document as PNG bytes at `scale ×` resolution: the base
+     * layer and every overlay layer composited into one image, exactly
+     * as the canvas shows them. A document without overlays exports the
+     * same bytes as the per-panel renderer export.
      * JS: `const png = await chart.export_png(2.0);`
      * Holds a mutable borrow of this WASM object until the Promise settles.
      * wasm-bindgen checks borrows; it does not queue concurrent calls.
@@ -1025,11 +1455,23 @@ export class FiggyChart {
         return ret;
     }
     /**
+     * `true` while a chart element or an annotation is selected.
      * @returns {boolean}
      */
     has_selection() {
         const ret = wasm.figgychart_has_selection(this.__wbg_ptr);
         return ret !== 0;
+    }
+    /**
+     * The topmost drawn annotation under a point in physical canvas
+     * pixels, as its index.
+     * @param {number} x
+     * @param {number} y
+     * @returns {number | undefined}
+     */
+    hit_annotation(x, y) {
+        const ret = wasm.figgychart_hit_annotation(this.__wbg_ptr, x, y);
+        return ret === Number.MAX_SAFE_INTEGER ? undefined : ret;
     }
     /**
      * Hit-test the chart chrome at canvas pixel `(x, y)` — returns the
@@ -1038,7 +1480,14 @@ export class FiggyChart {
      * `"colorbar_axis"`, `"colorbar_tick_labels"`,
      * `"colorbar_title"`, …) or `null`. Pure geometry, no selection state
      * change: the renderer's own layout answers, so hosts don't have to
-     * re-derive box positions for hover cursors / context UI.
+     * re-derive box positions for hover cursors / context UI. The set of
+     * registered elements follows the active layer: while an overlay is
+     * active its elements answer as `"overlay_<n>:axis_right"`,
+     * `"overlay_<n>:tick_labels_right"`, `"overlay_<n>:axis_title_right"`
+     * and `"overlay_<n>:legend"`, and the base Y axes do not answer.
+     * While the annotation layer is active (and shown) its drawn items
+     * sit on top and answer as `"annotation_<n>"`; on every other layer
+     * they are not registered and clicks pass through them.
      * @param {number} x
      * @param {number} y
      * @returns {string | undefined}
@@ -1133,6 +1582,8 @@ export class FiggyChart {
     }
     /**
      * Pointer move with frame delta — drags or resizes the selection.
+     * After a press on an annotation the delta moves that item (or the
+     * pressed handle) through the frame's anchor space.
      * @param {number} dx
      * @param {number} dy
      */
@@ -1145,6 +1596,14 @@ export class FiggyChart {
     /**
      * Pointer press. Returns `true` while something is selected.
      * The host can mirror that state in its own UI.
+     *
+     * The press follows the active layer's route: while the annotation
+     * layer is active (and shown), the selected annotation's handles win
+     * first, then a drawn item under the point is selected (clearing
+     * the element selection) and dragged by `on_move`; a press that
+     * misses every item falls through to the shared elements below and
+     * clears the annotation selection. On every other layer the items
+     * are not part of the route.
      * @param {number} x
      * @param {number} y
      * @returns {boolean}
@@ -1193,6 +1652,36 @@ export class FiggyChart {
     pick_point(x, y, max_distance_px) {
         const ret = wasm.figgychart_pick_point(this.__wbg_ptr, x, y, max_distance_px);
         return ret;
+    }
+    /**
+     * The anchor (`Anchor` JSON) at a point in physical canvas pixels,
+     * as `"Data"` or `"Ratio"`, for placing a new text box or arrow
+     * where the user clicked. `null` when the point has no data
+     * position (outside a log axis, or the chart has no value axes).
+     * @param {number} x
+     * @param {number} y
+     * @param {string} kind
+     * @returns {string}
+     */
+    pointer_to_anchor(x, y, kind) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(kind, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_pointer_to_anchor(this.__wbg_ptr, x, y, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
     }
     /**
      * Prepare the same resident Cartesian groups as prewarm_all_with_progress,
@@ -1388,6 +1877,17 @@ export class FiggyChart {
         return ret;
     }
     /**
+     * Remove the annotation at `index`. Later items move down one
+     * index; the selection follows or clears.
+     * @param {number} index
+     */
+    remove_annotation(index) {
+        const ret = wasm.figgychart_remove_annotation(this.__wbg_ptr, index);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * Unregister a column. Series referencing it are removed too so the
      * chart can never point at freed data. Auto-managed legends remove
      * the corresponding rows; freely edited legends preserve their text
@@ -1537,6 +2037,25 @@ export class FiggyChart {
         }
     }
     /**
+     * Select one annotation (its box and handles are drawn on the
+     * overlay) or none. Selecting an annotation clears the decoration
+     * selection; selecting a decoration with `on_press` clears this.
+     * @param {number | null} [index]
+     */
+    select_annotation(index) {
+        const ret = wasm.figgychart_select_annotation(this.__wbg_ptr, isLikeNone(index) ? Number.MAX_SAFE_INTEGER : (index) >>> 0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {number | undefined}
+     */
+    selected_annotation() {
+        const ret = wasm.figgychart_selected_annotation(this.__wbg_ptr);
+        return ret === Number.MAX_SAFE_INTEGER ? undefined : ret;
+    }
+    /**
      * Inspect the first resident typed selection as JSON, or `"null"` when
      * none is selected. Only selected GPU samples are read back. Histograms
      * expose `bin_start`, `bin_end`, `value`, and `orientation`; the value
@@ -1571,6 +2090,62 @@ export class FiggyChart {
             return getStringFromWasm0(ptr2, len2);
         } finally {
             wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * Set the layer that receives pointer interaction: `"Base"`,
+     * `{ "Overlay": index }`, `"Annotations"`, `{ "Subplot": index }` or
+     * `{ "SubplotOverlay": [subplot, overlay] }` as JSON. The hit map is
+     * rebuilt for that layer (`HitMap::for_active_layer`) and the
+     * element selection is cleared when the layer changes. An overlay
+     * index past the overlay list is stored as `"Base"`; the stored
+     * layer is returned as JSON. Drawn pixels never depend on it.
+     * JS: `chart.set_active_layer(JSON.stringify({ Overlay: 0 }))`
+     * @param {string} json
+     * @returns {string}
+     */
+    set_active_layer(json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_set_active_layer(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * Replace the annotation at `index` with an `Annotation` JSON value.
+     * @param {number} index
+     * @param {string} json
+     */
+    set_annotation(index, json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_set_annotation(this.__wbg_ptr, index, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Show or hide the whole annotation layer. Hiding skips the two
+     * composite draws and re-rasterizes nothing.
+     * @param {boolean} visible
+     */
+    set_annotations_visible(visible) {
+        const ret = wasm.figgychart_set_annotations_visible(this.__wbg_ptr, visible);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
         }
     }
     /**
@@ -3440,23 +4015,23 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1097, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1174, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1048, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1125, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1048, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1125, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__179);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1048, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1125, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__180);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0) {
@@ -3504,15 +4079,15 @@ function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149(arg0, arg1, arg2);
+function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__179(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__179(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150(arg0, arg1, arg2);
+function wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__180(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__180(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }

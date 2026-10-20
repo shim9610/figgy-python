@@ -68,9 +68,14 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
     Ok(value)
 }
 
-/// Renderer version stamped into, and required from, Settings documents.
+/// Renderer version stamped into Settings documents. Previous compatible
+/// documents are accepted explicitly by supported_settings_version.
 /// It names the `figgy-renderer` pin in Cargo.toml; update both together.
-const RENDERER_VERSION: &str = "0.17.0";
+const RENDERER_VERSION: &str = "0.18.0";
+
+fn supported_settings_version(schema: u32, renderer: &str) -> bool {
+    schema == 1 && matches!(renderer, "0.17.0" | RENDERER_VERSION)
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1059,15 +1064,10 @@ impl FigureAccess<'_> {
         })();
         if let Err(error) = result {
             self.renderer
-                .set_chart_series(
-                    self.data.chart_id,
-                    gpu::series(self.data.figure_id, &old.series),
-                )
-                .map_err(runtime)?;
-            self.renderer
-                .set_chart_config(
+                .set_chart_state(
                     self.data.chart_id,
                     gpu::config(self.data.figure_id, &old.config),
+                    gpu::series(self.data.figure_id, &old.series),
                 )
                 .map_err(runtime)?;
             self.data.chart = Chart::new(old.config);
@@ -1080,7 +1080,7 @@ impl FigureAccess<'_> {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut next: Settings = parse(json)?;
-        if next.schema_version != 1 || next.renderer_version != RENDERER_VERSION {
+        if !supported_settings_version(next.schema_version, &next.renderer_version) {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&next.config)?;
@@ -1115,10 +1115,20 @@ impl FigureAccess<'_> {
         }
         let old = self.data.series.clone();
         let series_changed = next.series != old;
-        if series_changed {
+        if series_changed
+            || next.config.colorbar.as_ref().map(|bar| &bar.colormap)
+                != self
+                    .data
+                    .chart
+                    .config()
+                    .colorbar
+                    .as_ref()
+                    .map(|bar| &bar.colormap)
+        {
             renderer::legend::update_legend_symbols_preserving_text(
                 &mut next.config.legend.content,
                 &next.series,
+                next.config.colorbar.as_ref().map(|bar| &bar.colormap),
             );
         }
         let radial_changed = document.as_ref() != self.data.document.as_ref().map(|r| &r.chart);
@@ -1129,25 +1139,16 @@ impl FigureAccess<'_> {
         {
             return Ok(());
         }
-        if series_changed {
-            self.renderer
-                .set_chart_series(
-                    self.data.chart_id,
-                    gpu::series(self.data.figure_id, &next.series),
-                )
-                .map_err(invalid)?;
-        }
-        if let Err(e) = self.renderer.set_chart_config(
-            self.data.chart_id,
-            gpu::config(self.data.figure_id, &next.config),
-        ) {
-            if series_changed {
-                self.renderer
-                    .set_chart_series(self.data.chart_id, gpu::series(self.data.figure_id, &old))
-                    .map_err(runtime)?;
-            }
-            return Err(invalid(e));
-        }
+        // Config and series can introduce or remove dependencies together
+        // (for example, a point color map and its colorbar). Let the renderer
+        // validate and commit the complete state without an invalid interim.
+        self.renderer
+            .set_chart_state(
+                self.data.chart_id,
+                gpu::config(self.data.figure_id, &next.config),
+                gpu::series(self.data.figure_id, &next.series),
+            )
+            .map_err(invalid)?;
         self.data.chart = Chart::new(next.config);
         self.data.series = next.series;
         self.data.background = next.background;
@@ -1719,15 +1720,17 @@ fn default_colorbar_json() -> PyResult<String> {
 }
 
 #[pyfunction]
-fn rebuild_legend_json(series: &str, rich: &str) -> PyResult<String> {
+#[pyo3(signature = (series, rich, colormap=None))]
+fn rebuild_legend_json(series: &str, rich: &str, colormap: Option<&str>) -> PyResult<String> {
     let series: Vec<SeriesConfig> = parse(series)?;
     let mut rich: renderer::text::RichText = parse(rich)?;
+    let colormap: Option<renderer::colormap::ColorMap> = colormap.map(parse).transpose()?;
     rich.segments.clear();
     for spec in series {
         if let Some(label) = &spec.label {
             renderer::legend::append_legend_entry_rich(
                 &mut rich,
-                renderer::legend::series_symbol_segments(&spec),
+                renderer::legend::series_symbol_segments(&spec, colormap.as_ref()),
                 label.segments.clone(),
             );
         }

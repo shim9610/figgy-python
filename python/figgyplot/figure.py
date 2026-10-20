@@ -1148,7 +1148,10 @@ class Axes(ChartMethods):
         self.figure._require_cartesian()
         from ._native import rebuild_legend_json
         state = self.figure.get_settings()
-        state["config"]["legend"]["content"] = json.loads(rebuild_legend_json(json.dumps(state["series"]), json.dumps(state["config"]["legend"]["content"])))
+        colorbar = state["config"].get("colorbar")
+        state["config"]["legend"]["content"] = json.loads(rebuild_legend_json(
+            json.dumps(state["series"]), json.dumps(state["config"]["legend"]["content"]),
+            json.dumps(colorbar["colormap"]) if colorbar else None))
         state["config"]["legend"]["visible"] = bool(visible)
         self.figure.apply_settings(state)
 

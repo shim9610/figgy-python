@@ -1,7 +1,7 @@
 # Process-wide native GPU sharing
 
 The first native Figure creates one process-local GPU instance, adapter, device,
-queue and `figgy-renderer 0.17.0` renderer (`figgyplot 0.3.0`, model `0.11.0`).
+queue and `figgy-renderer 0.18.0` renderer (`figgyplot 0.3.0`, model `0.12.0`).
 Later Figures register independent charts in that renderer and allocate their
 columns in its resident pool.
 There is no renderer source copy and no change to the borrowed f32/f64 → hi/lo

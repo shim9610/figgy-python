@@ -15,6 +15,29 @@ CASES = {
     'categorical': "ax.bar(['A','B','C'], [4, 3, 5])",
     'boxplot': "ax.boxplot([[1,2,3],[2,4,6],[3,5,8]])",
 }
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_legacy_settings_and_heatmap_legend_preserve_shared_host_model(backend):
+    """The migration keeps saved edits, current stamps and colormap symbols aligned."""
+    with figgy.Figure(backend=backend) as figure:
+        ax = figure.axes[0]
+        ax.imshow([[0, 1], [1, 0]], id='field')
+        figure.update('field', label='Temperature')
+        ax.legend()
+        before = figure.get_settings()
+        saved = json.loads(json.dumps(before))
+        saved['renderer_version'] = '0.17.0'
+        saved['config']['colorbar']['colormap'] = 'Magma'
+        figure.apply_settings(saved)
+        current = figure.get_settings()
+        assert current['renderer_version'] == '0.18.0'
+        assert current['config']['legend']['content'] != before['config']['legend']['content']
+        assert 'Temperature' in ''.join(s['text'] for s in current['config']['legend']['content']['segments'])
+        revision = figure.revision
+        figure.apply_settings(current)
+        assert figure.revision == revision
+
 NEEDS_UI = not os.environ.get('DISPLAY') or not all(shutil.which(p) for p in ['xdotool','xclip','wmctrl']) or os.environ.get('FIGGY_TEST_JUPYTER') != '1'
 
 if os.environ.get('FIGGY_REQUIRE_INTERACTION_PARITY') == '1' and NEEDS_UI:
@@ -657,6 +680,17 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
     source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.set_xlim(-1,3)\ndisplay(fig.widget())"
     with notebook(tmp_path/'scales',source) as (page,execute):
         page.locator('[data-properties]').click()
+        # Saved 0.17 settings must also pass the browser's local installer,
+        # before any kernel round trip can normalize the renderer stamp.
+        legacy = page.evaluate(ROOT+'.snapshot()')
+        legacy['renderer_version'] = '0.17.0'
+        legacy['config']['chart_title']['offset_x'] = 7
+        page.locator('[data-advanced]').evaluate('element=>element.open=true')
+        page.locator('[data-settings]').fill(json.dumps(legacy))
+        page.locator('[data-apply]').click()
+        page.wait_for_function(ROOT+'.snapshot().config.chart_title.offset_x===7')
+        assert page.evaluate(ROOT+'.snapshot().renderer_version') == '0.18.0'
+        page.locator('[data-advanced]').evaluate('element=>element.open=false')
         target=page.locator('[data-target]')
         def choose(control, value):
             page.locator(f'[data-property={control}]').select_option(value);page.evaluate(ROOT+'.flush()')

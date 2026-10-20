@@ -88,7 +88,7 @@ Its Figure is closed on exit; it is a diagnostic command, not a reliable cache
 producer for later processes. There is no GPU installation hook.
 
 **Persistent pipeline cache save/restore is not implemented.** All current reports
-set `persistent_cache_supported=False`. Renderer 0.17.0's public construction
+set `persistent_cache_supported=False`. Renderer 0.18.0's public construction
 path provides no cache injection; its pipeline descriptors use `cache: None`.
 Creating an unrelated wgpu cache in the wrapper would not cache those pipelines.
 

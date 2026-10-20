@@ -48,8 +48,15 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     cfg = settings["config"]
     modeled = copy.deepcopy(defaults)
     lines = [f"# Apply to the existing {variable} with the same plotted series.",
-             f"ax = {variable}.axes[0]" if variable != "ax" else "_ax = ax.axes[0]",
-             f"{variable}.configure(reset=True)"]
+             f"ax = {variable}.axes[0]" if variable != "ax" else "_ax = ax.axes[0]"]
+    # A resident field cannot temporarily lose its required colorbar while
+    # replay resets the rest of the document to defaults.
+    if cfg.get("colorbar") is not None:
+        modeled["colorbar"] = copy.deepcopy(cfg["colorbar"])
+        reset = pprint.pformat({"colorbar": cfg["colorbar"]}, width=96, sort_dicts=False)
+        lines.append(f"{variable}.configure(config={reset}, reset=True)")
+    else:
+        lines.append(f"{variable}.configure(reset=True)")
     axis = "_ax" if variable == "ax" else "ax"
     if "draw_style" in cfg:
         draw_style = copy.deepcopy(cfg["draw_style"])
@@ -165,8 +172,10 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         configure({"series": series})
     lines.append(f"{axis}.legend(visible={cfg['legend']['visible']!r})")
     from ._native import rebuild_legend_json
+    colorbar = modeled.get("colorbar")
     modeled["legend"]["content"] = json.loads(rebuild_legend_json(
-        json.dumps(settings["series"]), json.dumps(modeled["legend"]["content"])))
+        json.dumps(settings["series"]), json.dumps(modeled["legend"]["content"]),
+        json.dumps(colorbar["colormap"]) if colorbar else None))
     modeled["legend"]["visible"] = cfg["legend"]["visible"]
 
     # Advanced geometry and rich text remain ordinary Python values.

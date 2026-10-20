@@ -2,8 +2,8 @@
 
 ## Current 0.3 validation setup
 
-The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.17.0`
-and `figgy-model 0.11.0`. The dated measurements and test totals below belong
+The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.18.0`
+and `figgy-model 0.12.0`. The dated measurements and test totals below belong
 to earlier checkpoints; they are not a test count or performance claim for the
 current release candidate.
 
