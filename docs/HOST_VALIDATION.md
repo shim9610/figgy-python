@@ -24,7 +24,9 @@ not establish the result of a later commit; inspect that commit's CI result.
 The source fixes for issues #6–#13 were already present before the renderer
 0.18 migration. They were rechecked on the migration branch with Python
 3.12.14 on Linux x86_64 and llvmpipe software Vulkan. These are source-build
-results; the published 0.2.1 wheel is unchanged.
+results. PyPI 0.3.0 is already published with renderer 0.17.0/model 0.11.0;
+its sdist contains the earlier fixes. The renderer 0.18 migration is subsequent
+source work and does not replace published artifacts.
 
 | Issue | Resolution and regression evidence |
 | --- | --- |

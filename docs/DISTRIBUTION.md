@@ -13,8 +13,9 @@ import figgyplot as plt
 import figgyplot.pyplot as pyplot
 ```
 
-Version 0.2.1 is published; this source tree prepares 0.3.0 (registry status
-checked 2026-10-16). The GitHub repository remains `shim9610/figgy-python`.
+Version 0.3.0 is published (registry and sdist checked 2026-10-20); it uses
+renderer 0.17.0 and model 0.11.0. This source tree adds the renderer 0.18 migration.
+The GitHub repository remains `shim9610/figgy-python`.
 No `figgy` compatibility package is shipped: that name belongs to an unrelated
 PyPI package. Existing source users should change `import figgy` to
 `import figgyplot as figgy`, or update their aliases. New Copy Python exports
@@ -174,9 +175,10 @@ Wheel builds and publication remain manual; PR validation runs automatically.
 
 ## Release gates and version-specific evidence
 
-Completed 0.2.1 build/install checks below are historical evidence. Version 0.3.0
-must build and verify its own 74 wheels and sdist, then pass both indices'
-installation checks. Its native and WASM renderer sources remain pinned together
+Completed 0.2.1 build/install checks below are historical evidence. A future
+renderer-migration release must use a new package version, build and verify its
+own 74 wheels and sdist, then pass both indices' installation checks.
+Its native and WASM renderer sources remain pinned together
 as described in [publishing](PUBLISHING.md#versions-and-coordinated-release-order).
 
 - [x] Confirm Trusted Publishing works for `figgyplot` on PyPI/TestPyPI.
@@ -240,9 +242,10 @@ All 74 wheels and one sdist were uploaded; all nine production-index installatio
 jobs passed. Install with `python -m pip install figgyplot`, or
 `python -m pip install 'figgyplot[notebook]'` for Jupyter.
 
-Version **0.3.0** is prepared: figgy-renderer 0.18.0, the fixes reported against
+Version **0.3.0** was published on 2026-10-16 with figgy-renderer 0.17.0, the fixes reported against
 0.2.1, and the corrected installation instructions first prepared as 0.2.2 (never
 uploaded). It adds native/Jupyter editing parity, bounded-chart constructors,
 selected histogram values, numeric label controls and paired-axis convenience
-edits. It has not been uploaded as of 2026-10-16; it needs its own full wheel and
-index installation checks. Passing PR tests does not publish a package.
+edits. Its published sdist was checked directly on 2026-10-20. The current
+renderer 0.18 migration is a subsequent source change and has not been uploaded.
+Passing PR tests does not publish a package.

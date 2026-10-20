@@ -10,7 +10,7 @@ or release publication triggers. No API token or password needs to be added to G
 ## Trusted Publisher setup
 
 The 0.2.1 publication already verified the TestPyPI and PyPI publishers below.
-Retain those registrations for 0.3.0; this setup is needed only when configuring
+Retain those registrations for subsequent releases; this setup is needed only when configuring
 or repairing a publisher.
 
 On [TestPyPI's publishing page](https://test.pypi.org/manage/account/publishing/),
@@ -43,15 +43,18 @@ other branches before building. This does not change main's branch protection.
 
 ## Versions and coordinated release order
 
-| Component | This source release | Published version verified 2026-10-20 |
+| Component | Working tree version | Published version verified 2026-10-20 |
 | --- | --- | --- |
 | `figgy-model` | 0.12.0 | 0.12.0 |
 | `figgy-renderer` | 0.18.0 | 0.18.0 |
-| `figgyplot` | 0.3.0 | 0.2.1 |
+| `figgyplot` | 0.3.0 | 0.3.0 |
 | `figgy` WASM wrapper | 0.15.0 | Not a crates.io package (`publish = false`) |
 
-Model 0.12.0 and renderer 0.18.0 are published. Next, validate and publish
-Python 0.3.0 through TestPyPI and PyPI below. For future coordinated releases,
+Model 0.12.0 and renderer 0.18.0 are published. Python 0.3.0 was published on
+2026-10-16 with renderer 0.17.0/model 0.11.0, as verified from its PyPI sdist.
+The migration tree still carries that package version; select a new unused
+version before building publication artifacts. Do not upload the changed source
+as 0.3.0. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
 has its own version; the WASM wrapper's 0.15.0 is not the renderer version.
 The native extension consumes crates.io packages with versions and checksums
@@ -81,8 +84,8 @@ wheels contain the compiled extension and need neither Git nor Cargo to install.
    packaged WASM provenance. Publishing a new Rust version does not automatically
    update these pinned dependencies or existing Python installations.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
-3. Select **main**, **target `testpypi`** and the exact source version (currently
-   preparing **`0.3.0`**; `0.2.1` is published on both PyPI and TestPyPI). Leave the run-ID input empty.
+3. Select **main**, **target `testpypi`** and the new source version set in step 1
+   (`0.3.0` is already published). Leave the run-ID input empty.
 4. Run it. This is an actual public TestPyPI upload, not a build-only dry run.
 
 The pipeline runs these gates in order:
@@ -213,12 +216,12 @@ completed successfully, publishing all 74 wheels and one sdist to PyPI and
 passing all nine production-index installation jobs. PyPI's public JSON metadata
 also confirms version 0.2.1 with 75 distribution files.
 
-The prepared 0.3.0 release moves to figgy-renderer 0.18.0 and fixes the issues
-reported against 0.2.1; it also carries the PyPI installation instructions that
-were prepared as 0.2.2, which was never uploaded. Follow the coordinated version
-order above while retaining the native/WASM source pins. It needs a new TestPyPI
-build/upload and all installation checks before promotion; no 0.3.0 publication
-has occurred as of 2026-10-16.
+The published 0.3.0 release uses figgy-renderer 0.17.0 and includes the fixes
+reported against 0.2.1; it also carries the installation instructions prepared
+as 0.2.2, which was never uploaded. The renderer 0.18 migration needs a new
+Python package version and its own TestPyPI build/upload and installation
+checks before promotion. Follow the coordinated version order above while
+retaining the native/WASM source pins.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.
