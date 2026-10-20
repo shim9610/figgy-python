@@ -99,7 +99,7 @@ impl Editor {
                     let select = toolbar_icon(
                         ui,
                         Icon::Select,
-                        !self.edit_area,
+                        !self.edit_area && self.drawing.tool == crate::drawing::Tool::Select,
                         "Select",
                         "Select a chart element",
                     );
@@ -118,7 +118,7 @@ impl Editor {
                     let area = toolbar_icon(
                         ui,
                         Icon::Layout,
-                        self.edit_area,
+                        self.edit_area && self.drawing.tool == crate::drawing::Tool::Select,
                         "Layout",
                         "Move or resize the plot area",
                     );

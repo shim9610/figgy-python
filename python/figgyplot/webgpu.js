@@ -77,6 +77,8 @@ export function render({model,el}) {
     const anchor=root.querySelector('[data-anchor-data]');anchor.disabled=!owner||!data;if(anchor.disabled)anchor.checked=false;
     root.querySelector('[data-drawing-help]').textContent=!owner?'Select the root panel to draw annotations.':drawingTool==='select'?'Choose a tool. Select an annotation in the chart or object tree to edit.':drawingTool==='text'?'Click to place text, then edit it in Properties. Esc: cancel.':'Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges.';
     canvas.style.cursor=drawingTool==='select'?'':'crosshair';
+    root.querySelector('[data-select]').setAttribute('aria-pressed',String(drawingTool==='select'&&!root.querySelector('[data-area]').checked));
+    root.querySelector('[data-layout]').setAttribute('aria-pressed',String(drawingTool==='select'&&root.querySelector('[data-area]').checked));
   }
   function cancelDrawing(){drawingGesture=null;drawingTool='select';preview.replaceChildren();drawingUI();}
   function previewDrawing(){

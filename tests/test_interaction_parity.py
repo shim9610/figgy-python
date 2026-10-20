@@ -1370,7 +1370,8 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         exec(setup, {'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
         try:
             inputs=Inputs(handle);inputs.click('draw');revision=fig.revision
-            inputs.click('draw_arrow')
+            inputs.click('layout_mode');inputs.click('draw_arrow')
+            assert not inputs.info()['layout_mode'] and inputs.info()['drawing_tool']=='arrow'
             start=native_point(inputs.info(),(330,240));end=native_point(inputs.info(),(490,340))
             inputs.xdo('mousemove','--window',inputs.wid,*map(round,start));inputs.pump();inputs.xdo('mousedown',1);inputs.pump()
             inputs.xdo('mousemove','--window',inputs.wid,*map(round,end));inputs.pump()
@@ -1406,7 +1407,10 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         page.locator('[data-draw]').click()
         for name,allowed in [('vline',axes[0]),('vspan',axes[0]),('hline',axes[1]),('hspan',axes[1])]:
             assert page.locator(f'[data-tool={name}]').is_enabled()==allowed
-        page.locator('[data-tool=arrow]').click();r=page.locator('canvas').bounding_box()
+        page.locator('[data-layout]').click();page.locator('[data-tool=arrow]').click()
+        assert page.locator('[data-layout]').get_attribute('aria-pressed')=='false'
+        assert page.locator('[data-select]').get_attribute('aria-pressed')=='false'
+        r=page.locator('canvas').bounding_box()
         page.mouse.move(r['x']+r['width']*.35,r['y']+r['height']*.4);page.mouse.down();page.mouse.move(r['x']+r['width']*.55,r['y']+r['height']*.6)
         page.wait_for_function("document.querySelector('.figgy-drawing-preview').childElementCount>0")
         assert not items(page.evaluate(ROOT+'.snapshot()'))

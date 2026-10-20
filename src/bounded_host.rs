@@ -510,7 +510,7 @@ impl SurfaceWindow {
             .collect::<serde_json::Map<_, _>>();
         *self.control.stats.lock().unwrap() = json!({
             "host":"winit-wgpu", "window_role":"chart", "chart_family":c.data.document.as_ref().unwrap().chart.family(),
-            "controls":controls, "error":self.editor.error, "properties_open":self.editor.inspector_open,
+            "controls":controls, "layout_mode":self.editor.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"error":self.editor.error, "properties_open":self.editor.inspector_open,
             "inspector_overlay":self.inspector_overlay(), "selected":c.data.document.as_ref().unwrap().chart.selected_json(),
             "chart_panel":[self.panel.x,self.panel.y,self.panel.width,self.panel.height],
             "surface_size":[self.config.width,self.config.height], "scale_factor":self.window.scale_factor(),

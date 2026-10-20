@@ -210,7 +210,7 @@ impl Drawing {
     }
 }
 impl editor::Editor {
-    pub(super) fn drawing_ui(&mut self, root: &mut egui::Ui, c: &FigureAccess<'_>) {
+    pub(super) fn drawing_ui(&mut self, root: &mut egui::Ui, c: &mut FigureAccess<'_>) {
         if !self.drawing.open {
             return;
         }
@@ -243,7 +243,10 @@ impl editor::Editor {
                     let enabled=tool==Tool::Select || owner&&tool.allowed(axes);
                     let response=ui.add_enabled(enabled,egui::Button::selectable(self.drawing.tool==tool,label)).on_disabled_hover_text(if !owner {"Annotations belong to the root panel; select that panel first."}else{"This chart has no numeric value axis in this direction."});
                     self.controls.insert(format!("draw_{}",tool.name()),response.rect);
-                    if response.clicked() {self.drawing.cancel();self.drawing.tool=tool;}
+                    if response.clicked() {
+                        self.drawing.cancel();self.drawing.tool=tool;self.edit_area=false;
+                        if let Some(document)=&c.data.document {let mut chart=document.chart.clone();if chart.decorations().selected==Some(renderer::DecorationId::DataArea){chart.clear_selection();if let Err(e)=c.set_document(chart){self.error=e.to_string();}}}
+                    }
                 }
                 let r=ui.add_enabled(data&&owner,egui::Checkbox::new(&mut self.drawing.data_anchor,"Follow data"));self.controls.insert("draw_data_anchor".into(),r.rect);
             });});

@@ -218,7 +218,7 @@ impl Editor {
                     let select = toolbar_icon(
                         ui,
                         Icon::Select,
-                        !*edit_area,
+                        !*edit_area && self.drawing.tool == crate::drawing::Tool::Select,
                         "Select",
                         "Select a chart element to edit",
                     );
@@ -230,7 +230,7 @@ impl Editor {
                     let layout = toolbar_icon(
                         ui,
                         Icon::Layout,
-                        *edit_area,
+                        *edit_area && self.drawing.tool == crate::drawing::Tool::Select,
                         "Layout",
                         "Move or resize the plot area",
                     );
@@ -417,7 +417,9 @@ impl Editor {
                     });
                 });
             });
+        self.edit_area = *edit_area;
         self.drawing_ui(root, c);
+        *edit_area = self.edit_area;
         egui::Panel::top("navigation_help")
             .exact_size(24.)
             .frame(egui::Frame::NONE.fill(Color32::from_rgb(248, 249, 251))
