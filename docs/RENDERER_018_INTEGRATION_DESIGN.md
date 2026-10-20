@@ -1,7 +1,8 @@
 # Renderer 0.18 Python integration design
 
-Status: implementation proposal for issue #16 in draft PR #19. Public API names
-and the document envelope below are proposed contracts, not implemented APIs.
+Status: implementation design for issue #16 in draft PR #19, incorporating
+architecture review feedback. Public API names and the extended settings schema
+below are proposed contracts, not implemented APIs.
 Compatibility work for #15 is the existing implementation baseline.
 
 ## Scope and existing constraints
@@ -28,13 +29,20 @@ identities for panels or overlays. These assumptions must be removed together.
 
 ## Recommended decisions
 
-### 1. One Figure owns one upstream document
+### 1. Figure owns subplots; subplots own their local axes
 
-Keep one global series list and one Figure-local data namespace, as upstream
-requires. An Axes is a lightweight stable handle to a base panel, subplot or
-secondary-Y layer; it does not own a separate renderer or duplicate config.
-The root configuration remains the first visible panel. Additional panels use
-upstream subplots; their overlays reference the same global series list.
+Expose Figure -> Subplot -> Axes ownership. Each subplot owns its local
+coordinate system, axes, title, legend and series membership. Figure owns the
+document layout, shared-axis groups and data resources. A shared-axis group
+owns the linked range/scale/direction/tick state; member-specific axis text and
+visual style remain local. A secondary Y axis belongs to its parent subplot.
+
+Map that logical ownership onto upstream's one global series list, Figure-local
+data namespace and index-based links. Axes handles resolve stable targets; they
+do not create separate renderers or duplicate authoritative chart config. The
+root configuration remains the first visible panel, and additional panels use
+upstream subplots. The adapter must not expose that storage asymmetry as a
+different ownership model for the first panel.
 
 An explicit Axes receiver always determines a Python mutation target. Changing
 the selected panel in a window must not redirect a later `ax.plot(...)` call.
@@ -66,18 +74,19 @@ explicitly resolved in the same transaction.
 Reason: saved edits and future LLM feedback must continue to refer to the same
 object after reordering. Visible names and renderer indices cannot guarantee it.
 
-### 3. Preserve legacy settings; add a versioned document envelope
+### 3. Extend the existing settings API with an explicit schema version
 
-Keep `get_settings` / `apply_settings` as compatibility APIs for renderer-shaped
-settings. They must preserve the complete supported renderer document, including
-subplots, overlays and annotations; they are not a base-panel-only projection.
-Continue reading supported schema-1 settings from renderer 0.17 and 0.18.
+Keep one `get_settings` / `apply_settings` API for the complete document. Extend
+its versioned schema with persistent Figure/object identities, layout slots,
+placement and shared-axis relationships. Do not introduce a second document
+API merely to preserve the exact shape of the initial package's settings.
+Schema-1 inputs from renderer 0.17/0.18 should migrate where practical; write
+the new canonical schema after migration. Document structural changes explicitly.
 
-Propose `get_document` / `apply_document` for a version-2 host envelope containing
-the existing settings payload, persistent Figure/object identities and an
-explicit envelope version. The settings payload is the sole owner of visual
-properties and data references. Identity metadata must not copy axis settings,
-series styles or annotation geometry into another authoritative tree.
+The upstream settings payload remains the sole owner of visual properties and
+data references. Host metadata must not duplicate axis ranges, series styles
+or annotation geometry into another authoritative tree. Logical shared-axis
+ownership resolves to upstream's canonical linked values at the adapter boundary.
 
 Keep runtime revisions outside the persistent payload. Loading a saved document
 into an existing Figure is a new mutation, not a reset of its revision counter.
@@ -86,19 +95,28 @@ Unknown required versions fail explicitly; never silently downgrade or drop
 new fields. Legacy structural edits without identity metadata need a defined,
 conservative handle invalidation policy before release.
 
-Reason: changing the existing settings result unconditionally would break saved
-scripts. A host envelope adds durable addressing without modifying upstream
-types or duplicating their SSOT. This API is ordinary document I/O, not the
-future LLM review API.
+Reason: this early release can adopt a coherent schema without maintaining two
+overlapping public APIs indefinitely. Migration support is useful, but preserving
+every initial field shape is not a reason to fragment document persistence.
+The extended settings API is ordinary document I/O, not the future LLM review API.
 
-### 4. Use familiar constructors with explicit unsupported combinations
+### 4. Expose ID-addressed grid slots and explicit capability guards
+
+Make an ID-addressed grid the primary layout abstraction. Expose subplots through
+a mapping keyed by stable subplot ID; expose slot placement through a mapping
+from stable slot ID to subplot ID. Slot identity and subplot identity are
+distinct, so moving a subplot preserves its series, links and replay targets.
+Repeated slot labels may describe rectangular spans. Validate missing IDs,
+duplicate placements, nonrectangular spans and invalid row/column weights before
+mutation. Support empty slots, spacing and explicit panel rectangles. Resolve
+grid geometry on layout changes, not per data sample or by reuploading arrays.
 
 Extend `subplots` with grid construction, shared axes and `squeeze` behavior:
 1x1 still returns a scalar Axes; one-dimensional grids return a one-dimensional
 Axes array and general grids a two-dimensional array. `squeeze=False` always
 returns a two-dimensional array. `fig.axes` stays a flat ordered sequence.
-Provide explicit panel rectangles for manual layout, with deterministic initial
-grid spacing. Do not introduce an automatic constrained-layout solver here.
+Keep deterministic initial grid spacing. Do not introduce an automatic
+constrained-layout solver here.
 
 Propose polar construction through an Axes projection option and secondary Y
 through `ax.twinx()`. The latter shares the parent X mapping and plot rectangle;
@@ -145,7 +163,7 @@ scale and viewport resizing.
 Reason: merely looping over existing single-panel paths can clip the canvas,
 misroute input or erase the GPU residency/cache improvements of 0.18.
 
-### 6. Commit edits atomically with revision checks
+### 6. Separate manual mutations from turn-based review approval
 
 Route Python calls and both manual editors through the same validation and
 commit contract. One accepted logical operation commits settings, series
@@ -159,10 +177,18 @@ overlapping changes. In Jupyter, local interaction remains responsive and
 coalesced; synchronize accepted state through the existing acknowledgement
 protocol. Flush pending local edits before taking a review/export snapshot.
 
+Ordinary manual mode retains immediate accepted mutations. In review mode,
+edits update a draft shown in the window; approval seals the accepted turn.
+Flush edits, durably checkpoint the approved state, then close that window.
+Trigger the LLM once all required windows in the batch have approved. Keep the
+original turn's baseline and separate review comments in the checkpoint. The
+LLM's next result is a new turn, not a concurrent writer into a closed window.
+
 Do not promise one revision per pointer gesture or change existing revision
-semantics solely for review. Review diffs compare committed snapshots and can
-coalesce many intermediate drag updates. Concurrent edits from two views must
-be tested, including stale acknowledgements and deleted targets.
+semantics solely for review. Review diffs compare approved snapshots and can
+coalesce intermediate drag updates. Ordinary host synchronization still needs
+stale-acknowledgement and deleted-target tests; it must not dictate a permanently
+live, concurrently edited LLM session.
 
 Reason: a style change and its referenced colorbar or series cannot be exposed
 as invalid intermediate states. Revision checks prevent delayed browser or
@@ -196,7 +222,52 @@ noise. Stable targets plus a known baseline make feedback usable by an LLM,
 while separate comments preserve the distinction between instructions and
 edits that already happened.
 
-### 8. Distinguish settings replay from source-data reconstruction
+### 8. Persist review data in a program-managed temporary binary cache
+
+The opt-in review mode writes source data to temporary binary storage at input
+time, while the original buffers are available. Preserve dtype, shape and column
+identity, and record file sizes/integrity information in the manifest. Native
+rendering still retains no permanent CPU array copies; settings-only edits reuse
+immutable cached data instead of serializing the same arrays on every revision.
+Bounded-family values, layouts, stable IDs and all data needed to restore a
+document must be covered, not only plotted X/Y columns. Review-mode notebook
+transfer release must not remove the durable cache needed for recovery.
+
+Approval creates a checkpoint with session/batch/document/turn IDs, baseline and
+accepted settings, diff, separate comments and references to binary data. Write
+and flush payloads first; atomically publish a complete manifest last. Keep the
+window open if publication fails. Only after that publication may the window
+close and a ready signal be delivered. Signals identify the manifest and turn;
+the LLM reads the structured feedback, without receiving raw arrays in its text
+context. Duplicate delivery uses the same work ID and must not trigger a second
+independent turn. Resume pending work by scanning durable manifests after a
+disconnect; delivery must not depend on a single in-memory event.
+
+Cache maintenance belongs to application code, never to LLM cleanup commands.
+After publishing a complete higher revision in the same document lineage, the
+program reclaims superseded checkpoints and unreferenced data. Run maintenance
+also on restart and cache access, so a missed cleanup is repaired automatically.
+An unfinished higher revision is not a replacement for the last valid one.
+
+Keep the newest complete recoverable revision, every file it references and
+any approved feedback still needed by an unfinished turn. New checkpoints must
+contain or retain the baseline required to interpret their diffs; they cannot
+depend on deleted revision deltas. Never compare unrelated Figures' revision
+counters. Coordinate publication, readers and reclamation so maintenance cannot
+remove an active read or a file being committed. Shared immutable data is removed
+only when no retained checkpoint needs it. No LLM acknowledgement is required
+to reclaim genuinely superseded, unreferenced files.
+
+Reason: durable binary caching makes recovery independent of Python process
+memory, live GPU allocations and agent connectivity. Revision-driven cleanup
+also recovers from missed explicit finalization without deleting the latest
+recoverable work or arrays reused by the next turn.
+
+This checkpoint/review lifecycle belongs to #18. #16 must establish stable
+settings and data-reference boundaries that permit it, without making temporary
+review persistence mandatory for ordinary manual plotting.
+
+### 9. Distinguish settings replay from source-data reconstruction
 
 Extend current Copy Python to address all panels and layers by stable ID and
 apply a validated whole-document change to an existing compatible Figure.
@@ -207,16 +278,18 @@ objects instead of applying a partial result. Define whether transient selection
 is restored separately from visual/style equivalence.
 
 Settings replay does not reconstruct unavailable NumPy arrays. Complete standalone
-code requires the caller's original plotting/data recipe or an explicitly
-supplied data source; never recover all arrays by GPU readback or permanent
-native CPU caching. For future LLM regeneration, explicit user-provided stable
-IDs reconnect new code to review targets; labels are not a substitute.
+code requires the caller's plotting/data recipe or an explicit data source, which
+may be the review mode's binary cache while it exists. Cache-backed recovery must
+not be described as a permanently portable standalone script. Never recover all
+arrays by GPU readback or permanent native CPU caching. For LLM regeneration,
+explicit user-provided stable IDs reconnect new code to review targets; labels
+are not a substitute.
 
 Reason: the current native data lifetime deliberately does not retain source
 arrays, and claiming standalone reproducibility from settings alone would be
 incorrect. Existing manual Copy Python remains useful and compatible.
 
-### 9. Make CI prove complete feature paths
+### 10. Make CI prove complete feature paths
 
 Keep both existing required check names. Increase the Linux integration job's
 time budget before expanding coverage, and measure build/setup/test duration
