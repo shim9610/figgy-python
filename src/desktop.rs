@@ -70,6 +70,8 @@ struct SurfaceWindow {
     last_pool_generation: u32,
     selected: Option<String>,
     panel_focus: interaction::Focus,
+    chooser: Option<target_chooser::Chooser>,
+    pending_choices: Option<(u64, Vec<target_chooser::Choice>)>,
     rendered_selection: Option<String>,
     handle: Option<String>,
     dragging: bool,
@@ -189,6 +191,8 @@ impl SurfaceWindow {
             last_pool_generation: 0,
             selected: None,
             panel_focus: Default::default(),
+            chooser: None,
+            pending_choices: None,
             rendered_selection: None,
             handle: None,
             dragging: false,
@@ -250,8 +254,58 @@ impl SurfaceWindow {
         // Keep the document aspect ratio, including the fitted letterbox.
         panel.x += (stage.min.x * dpr).round().max(0.) as u32;
         panel.y += (stage.min.y * dpr).round().max(0.) as u32;
-        let display = renderer::place_document(c.data.chart.config(), scale, panel);
+        let mut config = c.data.chart.config().clone();
+        if let Some(choice) = self.chooser.as_ref().and_then(|v| v.preview()) {
+            config.set_active_layer(choice.layer);
+            config.picked_points = None;
+            config.picked_data =
+                choice
+                    .pick
+                    .clone()
+                    .map(|p| renderer::config::DataSelectionsConfig {
+                        refs: vec![p],
+                        ..Default::default()
+                    });
+        }
+        let display = renderer::place_document(&config, scale, panel);
         (display, panel, scale)
+    }
+    fn fit_stage_width(&mut self) {
+        if !self.settings_only && !self.inspector_overlay() {
+            let available = self.pending_chart_width.unwrap_or_else(|| {
+                self.config.width.saturating_sub(if self.inspector_docked {
+                    self.sidebar_pixels()
+                } else {
+                    0
+                })
+            });
+            self.editor.stage.max.x = self.editor.stage.min.x
+                + (available as f32 / self.ctx.pixels_per_point() - 32.).max(1.);
+        }
+    }
+    fn choose_target(
+        &mut self,
+        c: &mut FigureAccess<'_>,
+        choice: target_chooser::Choice,
+    ) -> PyResult<()> {
+        choice.apply(c)?;
+        self.panel_focus.select(
+            c.data.chart.config(),
+            c.data.identity.as_ref(),
+            Some(interaction::panel_index(choice.layer)),
+        );
+        self.selected = choice.target;
+        self.chooser = None;
+        self.pending_choices = None;
+        self.dragging = false;
+        self.panning = false;
+        self.chart_pressed = false;
+        if self.selected.is_some() {
+            self.editor.inspector_open = true;
+        }
+        self.last_revision = u64::MAX;
+        self.window.request_redraw();
+        Ok(())
     }
     fn inspector_overlay(&self) -> bool {
         self.window.is_maximized()
@@ -297,6 +351,9 @@ impl SurfaceWindow {
         }
     }
     fn keyboard(&mut self, key: &NamedKey) -> PyResult<()> {
+        if self.chooser.is_some() {
+            return Ok(());
+        }
         if self.editor.inline_text.is_some() {
             return Ok(());
         }
@@ -459,6 +516,21 @@ impl SurfaceWindow {
             self.window.request_redraw();
             return Ok(());
         }
+        if self.chooser.is_some() {
+            if matches!(
+                event,
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button: MouseButton::Left,
+                    ..
+                }
+            ) {
+                self.chooser = None;
+                self.last_revision = u64::MAX;
+                self.window.request_redraw();
+            }
+            return Ok(());
+        }
         let (display, panel, scale) = self.display(&c);
         self.panel = panel;
         self.scale = scale;
@@ -471,9 +543,25 @@ impl SurfaceWindow {
                     ..
                 }
             ) {
-                let at = interaction::panel_at(&display, self.cursor);
-                if at != self.panel_focus.index(&display, c.data.identity.as_ref()) || at.is_none()
-                {
+                let panels = interaction::panels_at(&display, self.cursor);
+                let focused = self.panel_focus.index(&display, c.data.identity.as_ref());
+                let at = focused
+                    .filter(|i| panels.contains(i))
+                    .or_else(|| panels.first().copied());
+                if focused.is_none() && panels.len() > 1 {
+                    self.chooser = Some(target_chooser::Chooser::new(
+                        panels
+                            .into_iter()
+                            .map(|i| target_chooser::Choice::panel(&c, i))
+                            .collect(),
+                        self.cursor,
+                        c.data.revision,
+                    ));
+                    self.last_revision = u64::MAX;
+                    self.window.request_redraw();
+                    return Ok(());
+                }
+                if at != focused || at.is_none() {
                     self.selected = None;
                     self.handle = None;
                     self.dragging = false;
@@ -566,6 +654,7 @@ impl SurfaceWindow {
                             c.clear_data_selection()?;
                             self.selected = None;
                             self.pan_moved = true;
+                            self.pending_choices = None;
                         }
                         let bounds = c
                             .data
@@ -710,16 +799,16 @@ impl SurfaceWindow {
                             map.element(map.hit_test([x, y])?).map(|e| e.index)
                         })
                         .filter(|_| index == 0 && display.annotations.visible);
-                    let hit = interaction::decoration_at(&display, index, (x, y));
+                    let hits = interaction::decorations_at(&display, index, (x, y));
                     let area = interaction::panel(&display, index)
                         .data_area()
                         .ok()
                         .map(|a| a.0);
                     let inside = area.is_some_and(|area| interaction::contains(area, (x, y)));
-                    let data_hit = hit.as_ref().is_none_or(|(_, t)| t.ends_with("data_area"));
+                    let data_hit = hits.iter().all(|(_, t)| t.ends_with("data_area"));
                     if annotation.is_none() && data_hit && inside && !self.edit_area {
                         self.panning = true;
-                        let picked = c.pick_panel_data(
+                        let picked = c.pick_panel_candidates(
                             index,
                             GpuPickRequest {
                                 canvas_position_px: [x, y],
@@ -727,41 +816,57 @@ impl SurfaceWindow {
                                 display_scale: scale,
                                 max_distance_px: 6.,
                             },
-                            self.modifiers.alt_key(),
                         )?;
-                        let mut cfg = c.data.chart.config().clone();
-                        let same = !self.modifiers.alt_key()
-                            && picked.as_ref().is_some_and(|(_, p)| {
+                        if picked.len() > 1 {
+                            self.pending_choices = Some((
+                                c.data.revision,
+                                picked
+                                    .into_iter()
+                                    .map(|p| target_chooser::Choice::data(&c, p))
+                                    .collect(),
+                            ));
+                        } else {
+                            let mut cfg = c.data.chart.config().clone();
+                            let picked = picked.into_iter().next();
+                            let same = picked.as_ref().is_some_and(|p| {
                                 cfg.picked_data
                                     .as_ref()
-                                    .is_some_and(|s| s.refs.first() == Some(p))
+                                    .is_some_and(|s| s.refs.first() == Some(&p.reference))
                             });
-                        self.selected = if same {
-                            None
-                        } else {
-                            picked.as_ref().map(|(_, p)| p.series_id().to_owned())
-                        };
-                        if let Some((layer, _)) = &picked {
-                            cfg.set_active_layer(*layer);
+                            self.selected = if same {
+                                None
+                            } else {
+                                picked.as_ref().map(|p| p.reference.series_id().to_owned())
+                            };
+                            if let Some(p) = &picked {
+                                cfg.set_active_layer(p.layer);
+                            }
+                            cfg.picked_data = if same {
+                                None
+                            } else {
+                                picked.map(|p| renderer::config::DataSelectionsConfig {
+                                    refs: vec![p.reference],
+                                    ..Default::default()
+                                })
+                            };
+                            cfg.picked_points = None;
+                            if cfg != *c.data.chart.config() {
+                                c.commit_config(cfg)?;
+                            }
                         }
-                        cfg.picked_data = if same {
-                            None
-                        } else {
-                            picked.map(|(_, p)| renderer::config::DataSelectionsConfig {
-                                refs: vec![p],
-                                ..Default::default()
-                            })
-                        };
-                        cfg.picked_points = None;
-                        if cfg != *c.data.chart.config() {
-                            c.commit_config(cfg)?;
-                        }
+                    } else if annotation.is_none() && hits.len() > 1 {
+                        self.pending_choices = Some((
+                            c.data.revision,
+                            hits.into_iter()
+                                .map(|(l, t)| target_chooser::Choice::element(&c, l, t))
+                                .collect(),
+                        ));
                     } else {
                         let mut cfg = c.data.chart.config().clone();
                         self.selected = if let Some(index) = annotation {
                             cfg.set_active_layer(renderer::LayerRef::Annotations);
                             Some(format!("annotation:{}", cfg.annotations.items[index].id))
-                        } else if let Some((layer, target)) = hit {
+                        } else if let Some((layer, target)) = hits.into_iter().next() {
                             cfg.set_active_layer(layer);
                             Some(target)
                         } else {
@@ -775,16 +880,17 @@ impl SurfaceWindow {
                     }
                 }
                 self.dragging = self.panning
-                    || self
-                        .selected
-                        .as_deref()
-                        .is_some_and(|id| id.starts_with("annotation:"))
-                    || self
-                        .selected
-                        .as_deref()
-                        .and_then(|t| c.element(t).ok())
-                        .and_then(|id| c.data.hitmap.get(id))
-                        .is_some_and(|e| e.as_draggable().is_some());
+                    || (self.pending_choices.is_none()
+                        && (self
+                            .selected
+                            .as_deref()
+                            .is_some_and(|id| id.starts_with("annotation:"))
+                            || self
+                                .selected
+                                .as_deref()
+                                .and_then(|t| c.element(t).ok())
+                                .and_then(|id| c.data.hitmap.get(id))
+                                .is_some_and(|e| e.as_draggable().is_some())));
                 self.last_revision = u64::MAX;
                 self.last_input = Some(input_received);
                 self.window.request_redraw();
@@ -794,6 +900,21 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                if let Some((revision, choices)) = self.pending_choices.take() {
+                    self.dragging = false;
+                    self.panning = false;
+                    self.chart_pressed = false;
+                    if !self.pan_moved && revision == c.data.revision {
+                        self.chooser = Some(target_chooser::Chooser::new(
+                            choices,
+                            self.cursor,
+                            c.data.revision,
+                        ));
+                        self.last_revision = u64::MAX;
+                        self.window.request_redraw();
+                    }
+                    return Ok(());
+                }
                 let chart_pressed = std::mem::take(&mut self.chart_pressed);
                 self.dragging = false;
                 self.panning = false;
@@ -906,6 +1027,14 @@ impl SurfaceWindow {
             };
             self.last_pick = current_pick;
         }
+        if self
+            .chooser
+            .as_ref()
+            .is_some_and(|v| v.revision != c.data.revision)
+        {
+            self.chooser = None;
+            self.last_revision = u64::MAX;
+        }
         let previous_selection = self.selected.clone();
         self.panel_focus
             .sync(c.data.chart.config(), c.data.identity.as_ref(), false);
@@ -925,6 +1054,18 @@ impl SurfaceWindow {
             "Click a chart to select it, then click or drag inside to edit".into()
         };
         let mut output = ctx.run_ui(input, |root| {
+            if self.chooser.as_ref().is_some_and(|v| {
+                v.rect.is_positive()
+                    && root.input(|i| {
+                        i.pointer.any_pressed()
+                            && i.pointer
+                                .interact_pos()
+                                .is_some_and(|p| !v.rect.contains(p))
+                    })
+            }) {
+                self.chooser = None;
+                self.last_revision = u64::MAX;
+            }
             if self.settings_only {
                 self.editor.show_settings(root, &mut c);
             } else {
@@ -935,8 +1076,69 @@ impl SurfaceWindow {
                     c.data.identity.as_ref(),
                     previous_selection != self.selected && self.selected.is_some(),
                 );
+                self.fit_stage_width();
+                // Tree/toolbar edits cancel a stale chooser before applying anything.
+                if self
+                    .chooser
+                    .as_ref()
+                    .is_some_and(|v| v.revision != c.data.revision)
+                    || previous_selection != self.selected
+                {
+                    self.chooser = None;
+                    self.last_revision = u64::MAX;
+                }
                 let display = self.display(&c).0;
                 let dpr = ctx.pixels_per_point();
+                if let Some(index) = self.panel_focus.index(&display, c.data.identity.as_ref()) {
+                    let panels = interaction::overlapping_panels(&display, index);
+                    if panels.len() > 1 {
+                        let r = interaction::panel(&display, index).chart_area.0;
+                        egui::Area::new(egui::Id::new("switch_chart"))
+                            .order(egui::Order::Foreground)
+                            .fixed_pos(egui::pos2(
+                                (r.x + r.width) as f32 / dpr - 145.,
+                                r.y as f32 / dpr + 5.,
+                            ))
+                            .show(root.ctx(), |ui| {
+                                let response =
+                                    ui.button(format!("Switch chart ({})", panels.len()));
+                                self.editor
+                                    .controls
+                                    .insert("switch_chart".into(), response.rect);
+                                if response.clicked() {
+                                    self.chooser = Some(target_chooser::Chooser::new(
+                                        panels
+                                            .into_iter()
+                                            .map(|i| target_chooser::Choice::panel(&c, i))
+                                            .collect(),
+                                        (response.rect.left() * dpr, response.rect.bottom() * dpr),
+                                        c.data.revision,
+                                    ));
+                                    self.last_revision = u64::MAX;
+                                }
+                            });
+                    }
+                }
+                if let Some(chooser) = &mut self.chooser {
+                    let before = chooser.active;
+                    let action =
+                        chooser.show(root, self.editor.stage, dpr, &mut self.editor.controls);
+                    if before != chooser.active {
+                        self.last_revision = u64::MAX;
+                    }
+                    match action {
+                        Some(target_chooser::Action::Choose(choice)) => {
+                            if let Err(e) = self.choose_target(&mut c, choice) {
+                                self.editor.error = e.to_string();
+                            }
+                        }
+                        Some(target_chooser::Action::Cancel) => {
+                            self.chooser = None;
+                            self.last_revision = u64::MAX;
+                        }
+                        None => {}
+                    }
+                }
                 let space = renderer::annotation::pixel_space_for_config(&display);
                 if let Some(target) = self.editor.inline_text_ui(
                     root,
@@ -980,17 +1182,7 @@ impl SurfaceWindow {
         if previous_size != (self.config.width, self.config.height) {
             self.surface.configure(c.renderer.device(), &self.config);
         }
-        if !self.settings_only && !self.inspector_overlay() {
-            let available = self.pending_chart_width.unwrap_or_else(|| {
-                self.config.width.saturating_sub(if self.inspector_docked {
-                    self.sidebar_pixels()
-                } else {
-                    0
-                })
-            });
-            self.editor.stage.max.x =
-                self.editor.stage.min.x + (available as f32 / ctx.pixels_per_point() - 32.).max(1.);
-        }
+        self.fit_stage_width();
         let (display, panel, scale) = if self.settings_only {
             (
                 c.data.chart.config().clone(),
@@ -1004,7 +1196,13 @@ impl SurfaceWindow {
         self.scale = scale;
         // Use the final stage after inspector docking/resizing, like the chart.
         if !self.settings_only && !display.subplots.is_empty() {
-            if let Some(index) = self.panel_focus.index(&display, c.data.identity.as_ref()) {
+            if let Some(index) = self
+                .chooser
+                .as_ref()
+                .and_then(|v| v.preview())
+                .map(|v| interaction::panel_index(v.layer))
+                .or_else(|| self.panel_focus.index(&display, c.data.identity.as_ref()))
+            {
                 let dpr = output.pixels_per_point;
                 let r = interaction::panel(&display, index).chart_area.0;
                 let rect = egui::Rect::from_min_size(
@@ -1037,12 +1235,19 @@ impl SurfaceWindow {
                 || self.last_pool_generation != c.renderer.pool().generation()
                 || self.last_panel != Some(panel))
         {
-            let boxes = self
-                .selected
+            let preview_target = self
+                .chooser
+                .as_ref()
+                .and_then(|v| v.preview())
+                .and_then(|v| v.target.clone());
+            let preview_map = HitMap::for_active_layer(&display);
+            let boxes = preview_target
+                .as_ref()
+                .or(self.selected.as_ref())
                 .as_deref()
-                .and_then(|t| c.element(t).ok())
+                .and_then(|t| preview_map.find(t))
                 .and_then(|id| {
-                    c.data.hitmap.selection_box(
+                    preview_map.selection_box(
                         id,
                         &display,
                         &CpuTextMeasure::for_style(&display.draw_style),
@@ -1229,7 +1434,7 @@ impl SurfaceWindow {
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
             Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
         });
-        *self.control.stats.lock().unwrap() = json!({"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        *self.control.stats.lock().unwrap() = json!({"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }
@@ -1345,6 +1550,9 @@ impl ApplicationHandler for App {
         let response = w.input.on_window_event(&w.window, &event);
         let result = match event {
             WindowEvent::Focused(false) => {
+                w.chooser = None;
+                w.pending_choices = None;
+                w.last_revision = u64::MAX;
                 w.modifiers = ModifiersState::empty();
                 w.dragging = false;
                 w.panning = false;

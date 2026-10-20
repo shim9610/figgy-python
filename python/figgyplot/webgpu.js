@@ -56,7 +56,11 @@ export function render({model,el}) {
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
   const kind=['radial','categorical','boxplot','radar'].find(k=>local[k]);
   let hoverPoint=null,lastFrame=0,wheelArea=null;
-  let focusedPanel=null,observedLayer=null;
+  let focusedPanel=null,observedLayer=null,chooser=null,previewOriginal=null;
+  const stage=root.querySelector('.figgy-stage');
+  const choiceBox=document.createElement('div');choiceBox.className='figgy-target-chooser';choiceBox.hidden=true;choiceBox.setAttribute('role','dialog');choiceBox.setAttribute('aria-label','Choose what to edit');stage.append(choiceBox);
+  const choicePreview=document.createElementNS('http://www.w3.org/2000/svg','svg');choicePreview.classList.add('figgy-choice-preview');choicePreview.setAttribute('aria-hidden','true');stage.append(choicePreview);
+  const switchChart=document.createElement('button');switchChart.className='figgy-switch-chart';switchChart.hidden=true;stage.append(switchChart);
   const focusOverlay=root.querySelector('.figgy-panel-focus');
   const panelIndex=layer=>(layer?.Subplot??layer?.SubplotOverlay?.[0]??-1)+1;
   const panelConfig=(index,state=local)=>index===0?state.config:state.config.subplots[index-1].config;
@@ -71,7 +75,9 @@ export function render({model,el}) {
     const scale=Math.min(canvas.width/width,canvas.height/height),ox=Math.floor((canvas.width-Math.round(width*scale))/2),oy=Math.floor((canvas.height-Math.round(height*scale))/2),r=panelConfig(index).chart_area;
     return [ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale];
   }
-  function panelAt(point){for(let i=local.config.subplots?.length??0;i>=0;i--)if(inRect(point,panelRect(i)))return i;return null;}
+  function panelsAt(point){return Array.from({length:(local.config.subplots?.length??0)+1},(_,i)=>i).reverse().filter(i=>inRect(point,panelRect(i)));}
+  function panelAt(point){const hits=panelsAt(point),focused=focusIndex();return hits.includes(focused)?focused:hits[0]??null;}
+  function overlappingPanels(index){const [x,y,w,h]=panelRect(index);return Array.from({length:(local.config.subplots?.length??0)+1},(_,i)=>i).reverse().filter(i=>{const [a,b,c,d]=panelRect(i);return x<a+c&&a<x+w&&y<b+d&&b<y+h;});}
   function syncPanelFocus(explicit=false){
     if(!hasPanels())focusedPanel=null;
     else if(explicit||(observedLayer!==null&&!sameLayer(observedLayer,local.config.active_layer??'Base')))focusedPanel=panelId(panelIndex(local.config.active_layer));
@@ -86,32 +92,75 @@ export function render({model,el}) {
       focusOverlay.append(rect);
     }
     focusOverlay.dataset.panel=focusedPanel??'';stats.focused_panel=focusedPanel;
+    const overlaps=index===null?[]:overlappingPanels(index);switchChart.hidden=overlaps.length<2;
+    if(!switchChart.hidden){const [x,y,w]=panelRect(index);switchChart.textContent=`Switch chart (${overlaps.length})`;switchChart.style.left=`${(x+w)/canvas.width*100}%`;switchChart.style.top=`${y/canvas.height*100}%`;switchChart.onclick=()=>enqueue(()=>openChooser(overlaps.map(panelChoice),[x+w,y+30]));}
     const name=index===null?'':text(panelConfig(index).chart_title?.text)||panelId(index);
     root.querySelector('[data-hint]').textContent=hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
   }
   function layersInPanel(index){const cfg=panelConfig(index);return [baseLayer(index),...(cfg.overlays??[]).map((_,i)=>index===0?{Overlay:i}:{SubplotOverlay:[index-1,i]})];}
   function setPointerLayer(layer){chart.set_active_layer(JSON.stringify(layer));local.config.active_layer=clone(layer);}
-  function decorationAt(point,index){
-    const original=JSON.parse(chart.active_layer()),layers=layersInPanel(index);let fallback=null;
-    const current=layers.findIndex(l=>sameLayer(l,original));if(current>=0)layers.push(...layers.splice(current,1));
-    try{for(const layer of layers.reverse()){
-      chart.set_active_layer(JSON.stringify(layer));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
-      if(target.includes('overlay_'))return {layer,target};
-      if(!target.endsWith('data_area')||!fallback)fallback={layer:baseLayer(index),target};
-    }return fallback;}finally{chart.set_active_layer(JSON.stringify(original));}
-  }
-  async function pickPanelData(point,index,cycle){
+  function decorationsAt(point,index){
     const original=JSON.parse(chart.active_layer()),hits=[];
-    const old=JSON.parse(chart.get_config()).picked_data?.refs?.[0];
-    try{for(const layer of layersInPanel(index)){
-      chart.set_active_layer(JSON.stringify(layer));const value=await chart.pick_data(...point,6);if(!value)continue;
-      const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px'));
-      hits.push({layer,ref,distance:identity.distance_px});
-    }}finally{chart.set_active_layer(JSON.stringify(original));}
-    hits.sort((a,b)=>a.distance-b.distance);stats.last_pick_candidates=hits.map(h=>({layer:h.layer,series:h.ref.series_id,distance:h.distance}));stats.last_pick_position=point;
-    const at=cycle?hits.findIndex(h=>JSON.stringify(h.ref)===JSON.stringify(old)):-1;
-    return hits.length?hits[(at+1)%hits.length]:null;
+    try{for(const layer of layersInPanel(index).reverse()){
+      chart.set_active_layer(JSON.stringify(layer));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
+      if(!hits.some(h=>h.target===target))hits.push({layer:target.includes('overlay_')?layer:baseLayer(index),target});
+    }return hits.some(h=>!h.target.endsWith('data_area'))?hits.filter(h=>!h.target.endsWith('data_area')):hits;}finally{chart.set_active_layer(JSON.stringify(original));}
   }
+  async function pickPanelCandidates(point,index){
+    const config=JSON.parse(chart.get_config()),series=JSON.parse(chart.get_series()),hits=[],excluded=new Set();
+    const owner=id=>{for(let i=0;i<=(config.subplots?.length??0);i++){const cfg=i?config.subplots[i-1].config:config;if(i&&!(config.subplots[i-1].series??[]).includes(id))continue;if(!i&&(config.subplots??[]).some(p=>(p.series??[]).includes(id)))continue;const o=(cfg.overlays??[]).findIndex(o=>(o.series??[]).includes(id));return o<0?baseLayer(i):i?{SubplotOverlay:[i-1,o]}:{Overlay:o};}return 'Base';};
+    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)).map(v=>{const item=clone(v);for(const style of Object.values(item.render_type))if(style.line)style.line.fill=null;return item;});
+    try{
+      chart.set_picked_data('null');chart.set_picked_points('null');
+      for(const layer of layersInPanel(index).reverse()){
+        chart.set_active_layer(JSON.stringify(layer));
+        while(series.some(v=>!excluded.has(v.series_id)&&sameLayer(owner(v.series_id),layer))){
+          const value=await chart.pick_data(...point,6);if(!value)break;
+          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px'));
+          if(excluded.has(ref.series_id))throw Error('Picker repeated an excluded series');
+          excluded.add(ref.series_id);hits.push({layer,ref,distance:identity.distance_px});
+          chart.set_series(JSON.stringify(remaining()));
+        }
+      }
+    }finally{try{chart.set_series(JSON.stringify(series));}finally{chart.set_config(JSON.stringify(config));}}
+    hits.sort((a,b)=>a.distance-b.distance);stats.last_pick_candidates=hits.map(h=>({layer:h.layer,series:h.ref.series_id,distance:h.distance}));stats.last_pick_position=point;
+    return hits;
+  }
+  function ownerName(layer){const index=panelIndex(layer),cfg=panelConfig(index),label=text(cfg.chart_title?.text)||panelId(index),o=layer?.Overlay??layer?.SubplotOverlay?.[1];return `${label} · ${o===undefined?'Primary axes':`Right Y · ${local.identity?.panels?.[index]?.overlays?.[o]??o+1}`}`;}
+  function panelChoice(index){return {key:`panel/${panelId(index)}`,label:text(panelConfig(index).chart_title?.text)||panelId(index),detail:`Chart · ${panelId(index)}`,layer:baseLayer(index),target:null,color:'#2663ad'};}
+  function dataChoice(hit){const id=hit.ref.series_id,series=local.series.find(v=>v.series_id===id),style=Object.values(series?.render_type??{})[0]??{},c=style.line?.line_color??style.scatter?.point_color??style.bar?.fill_color;return {key:`series/${id}`,label:text(series?.label)||id,detail:`${ownerName(hit.layer)} · ${id}`,layer:hit.layer,target:id,ref:hit.ref,color:c?`rgb(${c.r*255} ${c.g*255} ${c.b*255})`:'#556982'};}
+  function elementChoice(hit){return {key:`element/${hit.target}`,label:allNodes().find(v=>v.node.target===hostTarget(hit.target)&&sameLayer(v.node.layer,hit.layer))?.node.label??caption(hit.target.split(':').at(-1)),detail:ownerName(hit.layer),layer:hit.layer,target:hostTarget(hit.target),color:'#556982'};}
+  function restorePreview(){if(previewOriginal){chart.set_config(JSON.stringify(previewOriginal));previewOriginal=null;}choicePreview.replaceChildren();dirty=true;}
+  function cancelChooser(){if(!chooser)return;const restoreFocus=choiceBox.contains(document.activeElement);restorePreview();chooser=null;choiceBox.hidden=true;choiceBox.replaceChildren();stats.choice_candidates=null;stats.choice_preview=null;if(restoreFocus)canvas.focus({preventScroll:true});}
+  function previewChoice(index){
+    if(!chooser)return;restorePreview();chooser.active=index;const choice=chooser.choices[index];if(!choice)return;
+    previewOriginal=JSON.parse(chart.get_config());chart.set_picked_points('null');chart.set_active_layer(JSON.stringify(choice.layer));chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));
+    const rect=choice.target?JSON.parse(chart.decoration_bounds(rendererTarget(choice.target)))?.rect:panelRect(panelIndex(choice.layer));
+    choicePreview.setAttribute('viewBox',`0 0 ${canvas.width} ${canvas.height}`);
+    if(rect){const node=document.createElementNS('http://www.w3.org/2000/svg','rect');for(const [k,v]of Object.entries({x:rect[0],y:rect[1],width:rect[2],height:rect[3],fill:'none',stroke:'#2663ad','stroke-width':2,'stroke-dasharray':'5 3','vector-effect':'non-scaling-stroke'}))node.setAttribute(k,v);choicePreview.append(node);}
+    choiceBox.querySelectorAll('[data-choice]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.choice===choice.key)));stats.choice_preview=choice.key;dirty=true;
+  }
+  function chooseTarget(choice){cancelChooser();chart.set_picked_points('null');setPointerLayer(choice.layer);chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));selected=choice.target;local=snapshot();focusedPanel=panelId(panelIndex(choice.layer));observedLayer=clone(local.config.active_layer??'Base');if(selected)showProperties();dirty=true;commit();canvas.focus({preventScroll:true});}
+  function renderChooser(){
+    if(!chooser)return;const query=chooser.filter.toLowerCase(),visible=chooser.choices.map((c,i)=>({c,i})).filter(({c})=>`${c.label} ${c.detail}`.toLowerCase().includes(query));chooser.visible=visible.map(v=>v.i);
+    const rows=choiceBox.querySelector('[data-choices]');rows.replaceChildren();
+    for(const {c,i}of visible){const button=document.createElement('button');button.dataset.choice=c.key;button.setAttribute('role','option');button.setAttribute('aria-selected',String(i===chooser.active));const swatch=document.createElement('span');swatch.className='figgy-choice-swatch';swatch.style.background=c.color;const name=document.createElement('span');name.textContent=c.label;const detail=document.createElement('small');detail.textContent=c.detail;name.append(detail);button.append(swatch,name);button.addEventListener('pointerenter',()=>enqueue(()=>previewChoice(i)));button.addEventListener('click',()=>enqueue(()=>chooseTarget(c)));rows.append(button);}
+    if(!visible.length)rows.textContent='No matching targets';
+    if(!chooser.visible.includes(chooser.active))previewChoice(chooser.visible[0]??-1);
+  }
+  function openChooser(choices,point){
+    cancelChooser();chooser={choices,active:0,filter:'',visible:choices.map((_,i)=>i)};stats.choice_candidates=choices.map(({key,label,detail})=>({key,label,detail}));
+    choiceBox.innerHTML='<header><strong></strong><button data-cancel-choice aria-label="Cancel selection">×</button></header><p>Point to preview · Click to select</p><div data-choices role="listbox" aria-label="Targets at this position"></div><footer>↑↓: preview · Enter: select · Esc: cancel</footer>';
+    choiceBox.querySelector('strong').textContent=`Choose what to edit (${choices.length})`;choiceBox.querySelector('[data-cancel-choice]').onclick=()=>enqueue(cancelChooser);
+    if(choices.length>8){const input=document.createElement('input');input.type='search';input.placeholder='Find a target…';input.setAttribute('aria-label','Find a target');input.oninput=()=>{if(chooser){chooser.filter=input.value;enqueue(renderChooser);}};choiceBox.insertBefore(input,choiceBox.querySelector('[data-choices]'));}
+    choiceBox.hidden=false;renderChooser();
+    const scaleX=canvas.clientWidth/canvas.width,scaleY=canvas.clientHeight/canvas.height;
+    choiceBox.style.left=`${Math.max(0,Math.min(point[0]*scaleX+12,stage.clientWidth-choiceBox.offsetWidth))}px`;
+    choiceBox.style.top=`${Math.max(0,Math.min(point[1]*scaleY+12,stage.clientHeight-choiceBox.offsetHeight))}px`;
+    previewChoice(0);
+  }
+  root.addEventListener('pointerdown',e=>{if(!chooser||choiceBox.contains(e.target)||e.target===switchChart)return;const consume=e.target===canvas;enqueue(cancelChooser);if(consume){e.preventDefault();e.stopImmediatePropagation();}},true);
+  root.addEventListener('keydown',e=>{if(!chooser||!['Escape','ArrowDown','ArrowUp','Enter'].includes(e.key))return;e.preventDefault();e.stopImmediatePropagation();enqueue(()=>{if(!chooser)return;if(e.key==='Escape'){cancelChooser();return;}if(e.key==='Enter'){const choice=chooser.choices[chooser.active];if(choice)chooseTarget(choice);return;}const list=chooser.visible,at=list.indexOf(chooser.active),next=(at+(e.key==='ArrowDown'?1:-1)+list.length)%list.length;if(list.length){previewChoice(list[next]);choiceBox.querySelector(`[data-choice][aria-selected="true"]`)?.scrollIntoView({block:'nearest'});}});},true);
   function selectedHandleAt(point){
     if(!selected)return false;
     const value=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));
@@ -164,8 +213,9 @@ export function render({model,el}) {
     const width=kind?local.config.chart_area.width:canvas.width;
     const left=g.point[0]/g.size[0]*r.width,top=g.point[1]/g.size[1]*r.height;
     inlineInput.style.fontSize=`${Math.max(10,Math.min(72,g.item.kind.Text.text.font_size*r.width/width))}px`;
-    inlineBox.style.maxWidth=`${Math.max(80,r.width-8)}px`;
-    inlineBox.style.left=`${Math.max(0,Math.min(left-5,r.width-inlineBox.offsetWidth))}px`;
+    inlineBox.style.maxWidth='calc(100% - 8px)';
+    // Percent bounds update with CSS layout even before ResizeObserver runs.
+    inlineBox.style.left=`clamp(0px, calc(${g.point[0]/g.size[0]*100}% - 5px), max(0px, calc(100% - min(300px, 100% - 8px))))`;
     inlineBox.style.top=`${Math.max(0,Math.min(top-4,r.height-inlineBox.offsetHeight))}px`;
     inlineInput.style.height='auto';inlineInput.style.height=`${Math.min(Math.max(28,inlineInput.scrollHeight),Math.max(28,r.height-40))}px`;
   }
@@ -239,7 +289,7 @@ export function render({model,el}) {
   for(const button of root.querySelectorAll('[data-tool]'))button.addEventListener('click',()=>{cancelDrawing();drawingTool=button.dataset.tool;layoutMode(false);drawingUI();canvas.focus();});
   root.addEventListener('keydown',e=>{if(e.key==='Escape'&&drawingTool!=='select'){e.preventDefault();e.stopPropagation();cancelDrawing();}},true);
   canvas.addEventListener('lostpointercapture',()=>{if(drawingGesture&&!drawingGesture.released)cancelDrawing();});
-  const blurDrawing=()=>{if(drawingGesture&&!drawingGesture.released)cancelDrawing();};
+  const blurDrawing=()=>{if(chooser)enqueue(cancelChooser);if(drawingGesture&&!drawingGesture.released)cancelDrawing();};
   window.addEventListener('blur',blurDrawing);
   function rendererTarget(target){if(kind||!target?.startsWith('annotation:'))return target;const index=local.config.annotations?.items?.findIndex(v=>'annotation:'+v.id===target);return index>=0?`annotation_${index}`:target;}
   function hostTarget(target){if(kind)return target;const index=/^annotation_(\d+)$/.exec(target??'')?.[1],item=index===undefined?null:local.config.annotations?.items?.[Number(index)];return item?'annotation:'+item.id:target;}
@@ -264,7 +314,7 @@ export function render({model,el}) {
     const operation=queue.then(async()=>{queuedOperations--;if(disposed)throw Error('Widget disposed');busy++;trace('queue.started',{operationId});try{return await fn();}finally{busy--;trace('queue.finished',{operationId});}});
     queue=operation.catch(fail);return propagate?operation:queue;
   };
-  function snapshot(){if(kind)return {...clone(local),renderer_version:rendererVersion,[kind]:JSON.parse(chart.get_document())};return {...clone(local),schema_version:local.schema_version,renderer_version:rendererVersion,config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
+  function snapshot(){if(kind)return {...clone(local),renderer_version:rendererVersion,[kind]:JSON.parse(chart.get_document())};return {...clone(local),schema_version:local.schema_version,renderer_version:rendererVersion,config:clone(previewOriginal??JSON.parse(chart.get_config())),series:JSON.parse(chart.get_series()),...(background ? {background:clone(background)} : {})};}
   function clearColor(color){const c=color ?? {r:1,g:1,b:1,a:1};chart.set_clear_color(c.r,c.g,c.b,c.a);background=clone(color ?? null);}
   function checkNumbers(value,path='settings'){
     if(typeof value==='number' && !Number.isFinite(value))throw Error(`${path} must be finite`);
@@ -279,7 +329,7 @@ export function render({model,el}) {
     if(typeof requested==='number' && typeof accepted!=='number')throw Error(`${path} exceeds the renderer floating-point range`);
     if(requested && typeof requested==='object')for(const [key,item] of Object.entries(requested)){
       if(!accepted || !(key in accepted)){
-        const omittedDefault=(key==='align'&&item==='Left')||(key==='draw_style'&&item?.mode==='precise'&&Object.keys(item).length===1)||(key==='picked_data'&&item===null);
+        const omittedDefault=(key==='active_layer'&&item==='Base')||(key==='align'&&item==='Left')||(key==='draw_style'&&item?.mode==='precise'&&Object.keys(item).length===1)||(key==='picked_data'&&item===null);
         if(omittedDefault)continue;
         throw Error(`Unknown settings field: ${path}.${key}`);
       }
@@ -287,6 +337,7 @@ export function render({model,el}) {
     }
   }
   function install(settings){
+    cancelChooser();
     if(kind){
       if(!supportedSettings(settings)||!settings[kind]||settings.series.length)throw Error('Unsupported chart settings');
       checkNumbers(settings);
@@ -440,6 +491,7 @@ export function render({model,el}) {
   }
   let decorationIds=[],inspectorTarget=null,inspectorLayer=null,inspectorGeneration=0,formContext='',sidebarPointer=false,formRefreshPending=false;
   root.querySelector('.figgy-properties').addEventListener('pointerdown',()=>{sidebarPointer=true;},true);
+  root.querySelector('.figgy-properties').addEventListener('click',()=>{sidebarPointer=false;},true);
   const releaseSidebar=()=>setTimeout(()=>{sidebarPointer=false;if(formRefreshPending&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0);
   window.addEventListener('pointerup',releaseSidebar,true);window.addEventListener('pointercancel',releaseSidebar,true);
   fields.addEventListener('focusout',()=>setTimeout(()=>{if(formRefreshPending&&!sidebarPointer&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0));
@@ -450,6 +502,7 @@ export function render({model,el}) {
     syncPanelFocus();drawingUI();navigateTree();selectionProperties();
     const nextTarget=inspectorTarget??selected??elementName('chart_title'),nextContext=JSON.stringify([layerOf(local),nextTarget]);
     if(nextContext===formContext&&fields.contains(document.activeElement)&&document.activeElement.matches('input,textarea')){formRefreshPending=true;return;}
+    if(nextContext!==formContext)root.querySelector('.figgy-inspector-scroll').scrollTop=0;
     formContext=nextContext;inspectedTarget=nextTarget;fields.replaceChildren();
     if(hasPanels()&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent=focusIndex()===null?'Select a chart on the canvas.':'Click a title, axis, legend or data series in the selected chart.';fields.append(hint);return;}
     if(layerOf(local)==='Annotations'&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent='Choose an annotation in the tree or click it in the chart.';fields.append(hint);return;}
@@ -459,7 +512,8 @@ export function render({model,el}) {
     function applyProperty(apply,value){
       const before=snapshot(),state=clone(before);
       apply(state,value);
-      if(!kind)reconcilePairedAxisEdit({config:configOf(before)},{config:configOf(state)},target);
+      const secondary=before.config.active_layer?.Overlay??before.config.active_layer?.SubplotOverlay?.[1];
+      if(!kind&&!(secondary!==undefined&&/^(axis|tick_labels)_right$/.test(target)))reconcilePairedAxisEdit({config:configOf(before)},{config:configOf(state)},target);
       install(state);commit();
     }
     function field(label,value,type,apply){
@@ -473,7 +527,7 @@ export function render({model,el}) {
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
       for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Timestamp:'Timestamp (configured)'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>enqueue(()=>{try{applyProperty(apply,input.value);}catch(e){input.value=value;throw e;}}));row.append(input);fields.append(row);
+      input.addEventListener('change',()=>{const next=input.value;enqueue(()=>{try{applyProperty(apply,next);}catch(e){input.value=value;throw e;}});});row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
       choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
@@ -655,7 +709,7 @@ export function render({model,el}) {
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1){trace('export.flush_started',{scale});await flush();trace('export.flush_completed');return enqueue(async()=>{await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
+  async function exporting(scale=1){trace('export.flush_started',{scale});await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
@@ -751,6 +805,7 @@ export function render({model,el}) {
     a.min=log?10**low:low;a.max=log?10**high:high;
   }
   function selectPanelAt(point){
+    const panels=panelsAt(point);if(focusIndex()===null&&panels.length>1){openChooser(panels.map(panelChoice),point);return;}
     const at=panelAt(point);selected=null;chart.on_press(-100,-100);chart.on_release();chart.set_picked_data('null');
     if(at!==null)setPointerLayer(baseLayer(at));
     local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;dirty=true;commit();
@@ -780,22 +835,23 @@ export function render({model,el}) {
       const annotations=local.config.annotations;
       let annotation=null;
       if(index===0&&annotations?.visible!==false&&annotations?.items?.length){await annotationGeometry();const at=chart.hit_annotation(x,y);if(at!==undefined&&at!==null)annotation=at;}
-      const hit=annotation===null?decorationAt(point,index):{layer:'Annotations',target:`annotation_${annotation}`};
+      const hits=annotation===null?decorationsAt(point,index):[{layer:'Annotations',target:`annotation_${annotation}`}];
       const probeState=snapshot();probeState.config.active_layer=baseLayer(index);
-      // The base data rectangle is shared by all secondary Y axes.
       const original=JSON.parse(chart.active_layer());chart.set_active_layer(JSON.stringify(baseLayer(index)));
       const area=JSON.parse(chart.decoration_bounds(elementName('data_area',probeState)))?.rect??panelRect(index);chart.set_active_layer(JSON.stringify(original));
       const inside=inRect(point,area);
-      gesture.pan=annotation===null&&(!hit||hit.target.endsWith('data_area'))&&inside&&!root.querySelector('[data-area]').checked;
-      stats.last_pointer_hit=hit?.target??null;stats.last_pointer_pan=gesture.pan;
+      gesture.pan=annotation===null&&hits.every(h=>h.target.endsWith('data_area'))&&inside&&!root.querySelector('[data-area]').checked;
+      stats.last_pointer_hit=hits[0]?.target??null;stats.last_pointer_pan=gesture.pan;
       if(gesture.pan){
-        chart.on_press(-100,-100);chart.on_release();const picked=await pickPanelData(point,index,e.altKey);
-        const old=JSON.parse(chart.get_config()).picked_data?.refs?.[0],same=!e.altKey&&picked&&JSON.stringify(picked.ref)===JSON.stringify(old);
+        chart.on_press(-100,-100);chart.on_release();const picks=await pickPanelCandidates(point,index);
+        if(picks.length>1){gesture.choices=picks.map(dataChoice);return;}
+        const picked=picks[0],old=JSON.parse(chart.get_config()).picked_data?.refs?.[0],same=picked&&JSON.stringify(picked.ref)===JSON.stringify(old);
         if(picked)setPointerLayer(picked.layer);
         selected=same?null:picked?.ref.series_id??null;
         chart.set_picked_data(JSON.stringify(!same&&picked?{refs:[picked.ref]}:null));
-      }else{
-        chart.set_picked_data('null');if(hit)setPointerLayer(hit.layer);
+      }else if(hits.length>1){gesture.choices=hits.map(elementChoice);return;}
+      else{
+        const hit=hits[0];chart.set_picked_data('null');if(hit)setPointerLayer(hit.layer);
         selected=hostTarget(hit?.target??null);chart.on_press(x,y);
       }
     }
@@ -808,12 +864,13 @@ export function render({model,el}) {
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
     if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
     else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;navigateDocumentAxis(s,'x',1,.5,-(next[0]-old[0])/r[2]);navigateDocumentAxis(s,'y',1,.5,(next[1]-old[1])/r[3]);install(s);}}
-    else chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
+    else if(!gesture.choices)chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
   });});
-  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(gesture.focusOnly)return;if(!kind)chart.on_release();if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
+  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(gesture.focusOnly)return;if(!kind)chart.on_release();if(gesture.choices&&!gesture.moved&&e.type!=='pointercancel'){openChooser(gesture.choices,gesture.origin);return;}if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
   root.querySelector('.figgy-stage').addEventListener('pointerdown',e=>{if(e.target===e.currentTarget&&hasPanels())enqueue(()=>selectPanelAt([-100,-100]));});
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
   canvas.addEventListener('wheel',e=>{
+    if(chooser){e.preventDefault();return;}
     if(inlineText){e.preventDefault();return;}
     if(chart&&kind&&boundedView){
       const horizontal=boundedView.axis==='x';if(horizontal?e.shiftKey&&!e.ctrlKey:e.ctrlKey&&!e.shiftKey)return;

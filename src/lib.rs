@@ -1689,6 +1689,7 @@ mod identity;
 mod interaction;
 mod navigation;
 mod notebook;
+mod target_chooser;
 use identity::{validate_columns, validate_identity};
 mod selection;
 

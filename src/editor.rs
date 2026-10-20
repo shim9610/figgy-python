@@ -523,18 +523,22 @@ impl Editor {
         }
         ui.add_space(6.);
         let context = format!("{:?}/{:?}", c.data.chart.config().active_layer(), selected);
-        if context != self.inspector_context {
+        let context_changed = context != self.inspector_context;
+        if context_changed {
             self.text_ranges.clear();
             self.inspector_context = context;
         }
         if let Some(target) = selected.as_ref() {
-            let form = egui::ScrollArea::vertical()
+            let mut form = egui::ScrollArea::vertical()
                 .id_salt("object_properties")
                 .max_height(
                     (ui.available_height() - if self.picked.is_some() { 250. } else { 74. })
                         .max(100.),
-                )
-                .show(ui, |ui| self.properties(ui, c, target));
+                );
+            if context_changed {
+                form = form.vertical_scroll_offset(0.);
+            }
+            let form = form.show(ui, |ui| self.properties(ui, c, target));
             self.controls
                 .insert("properties_viewport".into(), form.inner_rect);
         } else {
@@ -1255,7 +1259,9 @@ impl Editor {
                 }
             }
         }
-        if changed {
+        // Secondary Y axes have independent ownership even when their numeric
+        // domains happen to match the panel's primary axes.
+        if changed && overlay_index.is_none() {
             crate::axis_edit::sync_linked_axis_edit(
                 state.pointer(&scoped_path).unwrap(),
                 &mut config,

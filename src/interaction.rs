@@ -34,12 +34,6 @@ pub(super) fn contains(rect: Rect, point: (f32, f32)) -> bool {
         && point.0 < (rect.x + rect.width) as f32
         && point.1 < (rect.y + rect.height) as f32
 }
-pub(super) fn panel_at(config: &Config, point: (f32, f32)) -> Option<usize> {
-    // Later panels paint above earlier panels if a hand-authored layout overlaps.
-    (0..=config.subplots.len())
-        .rev()
-        .find(|&i| contains(panel(config, i).chart_area.0, point))
-}
 pub(super) fn panel_label(config: &Config, identity: Option<&Value>, index: usize) -> String {
     let title: String = panel(config, index)
         .chart_title
@@ -85,112 +79,173 @@ impl Focus {
     }
 }
 
-/// Probe the renderer's own hit maps, without installing speculative document
-/// edits. Overlay-only hits win over shared panel decorations.
-pub(super) fn decoration_at(
+/// Every distinct visible decoration under the pointer, with shared elements
+/// deduplicated back to their panel owner.
+pub(super) fn decorations_at(
     config: &Config,
     index: usize,
     point: (f32, f32),
-) -> Option<(LayerRef, String)> {
+) -> Vec<(LayerRef, String)> {
     let measure = CpuTextMeasure::for_style(&config.draw_style);
-    let mut layers: Vec<_> = config
+    let mut hits = vec![];
+    for layer in config
         .panel_layers()
         .into_iter()
         .filter(|l| panel_index(*l) == index)
-        .collect();
-    // The current axis wins when several secondary axes occupy the same pixels.
-    if let Some(at) = layers.iter().position(|l| *l == config.active_layer()) {
-        let current = layers.remove(at);
-        layers.push(current);
-    }
-    let mut fallback = None;
-    for layer in layers.into_iter().rev() {
+        .rev()
+    {
         let mut probe = config.clone();
         probe.set_active_layer(layer);
         let map = HitMap::for_active_layer(&probe);
-        let Some(target) = map
+        if let Some(target) = map
             .hit_test(&probe, &measure, point.0, point.1)
             .and_then(|id| map.get(id))
             .map(|e| e.element_id())
-        else {
-            continue;
-        };
-        if target.contains("overlay_") {
-            return Some((layer, target));
-        }
-        // Shared elements retain their base owner, even when probed in an overlay.
-        if !target.ends_with("data_area") {
-            fallback = Some((base_layer(index), target));
-        } else if fallback.is_none() {
-            fallback = Some((base_layer(index), target));
+        {
+            let owner = if target.contains("overlay_") {
+                layer
+            } else {
+                base_layer(index)
+            };
+            if !hits.iter().any(|(_, t)| *t == target) {
+                hits.push((owner, target));
+            }
         }
     }
-    fallback
+    // A plot background behind a title or axis is not an ambiguous target.
+    if hits.iter().any(|(_, t)| !t.ends_with("data_area")) {
+        hits.retain(|(_, t)| !t.ends_with("data_area"));
+    }
+    hits
 }
-
+pub(super) fn panels_at(config: &Config, point: (f32, f32)) -> Vec<usize> {
+    (0..=config.subplots.len())
+        .rev()
+        .filter(|&i| contains(panel(config, i).chart_area.0, point))
+        .collect()
+}
+pub(super) fn overlapping_panels(config: &Config, index: usize) -> Vec<usize> {
+    let a = panel(config, index).chart_area.0;
+    (0..=config.subplots.len())
+        .rev()
+        .filter(|&i| {
+            let b = panel(config, i).chart_area.0;
+            a.x < b.x + b.width
+                && b.x < a.x + a.width
+                && a.y < b.y + b.height
+                && b.y < a.y + a.height
+        })
+        .collect()
+}
+#[derive(Clone)]
+pub(super) struct DataHit {
+    pub layer: LayerRef,
+    pub reference: renderer::config::PickedDataRef,
+    pub distance: f32,
+}
+// Fills are not pick primitives. Removing them from a temporary picker registry
+// keeps cross-series fills valid while already-found series are excluded.
+fn picker_series(
+    input: &[SeriesConfig],
+    excluded: &std::collections::HashSet<String>,
+) -> Vec<SeriesConfig> {
+    use renderer::data_config::DataRenderType as T;
+    input
+        .iter()
+        .filter(|s| !excluded.contains(&s.series_id))
+        .cloned()
+        .map(|mut s| {
+            match &mut s.render_type {
+                T::Line { line }
+                | T::ScatterLine { line, .. }
+                | T::LineScatterErrorbarX { line, .. }
+                | T::LineScatterErrorbarY { line, .. }
+                | T::LineScatterErrorbarXY { line, .. } => line.fill = None,
+                _ => {}
+            }
+            s
+        })
+        .collect()
+}
 impl FigureAccess<'_> {
-    /// Only compact pick identities cross the GPU boundary. Temporary layer
-    /// routing is restored on both success and failure; no source is reuploaded.
-    pub(super) fn pick_panel_data(
+    /// Enumerate all nearby series, including coincident series on the same
+    /// axis. Only renderer metadata and compact pick identities change. The
+    /// authoritative document, columns, legend and order are restored exactly.
+    pub(super) fn pick_panel_candidates(
         &mut self,
         index: usize,
         request: GpuPickRequest,
-        cycle: bool,
-    ) -> PyResult<Option<(LayerRef, renderer::config::PickedDataRef)>> {
+    ) -> PyResult<Vec<DataHit>> {
         self.renderer.enable_gpu_picking().map_err(runtime)?;
-        let original = self.data.chart.config().active_layer();
-        let layers: Vec<_> = self
-            .data
-            .chart
-            .config()
-            .panel_layers()
-            .into_iter()
-            .filter(|l| panel_index(*l) == index)
-            .collect();
+        let original = self.data.chart.config().clone();
+        let original_gpu = gpu::config(self.data.figure_id, &original);
+        let series = self.gpu_series(&self.data.series);
+        let mut probe = original_gpu.clone();
+        probe.picked_data = None;
+        probe.picked_points = None;
         let result = (|| {
+            self.renderer
+                .set_chart_config(self.data.chart_id, probe)
+                .map_err(runtime)?;
             let mut hits = vec![];
-            for layer in layers {
+            let mut excluded = std::collections::HashSet::new();
+            for layer in original
+                .panel_layers()
+                .into_iter()
+                .filter(|l| panel_index(*l) == index)
+                .rev()
+            {
                 self.renderer
                     .set_active_layer(self.data.chart_id, layer)
                     .map_err(runtime)?;
-                let ticket = self
-                    .renderer
-                    .pick_chart_data(self.data.chart_id, request)
-                    .map_err(runtime)?;
-                self.renderer.wait_idle();
-                if let Some(pick) = pollster::block_on(ticket.resolve()).map_err(runtime)? {
-                    let distance = pick.distance_px();
+                loop {
+                    let remaining = self
+                        .renderer
+                        .chart_series(self.data.chart_id)
+                        .map_err(runtime)?;
+                    if !remaining
+                        .iter()
+                        .any(|s| original_gpu.layer_of_series(&s.series_id) == layer)
+                    {
+                        break;
+                    }
+                    let ticket = self
+                        .renderer
+                        .pick_chart_data(self.data.chart_id, request)
+                        .map_err(runtime)?;
+                    self.renderer.wait_idle();
+                    let Some(pick) = pollster::block_on(ticket.resolve()).map_err(runtime)? else {
+                        break;
+                    };
                     let mut reference = pick.to_ref();
+                    if !excluded.insert(reference.series_id().to_owned()) {
+                        return Err(runtime("picker repeated an excluded series"));
+                    }
                     gpu::local_selection(self.data.figure_id, &mut reference);
-                    hits.push((distance, layer, reference));
+                    hits.push(DataHit {
+                        layer,
+                        reference,
+                        distance: pick.distance_px(),
+                    });
+                    self.renderer
+                        .set_chart_series(self.data.chart_id, picker_series(&series, &excluded))
+                        .map_err(runtime)?;
                 }
             }
-            hits.sort_by(|a, b| a.0.total_cmp(&b.0));
-            let current = self
-                .data
-                .chart
-                .config()
-                .picked_data
-                .as_ref()
-                .and_then(|p| p.refs.first());
-            let at = if cycle {
-                hits.iter()
-                    .position(|(_, _, p)| Some(p) == current)
-                    .map(|i| (i + 1) % hits.len())
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-            Ok(hits
-                .into_iter()
-                .nth(at)
-                .map(|(_, layer, reference)| (layer, reference)))
+            hits.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+            Ok(hits)
         })();
-        let restore = self
+        // Attempt both restorations even after a rejected probe.
+        let restore_series = self
             .renderer
-            .set_active_layer(self.data.chart_id, original)
+            .set_chart_series(self.data.chart_id, series)
             .map_err(runtime);
-        restore?;
+        let restore_config = self
+            .renderer
+            .set_chart_config(self.data.chart_id, original_gpu)
+            .map_err(runtime);
+        restore_series?;
+        restore_config?;
         result
     }
 }

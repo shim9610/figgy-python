@@ -123,6 +123,35 @@ panel is probed, using renderer hit maps and GPU picks; source arrays stay in
 the GPU pool. **Properties** also opens or closes the sidebar. Toolbar icons
 have name tooltips.
 
+All visible coordinate layers in that panel participate in input. For example,
+while the primary axes are active, click a secondary Y axis to edit its range,
+or drag its title directly. Clicking a primary axis routes input back to its
+owner. This routing does not require selecting a layer first.
+
+When several nearby series coincide, **Choose what to edit** appears next to the
+click. Its rows show the label, color, stable ID and owning chart/axis, including
+series that coincide on the same axes. Hover or Up/Down previews a target; click
+or Enter selects it. Esc or an outside canvas click cancels without saving the
+preview. A plot-area drag still pans. Coincident decorations from different
+coordinate layers use the same chooser.
+
+Overlapping chart rectangles are a separate case: choose the chart first and it
+keeps ownership of following input. **Switch chart (N)** lets you select another
+intersecting chart. Neither operation changes data positions or draw order.
+See the [selection design and reference applications](EDITOR_SELECTION_DESIGN.md).
+
+These captures show a secondary-axis title selected by dragging it while the
+primary coordinate layer was active. Its Properties form identifies the owning
+secondary Y axis; the primary axis range remains unchanged.
+
+![Native direct interaction with an inactive overlay object](images/desktop-editor-overlay-objects.png)
+
+![Jupyter direct interaction with an inactive overlay object](images/jupyter-editor-overlay-objects.png)
+
+For coincident-series selection, see the
+[native candidate chooser](images/desktop-editor-overlap-chooser.png) and
+[Jupyter candidate chooser](images/jupyter-editor-overlap-chooser.png).
+
 The Properties sidebar starts with an **Objects** tree. Panels contain their
 axes, titles, legend, series, secondary Y axes and annotations. Search by a
 human label or object ID, expand/collapse branches, then select the object to

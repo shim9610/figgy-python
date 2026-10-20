@@ -20,6 +20,38 @@ current supported controls. A configured check or an earlier passing run does
 not establish the result of a later commit; inspect that commit's CI result.
 
 
+## Overlay ownership and ambiguous selection (2026-10-20)
+
+The installed release wheel passed **15 focused real-host cases, with no skips**
+across two runs on Linux x86_64, Python 3.12.14, native llvmpipe Vulkan and headed
+Chromium 154/SwiftShader under Xvfb/Openbox. The installed native binary and browser
+assets were compared byte-for-byte with the final wheel and browser source.
+
+Coverage includes direct editing/dragging of inactive secondary-axis objects,
+independent secondary ranges even when their numbers match the primary axes,
+inactive annotation drag/endpoint resizing, same-axis and cross-axis coincident
+series, duplicate labels, keyboard/hover preview and cancellation, retained chart
+ownership for fully overlapping panels and tree selection, isolated Y zoom,
+primary opposite-axis property pairing, numeric drafts and multiline text during
+resizing. A new object's form starts at the top. Preview checks preserve the
+native document/revision and browser settings; the browser ambiguity scenario
+sends exactly one edit to Python when a target is finally chosen. Source uploads,
+reference-fill settings and legend contents are preserved.
+
+The preceding Actions run at `3a8aa75` had **430 passed and 3 failed**. All three
+failed cases passed in this local run. Fixes complete sidebar click delivery
+before replacing controls, retain the selected property's input value across
+queued work, and constrain the inline text editor horizontally through CSS layout
+during resizing. Additional ownership checks exposed and fixed native overlay
+edits propagating into primary axes and browser rejection of the canonical
+omitted `Base` default.
+
+Workflow/assets preflight passed **112 tests**; Rust formatting/locked compilation,
+JavaScript syntax and release wheel packaging passed. The final PR's Actions
+result is independent of these local results. See the
+[selection design and official application references](EDITOR_SELECTION_DESIGN.md)
+and [actual host screenshots](DESKTOP_EDITOR.md).
+
 ## Renderer 0.18 feature integration (2026-10-20)
 
 Local verification covers all **409 current suite cases** across a complete

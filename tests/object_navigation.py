@@ -4,7 +4,7 @@ import json
 
 def ensure_native_control_visible(info, xdo, pump, wid, name):
     """Scroll a form with real X11 wheel input before clicking a clipped row."""
-    if name.lower() != name or name in {'advanced', 'close_properties', 'properties', 'properties_header', 'properties_viewport', 'copy', 'fit', 'select_mode', 'layout_mode', 'visibility_menu', 'draw_style_menu', 'navigation_help'} or name.startswith(('tree', 'object_', 'style_', 'save', 'draw')):
+    if name.lower() != name or name in {'advanced', 'close_properties', 'properties', 'properties_header', 'properties_viewport', 'copy', 'fit', 'select_mode', 'layout_mode', 'visibility_menu', 'draw_style_menu', 'navigation_help'} or name.startswith(('tree', 'object_', 'style_', 'save', 'draw', 'choose:', 'choice_', 'switch_chart')):
         return
     for _ in range(35):
         state = info()

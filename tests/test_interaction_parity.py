@@ -1186,6 +1186,7 @@ def test_annotation_layer_drag_and_endpoint_resize_match_hosts(tmp_path, kind):
     import copy
     setup = "ax.plot([0,1,2],[1,2,0],id='signal')" if kind == 'cartesian' else "ax.radar(['A','B','C'],[2,4,3])"
     setup += "; ax.arrow(.25,.3,.25,.15,coords='ratio',id='arrow').select()"
+    if kind == 'cartesian': setup += "; ax.activate()"  # The annotation layer starts inactive.
     def geometry(state):
         owner = state['config'] if kind == 'cartesian' else state['radar']
         return owner['annotations']['items'][0]['kind']['Arrow']
@@ -1606,6 +1607,8 @@ ax.activate()
                 assert fig.get_settings()['config']['active_layer']=={'Subplot':0}
                 # The right-hand axis belongs to the visible secondary scale.
                 inputs.click_rect([area[0]+area[2]-2,area[1]+area[3]*.37,0,0])
+                if inputs.info()['choice_candidates']:
+                    inputs.click('choose:element/subplot_0:overlay_0:axis_right')
                 assert inputs.info()['selected']=='subplot_0:overlay_0:axis_right'
                 assert fig.get_settings()['config']['active_layer']=={'SubplotOverlay':[0,0]}
                 old=fig.get_settings()
@@ -1652,6 +1655,8 @@ ax.activate()
         assert ObjectNavigator(page).selected()=='signal', (area,page.evaluate(ROOT+'.stats'),page.evaluate(ROOT+'.snapshot().config.active_layer'))
         assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'Subplot':0}
         click([area[0]+area[2]-2,area[1]+area[3]*.37])
+        if page.locator('.figgy-target-chooser').is_visible():
+            page.locator('[data-choice="element/subplot_0:overlay_0:axis_right"]').click();page.evaluate(ROOT+'.flush()')
         assert ObjectNavigator(page).selected()=='subplot_0:overlay_0:axis_right'
         old=page.evaluate(ROOT+'.snapshot()')
         point=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",data_point(area,.4,.5))
@@ -1673,3 +1678,253 @@ ax.activate()
         assert not page.locator('.figgy-error').inner_text()
         execute('await fig.sync()')
         assert json.loads(execute('print(json.dumps(fig.get_settings()))'))['config'].get('active_layer','Base')=='Base'
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_coincident_series_chooser_is_view_only_until_commit(tmp_path, backend):
+    """All same-axis and secondary-axis hits remain reachable without reordering."""
+    setup = """
+ax=fig.axes[0]
+ax.plot([1,5,9],[5,5,5],id='red',label='Signal',color='red')
+blue=json.loads(json.dumps(fig.get_settings()['series'][0]))
+blue['series_id']='blue'
+blue['render_type']['Line']['line']['line_color']={'r':0.,'g':0.,'b':1.,'a':1.}
+fig._native.add_series_fitted(json.dumps(blue),None,[0.,10.,0.,10.])
+twin=ax.twinx(id='pressure_axis')
+twin.plot([1,5,9],[50,50,50],id='pressure',label='Pressure',color='green')
+ax.set_xlim(0,10);ax.set_ylim(0,10);twin.set_ylim(0,100)
+ax.set_title('Overlapping signals');ax.legend();ax.activate()
+s=fig.get_settings()
+s['series'][0]['render_type']['Line']['line']['fill']={'ToSeries':'blue'}
+fig.apply_settings(s)
+"""
+    def point(rect):
+        x,y,w,h=rect
+        return x+w/2,y+h/2
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig,'json':json});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();revision=fig.revision;uploads=fig.info['column_uploads']
+                inputs.click_rect([*point(inputs.info()['decorations']['data_area']),0,0])
+                choices=inputs.info()['choice_candidates']
+                assert {c['key'] for c in choices}=={'series/red','series/blue','series/pressure'},inputs.info()
+                assert fig.get_settings()==before and fig.revision==revision
+                inputs.input_frame('mousemove','--window',inputs.wid,*map(round,point(inputs.info()['controls']['choose:series/blue'])))
+                assert inputs.info()['choice_preview']=='series/blue'
+                assert fig.get_settings()==before and fig.revision==revision
+                from PIL import ImageGrab
+                window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+                x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+                ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-overlap-chooser.png')
+                inputs.key('Escape');assert inputs.info()['choice_candidates'] is None
+                assert fig.get_settings()==before and fig.revision==revision
+                inputs.click_rect([*point(inputs.info()['decorations']['data_area']),0,0])
+                inputs.click('choose:series/red')
+                assert inputs.info()['selected']=='red' and inputs.info()['properties_open']
+                state=fig.get_settings();assert state['config']['picked_data']['refs'][0]['series_id']=='red'
+                assert state['series']==before['series']
+                assert state['config']['legend']==before['config']['legend']
+                # Selection stays available through the tree, including duplicate labels.
+                assert fig.info['column_uploads']==uploads
+                assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source="import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'coincident',source) as (page,execute):
+        def click_center():
+            area=page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+            p=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",point(area))
+            page.mouse.click(*p);page.evaluate(ROOT+'.flush()')
+        before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        click_center()
+        assert {c['key'] for c in page.evaluate(ROOT+'.stats.choice_candidates')}=={'series/red','series/blue','series/pressure'},page.evaluate(ROOT+'.stats')
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.locator('[data-choice="series/blue"]').hover();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.choice_preview')=='series/blue'
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-overlap-chooser.png'))
+        page.keyboard.press('ArrowDown');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.choice_preview')!='series/blue'
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.keyboard.press('Escape');page.evaluate(ROOT+'.flush()')
+        assert page.locator('.figgy-target-chooser').is_hidden()
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        click_center();page.locator('[data-choice="series/red"]').click();page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='red'
+        state=page.evaluate(ROOT+'.snapshot()')
+        assert state['config']['picked_data']['refs'][0]['series_id']=='red'
+        assert state['series']==before['series'] and state['config']['legend']==before['config']['legend']
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_fully_overlapping_panels_keep_the_chosen_chart(tmp_path, backend):
+    """Choose a rear chart once; subsequent canvas clicks keep its ownership."""
+    setup="""
+fig.set_layout([['rear','front']])
+for id,name in [('rear','Rear chart'),('front','Front chart')]:
+    ax=fig.subplots[id].axes
+    ax.plot([1,5,9],[5,5,5],id=id+'_line',label=name)
+    ax.set_title(name);ax.set_xlim(0,10);ax.set_ylim(0,10)
+fig.subplots['rear'].set_rect(0,0,960,600)
+fig.subplots['front'].set_rect(0,0,960,600)
+fig.subplots['rear'].axes.activate()
+"""
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig,'json':json});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();revision=fig.revision
+                inputs.click_rect([*native_point(inputs.info(),(300,200)),0,0])
+                assert {c['key'] for c in inputs.info()['choice_candidates']}=={'panel/rear','panel/front'}
+                assert fig.get_settings()==before and fig.revision==revision
+                inputs.click('choose:panel/rear')
+                assert inputs.info()['focused_panel']=='rear'
+                rect=inputs.info()['decorations']['data_area']
+                inputs.click_rect([rect[0]+rect[2]/2,rect[1]+rect[3]/2,0,0])
+                assert inputs.info()['selected']=='rear_line'
+                assert inputs.info()['focused_panel']=='rear'
+                inputs.click('switch_chart');inputs.click('choose:panel/front')
+                assert inputs.info()['focused_panel']=='front'
+                assert fig.get_settings()['config']['active_layer']=={'Subplot':0}
+                # A tree choice of the covered chart also owns following canvas input.
+                inputs.click('object_search');inputs.xdo('type','--clearmodifiers','rear_line');inputs.pump()
+                inputs.click('tree:series/rear_line')
+                assert inputs.info()['focused_panel']=='rear'
+                rect=inputs.info()['decorations']['data_area']
+                inputs.click_rect([rect[0]+rect[2]/2,rect[1]+rect[3]/2,0,0])
+                assert inputs.info()['focused_panel']=='rear'
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source="import figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'overlap-panels',source) as (page,execute):
+        before=page.evaluate(ROOT+'.snapshot()')
+        page.mouse.click(*browser_point(page,(300,200)));page.evaluate(ROOT+'.flush()')
+        assert {c['key'] for c in page.evaluate(ROOT+'.stats.choice_candidates')}=={'panel/rear','panel/front'}
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.locator('[data-choice="panel/rear"]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        r=page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+        p=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",[r[0]+r[2]/2,r[1]+r[3]/2])
+        page.mouse.click(*p);page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='rear_line'
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        page.locator('.figgy-switch-chart').click();page.evaluate(ROOT+'.flush()')
+        page.locator('[data-choice="panel/front"]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='front'
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'Subplot':0}
+        if page.locator('.figgy-properties').is_hidden():page.locator('[data-properties]').click()
+        ObjectNavigator(page).choose('rear_line');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        r=page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+        p=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",[r[0]+r[2]/2,r[1]+r[3]/2])
+        page.mouse.click(*p);page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_inactive_overlay_objects_can_be_edited_and_dragged_directly(tmp_path, backend):
+    """Overlay objects receive input without first activating their layer in a tree."""
+    setup="""
+ax=fig.axes[0]
+ax.plot([1,5,9],[2,8,4],id='signal',label='Signal')
+twin=ax.twinx(id='pressure_axis')
+twin.plot([1,5,9],[85,60,25],id='pressure',label='Pressure',color='red')
+twin.set_ylabel('Pressure')
+ax.set_xlim(0,10);ax.set_ylim(0,10);twin.set_ylim(0,100)
+state=fig.get_settings()
+state['config']['right_y']['out_margin']=160
+state['config']['overlays'][0]['y_axis']['line_offset']=45
+state['config']['overlays'][0]['y_axis']['title_option']['visible']=True
+fig.apply_settings(state)
+ax.activate()
+"""
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();uploads=fig.info['column_uploads']
+                assert before['config'].get('active_layer','Base')=='Base'
+                primary_left=inputs.info()['decorations']['axis_left']
+                area=inputs.info()['decorations']['data_area'];scale=inputs.info()['chart_panel'][2]/960
+                inputs.click_rect([area[0]+area[2]-2+45*scale,area[1]+area[3]*.4,0,0])
+                assert inputs.info()['selected']=='overlay_0:axis_right',inputs.info()
+                assert fig.get_settings()['config']['active_layer']=={'Overlay':0}
+                inputs.click('min');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','10');inputs.key('Return')
+                changed=fig.get_settings()
+                assert changed['config']['overlays'][0]['y_axis']['min']==10
+                assert changed['config']['left_y']==before['config']['left_y']
+                # Matching numbers do not make independent coordinate layers linked.
+                equal=fig.get_settings();equal['config']['overlays'][0]['y_axis'].update(min=0,max=10,major_spacing=2)
+                fig.apply_settings(equal);inputs.pump()
+                inputs.click('min');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','1');inputs.key('Return')
+                assert fig.get_settings()['config']['overlays'][0]['y_axis']['min']==1
+                assert fig.get_settings()['config']['left_y']==before['config']['left_y']
+                fig.apply_settings(changed);inputs.pump()
+                # The shared left axis belongs to Base even while the overlay is active.
+                rect=inputs.info()['decorations']['overlay_0:axis_title_right']
+                inputs.click_rect(primary_left)
+                assert fig.get_settings()['config'].get('active_layer','Base')=='Base'
+                before=fig.get_settings()
+                start=(rect[0]+rect[2]/2,rect[1]+rect[3]/2)
+                drag_native(inputs,start,(16,12))
+                assert inputs.info()['selected']=='overlay_0:axis_title_right'
+                r=inputs.info()['controls']['text'];v=inputs.info()['controls']['properties_viewport']
+                assert r[1]>=v[1]-1 and r[1]+r[3]<=v[1]+v[3]+1
+                assert fig.get_settings()['config']['overlays'][0]['y_axis']['title_option']!=before['config']['overlays'][0]['y_axis']['title_option']
+                assert fig.get_settings()['config']['left_y']==before['config']['left_y']
+                assert fig.info['column_uploads']==uploads and not inputs.info()['error']
+                from PIL import ImageGrab
+                window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+                x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+                ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-overlay-object-edit.png')
+            finally:handle.close();Inputs.pump()
+        return
+    source="import figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'overlay-objects',source) as (page,execute):
+        def bounds(target):return page.evaluate(ROOT+'.decorations()')[target]['rect']
+        def screen(rect):
+            return page.evaluate("""r=>{const c=document.querySelector('.figgy-editor canvas'),b=c.getBoundingClientRect();return [b.x+(r[0]+r[2]/2)*b.width/c.width,b.y+(r[1]+r[3]/2)*b.height/c.height];}""",rect)
+        before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        # Decorations exposes the active owner; the shared plot edge plus the
+        # configured offset locates the inactive overlay without activating it.
+        area=bounds('data_area');page.mouse.click(*screen([area[0]+area[2]-2+45*page.locator('canvas').evaluate('c=>c.width/960'),area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='overlay_0:axis_right'
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'Overlay':0}
+        page.locator('[data-property=min]').fill('10');page.locator('[data-property=min]').press('Tab');page.evaluate(ROOT+'.flush()')
+        changed=page.evaluate(ROOT+'.snapshot()')
+        assert changed['config']['overlays'][0]['y_axis']['min']==10
+        assert changed['config']['left_y']==before['config']['left_y']
+        execute("state=fig.get_settings();state['config']['overlays'][0]['y_axis'].update(min=0,max=10,major_spacing=2);fig.apply_settings(state);print('matched')")
+        page.wait_for_function(ROOT+'.snapshot().config.overlays[0].y_axis.max===10')
+        page.locator('[data-property=min]').fill('1');page.locator('[data-property=min]').press('Tab');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot().config.overlays[0].y_axis.min')==1
+        assert page.evaluate(ROOT+'.snapshot().config.left_y')==before['config']['left_y']
+        execute(f"fig.apply_settings({changed!r});print('restored')")
+        page.wait_for_function(ROOT+'.snapshot().config.overlays[0].y_axis.max===100')
+        area=bounds('data_area');page.mouse.click(*screen([area[0]+2,area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        assert page.evaluate('('+ROOT+'.snapshot().config.active_layer??"Base")')=='Base'
+        # Title geometry is offset to the right of the overlay axis; find its
+        # public bounds using the same active-owner decoration API after direct
+        # selection of the secondary axis, then return to Base before dragging.
+        area=bounds('data_area');scale=page.locator('canvas').evaluate('c=>c.width/960')
+        page.mouse.click(*screen([area[0]+area[2]-2+45*scale,area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        title=bounds('overlay_0:axis_title_right')
+        area=bounds('data_area');page.mouse.click(*screen([area[0]+2,area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        before=page.evaluate(ROOT+'.snapshot()');start=screen(title)
+        page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+16,start[1]+12,steps=5);page.mouse.up();page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='overlay_0:axis_title_right'
+        assert page.locator('.figgy-inspector-scroll').evaluate('e=>e.scrollTop')==0
+        changed=page.evaluate(ROOT+'.snapshot()')
+        assert changed['config']['overlays'][0]['y_axis']['title_option']!=before['config']['overlays'][0]['y_axis']['title_option']
+        assert changed['config']['left_y']==before['config']['left_y']
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads and not page.locator('.figgy-error').inner_text()
+        page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-overlay-object-edit.png'))
