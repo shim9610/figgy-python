@@ -42,7 +42,7 @@ export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
   const paths={fit:'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l5 5m11-5-5 5m5 11-5-5M4 20l5-5',select:'M6 3v17l5-5 4 7 3-2-4-6h7Z',layout:'M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4',copy:'M8 3h9l4 4v14H8ZM8 7H3v14h2M13 11l-2 3 2 3m3-6 2 3-2 3',save:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',properties:'M3 5h18M3 12h18M3 19h18M8 2v6M16 9v6M10 16v6',fullscreen:'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6'};
   const icon=(name,label)=>`<button data-${name} title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name]}"/></svg></button>`;
-  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<button data-draw aria-pressed="false">Draw</button><input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<button data-display-scale title="Use the available width instead of the requested Figure size">Fit width</button><span data-status>Preparing…</span></div><div class="figgy-drawing" hidden><div role="toolbar" aria-label="Annotation drawing tools"><button data-tool="select">Select</button><button data-tool="text">Text</button><button data-tool="arrow">Arrow</button><button data-tool="hline">Horizontal line</button><button data-tool="vline">Vertical line</button><button data-tool="hspan">Horizontal band</button><button data-tool="vspan">Vertical band</button><label><input data-anchor-data type="checkbox">Follow data</label></div><p data-drawing-help></p></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas><svg class="figgy-drawing-preview" aria-hidden="true"></svg></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><section class="figgy-navigator"><div class="figgy-navigator-heading">Objects</div><label class="figgy-search"><input type="search" data-object-search placeholder="Find a panel, axis or series…" aria-label="Find chart objects"></label><div data-object-tree role="tree" aria-label="Chart objects"></div></section><div class="figgy-inspector-scroll"><div data-context class="figgy-context"></div><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
+  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<button data-draw aria-pressed="false">Draw</button><input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<button data-display-scale title="Use the available width instead of the requested Figure size">Fit width</button><span data-status>Preparing…</span></div><div class="figgy-drawing" hidden><div role="toolbar" aria-label="Annotation drawing tools"><button data-tool="select">Select</button><button data-tool="text">Text</button><button data-tool="arrow">Arrow</button><button data-tool="hline">Horizontal line</button><button data-tool="vline">Vertical line</button><button data-tool="hspan">Horizontal band</button><button data-tool="vspan">Vertical band</button><label><input data-anchor-data type="checkbox">Follow data</label></div><p data-drawing-help></p></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas><svg class="figgy-panel-focus" aria-hidden="true"></svg><svg class="figgy-drawing-preview" aria-hidden="true"></svg></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><section class="figgy-navigator"><div class="figgy-navigator-heading">Objects</div><label class="figgy-search"><input type="search" data-object-search placeholder="Find a panel, axis or series…" aria-label="Find chart objects"></label><div data-object-tree role="tree" aria-label="Chart objects"></div></section><div class="figgy-inspector-scroll"><div data-context class="figgy-context"></div><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
   el.append(root);
   const canvas=root.querySelector('canvas'), fields=root.querySelector('[data-fields]');
   let inspectedTarget=null,outlineNodes=clone(model.get('state').outline??[]),boundedView=clone(model.get('state').bounded_view??null);
@@ -56,14 +56,76 @@ export function render({model,el}) {
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
   const kind=['radial','categorical','boxplot','radar'].find(k=>local[k]);
   let hoverPoint=null,lastFrame=0,wheelArea=null;
+  let focusedPanel=null,observedLayer=null;
+  const focusOverlay=root.querySelector('.figgy-panel-focus');
+  const panelIndex=layer=>(layer?.Subplot??layer?.SubplotOverlay?.[0]??-1)+1;
+  const panelConfig=(index,state=local)=>index===0?state.config:state.config.subplots[index-1].config;
+  const panelId=index=>local.identity?.panels?.[index]?.id??`panel_${index}`;
+  const baseLayer=index=>index===0?'Base':{Subplot:index-1};
+  const hasPanels=()=>!kind&&Boolean(local.config.subplots?.length);
+  const focusIndex=()=>focusedPanel===null?null:Array.from({length:(local.config.subplots?.length??0)+1},(_,i)=>i).find(i=>panelId(i)===focusedPanel)??null;
+  const inRect=([x,y],[rx,ry,w,h])=>x>=rx&&y>=ry&&x<rx+w&&y<ry+h;
+  function panelRect(index){
+    const rectangles=[local.config.chart_area,...(local.config.subplots??[]).map(p=>p.config.chart_area)];
+    const width=Math.max(...rectangles.map(r=>r.x+r.width)),height=Math.max(...rectangles.map(r=>r.y+r.height));
+    const scale=Math.min(canvas.width/width,canvas.height/height),ox=Math.floor((canvas.width-Math.round(width*scale))/2),oy=Math.floor((canvas.height-Math.round(height*scale))/2),r=panelConfig(index).chart_area;
+    return [ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale];
+  }
+  function panelAt(point){for(let i=local.config.subplots?.length??0;i>=0;i--)if(inRect(point,panelRect(i)))return i;return null;}
+  function syncPanelFocus(explicit=false){
+    if(!hasPanels())focusedPanel=null;
+    else if(explicit||(observedLayer!==null&&!sameLayer(observedLayer,local.config.active_layer??'Base')))focusedPanel=panelId(panelIndex(local.config.active_layer));
+    else if(focusIndex()===null)focusedPanel=null;
+    observedLayer=clone(local.config.active_layer??'Base');
+    root.dataset.panelMode=hasPanels()?'grid':'single';
+    focusOverlay.replaceChildren();focusOverlay.setAttribute('viewBox',`0 0 ${canvas.width} ${canvas.height}`);
+    const index=focusIndex();
+    if(hasPanels()&&index!==null){
+      const [x,y,w,h]=panelRect(index),rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      for(const [name,value]of Object.entries({x:x+2,y:y+2,width:Math.max(0,w-4),height:Math.max(0,h-4),rx:3,fill:'none',stroke:'#2663ad','stroke-width':1.5,'vector-effect':'non-scaling-stroke'}))rect.setAttribute(name,value);
+      focusOverlay.append(rect);
+    }
+    focusOverlay.dataset.panel=focusedPanel??'';stats.focused_panel=focusedPanel;
+    const name=index===null?'':text(panelConfig(index).chart_title?.text)||panelId(index);
+    root.querySelector('[data-hint]').textContent=hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
+  }
+  function layersInPanel(index){const cfg=panelConfig(index);return [baseLayer(index),...(cfg.overlays??[]).map((_,i)=>index===0?{Overlay:i}:{SubplotOverlay:[index-1,i]})];}
+  function setPointerLayer(layer){chart.set_active_layer(JSON.stringify(layer));local.config.active_layer=clone(layer);}
+  function decorationAt(point,index){
+    const original=JSON.parse(chart.active_layer()),layers=layersInPanel(index);let fallback=null;
+    const current=layers.findIndex(l=>sameLayer(l,original));if(current>=0)layers.push(...layers.splice(current,1));
+    try{for(const layer of layers.reverse()){
+      chart.set_active_layer(JSON.stringify(layer));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
+      if(target.includes('overlay_'))return {layer,target};
+      if(!target.endsWith('data_area')||!fallback)fallback={layer:baseLayer(index),target};
+    }return fallback;}finally{chart.set_active_layer(JSON.stringify(original));}
+  }
+  async function pickPanelData(point,index,cycle){
+    const original=JSON.parse(chart.active_layer()),hits=[];
+    const old=JSON.parse(chart.get_config()).picked_data?.refs?.[0];
+    try{for(const layer of layersInPanel(index)){
+      chart.set_active_layer(JSON.stringify(layer));const value=await chart.pick_data(...point,6);if(!value)continue;
+      const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px'));
+      hits.push({layer,ref,distance:identity.distance_px});
+    }}finally{chart.set_active_layer(JSON.stringify(original));}
+    hits.sort((a,b)=>a.distance-b.distance);stats.last_pick_candidates=hits.map(h=>({layer:h.layer,series:h.ref.series_id,distance:h.distance}));stats.last_pick_position=point;
+    const at=cycle?hits.findIndex(h=>JSON.stringify(h.ref)===JSON.stringify(old)):-1;
+    return hits.length?hits[(at+1)%hits.length]:null;
+  }
+  function selectedHandleAt(point){
+    if(!selected)return false;
+    const value=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));
+    return value?.handles?.some(rect=>inRect(point,rect))??false;
+  }
   const textRanges=new Map();
   let drawingTool='select',drawingGesture=null;
   const drawingPalette=root.querySelector('.figgy-drawing'),preview=root.querySelector('.figgy-drawing-preview');
   function drawingSupport(){
-    const owner=kind||['Base','Annotations'].includes(local.config.active_layer??'Base');
+    const owner=kind||(panelIndex(local.config.active_layer)===0&&(!hasPanels()||focusIndex()===0));
     const rectangular=kind==='boxplot'||kind==='categorical',horizontal=rectangular&&local[kind].direction==='Horizontal';
     return {owner,axes:kind?(rectangular?[horizontal,!horizontal]:[false,false]):[!local.config.polar,!local.config.polar],data:kind?rectangular:!local.config.polar};
   }
+  function annotationUnavailable(){return `Annotations are available on “${text(local.config.chart_title?.text)||panelId(0)}”. Select that chart to draw.`;}
   function drawingUI(){
     const {owner,axes,data}=drawingSupport();
     const axis=drawingTool.startsWith('h')?1:drawingTool.startsWith('v')?0:null;
@@ -71,11 +133,11 @@ export function render({model,el}) {
     for(const button of root.querySelectorAll('[data-tool]')){
       const name=button.dataset.tool,axis=name.startsWith('h')?1:name.startsWith('v')?0:null;
       button.disabled=name!=='select'&&(!owner||(axis!==null&&!axes[axis]));
-      button.title=!owner?'Annotations belong to the root panel; select that panel first.':axis!==null&&!axes[axis]?'This chart has no numeric value axis in this direction.':'';
+      button.title=!owner?annotationUnavailable():axis!==null&&!axes[axis]?'This chart has no numeric value axis in this direction.':'';
       button.setAttribute('aria-pressed',String(name===drawingTool));
     }
     const anchor=root.querySelector('[data-anchor-data]');anchor.disabled=!owner||!data;if(anchor.disabled)anchor.checked=false;
-    root.querySelector('[data-drawing-help]').textContent=!owner?'Select the root panel to draw annotations.':drawingTool==='select'?'Double-click text to edit it. Drag annotations to move them.':drawingTool==='text'?'Click and type. Enter: apply. Esc: cancel.':'Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges.';
+    root.querySelector('[data-drawing-help]').textContent=!owner?annotationUnavailable():drawingTool==='select'?'Double-click text to edit it. Drag annotations to move them.':drawingTool==='text'?'Click and type. Enter: apply. Esc: cancel.':'Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges.';
     canvas.style.cursor=drawingTool==='select'?'':'crosshair';
     root.querySelector('[data-select]').setAttribute('aria-pressed',String(drawingTool==='select'&&!root.querySelector('[data-area]').checked));
     root.querySelector('[data-layout]').setAttribute('aria-pressed',String(drawingTool==='select'&&root.querySelector('[data-area]').checked));
@@ -139,6 +201,9 @@ export function render({model,el}) {
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
   async function annotationGeometry(){
+    // Bounded charts prepare their logical annotation map synchronously when
+    // adopting a document. Editing it does not depend on a material GPU fence.
+    if(kind)return JSON.parse(chart.annotations());
     await waitForFrame();
     if(dirty){await readyDisplayedFrame();dirty=false;}
     return JSON.parse(chart.annotations());
@@ -155,7 +220,7 @@ export function render({model,el}) {
   });
   function finishDrawing(g){
     if(g.cancelled||g!==drawingGesture)return;
-    if(/^[hv]/.test(g.tool)){const [x,y,w,h]=g.area;g.end=[Math.max(x,Math.min(x+w,g.end[0])),Math.max(y,Math.min(y+h,g.end[1]))];}const [x,y]=g.start,[u,v]=g.end;if(['arrow','hspan','vspan'].includes(g.tool)&&Math.hypot(u-x,v-y)<3){cancelDrawing();return;}
+    {const [x,y,w,h]=/^[hv]/.test(g.tool)?g.area:g.panel;g.end=[Math.max(x,Math.min(x+w,g.end[0])),Math.max(y,Math.min(y+h,g.end[1]))];}const [x,y]=g.start,[u,v]=g.end;if(['arrow','hspan','vspan'].includes(g.tool)&&Math.hypot(u-x,v-y)<3){cancelDrawing();return;}
     const anchor=p=>JSON.parse(chart.pointer_to_anchor(...p,g.data?'Data':'Ratio'));
     const start=anchor(g.start),end=anchor(g.end);if(!start||!end)throw Error('This chart does not support these annotation coordinates.');
     const line={color:{r:.235,g:.235,b:.235,a:1},width:1.5,style:'Solid'},rich={segments:segments('Text'),color:{r:.137,g:.176,b:.235,a:1},font_size:16,font:''};let geometry;
@@ -179,7 +244,7 @@ export function render({model,el}) {
   function rendererTarget(target){if(kind||!target?.startsWith('annotation:'))return target;const index=local.config.annotations?.items?.findIndex(v=>'annotation:'+v.id===target);return index>=0?`annotation_${index}`:target;}
   function hostTarget(target){if(kind)return target;const index=/^annotation_(\d+)$/.exec(target??'')?.[1],item=index===undefined?null:local.config.annotations?.items?.[Number(index)];return item?'annotation:'+item.id:target;}
 
-  function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;}
+  function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;if(open)navigateTree(true);}
   function layoutMode(enabled){if(!enabled&&kind&&chart&&selected==='data_area')enqueue(()=>{chart.clear_selection();selected=null;dirty=true;commit();});root.querySelector('[data-area]').checked=enabled;root.querySelector('[data-layout]').setAttribute('aria-pressed',String(enabled));root.querySelector('[data-select]').setAttribute('aria-pressed',String(!enabled));}
   let inputAt=null,busy=0,startInit,pendingFrame=null,frameError=null;
   let queuedOperations=0,operationSequence=0;
@@ -294,13 +359,10 @@ export function render({model,el}) {
     Object.defineProperty(view,'right_y',{get:()=>node.y_axis,set:value=>node.y_axis=value});
     return view;
   }
-  function seriesInActiveLayer(id){
-    const cfg=local.config,layer=cfg.active_layer??'Base';
-    const index=cfg.subplots?.findIndex(p=>p.series?.includes(id))??-1;
-    const panel=index<0?cfg:cfg.subplots[index].config;
-    const overlay=panel.overlays?.findIndex(o=>o.series?.includes(id))??-1;
-    const owner=index<0?(overlay<0?'Base':{Overlay:overlay}):(overlay<0?{Subplot:index}:{SubplotOverlay:[index,overlay]});
-    return JSON.stringify(owner)===JSON.stringify(layer);
+  function navigateDocumentAxis(state,dimension,factor,anchor,shift=0){
+    const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
+    if(dimension==='y'&&overlay!==undefined)navigate(cfg.overlays[overlay].y_axis,factor,anchor,shift);
+    else for(const key of dimension==='x'?['bottom_x','top_x']:['left_y','right_y'])navigate(cfg[key],factor,anchor,shift);
   }
   function elementName(name,state=local){
     const layer=state.config.active_layer,index=layer?.Subplot??layer?.SubplotOverlay?.[0];
@@ -315,7 +377,8 @@ export function render({model,el}) {
   const sameLayer=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   function allNodes(nodes=outlineNodes,path=[]){return nodes.flatMap(node=>[{node,path:[...path,node]},...allNodes(node.children,[...path,node])]);}
   function navigateTree(reveal=false){
-    const layer=inspectorLayer??layerOf(local),target=inspectorTarget??selected??(layer==='Annotations'?null:elementName('chart_title'));
+    if(sidebarPointer){formRefreshPending=true;return;}
+    const layer=inspectorLayer??layerOf(local),target=inspectorTarget??selected??(hasPanels()||layer==='Annotations'?null:elementName('chart_title'));
     let entry=allNodes().find(v=>v.node.target===target&&sameLayer(v.node.layer,layer));
     const signature=JSON.stringify([layer,target]);
     if(signature!==lastTreeSignature){
@@ -356,7 +419,7 @@ export function render({model,el}) {
     if(reveal&&active)active.scrollIntoView({block:'nearest',inline:'nearest'});
     const context=root.querySelector('[data-context]');context.textContent=entry?entry.path.slice(1).map(n=>n.label).join(' / '):'Click an object in the chart or tree';context.dataset.target=target??'';
   }
-  search.addEventListener('input',()=>navigateTree());
+  search.addEventListener('input',()=>navigateTree(!search.value));
   search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key.split('/').at(-1)}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
   function chooseObject(node){
     const target=node.target,generation=++inspectorGeneration;
@@ -367,6 +430,7 @@ export function render({model,el}) {
         const state=snapshot();(kind?state[kind]:state.config).active_layer=clone(node.layer);if(!kind)state.config.picked_data=null;install(state);wheelArea=null;
       }
       selected=target;
+      if(!kind){local=snapshot();syncPanelFocus(true);}
       if(kind){const dataTarget=/^slice_/.test(target??'')||local[kind].series?.some(v=>v.id===target);if(dataTarget){chart.clear_selection();}else if(target)chart.select_decoration(target);else chart.clear_selection();}
       else if(target?.startsWith('annotation:')){chart.select_annotation(local.config.annotations.items.findIndex(v=>'annotation:'+v.id===target));}
       else if(!local.series.some(s=>s.series_id===target)){const bound=target?JSON.parse(chart.decoration_bounds(rendererTarget(target))):null;if(bound){chart.on_press(bound.rect[0]+bound.rect[2]/2,bound.rect[1]+bound.rect[3]/2);chart.on_release();}}
@@ -374,12 +438,20 @@ export function render({model,el}) {
       dirty=true;commit();
     });
   }
-  let decorationIds=[],inspectorTarget=null,inspectorLayer=null,inspectorGeneration=0;
+  let decorationIds=[],inspectorTarget=null,inspectorLayer=null,inspectorGeneration=0,formContext='',sidebarPointer=false,formRefreshPending=false;
+  root.querySelector('.figgy-properties').addEventListener('pointerdown',()=>{sidebarPointer=true;},true);
+  const releaseSidebar=()=>setTimeout(()=>{sidebarPointer=false;if(formRefreshPending&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0);
+  window.addEventListener('pointerup',releaseSidebar,true);window.addEventListener('pointercancel',releaseSidebar,true);
+  fields.addEventListener('focusout',()=>setTimeout(()=>{if(formRefreshPending&&!sidebarPointer&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0));
   function properties(refresh=true){
     if(!chart)return;
     if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
-    drawingUI();navigateTree();selectionProperties();
-    inspectedTarget=inspectorTarget??selected??elementName('chart_title');fields.replaceChildren();
+    if(sidebarPointer){formRefreshPending=true;return;}
+    syncPanelFocus();drawingUI();navigateTree();selectionProperties();
+    const nextTarget=inspectorTarget??selected??elementName('chart_title'),nextContext=JSON.stringify([layerOf(local),nextTarget]);
+    if(nextContext===formContext&&fields.contains(document.activeElement)&&document.activeElement.matches('input,textarea')){formRefreshPending=true;return;}
+    formContext=nextContext;inspectedTarget=nextTarget;fields.replaceChildren();
+    if(hasPanels()&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent=focusIndex()===null?'Select a chart on the canvas.':'Click a title, axis, legend or data series in the selected chart.';fields.append(hint);return;}
     if(layerOf(local)==='Annotations'&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent='Choose an annotation in the tree or click it in the chart.';fields.append(hint);return;}
     if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
@@ -392,7 +464,7 @@ export function render({model,el}) {
     }
     function field(label,value,type,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>enqueue(()=>{applyProperty(apply,type==='number'?Number(input.value):input.value);}));row.append(input);fields.append(row);return input;
+      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;enqueue(()=>{applyProperty(apply,value);});});row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
@@ -546,7 +618,7 @@ export function render({model,el}) {
   function displaySize(){const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;return [Math.max(1,Math.round(rect.width*dpr)),Math.max(1,Math.round(rect.height*dpr))];}
   function resizeSurface(){const [width,height]=displaySize();if(canvas.width===width&&canvas.height===height)return false;const previous=[canvas.width,canvas.height];canvas.width=width;canvas.height=height;wheelArea=null;chart.resize(width,height);dirty=true;trace('surface.resized',{previous});return true;}
   function resize(){if(!chart || disposed)return;const [width,height]=displaySize();if(canvas.width!==width||canvas.height!==height)enqueue(resizeSurface);}
-  function recordFrame(){if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;}
+  function recordFrame(){syncPanelFocus();if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;}
   async function readyDisplayedFrame(){
     if(disposed)throw Error('Widget disposed');
     resizeSurface();
@@ -678,45 +750,68 @@ export function render({model,el}) {
     const low=pivot+(lo-pivot)*factor+shift*span,high=pivot+(hi-pivot)*factor+shift*span;
     a.min=log?10**low:low;a.max=log?10**high:high;
   }
-  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e);
+  function selectPanelAt(point){
+    const at=panelAt(point);selected=null;chart.on_press(-100,-100);chart.on_release();chart.set_picked_data('null');
+    if(at!==null)setPointerLayer(baseLayer(at));
+    local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;dirty=true;commit();
+  }
+  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e),pointSize=[canvas.width,canvas.height];
     if(drawingTool!=='select'){
+      if(hasPanels()&&(focusIndex()===null||panelAt(point)!==focusIndex())){enqueue(()=>{cancelDrawing();selectPanelAt(point);});return;}
       const g={tool:drawingTool,start:point,end:point,data:root.querySelector('[data-anchor-data]').checked,area:[0,0,canvas.width,canvas.height]};drawingGesture=g;
-      enqueue(()=>{if(g!==drawingGesture)return;g.area=drawingArea()??g.area;const [x,y,w,h]=g.area;if(/^[hv]/.test(g.tool)&&(g.start[0]<x||g.start[0]>x+w||g.start[1]<y||g.start[1]>y+h)){cancelDrawing();return;}previewDrawing();});return;
+      enqueue(()=>{if(g!==drawingGesture)return;g.panel=kind?[0,0,local.config.chart_area.width,local.config.chart_area.height]:panelRect(0);if(!inRect(g.start,g.panel)){cancelDrawing();return;}g.area=drawingArea()??g.area;const [x,y,w,h]=g.area;if(/^[hv]/.test(g.tool)&&(g.start[0]<x||g.start[0]>x+w||g.start[1]<y||g.start[1]>y+h)){cancelDrawing();return;}previewDrawing();});return;
     }
     pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
+    if(!kind){point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];gesture.size=[canvas.width,canvas.height];}
     const [x,y]=point;
-    if(!kind&&local.config.subplots?.length){
-      const width=Math.max(local.config.chart_area.x+local.config.chart_area.width,...local.config.subplots.map(p=>p.config.chart_area.x+p.config.chart_area.width)),scale=canvas.width/width;
-      const contains=r=>x>=r.x*scale&&y>=r.y*scale&&x<(r.x+r.width)*scale&&y<(r.y+r.height)*scale;
-      const index=local.config.subplots.findIndex(p=>contains(p.config.chart_area)),current=local.config.active_layer?.Subplot??local.config.active_layer?.SubplotOverlay?.[0]??-1;
-      if(index!==current&&(index>=0||contains(local.config.chart_area))){const state=snapshot();state.config.active_layer=index<0?'Base':{Subplot:index};state.config.picked_data=null;install(state);wheelArea=null;}
+    if(hasPanels()&&(panelAt(point)!==focusIndex()||focusIndex()===null)){
+      gesture.focusOnly=true;selectPanelAt(point);return;
     }
-    if(await textAnnotationAt(point))chart.set_active_layer(JSON.stringify('Annotations'));
     if(kind){
+      if(await textAnnotationAt(point))chart.set_active_layer(JSON.stringify('Annotations'));
       gesture.handle=selected?chart.resize_handle(selected,x,y):null;
       gesture.target=gesture.handle?selected:chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
       selected=gesture.target;
       if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
     }else{
-      const hit=chart.hit_test(x,y);selected=hostTarget(hit);stats.last_pointer_hit=hit;
-      const area=bounds(),inside=x>=area[0]&&x<=area[0]+area[2]&&y>=area[1]&&y<=area[1]+area[3];
-      gesture.pan=(hit===elementName('data_area')||(hit===null&&inside))&&!root.querySelector('[data-area]').checked;
-      stats.last_pointer_pan=gesture.pan;
-      if((hit===null||gesture.pan)){chart.on_press(-100,-100);chart.on_release();const picked=await chart.pick_data(x,y,6);const identity=picked?JSON.parse(picked):null;const ref=identity?Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px')):null;
-        const old=JSON.parse(chart.get_config()).picked_data?.refs?.[0];const same=ref&&JSON.stringify(ref)===JSON.stringify(old);
-        selected=same?null:identity?.series_id??null;chart.set_picked_data(JSON.stringify(!same&&ref?{refs:[ref]}:null));
-      }else{chart.set_picked_data('null');chart.on_press(x,y);}
+      // Keep existing resize handles before probing other axis owners.
+      if(selectedHandleAt(point)){chart.on_press(x,y);dirty=true;return;}
+      const index=panelIndex(local.config.active_layer);
+      const annotations=local.config.annotations;
+      let annotation=null;
+      if(index===0&&annotations?.visible!==false&&annotations?.items?.length){await annotationGeometry();const at=chart.hit_annotation(x,y);if(at!==undefined&&at!==null)annotation=at;}
+      const hit=annotation===null?decorationAt(point,index):{layer:'Annotations',target:`annotation_${annotation}`};
+      const probeState=snapshot();probeState.config.active_layer=baseLayer(index);
+      // The base data rectangle is shared by all secondary Y axes.
+      const original=JSON.parse(chart.active_layer());chart.set_active_layer(JSON.stringify(baseLayer(index)));
+      const area=JSON.parse(chart.decoration_bounds(elementName('data_area',probeState)))?.rect??panelRect(index);chart.set_active_layer(JSON.stringify(original));
+      const inside=inRect(point,area);
+      gesture.pan=annotation===null&&(!hit||hit.target.endsWith('data_area'))&&inside&&!root.querySelector('[data-area]').checked;
+      stats.last_pointer_hit=hit?.target??null;stats.last_pointer_pan=gesture.pan;
+      if(gesture.pan){
+        chart.on_press(-100,-100);chart.on_release();const picked=await pickPanelData(point,index,e.altKey);
+        const old=JSON.parse(chart.get_config()).picked_data?.refs?.[0],same=!e.altKey&&picked&&JSON.stringify(picked.ref)===JSON.stringify(old);
+        if(picked)setPointerLayer(picked.layer);
+        selected=same?null:picked?.ref.series_id??null;
+        chart.set_picked_data(JSON.stringify(!same&&picked?{refs:[picked.ref]}:null));
+      }else{
+        chart.set_picked_data('null');if(hit)setPointerLayer(hit.layer);
+        selected=hostTarget(hit?.target??null);chart.on_press(x,y);
+      }
     }
     dirty=true;properties();
   });});
-  canvas.addEventListener('pointermove',e=>{if(!chart)return;const next=localPoint(e);hoverPoint=next;if(drawingGesture){drawingGesture.end=next;previewDrawing();return;}if(!pointer)return;const gesture=pointer;inputAt=performance.now();enqueue(()=>{
+  canvas.addEventListener('pointermove',e=>{if(!chart)return;const next=localPoint(e);hoverPoint=next;if(drawingGesture){const g=drawingGesture,r=/^[hv]/.test(g.tool)?g.area:g.panel;g.end=r?[Math.max(r[0],Math.min(r[0]+r[2],next[0])),Math.max(r[1],Math.min(r[1]+r[3],next[1]))]:next;previewDrawing();return;}if(!pointer)return;const gesture=pointer,nextSize=[canvas.width,canvas.height];inputAt=performance.now();enqueue(()=>{
+    if(gesture.focusOnly)return;
+    if(!kind){next[0]*=canvas.width/nextSize[0];next[1]*=canvas.height/nextSize[1];const oldSize=gesture.size??nextSize;gesture.point=gesture.point.map((v,i)=>v*(i?canvas.height:canvas.width)/oldSize[i]);gesture.origin=gesture.origin.map((v,i)=>v*(i?canvas.height:canvas.width)/oldSize[i]);gesture.size=[canvas.width,canvas.height];}
     const distance=Math.hypot(next[0]-gesture.origin[0],next[1]-gesture.origin[1]);if(distance>=3)gesture.moved=true;
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
     if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
-    else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;for(const k of ['bottom_x','top_x'])navigate(configOf(s)[k],1,.5,-(next[0]-old[0])/r[2]);for(const k of ['left_y','right_y'])navigate(configOf(s)[k],1,.5,(next[1]-old[1])/r[3]);install(s);}}
+    else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;navigateDocumentAxis(s,'x',1,.5,-(next[0]-old[0])/r[2]);navigateDocumentAxis(s,'y',1,.5,(next[1]-old[1])/r[3]);install(s);}}
     else chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
   });});
-  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
+  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(gesture.focusOnly)return;if(!kind)chart.on_release();if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
+  root.querySelector('.figgy-stage').addEventListener('pointerdown',e=>{if(e.target===e.currentTarget&&hasPanels())enqueue(()=>selectPanelAt([-100,-100]));});
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
   canvas.addEventListener('wheel',e=>{
     if(inlineText){e.preventDefault();return;}
@@ -732,14 +827,15 @@ export function render({model,el}) {
         state[kind].value_range=range.map(v=>pivot+(v-pivot)*factor);install(state);commit();
       });return;
     }
-    if(!chart||kind||!wheelArea)return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX;enqueue(()=>{
+    if(!chart||kind||!wheelArea||(hasPanels()&&focusIndex()===null))return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX,pointSize=[canvas.width,canvas.height];enqueue(()=>{
+    point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];
     const s=snapshot(),r=bounds(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
-    if(!shift||ctrl)for(const key of ['bottom_x','top_x'])navigate(s.config[key],factor,x);
-    if(!ctrl||shift)for(const key of ['left_y','right_y'])navigate(s.config[key],factor,y);
+    if(!shift||ctrl)navigateDocumentAxis(s,'x',factor,x);
+    if(!ctrl||shift)navigateDocumentAxis(s,'y',factor,y);
     install(s);commit();
   });},{passive:false});
   canvas.addEventListener('keydown',e=>{if(!chart)return;if(e.key==='F11'){e.preventDefault();fullscreen().catch(fail);return;}if(drawingTool!=='select')return;if((e.key==='Delete'||e.key==='Backspace')&&selected&&(selected.startsWith('annotation:')||/^annotation_\d+$/.test(selected))){e.preventDefault();enqueue(()=>{const s=snapshot(),owner=kind?s[kind]:s.config,index=kind?Number(selected.slice(11)):owner.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)owner.annotations.items.splice(index,1);if(kind)owner.decorations.selected=null;selected=null;install(s);commit();});return;}if(e.key!=='Escape'&&!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?10:1;enqueue(()=>{
-    if(e.key==='Escape'){selected=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}
+    if(e.key==='Escape'){selected=null;focusedPanel=null;observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}
     else{const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0,dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
       if(kind){if(selected&&!selected.startsWith('slice_')&&!local[kind].series?.some(s=>s.id===selected))chart.drag(selected,dx,dy,undefined);else if(dx!==0)chart.step_selection(dx<0);}
       else{const cfg=JSON.parse(chart.get_config());if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected?.startsWith('annotation:')){const index=local.config.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)chart.drag_annotation(index,dx,dy,undefined);}else if(selected){const b=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx,dy);chart.on_release();}}}
@@ -792,10 +888,10 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);drawingUI();
-    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
+    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{if(kind)return JSON.parse(chart.decorations());await waitForFrame();resizeSurface();if(dirty)await readyDisplayedFrame();return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('blur',blurDrawing);disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

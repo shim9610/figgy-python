@@ -6,6 +6,8 @@ pub const INSPECTOR_WIDTH: f32 = 320.;
 
 pub(crate) struct Editor {
     pub inspector_open: bool,
+    pub selection_hint: String,
+    pub panel_focused: bool,
     pub(super) drawing: crate::drawing::Drawing,
     pub(super) delete_annotation: bool,
     pub(super) inline_text: Option<crate::drawing::InlineText>,
@@ -27,6 +29,8 @@ impl Default for Editor {
     fn default() -> Self {
         Self {
             inspector_open: false,
+            selection_hint: String::new(),
+            panel_focused: true,
             drawing: Default::default(),
             delete_annotation: false,
             inline_text: None,
@@ -442,6 +446,8 @@ impl Editor {
                     self.error.as_str()
                 } else if !self.notice.is_empty() {
                     self.notice.as_str()
+                } else if !self.selection_hint.is_empty() {
+                    self.selection_hint.as_str()
                 } else {
                     "Click an element to edit  ·  Esc: Clear selection  ·  Arrows: Move selection  ·  F11: Full screen"
                 };

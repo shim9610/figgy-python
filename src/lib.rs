@@ -1686,6 +1686,7 @@ mod drawing;
 mod editor;
 mod gpu;
 mod identity;
+mod interaction;
 mod navigation;
 mod notebook;
 use identity::{validate_columns, validate_identity};

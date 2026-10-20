@@ -52,6 +52,14 @@ impl Drawing {
         self.gesture = None;
     }
     pub fn begin(&mut self, space: PixelSpace, point: [f32; 2]) {
+        let panel = space.panel;
+        if point[0] < panel.x
+            || point[0] >= panel.x + panel.width
+            || point[1] < panel.y
+            || point[1] >= panel.y + panel.height
+        {
+            return;
+        }
         let p = space.plot;
         if self.tool.axis().is_some()
             && (point[0] < p.x
@@ -65,14 +73,16 @@ impl Drawing {
     }
     pub fn update(&mut self, point: [f32; 2]) {
         if let Some((space, _, end)) = &mut self.gesture {
-            let p = space.plot;
-            *end = if self.tool.axis().is_some() {
+            let p = if self.tool.axis().is_some() {
+                space.plot
+            } else {
+                space.panel
+            };
+            *end = {
                 [
                     point[0].clamp(p.x, p.x + p.width),
                     point[1].clamp(p.y, p.y + p.height),
                 ]
-            } else {
-                point
             };
         }
     }
@@ -414,10 +424,7 @@ impl editor::Editor {
                 _ => ([false, false], false, true),
             }
         } else {
-            let owner = matches!(
-                config.active_layer(),
-                renderer::LayerRef::Base | renderer::LayerRef::Annotations
-            );
+            let owner = interaction::panel_index(config.active_layer()) == 0 && self.panel_focused;
             ([config.polar.is_none(); 2], config.polar.is_none(), owner)
         };
         if !owner || !self.drawing.tool.allowed(axes) {
@@ -426,11 +433,15 @@ impl editor::Editor {
         if !data {
             self.drawing.data_anchor = false;
         }
+        let unavailable = format!(
+            "Annotations are available on “{}”. Select that chart to draw.",
+            interaction::panel_label(config, c.data.identity.as_ref(), 0)
+        );
         egui::Panel::top("drawing_tools").show(root,|ui| {
             egui::ScrollArea::horizontal().show(ui,|ui| {ui.horizontal(|ui| {
                 for (tool,label) in [(Tool::Select,"Select"),(Tool::Text,"Text"),(Tool::Arrow,"Arrow"),(Tool::HLine,"H line"),(Tool::VLine,"V line"),(Tool::HSpan,"H band"),(Tool::VSpan,"V band")] {
                     let enabled=tool==Tool::Select || owner&&tool.allowed(axes);
-                    let response=ui.add_enabled(enabled,egui::Button::selectable(self.drawing.tool==tool,label)).on_disabled_hover_text(if !owner {"Annotations belong to the root panel; select that panel first."}else{"This chart has no numeric value axis in this direction."});
+                    let response=ui.add_enabled(enabled,egui::Button::selectable(self.drawing.tool==tool,label)).on_disabled_hover_text(if !owner {unavailable.as_str()}else{"This chart has no numeric value axis in this direction."});
                     self.controls.insert(format!("draw_{}",tool.name()),response.rect);
                     if response.clicked() {
                         self.drawing.cancel();self.drawing.tool=tool;self.edit_area=false;
@@ -439,7 +450,7 @@ impl editor::Editor {
                 }
                 let r=ui.add_enabled(data&&owner,egui::Checkbox::new(&mut self.drawing.data_anchor,"Follow data"));self.controls.insert("draw_data_anchor".into(),r.rect);
             });});
-            ui.weak(if !owner {"Select the root panel to draw annotations."}else if self.drawing.tool==Tool::Text {"Click and type. Enter: apply. Esc: cancel."}else if self.drawing.tool==Tool::Select {"Double-click text to edit it. Drag annotations to move them."}else {"Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges."});
+            ui.weak(if !owner {unavailable.as_str()}else if self.drawing.tool==Tool::Text {"Click and type. Enter: apply. Esc: cancel."}else if self.drawing.tool==Tool::Select {"Double-click text to edit it. Drag annotations to move them."}else {"Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges."});
         });
         if root.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.drawing.cancel();

@@ -69,6 +69,7 @@ struct SurfaceWindow {
     last_scale: f32,
     last_pool_generation: u32,
     selected: Option<String>,
+    panel_focus: interaction::Focus,
     rendered_selection: Option<String>,
     handle: Option<String>,
     dragging: bool,
@@ -187,6 +188,7 @@ impl SurfaceWindow {
             last_scale: 0.,
             last_pool_generation: 0,
             selected: None,
+            panel_focus: Default::default(),
             rendered_selection: None,
             handle: None,
             dragging: false,
@@ -242,8 +244,9 @@ impl SurfaceWindow {
         let dpr = self.ctx.pixels_per_point();
         let width = (stage.width() * dpr).round().max(1.) as u32;
         let height = (stage.height() * dpr).round().max(1.) as u32;
-        let (_, mut panel, scale) =
-            renderer::display_config_for_surface(c.data.chart.config(), (width, height));
+        let document = c.data.chart.config().document_area();
+        let (scale, mut panel) =
+            renderer::fit_display_panel((document.width, document.height), (width, height));
         // Keep the document aspect ratio, including the fitted letterbox.
         panel.x += (stage.min.x * dpr).round().max(0.) as u32;
         panel.y += (stage.min.y * dpr).round().max(0.) as u32;
@@ -370,6 +373,8 @@ impl SurfaceWindow {
             return Ok(());
         }
         if *key == NamedKey::Escape {
+            self.panel_focus
+                .select(c.data.chart.config(), c.data.identity.as_ref(), None);
             self.selected = None;
             self.handle = None;
             self.dragging = false;
@@ -454,9 +459,48 @@ impl SurfaceWindow {
             self.window.request_redraw();
             return Ok(());
         }
-        let (mut display, panel, scale) = self.display(&c);
+        let (display, panel, scale) = self.display(&c);
         self.panel = panel;
         self.scale = scale;
+        if !display.subplots.is_empty() {
+            if matches!(
+                event,
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button: MouseButton::Left,
+                    ..
+                }
+            ) {
+                let at = interaction::panel_at(&display, self.cursor);
+                if at != self.panel_focus.index(&display, c.data.identity.as_ref()) || at.is_none()
+                {
+                    self.selected = None;
+                    self.handle = None;
+                    self.dragging = false;
+                    self.panning = false;
+                    self.chart_pressed = false;
+                    self.last_text_click = None;
+                    self.editor.drawing.cancel();
+                    let mut cfg = c.data.chart.config().clone();
+                    if let Some(index) = at {
+                        cfg.set_active_layer(interaction::base_layer(index));
+                    }
+                    cfg.picked_data = None;
+                    cfg.picked_points = None;
+                    if cfg != *c.data.chart.config() {
+                        c.commit_config(cfg)?;
+                    }
+                    self.panel_focus
+                        .select(c.data.chart.config(), c.data.identity.as_ref(), at);
+                    self.last_revision = u64::MAX;
+                    self.window.request_redraw();
+                    return Ok(());
+                }
+            }
+            if matches!(event, WindowEvent::MouseWheel { .. }) && self.panel_focus.id.is_none() {
+                return Ok(());
+            }
+        }
         if self.editor.drawing.tool != crate::drawing::Tool::Select {
             match event {
                 WindowEvent::MouseInput {
@@ -626,36 +670,6 @@ impl SurfaceWindow {
                 } else {
                     self.last_text_click = None;
                 }
-                // Resolve the clicked panel before asking its hit map. The
-                // selected tree item and the chart share this owner route.
-                let (px, py) = self.cursor;
-                let contains = |rect: Rect| {
-                    px >= rect.x as f32
-                        && py >= rect.y as f32
-                        && px < (rect.x + rect.width) as f32
-                        && py < (rect.y + rect.height) as f32
-                };
-                let panel_at = display
-                    .subplots
-                    .iter()
-                    .position(|p| contains(p.config.chart_area.0));
-                let current = match c.data.chart.config().active_layer() {
-                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
-                        Some(i)
-                    }
-                    _ => None,
-                };
-                if panel_at != current && (panel_at.is_some() || contains(display.chart_area.0)) {
-                    let mut config = c.data.chart.config().clone();
-                    config.active_layer = panel_at
-                        .map(renderer::LayerRef::Subplot)
-                        .unwrap_or(renderer::LayerRef::Base);
-                    config.picked_data = None;
-                    config.picked_points = None;
-                    c.commit_config(config)?;
-                    self.selected = None;
-                    display = self.display(&c).0;
-                }
                 self.chart_pressed = true;
                 self.panning = false;
                 self.pan_moved = false;
@@ -687,73 +701,77 @@ impl SurfaceWindow {
                     }
                 }
                 if self.handle.is_none() {
-                    self.selected =
-                        if let Some(renderer::annotation::LayerHit::Annotation { index, .. }) =
-                            self.view.as_ref().and_then(|view| {
-                                view.hit_test_active_layer(&display, &c.data.hitmap, [x, y])
-                            })
-                        {
-                            Some(format!(
-                                "annotation:{}",
-                                c.data.chart.config().annotations.items[index].id
-                            ))
-                        } else {
-                            c.data
-                                .hitmap
-                                .hit_test(&display, &measure, x, y)
-                                .and_then(|id| c.data.hitmap.get(id))
-                                .map(|e| e.element_id())
-                        };
-                    if self
-                        .selected
-                        .as_deref()
-                        .is_some_and(|id| id.rsplit(':').next() == Some("data_area"))
-                        && !self.edit_area
-                    {
+                    let index = interaction::panel_index(c.data.chart.config().active_layer());
+                    let annotation = self
+                        .view
+                        .as_ref()
+                        .and_then(|view| {
+                            let map = view.annotation_map();
+                            map.element(map.hit_test([x, y])?).map(|e| e.index)
+                        })
+                        .filter(|_| index == 0 && display.annotations.visible);
+                    let hit = interaction::decoration_at(&display, index, (x, y));
+                    let area = interaction::panel(&display, index)
+                        .data_area()
+                        .ok()
+                        .map(|a| a.0);
+                    let inside = area.is_some_and(|area| interaction::contains(area, (x, y)));
+                    let data_hit = hit.as_ref().is_none_or(|(_, t)| t.ends_with("data_area"));
+                    if annotation.is_none() && data_hit && inside && !self.edit_area {
                         self.panning = true;
-                        c.renderer.enable_gpu_picking().map_err(runtime)?;
-                        let id = c.data.chart_id;
-                        let ticket = c
-                            .renderer
-                            .pick_chart_data(
-                                id,
-                                GpuPickRequest {
-                                    canvas_position_px: [x, y],
-                                    display_panel_px: panel,
-                                    display_scale: scale,
-                                    max_distance_px: 6.,
-                                },
-                            )
-                            .map_err(runtime)?;
-                        c.renderer.wait_idle();
-                        let picked = pollster::block_on(ticket.resolve()).map_err(runtime)?;
-                        let picked = picked.map(|p| {
-                            let mut reference = p.to_ref();
-                            gpu::local_selection(c.data.figure_id, &mut reference);
-                            reference
-                        });
-                        self.selected = picked.as_ref().map(|p| p.series_id().to_string());
+                        let picked = c.pick_panel_data(
+                            index,
+                            GpuPickRequest {
+                                canvas_position_px: [x, y],
+                                display_panel_px: panel,
+                                display_scale: scale,
+                                max_distance_px: 6.,
+                            },
+                            self.modifiers.alt_key(),
+                        )?;
                         let mut cfg = c.data.chart.config().clone();
-                        let same = picked.as_ref().is_some_and(|p| {
-                            cfg.picked_data
-                                .as_ref()
-                                .is_some_and(|s| s.refs.first() == Some(p))
-                        });
+                        let same = !self.modifiers.alt_key()
+                            && picked.as_ref().is_some_and(|(_, p)| {
+                                cfg.picked_data
+                                    .as_ref()
+                                    .is_some_and(|s| s.refs.first() == Some(p))
+                            });
+                        self.selected = if same {
+                            None
+                        } else {
+                            picked.as_ref().map(|(_, p)| p.series_id().to_owned())
+                        };
+                        if let Some((layer, _)) = &picked {
+                            cfg.set_active_layer(*layer);
+                        }
                         cfg.picked_data = if same {
                             None
                         } else {
-                            picked.map(|p| renderer::config::DataSelectionsConfig {
+                            picked.map(|(_, p)| renderer::config::DataSelectionsConfig {
                                 refs: vec![p],
                                 ..Default::default()
                             })
                         };
                         cfg.picked_points = None;
-                        if same {
-                            self.selected = None;
+                        if cfg != *c.data.chart.config() {
+                            c.commit_config(cfg)?;
                         }
-                        c.commit_config(cfg)?;
                     } else {
-                        c.clear_data_selection()?;
+                        let mut cfg = c.data.chart.config().clone();
+                        self.selected = if let Some(index) = annotation {
+                            cfg.set_active_layer(renderer::LayerRef::Annotations);
+                            Some(format!("annotation:{}", cfg.annotations.items[index].id))
+                        } else if let Some((layer, target)) = hit {
+                            cfg.set_active_layer(layer);
+                            Some(target)
+                        } else {
+                            None
+                        };
+                        cfg.picked_data = None;
+                        cfg.picked_points = None;
+                        if cfg != *c.data.chart.config() {
+                            c.commit_config(cfg)?;
+                        }
                     }
                 }
                 self.dragging = self.panning
@@ -889,12 +907,34 @@ impl SurfaceWindow {
             self.last_pick = current_pick;
         }
         let previous_selection = self.selected.clone();
-        let output = ctx.run_ui(input, |root| {
+        self.panel_focus
+            .sync(c.data.chart.config(), c.data.identity.as_ref(), false);
+        self.editor.panel_focused =
+            c.data.chart.config().subplots.is_empty() || self.panel_focus.id.is_some();
+        self.editor.selection_hint = if c.data.chart.config().subplots.is_empty() {
+            String::new()
+        } else if let Some(index) = self
+            .panel_focus
+            .index(c.data.chart.config(), c.data.identity.as_ref())
+        {
+            format!(
+                "{} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart",
+                interaction::panel_label(c.data.chart.config(), c.data.identity.as_ref(), index)
+            )
+        } else {
+            "Click a chart to select it, then click or drag inside to edit".into()
+        };
+        let mut output = ctx.run_ui(input, |root| {
             if self.settings_only {
                 self.editor.show_settings(root, &mut c);
             } else {
                 self.editor
                     .show(root, &mut c, &mut self.selected, &mut self.edit_area);
+                self.panel_focus.sync(
+                    c.data.chart.config(),
+                    c.data.identity.as_ref(),
+                    previous_selection != self.selected && self.selected.is_some(),
+                );
                 let display = self.display(&c).0;
                 let dpr = ctx.pixels_per_point();
                 let space = renderer::annotation::pixel_space_for_config(&display);
@@ -962,6 +1002,27 @@ impl SurfaceWindow {
         };
         self.panel = panel;
         self.scale = scale;
+        // Use the final stage after inspector docking/resizing, like the chart.
+        if !self.settings_only && !display.subplots.is_empty() {
+            if let Some(index) = self.panel_focus.index(&display, c.data.identity.as_ref()) {
+                let dpr = output.pixels_per_point;
+                let r = interaction::panel(&display, index).chart_area.0;
+                let rect = egui::Rect::from_min_size(
+                    egui::pos2(r.x as f32 / dpr, r.y as f32 / dpr),
+                    egui::vec2(r.width as f32 / dpr, r.height as f32 / dpr),
+                )
+                .shrink(2.);
+                output.shapes.push(egui::epaint::ClippedShape {
+                    clip_rect: self.editor.stage,
+                    shape: egui::Shape::rect_stroke(
+                        rect,
+                        3.,
+                        egui::Stroke::new(1.5, egui::Color32::from_rgb(38, 99, 173)),
+                        egui::StrokeKind::Inside,
+                    ),
+                });
+            }
+        }
         if !self.settings_only && self.view.is_none() {
             self.view = Some(
                 c.renderer
@@ -1168,7 +1229,7 @@ impl SurfaceWindow {
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
             Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
         });
-        *self.control.stats.lock().unwrap() = json!({"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        *self.control.stats.lock().unwrap() = json!({"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }

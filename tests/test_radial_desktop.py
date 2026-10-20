@@ -40,18 +40,33 @@ class Inputs:
     def info(self):
         return json.loads(self.window.info_json())
 
+    def input_frame(self, *args):
+        """Wait for the host to present an input instead of assuming a fixed delay.
+
+        Software Vulkan can take longer than the usual 100 ms under CI load;
+        sending the next gesture before a toolbar click is consumed loses input.
+        """
+        before = self.info()['surface_frames']
+        pointer = self.xdo('getmouselocation', '--shell') if args[0]=='mousemove' else None
+        self.xdo(*args)
+        if pointer is not None and pointer == self.xdo('getmouselocation', '--shell'):
+            self.pump()
+            return
+        deadline = time.monotonic()+5
+        while True:
+            self.pump()
+            if self.info()['surface_frames'] > before:
+                return
+            assert time.monotonic() < deadline, self.info()
+
     def click_rect(self, rect):
         x, y = round(rect[0]+rect[2]/2), round(rect[1]+rect[3]/2)
         # X11 may suppress same-position motion left over from an earlier window.
         # Deliver a real motion event before pressing on the new chart surface.
-        self.xdo("mousemove", "--window", self.wid, x+8, y+8)
-        self.pump()
-        self.xdo("mousemove", "--window", self.wid, x, y)
-        self.pump()
-        self.xdo("mousedown", 1)
-        self.pump()
-        self.xdo("mouseup", 1)
-        self.pump()
+        self.input_frame("mousemove", "--window", self.wid, x+8, y+8)
+        self.input_frame("mousemove", "--window", self.wid, x, y)
+        self.input_frame("mousedown", 1)
+        self.input_frame("mouseup", 1)
 
     def click(self, name):
         from object_navigation import ensure_native_control_visible

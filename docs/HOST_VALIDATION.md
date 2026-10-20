@@ -565,3 +565,32 @@ browser style pixels were not rerun at that checkpoint. Interactive browser
 radial bindings were not yet exposed then; radial windows/PNG export required
 the native backend. The current 0.3 binding supports interactive radial charts
 and browser PNG export in Jupyter as well.
+
+## Renderer 0.18 panel focus and editing regressions
+
+Draft PR #19 adds host-owned focus for multi-panel figures. The first canvas
+click selects a stable panel ID without changing plot geometry or selecting data;
+subsequent clicks resolve visible base/secondary axes and series automatically.
+A gutter click or Esc leaves the panel, and an unfocused grid ignores wheel zoom.
+Native surface placement and input bounds now cover the whole document, and its
+focus outline uses the final stage after inspector docking. Browser queued input
+coordinates follow the current canvas size. Screenshots are in the editor guide.
+
+The preceding Actions run had 428 passes and three failures: two radial text
+editing waits and one numeric precision edit. Bounded annotation maps are prepared
+synchronously by the renderer, so their reads and text hits no longer wait for a
+material GPU frame. Background acknowledgements preserve focused form drafts,
+and sidebar pointer gestures defer rebuilding controls until after the click.
+Native UI input tests wait for a processed host frame rather than assuming a
+fixed 100 ms delay; they do not retry or replay actions.
+
+The installed release wheel was checked on Linux x86_64, Python 3.12.14, Rust
+1.99.0, native llvmpipe, Xvfb/Openbox and headed Chromium 154 with SwiftShader.
+Focused real-host coverage includes both grid hosts, direct secondary-axis/data
+selection, isolated Y zoom, escape/gutter release, numeric drafts across Python
+updates, radial text edit/cancel/delete and multiline/resize/format preservation,
+and Cartesian inline text plus tree ownership/reveal. Native checks retain zero
+RGBA readbacks/PNG display transport and unchanged source upload counts.
+Workflow/assets preflight has 112 passes; formatting, locked compilation,
+JavaScript syntax and installed browser asset comparisons also pass. Full Actions
+integration results are reported by the PR checks, independently of local results.

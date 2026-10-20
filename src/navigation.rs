@@ -522,7 +522,7 @@ impl Navigator {
         let mut selected_path = vec![];
         path(nodes, layer, target, &mut selected_path);
         let signature = format!("{layer:?}/{target:?}");
-        let reveal = signature != self.last_selection;
+        let mut reveal = signature != self.last_selection;
         if reveal {
             self.last_selection = signature;
             for node in &selected_path {
@@ -543,6 +543,7 @@ impl Navigator {
             controls.insert("object_search".into(), search.rect);
             if ui.small_button("×").on_hover_text("Clear search").clicked() {
                 self.filter.clear();
+                reveal = true;
             }
         });
         let query = self.filter.to_lowercase();

@@ -71,7 +71,13 @@ def test_numeric_format_and_precision_editing_in_both_hosts(tmp_path):
             ObjectNavigator(page).choose(target)
             width_before=page.evaluate('async target=>(await '+ROOT+'.decorations())[target].rect[2]',target)
             digits=page.locator('[data-property=significant_digits]')
-            digits.fill('2');digits.press('Tab');page.evaluate(ROOT+'.flush()')
+            digits.fill('2')
+            # A Python update/comm acknowledgement must not replace a focused
+            # uncommitted form input before its normal blur/change event.
+            execute("fig.configure(config={'grid':{'show_minor_x':True}});print('updated')")
+            assert digits.input_value()=='2'
+            digits.press('Tab');page.evaluate(ROOT+'.flush()')
+            assert style(page.evaluate(ROOT+'.snapshot()'),key)['significant_digits']==2
             if target=='tick_labels_left':
                 width_after=page.evaluate('async target=>(await '+ROOT+'.decorations())[target].rect[2]',target)
                 assert width_after < width_before-10

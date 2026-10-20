@@ -6,8 +6,9 @@ Linux X11 windows using software Vulkan. Window decorations and fonts vary by
 platform; the new host has not yet been verified on Windows/macOS hardware.
 
 winit creates the OS window and handles input. egui draws the toolbar, property
-forms and popups inside that window. The upstream renderer draws the chart and
-owns its layout, picking and drag policies.
+forms and popups inside that window. Figgy owns panel focus and routes visible
+objects to their owners. The upstream renderer draws the chart and supplies
+layout, hit geometry, GPU picking and drag policies.
 
 | Component | Role |
 | --- | --- |
@@ -91,8 +92,10 @@ not create saved annotations or intermediate document revisions.
 zooming; otherwise anchors stay at a fraction of the plot area. Numeric lines
 and bands always follow their value axis. Unsupported directions are disabled:
 bar/box charts have one value axis; pie/donut, radar and polar accept ratio
-text/arrows. Annotations belong to the root panel; select it before drawing
-in a multi-panel document.
+text/arrows. Upstream annotations currently belong to the first panel. In a
+multi-panel document, the drawing palette names the supported chart and disables
+drawing elsewhere. Drawing stays inside that panel rather than creating invisible
+annotations in another grid cell.
 
 Select an annotation on the canvas or in Objects to edit its content, coordinates,
 visibility, colors and size. Arrow forms include head dimensions and stroke;
@@ -105,9 +108,20 @@ part of the same settings/replay/export document as Python-created annotations.
 
 ## Properties and layout
 
-The initial view contains the chart and toolbar, with properties closed. Click a
-chart title, axis, legend or series to open that object's form on the right.
-**Properties** also opens or closes the panel. Toolbar icons have name tooltips.
+The initial view contains the chart and toolbar, with properties closed. In a
+multi-panel figure, click a chart once to select it. A blue outline marks the
+whole selected panel, including its title and axes; the status strip names it.
+That first click does not move decorations, select data or pan. Subsequent
+clicks and drags edit inside that chart. Click another chart to switch; click a
+grid gutter or press Esc to leave it. Wheel zoom is inactive until a chart is
+selected. Single-panel figures retain immediate interaction.
+
+Click a visible title, axis, legend or series to open its form on the right.
+Secondary axes and data automatically select their owning axis, so editing a
+secondary series does not require finding its layer in a tree. Only the selected
+panel is probed, using renderer hit maps and GPU picks; source arrays stay in
+the GPU pool. **Properties** also opens or closes the sidebar. Toolbar icons
+have name tooltips.
 
 The Properties sidebar starts with an **Objects** tree. Panels contain their
 axes, titles, legend, series, secondary Y axes and annotations. Search by a
@@ -115,6 +129,13 @@ human label or object ID, expand/collapse branches, then select the object to
 edit. The path above the form shows its owner. Clicking an object in the chart
 reveals the corresponding tree item; clicking another panel routes subsequent
 edits to that panel. Object and layer selection do not use dropdowns.
+
+The same panel/axis interaction is available in Jupyter WebGPU. These actual
+host captures show a direct click on the red secondary-axis series in a 2×2 grid:
+
+![Native panel and direct series selection](images/desktop-editor-grid-direct-selection.png)
+
+![Jupyter panel and direct series selection](images/jupyter-editor-grid-direct-selection.png)
 
 Tree arrow keys move focus and expand/collapse branches; Enter selects an
 object. Chart arrow keys retain their sample-stepping/decoration-nudge meaning.

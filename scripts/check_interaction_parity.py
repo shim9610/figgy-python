@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 import subprocess
 
 NATIVE = {'src/desktop.rs', 'src/editor.rs', 'src/bounded_host.rs',
-          'src/bounded.rs', 'src/radial_host.rs', 'src/radial_editor.rs', 'src/radial.rs', 'src/selection.rs'}
+          'src/bounded.rs', 'src/interaction.rs', 'src/drawing.rs', 'src/navigation.rs', 'src/radial_host.rs', 'src/radial_editor.rs', 'src/radial.rs', 'src/selection.rs'}
 BROWSER = {'python/figgyplot/webgpu.js', 'python/figgyplot/editor.css', 'python/figgyplot/widget.py', 'src/notebook.rs'}
 SHARED = {'python/figgyplot/figure.py', 'python/figgyplot/_charts.py',
           'python/figgyplot/notebook.py', 'src/lib.rs'}
