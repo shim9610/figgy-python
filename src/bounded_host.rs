@@ -20,6 +20,19 @@ impl SurfaceWindow {
         let mut error = None;
         let output = ctx.run_ui(input, |root| {
             self.editor.show_bounded(root, c, overlay);
+            // Side-panel frame margins must not enlarge the chart when the
+            // window grows to accommodate the docked inspector.
+            if !overlay {
+                let available = self.pending_chart_width.unwrap_or_else(|| {
+                    self.config.width.saturating_sub(if self.inspector_docked {
+                        self.sidebar_pixels()
+                    } else {
+                        0
+                    })
+                });
+                self.editor.stage.max.x = self.editor.stage.min.x
+                    + (available as f32 / ctx.pixels_per_point() - 32.).max(1.);
+            }
             let (_, panel, scale) = self.display(c);
             self.panel = panel;
             self.scale = scale;

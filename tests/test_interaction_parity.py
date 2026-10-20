@@ -1319,7 +1319,9 @@ def test_bounded_value_range_wheel_and_fit_work_in_both_hosts(tmp_path, family):
             after=fig.get_settings()[kind]
             assert after['value_range'] is not None
             assert after['series']==before['series']
+            panel_before=inputs.info()['chart_panel']
             inputs.click('properties');assert 'range_min' in inputs.info()['controls']
+            assert inputs.info()['chart_panel']==panel_before
             inputs.click('fit');assert fig.get_settings()[kind]['value_range'] is None
             assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
         finally:handle.close();Inputs.pump()
@@ -1375,9 +1377,15 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
             inputs.click('draw_text');revision=fig.revision;point=native_point(inputs.info(),(330,240))
             inputs.click_rect([point[0]-1,point[1]-1,2,2]);assert len(items(fig.get_settings()))==1
             assert inputs.info()['properties_open']
-            if kind is None:assert fig.revision==revision+1
+            if kind is None:
+                assert fig.revision==revision+1
+                selection=inputs.info()['annotation_selection'];assert selection['index']==0
+                text_width=selection['rect'][2]
             inputs.click('annotation_text');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','Review this region');inputs.pump()
             assert ''.join(v['text'] for v in items(fig.get_settings())[0]['kind']['Text']['text']['segments'])=='Review this region'
+            if kind is None:
+                selection=inputs.info()['annotation_selection'];assert selection['index']==0
+                assert selection['rect'][2]>text_width*2
             if any(axes):
                 revision=fig.revision;inputs.click('draw_data_anchor');assert fig.revision==revision
             for tool in tools:
@@ -1411,8 +1419,10 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         page.wait_for_function(ROOT+f'.snapshot().{kind or "config"}.annotations.items.length===1')
         page.evaluate(ROOT+'.flush()')
         page.wait_for_function("document.activeElement?.dataset.property==='text'")
+        text_width=page.evaluate(ROOT+'.annotations()')[0]['rect'][2]
         text=page.locator('[data-property=text]');text.fill('Review this region');text.dispatch_event('change');page.evaluate(ROOT+'.flush()')
         assert ''.join(v['text'] for v in items(page.evaluate(ROOT+'.snapshot()'))[0]['kind']['Text']['text']['segments'])=='Review this region'
+        page.wait_for_function('async width=>(await '+ROOT+'.annotations())[0].rect[2]>width*2',arg=text_width)
         if any(axes):page.locator('[data-anchor-data]').check()
         for tool in tools:
             page.locator(f'[data-tool={tool}]').click();r=page.locator('canvas').bounding_box();count=len(items(page.evaluate(ROOT+'.snapshot()')))

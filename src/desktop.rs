@@ -878,7 +878,7 @@ impl SurfaceWindow {
                 || self.last_pool_generation != c.renderer.pool().generation()
                 || self.last_panel != Some(panel))
         {
-            let mut boxes = self
+            let boxes = self
                 .selected
                 .as_deref()
                 .and_then(|t| c.element(t).ok())
@@ -891,18 +891,10 @@ impl SurfaceWindow {
                 })
                 .into_iter()
                 .collect::<Vec<_>>();
-            if let Some(target) = self.selected.as_deref()
-                && target.starts_with("annotation:")
-            {
-                if let Ok(index) = c.annotation_index(target) {
-                    if let Some(view) = self.view.as_ref()
-                        && let Some(id) = view.annotation_map().find(index)
-                        && let Some(bounds) = view.annotation_map().selection_box(id)
-                    {
-                        boxes.push(bounds);
-                    }
-                }
-            }
+            let annotation_selected = self
+                .selected
+                .as_deref()
+                .and_then(|target| c.annotation_index(target).ok());
             c.renderer
                 .refresh_axis_with_selection(
                     self.view.as_mut().unwrap(),
@@ -911,6 +903,18 @@ impl SurfaceWindow {
                     &boxes,
                 )
                 .map_err(runtime)?;
+            // Let the renderer draw the selection from the current annotation
+            // raster. A box taken from the previous view is stale after an edit.
+            if self.view.as_ref().unwrap().annotation_selected() != annotation_selected {
+                c.renderer
+                    .refresh_annotations(
+                        self.view.as_mut().unwrap(),
+                        &Chart::new(display.clone()),
+                        display.chart_area.0,
+                        annotation_selected,
+                    )
+                    .map_err(runtime)?;
+            }
             let specs = c.gpu_series(&c.data.series);
             self.styles = specs
                 .iter()
@@ -1062,7 +1066,11 @@ impl SurfaceWindow {
                     })
             })
             .collect::<serde_json::Map<_, _>>();
-        *self.control.stats.lock().unwrap() = json!({"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        let annotation_selection=self.view.as_ref().and_then(|view|{
+            let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
+            Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
+        });
+        *self.control.stats.lock().unwrap() = json!({"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }

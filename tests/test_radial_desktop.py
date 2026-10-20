@@ -95,9 +95,16 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         inputs.click("radial_material_Wood")
         assert fig.get_settings()["radial"]["style"]["material"] == "Wood"
         inputs.click("copy")
-        copied = subprocess.check_output(
-            ["xclip", "-selection", "clipboard", "-o", "-t", "UTF8_STRING"], text=True)
-        assert copied == fig.to_code() and "configure_radial" in copied
+        # X11 clipboard ownership is asynchronous, especially when previous
+        # windows in the same process have just closed. Wait for this copy.
+        expected=fig.to_code();deadline=time.monotonic()+3
+        while True:
+            result=subprocess.run(["xclip","-selection","clipboard","-o","-t","UTF8_STRING"],capture_output=True,text=True,timeout=3)
+            copied=result.stdout
+            if result.returncode==0 and copied==expected:break
+            assert time.monotonic()<deadline,(result.returncode,result.stderr,copied)
+            inputs.pump()
+        assert copied == expected and "configure_radial" in copied
         assert "'value':" not in copied
         subprocess.run(["wmctrl", "-ir", inputs.wid, "-b", "add,maximized_vert,maximized_horz"], check=True)
         inputs.pump()
