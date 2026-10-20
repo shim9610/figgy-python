@@ -15,6 +15,10 @@
 
 ## Validation and performance
 
+The [renderer 0.18 integration design](RENDERER_018_INTEGRATION_DESIGN.md)
+records the proposed document, identity and host contracts for the new feature
+integration. It describes planned APIs, not additional released functionality.
+
 | Record | Environment and scope |
 | --- | --- |
 | [Host validation](HOST_VALIDATION.md) | Installed packages, native input and notebook checks by checkpoint |

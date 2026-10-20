@@ -43,7 +43,8 @@ jobs:
     name: PR / Linux integration
     needs: preflight
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Baseline setup/build, priority checks and the full UI suite exceed 30m.
+    timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: '4'
       WGPU_BACKEND: vulkan
