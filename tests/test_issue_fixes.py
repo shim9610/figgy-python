@@ -81,7 +81,10 @@ def test_grayscale_colorbar_has_no_interior_brightness_reversals(plot):
     ax.imshow(np.tile(np.linspace(0, 1, 64), (8, 1)), cmap="gray", vmin=0, vmax=1, id="z")
     x, y, width, height = json.loads(fig._native.bounds_json("colorbar"))["rect"]
     pixels = fig.render_rgba()
-    strip = pixels[int(y)+3:int(y+height)-3, round(x+width/2), :3].astype(int)
+    # Exclude the antialiased frame at the ends; the reported discontinuities
+    # were inside the ramp, around one-third and two-thirds of its height.
+    inset = max(6, round(height * .05))
+    strip = pixels[int(y)+inset:int(y+height)-inset, round(x+width/2), :3].astype(int)
     brightness = strip.mean(axis=1)
     assert brightness[0] - brightness[-1] > 150
     assert np.max(np.diff(brightness)) <= 1

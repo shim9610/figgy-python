@@ -18,6 +18,29 @@ See [chart types](CHART_TYPES.md) and [desktop editing](DESKTOP_EDITOR.md) for
 current supported controls. A configured check or an earlier passing run does
 not establish the result of a later commit; inspect that commit's CI result.
 
+
+## Reported issue verification (2026-10-20)
+
+The source fixes for issues #6–#13 were already present before the renderer
+0.18 migration. They were rechecked on the migration branch with Python
+3.12.14 on Linux x86_64 and llvmpipe software Vulkan. These are source-build
+results; the published 0.2.1 wheel is unchanged.
+
+| Issue | Resolution and regression evidence |
+| --- | --- |
+| [#6](https://github.com/shim9610/figgy-python/issues/6) | Automatic range setters retain their documented tick derivation. `set_xlim_without_tick_auto` / `set_ylim_without_tick_auto` preserve explicit tick and label settings; tests cover linear/log axes on native and browser models. |
+| [#7](https://github.com/shim9610/figgy-python/issues/7) | Histogram recoloring writes `fill_color` and exports the same setting in generated Python. |
+| [#8](https://github.com/shim9610/figgy-python/issues/8) | Sketch rejects unsupported existing histograms and new unsupported series, preserving the current settings and rendered image. |
+| [#9](https://github.com/shim9610/figgy-python/issues/9) | A grayscale colorbar has no brightness reversals inside its ramp; the pixel check excludes the antialiased frame and covers the former one-third/two-thirds discontinuities. |
+| [#10](https://github.com/shim9610/figgy-python/issues/10) | Unknown font families raise `ValueError`; supported and default names remain accepted. |
+| [#11](https://github.com/shim9610/figgy-python/issues/11) | Unicode super/subscripts normalize to rich text. A Greek alpha in the Latin-only handwritten face uses fallback and renders differently from an unassigned character's missing-glyph box. |
+| [#12](https://github.com/shim9610/figgy-python/issues/12) | Multiline title helpers grow the title band; direct settings retain explicitly chosen geometry. |
+| [#13](https://github.com/shim9610/figgy-python/issues/13) | The unsupported multi-panel message uses the running package version. Multi-panel support is separate feature work. |
+
+The behavioral checks are in `tests/test_issue_fixes.py`. Native/Jupyter
+interaction checks and renderer-migration coverage are recorded separately;
+these issue checks do not establish physical GPU or Windows/macOS results.
+
 ## Historical 0.2 checkpoints (2026-10-14)
 
 2026-10-14 (Asia/Seoul), based on main `294b270a2b2e6645056278b3ef035e5199a5f658`.
