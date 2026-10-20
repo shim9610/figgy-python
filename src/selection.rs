@@ -73,13 +73,33 @@ impl FigureAccess<'_> {
         let mut result = json!({"identity":reference, "series_id":series.series_id});
         match reference {
             PickedDataRef::Point { point_index, .. } => {
-                let values = self.read_samples(&[
-                    (series.x_column, *point_index),
-                    (series.y_column, *point_index),
-                ])?;
+                let style = serde_json::to_value(&series.render_type).map_err(runtime)?;
+                let style = style.as_object().unwrap().values().next().unwrap();
+                let mut samples = vec![
+                    (series.x_column.clone(), *point_index),
+                    (series.y_column.clone(), *point_index),
+                ];
+                let mut fields = vec!["x", "y"];
+                for (field, node) in [
+                    (
+                        "color_value",
+                        &style["scatter"]["point_color_map"]["column"],
+                    ),
+                    ("size_value", &style["scatter"]["point_size_map"]["column"]),
+                    ("u", &style["components"]["Points"]["u"]),
+                    ("v", &style["components"]["Points"]["v"]),
+                    ("color_value", &style["style"]["color_map"]["Column"]),
+                ] {
+                    if let Some(column) = node.as_str() {
+                        samples.push((column.to_owned(), *point_index));
+                        fields.push(field);
+                    }
+                }
+                let values = self.read_samples(&samples)?;
                 result["index"] = json!(point_index);
-                result["x"] = json!(values[0]);
-                result["y"] = json!(values[1]);
+                for (field, value) in fields.into_iter().zip(values) {
+                    result[field] = json!(value);
+                }
             }
             PickedDataRef::HistogramBin { bin_index, .. } => {
                 let renderer::DataRenderType::Histogram { bar } = &series.render_type else {

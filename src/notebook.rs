@@ -2,6 +2,7 @@
 use super::*;
 #[pyclass(module = "figgyplot._native")]
 pub struct NotebookFigure {
+    identity: Option<Value>,
     background: Option<Color>,
     document: Option<bounded::DocumentChart>,
     chart: Chart,
@@ -30,6 +31,7 @@ impl NotebookFigure {
         config.top_x.out_margin = 25.;
         validate_config(&config)?;
         Ok(Self {
+            identity: None,
             background: None,
             document: None,
             chart: Chart::new(config),
@@ -48,6 +50,7 @@ impl NotebookFigure {
         self.set_document_model(match family {
             "categorical" => bounded::DocumentChart::Categorical(parse(json)?),
             "boxplot" => bounded::DocumentChart::BoxPlot(parse(json)?),
+            "radar" => bounded::DocumentChart::Radar(parse(json)?),
             _ => return Err(invalid("unknown chart family")),
         })
     }
@@ -76,6 +79,10 @@ impl NotebookFigure {
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let s: SeriesConfig = parse(json)?;
+        validate_columns(
+            std::slice::from_ref(&s),
+            &self.columns.keys().cloned().collect(),
+        )?;
         validate_model_numbers(&s, "series")?;
         if self.series.iter().any(|a| a.series_id == s.series_id) {
             return Err(invalid("series IDs must be unique"));
@@ -93,7 +100,15 @@ impl NotebookFigure {
     }
     fn settings_json(&self) -> PyResult<String> {
         serde_json::to_string(&Settings {
-            schema_version: 1,
+            schema_version: if self.identity.is_some() { 2 } else { 1 },
+            identity: self.identity.clone(),
+            radar: self.document.as_ref().and_then(|r| {
+                if let bounded::DocumentChart::Radar(c) = r {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            }),
             renderer_version: RENDERER_VERSION.into(),
             config: self.chart.config().clone(),
             series: self.series.clone(),
@@ -142,6 +157,11 @@ impl NotebookFigure {
             Ok(())
         })();
         if let Err(error) = result {
+            if let Ok(spec) = serde_json::from_str::<SeriesConfig>(json)
+                && !old_series.iter().any(|s| s.series_id == spec.series_id)
+            {
+                self.fit_extents.remove(&spec.series_id);
+            }
             self.chart = Chart::new(old_config);
             self.series = old_series;
             self.revision = revision;
@@ -150,8 +170,31 @@ impl NotebookFigure {
         self.revision = revision + 1;
         Ok(())
     }
+    fn add_series_batch(&mut self, json: &str, config: &str) -> PyResult<()> {
+        let previous_config = self.chart.config().clone();
+        let previous_series = self.series.clone();
+        let revision = self.revision;
+        let result = (|| {
+            let config = parse(config)?;
+            validate_config(&config)?;
+            self.chart = Chart::new(config);
+            for spec in parse::<Vec<SeriesConfig>>(json)? {
+                self.add_series(&serde_json::to_string(&spec).map_err(invalid)?)?;
+            }
+            self.fit(0.05)
+        })();
+        if let Err(error) = result {
+            self.chart = Chart::new(previous_config);
+            self.series = previous_series;
+            self.revision = revision;
+            return Err(error);
+        }
+        self.revision = revision + 1;
+        Ok(())
+    }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut s: Settings = parse(json)?;
+        s.config.sync_subplot_links(Some(self.chart.config()));
         if !supported_settings_version(s.schema_version, &s.renderer_version) {
             return Err(invalid("unsupported settings/renderer version"));
         }
@@ -170,6 +213,7 @@ impl NotebookFigure {
             }
         }
         validate_draw_style(&s.config, &s.series)?;
+        validate_columns(&s.series, &self.columns.keys().cloned().collect())?;
         for series in &s.series {
             validate_model_numbers(series, "series")?;
         }
@@ -183,6 +227,7 @@ impl NotebookFigure {
             ));
         }
         if s.series != self.series
+            || s.config != *self.chart.config()
             || s.config.colorbar.as_ref().map(|bar| &bar.colormap)
                 != self
                     .chart
@@ -191,21 +236,19 @@ impl NotebookFigure {
                     .as_ref()
                     .map(|bar| &bar.colormap)
         {
-            renderer::legend::update_legend_symbols_preserving_text(
-                &mut s.config.legend.content,
-                &s.series,
-                s.config.colorbar.as_ref().map(|bar| &bar.colormap),
-            );
+            identity::refresh_legends(&mut s.config, &s.series);
         }
         if s.series != self.series
             || s.config != *self.chart.config()
             || document != self.document
             || s.background != self.background
+            || s.identity != self.identity
         {
             self.document = document;
             self.chart = Chart::new(s.config);
             self.series = s.series;
             self.background = s.background;
+            self.identity = s.identity;
             self.revision += 1;
         }
         Ok(())
@@ -234,9 +277,22 @@ impl NotebookFigure {
         Ok(())
     }
     fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
+        self.log_bounds_at(
+            axis,
+            &serde_json::to_string(&self.chart.config().active_layer()).map_err(invalid)?,
+        )
+    }
+    fn log_bounds_at(&self, axis: &str, layer: &str) -> PyResult<(f64, f64)> {
+        let layer = parse(layer)?;
+        let selected: Vec<_> = self
+            .series
+            .iter()
+            .filter(|s| identity::fit_member(self.chart.config(), &s.series_id, axis, layer))
+            .cloned()
+            .collect();
         let mut extra = renderer::chart::FitExtent::EMPTY;
         if matches!(axis, "x" | "y") {
-            for series in &self.series {
+            for series in &selected {
                 if !matches!(
                     series.render_type,
                     renderer::DataRenderType::ScatterErrorbarX { .. }
@@ -253,7 +309,7 @@ impl NotebookFigure {
                 }
             }
         }
-        positive_data_bounds(axis, &self.series, extra, |id| {
+        positive_data_bounds(axis, &selected, extra, |id| {
             self.columns
                 .get(id)
                 .copied()
@@ -261,11 +317,16 @@ impl NotebookFigure {
         })
     }
     fn fit(&mut self, padding: f64) -> PyResult<()> {
+        self.fit_domain(padding, false)
+    }
+    fn fit_active(&mut self, padding: f64) -> PyResult<()> {
+        self.fit_domain(padding, true)
+    }
+    fn fit_domain(&mut self, padding: f64, active_only: bool) -> PyResult<()> {
         if !padding.is_finite() || padding < 0. {
             return Err(invalid("padding must be finite and non-negative"));
         }
-        let mut x = renderer::chart::FitExtent::EMPTY;
-        let mut y = x;
+        let mut extents = Vec::new();
         for s in &self.series {
             let [mut a, mut b] = self
                 .fit_extents
@@ -303,14 +364,17 @@ impl NotebookFigure {
                     a.union(&base);
                 }
             }
-            x.union(&a);
-            y.union(&b);
+            extents.push([a, b]);
         }
-        let mut fitted = Chart::new(self.chart.config().clone());
-        fitted.auto_fit_x_extent(&x, padding);
-        fitted.auto_fit_y_extent(&y, padding);
-        validate_config(fitted.config())?;
-        self.chart = fitted;
+        let fitted = document_fit::fit(
+            self.chart.config(),
+            &self.series,
+            &extents,
+            padding,
+            active_only,
+        );
+        validate_config(&fitted)?;
+        self.chart = Chart::new(fitted);
         self.revision += 1;
         Ok(())
     }
@@ -318,24 +382,13 @@ impl NotebookFigure {
         if !min.is_finite() || !max.is_finite() || min >= max {
             return Err(invalid("range must be finite and increasing"));
         }
-        let mut next = Chart::new(self.chart.config().clone());
-        match axis {
-            "x" => {
-                next.set_x_range(min, max);
-            }
-            "y" => {
-                next.set_y_range(min, max);
-            }
-            _ => return Err(invalid("axis must be x or y")),
-        };
-        validate_config(next.config())?;
-        self.chart = next;
+        let next = document_fit::set_range(self.chart.config(), axis, min, max)?;
+        validate_config(&next)?;
+        self.chart = Chart::new(next);
         self.revision += 1;
         Ok(())
     }
-    fn clear_data_selection(&mut self) {
-        self.chart.config_mut().picked_data = None;
-    }
+
     #[getter]
     fn revision(&self) -> u64 {
         self.revision
@@ -405,7 +458,12 @@ fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
 
 impl NotebookFigure {
     fn set_document_model(&mut self, document: bounded::DocumentChart) -> PyResult<()> {
-        if !self.series.is_empty() || !self.columns.is_empty() {
+        if !self.series.is_empty()
+            || !self.columns.is_empty()
+            || !self.chart.config().subplots.is_empty()
+            || !self.chart.config().overlays.is_empty()
+            || self.chart.config().polar.is_some()
+        {
             return Err(invalid("create a separate Figure for bounded charts"));
         }
         if !matches!(

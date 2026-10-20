@@ -32,9 +32,13 @@ def test_package_version_has_one_source():
     assert figgy.__version__ == version
 
 
-def test_multiple_panels_error_names_the_running_version():
-    with pytest.raises(NotImplementedError, match=re.escape(f"figgyplot {figgy.__version__}")):
-        figgy.subplots(1, 2, backend="native")
+def test_multiple_panels_have_stable_public_addresses():
+    figure, axes = figgy.subplots(1, 2, backend="native")
+    try:
+        assert axes.shape == (2,)
+        assert figure.subplots[axes[1].subplot_id].axes is axes[1]
+    finally:
+        figure.close()
 
 
 def test_bar_series_recolour_and_code_export(plot):

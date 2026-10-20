@@ -181,8 +181,9 @@ requires a usable kernel GPU and performs image transfers.
 
 ## Renderer 0.18 compatibility
 
-Native and browser settings accept schema 1 documents stamped with renderer
-0.17.0 or 0.18.0; new snapshots are stamped 0.18.0. Other versions are rejected
+Native and browser settings migrate schema 1 documents stamped with renderer
+0.17.0 or 0.18.0; new snapshots use schema 2 and renderer 0.18.0, with stable
+document identities and grid metadata. Other versions are rejected
 without changing the Figure. Existing stored geometry is preserved. New
 colorbars adopt upstream's 8 px gap (previously 24 px); set `gap_px=24` through
 settings to retain the earlier spacing. The hosts keep their explicit 25 px
@@ -190,9 +191,10 @@ right-axis margin. Heatmap legend symbols now use the chart colormap and
 refresh when it changes, preserving label text.
 
 This migration keeps the existing single-panel Python API and manual editing
-workflow. The renderer's new chart constructors, panels and layer editing are
-tracked separately in [feature integration](https://github.com/shim9610/figgy-python/issues/16)
-and [editor coverage](https://github.com/shim9610/figgy-python/issues/17).
+workflow. See [renderer 0.18 features](RENDERER_018_FEATURES.md) for new
+constructors, ID-addressed panels, layers, annotations and complete-document
+export/replay. Comprehensive editor control coverage remains
+[issue #17](https://github.com/shim9610/figgy-python/issues/17).
 
 ## Assets and builds
 

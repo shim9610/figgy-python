@@ -146,6 +146,24 @@ impl Editor {
                         }
                     }
 
+                    let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                    if !chart.annotations().items.is_empty() {
+                        let mut annotations =
+                            chart.active_layer() == renderer::LayerRef::Annotations;
+                        let response = ui.checkbox(&mut annotations, "Annotations");
+                        self.controls
+                            .insert("annotation_layer".into(), response.rect);
+                        if response.changed() {
+                            chart.set_active_layer(if annotations {
+                                renderer::LayerRef::Annotations
+                            } else {
+                                renderer::LayerRef::Base
+                            });
+                            if let Err(error) = c.set_document(chart) {
+                                self.error = error.to_string();
+                            }
+                        }
+                    }
                     let advanced = ui.button("Advanced settings…");
                     self.controls.insert("advanced".into(), advanced.rect);
                     if advanced.clicked() {
@@ -255,6 +273,7 @@ impl Editor {
             crate::bounded::DocumentChart::BoxPlot(v) => {
                 ("boxplot", serde_json::to_value(v).unwrap())
             }
+            crate::bounded::DocumentChart::Radar(v) => ("radar", serde_json::to_value(v).unwrap()),
             _ => unreachable!(),
         };
         ui.heading(if family == "categorical" {
@@ -263,7 +282,10 @@ impl Editor {
             "Box plot"
         });
         let mut changed = false;
-        for key in ["title", "category_title", "value_title"] {
+        for key in ["title", "category_title", "value_title"]
+            .into_iter()
+            .filter(|key| family != "radar" || *key == "title")
+        {
             ui.label(key.replace('_', " "));
             let mut text = value[key].as_str().unwrap().to_owned();
             let response = ui.text_edit_singleline(&mut text);
@@ -271,6 +293,10 @@ impl Editor {
                 .insert(format!("bounded_{key}"), response.rect);
             if response.changed() {
                 value[key] = json!(text);
+                if key == "title" && value["chart_title"].is_object() {
+                    value["chart_title"]["text"]["segments"] =
+                        json!(renderer::text::rich_segments_from_text(&text));
+                }
                 changed = true;
             }
         }
@@ -288,14 +314,16 @@ impl Editor {
                 .as_array()
                 .unwrap()
                 .iter()
-                .position(|v| v["id"] == selected["category_id"])
-                .unwrap();
-            let category = &mut value["categories"][index];
-            let mut label = category["label"].as_str().unwrap().to_owned();
-            ui.label("Category label");
-            if ui.text_edit_singleline(&mut label).changed() {
-                category["label"] = json!(label);
-                changed = true;
+                .position(|v| selected.get("category_id").is_some_and(|id| &v["id"] == id));
+            let index = index.unwrap_or(0);
+            if selected.contains_key("category_id") {
+                let category = &mut value["categories"][index];
+                let mut label = category["label"].as_str().unwrap().to_owned();
+                ui.label("Category label");
+                if ui.text_edit_singleline(&mut label).changed() {
+                    category["label"] = json!(label);
+                    changed = true;
+                }
             }
             let series = value["series"]
                 .as_array_mut()
@@ -318,7 +346,9 @@ impl Editor {
                 series["color"] = json!(Color::new(rgb[0], rgb[1], rgb[2], 1.));
                 changed = true;
             }
-            if family == "categorical" {
+            if family == "categorical"
+                || (family == "radar" && selected.contains_key("category_id"))
+            {
                 let mut v = series["values"][index].as_f64().unwrap();
                 ui.label("Value");
                 if ui.add(egui::DragValue::new(&mut v).speed(0.1)).changed() {
@@ -360,7 +390,12 @@ impl Editor {
         ui.label("Title");
         let title = ui.text_edit_singleline(&mut chart.title);
         self.controls.insert("radial_title".into(), title.rect);
-        changed |= title.changed();
+        if title.changed() {
+            if let Some(option) = chart.chart_title.as_mut() {
+                option.text.segments = renderer::text::rich_segments_from_text(&chart.title);
+            }
+            changed = true;
+        }
         let mut donut = matches!(chart.kind, RadialKind::Donut { .. });
         if ui.checkbox(&mut donut, "Donut").changed() {
             chart.kind = if donut {

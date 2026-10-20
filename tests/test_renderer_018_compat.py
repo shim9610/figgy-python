@@ -29,7 +29,7 @@ def test_previous_settings_preserve_edits_and_reject_unknown_versions(backend, k
         expected = dict(saved, renderer_version='0.18.0')
         assert current == expected
         revision = figure.revision
-        for key, value in [('renderer_version', '0.19.0'), ('schema_version', 2)]:
+        for key, value in [('renderer_version', '0.19.0'), ('schema_version', 3)]:
             invalid = dict(saved, **{key: value})
             with pytest.raises(ValueError, match='version'):
                 figure.apply_settings(invalid)

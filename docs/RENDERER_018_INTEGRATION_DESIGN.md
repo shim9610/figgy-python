@@ -1,8 +1,11 @@
 # Renderer 0.18 Python integration design
 
 Status: implementation design for issue #16 in draft PR #19, incorporating
-architecture review feedback. Public API names and the extended settings schema
-below are proposed contracts, not implemented APIs.
+architecture review feedback. The ordinary plotting implementation is described
+in [the feature guide](RENDERER_018_FEATURES.md); local validation is recorded
+in [host verification](HOST_VALIDATION.md#renderer-018-feature-integration-2026-10-20).
+Review-session APIs, the feedback protocol and binary recovery cache remain
+design requirements for #18 and are not implemented in this PR.
 Compatibility work for #15 is the existing implementation baseline.
 
 ## Scope and existing constraints
@@ -21,13 +24,13 @@ Reuse the pinned upstream model and public renderer APIs. Preserve resident GPU
 data, binary notebook transfers and existing source-array lifetime guarantees.
 Do not add a second chart engine, permanent native CPU data copies or streaming.
 
-The current implementation has one `Axes(self)` per Figure. Axes setters mutate
-the root configuration, `subplots` rejects multiple panels, settings-to-code
-starts from `fig.axes[0]`, and one scaled export path calls a panel-only exporter.
-The existing settings schema carries renderer settings but no persistent host
-identities for panels or overlays. These assumptions must be removed together.
+Before this integration, each Figure had one `Axes(self)`. Axes setters mutated
+the root configuration, `subplots` rejected multiple panels, settings-to-code
+started from `fig.axes[0]`, and one scaled export path called a panel-only exporter.
+Schema 1 carried renderer settings without persistent host identities for panels
+or overlays. The integration replaces these assumptions together.
 
-## Recommended decisions
+## Accepted decisions
 
 ### 1. Figure owns subplots; subplots own their local axes
 
@@ -162,6 +165,14 @@ scale and viewport resizing.
 
 Reason: merely looping over existing single-panel paths can clip the canvas,
 misroute input or erase the GPU residency/cache improvements of 0.18.
+
+The 0.18 registry validates mapped series against the root colorbar before
+expanding subplots. When only a child has a colorbar, both hosts derive an
+invisible root validation context from it at the GPU/WASM boundary. The context
+is excluded from saved settings; the child's colorbar remains authoritative.
+Config-only browser edits retain the registered series so resident body caches
+remain usable. The root-polar registry restriction on non-polar series is guarded
+explicitly, as documented in the feature guide.
 
 ### 6. Separate manual mutations from turn-based review approval
 

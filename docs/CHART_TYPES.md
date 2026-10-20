@@ -46,9 +46,10 @@ and defaults to `inner_radius=0.5`. The stateful `figgy.pyplot.pie()` and
 
 Setting a material leaves the chosen camera/depth unchanged. A top-down flat
 chart remains flat until tilt and depth are explicitly set. Zero-valued slices
-retain their original indices but have no visible surface/label. Font size is
-shared by radial annotations; Python point values are converted at the Figure's
-DPI. The bounded model requires a canvas of at least 160×160 logical pixels.
+retain their original indices but have no visible surface/label. Data-label font
+size remains chart-wide; `ax.set_title` now owns independent rich title styling.
+Python point values are converted at the Figure's DPI. The bounded model requires
+a canvas of at least 160×160 logical pixels.
 Its shared annotation size is 8–64 renderer pixels; use export scaling for
 higher-resolution output without increasing the logical font size.
 Export scale is 0.5–4, subject to the device's texture limit.

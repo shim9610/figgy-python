@@ -141,6 +141,10 @@ class FigureWidget(anywidget.AnyWidget):
             self._ready_event.set()
         elif action == "unmounted":
             self._clients.pop(content.get("client"), None)
+        elif action == "fit":
+            if content.get("revision") == self.figure.revision:
+                self.figure.fit()
+            self.refresh()
         elif action == "edit":
             self._handling = True
             error = ""

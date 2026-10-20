@@ -238,12 +238,12 @@ impl SurfaceWindow {
         let dpr = self.ctx.pixels_per_point();
         let width = (stage.width() * dpr).round().max(1.) as u32;
         let height = (stage.height() * dpr).round().max(1.) as u32;
-        let (mut display, mut panel, scale) =
+        let (_, mut panel, scale) =
             renderer::display_config_for_surface(c.data.chart.config(), (width, height));
         // Keep the document aspect ratio, including the fitted letterbox.
         panel.x += (stage.min.x * dpr).round().max(0.) as u32;
         panel.y += (stage.min.y * dpr).round().max(0.) as u32;
-        display.chart_area = renderer::layout::ChartArea(panel);
+        let display = renderer::place_document(c.data.chart.config(), scale, panel);
         (display, panel, scale)
     }
     fn inspector_overlay(&self) -> bool {
@@ -441,12 +441,8 @@ impl SurfaceWindow {
                         let mut cfg = c.data.chart.config().clone();
                         let dx = -(self.cursor.0 - old.0) as f64 / bounds.width.max(1.) as f64;
                         let dy = (self.cursor.1 - old.1) as f64 / bounds.height.max(1.) as f64;
-                        for axis in [&mut cfg.bottom_x, &mut cfg.top_x] {
-                            navigate_axis(axis, 1., 0.5, dx);
-                        }
-                        for axis in [&mut cfg.left_y, &mut cfg.right_y] {
-                            navigate_axis(axis, 1., 0.5, dy);
-                        }
+                        navigate_document_axis(&mut cfg, "x", 1., 0.5, dx);
+                        navigate_document_axis(&mut cfg, "y", 1., 0.5, dy);
                         c.commit_config(cfg)?;
                         self.last_input = Some(input_received);
                         self.window.request_redraw();
@@ -484,14 +480,46 @@ impl SurfaceWindow {
                     .and_then(|e| e.as_resizable())
                     .and_then(|e| e.hit_resize_handle(&display, &measure, x, y))
                     .map(|h| format!("{h:?}"));
+                if self.handle.is_none()
+                    && let Some(target) = self.selected.as_deref()
+                    && target.starts_with("annotation:")
+                {
+                    if let Ok(index) = c.annotation_index(target) {
+                        self.handle = self
+                            .view
+                            .as_ref()
+                            .and_then(|view| {
+                                view.annotation_map().find(index).and_then(|id| {
+                                    view.annotation_map().hit_resize_handle(id, [x, y])
+                                })
+                            })
+                            .map(|h| format!("{h:?}"));
+                    }
+                }
                 if self.handle.is_none() {
-                    self.selected = c
-                        .data
-                        .hitmap
-                        .hit_test(&display, &measure, x, y)
-                        .and_then(|id| c.data.hitmap.get(id))
-                        .map(|e| e.element_id());
-                    if self.selected.as_deref() == Some("data_area") && !self.edit_area {
+                    self.selected =
+                        if let Some(renderer::annotation::LayerHit::Annotation { index, .. }) =
+                            self.view.as_ref().and_then(|view| {
+                                view.hit_test_active_layer(&display, &c.data.hitmap, [x, y])
+                            })
+                        {
+                            Some(format!(
+                                "annotation:{}",
+                                c.data.chart.config().annotations.items[index].id
+                            ))
+                        } else {
+                            c.data
+                                .hitmap
+                                .hit_test(&display, &measure, x, y)
+                                .and_then(|id| c.data.hitmap.get(id))
+                                .map(|e| e.element_id())
+                        };
+                    if self
+                        .selected
+                        .as_deref()
+                        .is_some_and(|id| id.rsplit(':').next() == Some("data_area"))
+                        && !self.edit_area
+                    {
                         self.panning = true;
                         c.renderer.enable_gpu_picking().map_err(runtime)?;
                         let id = c.data.chart_id;
@@ -542,6 +570,10 @@ impl SurfaceWindow {
                     || self
                         .selected
                         .as_deref()
+                        .is_some_and(|id| id.starts_with("annotation:"))
+                    || self
+                        .selected
+                        .as_deref()
                         .and_then(|t| c.element(t).ok())
                         .and_then(|id| c.data.hitmap.get(id))
                         .is_some_and(|e| e.as_draggable().is_some());
@@ -569,7 +601,7 @@ impl SurfaceWindow {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 // Decorations and the surrounding canvas do not own plot zoom.
-                let Ok(area) = display.data_area() else {
+                let Ok(area) = active_coordinate_config(&display).data_area() else {
                     return Ok(());
                 };
                 let area = area.0;
@@ -604,14 +636,10 @@ impl SurfaceWindow {
                 let shift = self.modifiers.shift_key();
                 // Ctrl isolates X, Shift isolates Y; plain wheel zooms both.
                 if !shift || ctrl {
-                    for axis in [&mut cfg.bottom_x, &mut cfg.top_x] {
-                        navigate_axis(axis, factor, x, 0.);
-                    }
+                    navigate_document_axis(&mut cfg, "x", factor, x, 0.);
                 }
                 if !ctrl || shift {
-                    for axis in [&mut cfg.left_y, &mut cfg.right_y] {
-                        navigate_axis(axis, factor, y, 0.);
-                    }
+                    navigate_document_axis(&mut cfg, "y", factor, y, 0.);
                 }
                 c.commit_config(cfg)?;
                 self.last_input = Some(input_received);
@@ -719,7 +747,7 @@ impl SurfaceWindow {
         if !self.settings_only && self.view.is_none() {
             self.view = Some(
                 c.renderer
-                    .create_chart_view(&Chart::new(display.clone()), panel)
+                    .create_chart_view(&Chart::new(display.clone()), display.chart_area.0)
                     .map_err(runtime)?,
             );
         }
@@ -729,7 +757,7 @@ impl SurfaceWindow {
                 || self.last_pool_generation != c.renderer.pool().generation()
                 || self.last_panel != Some(panel))
         {
-            let boxes = self
+            let mut boxes = self
                 .selected
                 .as_deref()
                 .and_then(|t| c.element(t).ok())
@@ -742,11 +770,23 @@ impl SurfaceWindow {
                 })
                 .into_iter()
                 .collect::<Vec<_>>();
+            if let Some(target) = self.selected.as_deref()
+                && target.starts_with("annotation:")
+            {
+                if let Ok(index) = c.annotation_index(target) {
+                    if let Some(view) = self.view.as_ref()
+                        && let Some(id) = view.annotation_map().find(index)
+                        && let Some(bounds) = view.annotation_map().selection_box(id)
+                    {
+                        boxes.push(bounds);
+                    }
+                }
+            }
             c.renderer
                 .refresh_axis_with_selection(
                     self.view.as_mut().unwrap(),
                     &Chart::new(display.clone()),
-                    panel,
+                    display.chart_area.0,
                     &boxes,
                 )
                 .map_err(runtime)?;
@@ -1167,4 +1207,46 @@ pub fn run_events(py: Python<'_>) -> PyResult<()> {
         py.check_signals()?;
     }
     Ok(())
+}
+
+fn active_coordinate_config(config: &Config) -> Config {
+    match config.active_layer() {
+        renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+            config.subplot_config(i).unwrap_or_else(|| config.clone())
+        }
+        _ => config.clone(),
+    }
+}
+fn navigate_document_axis(
+    config: &mut Config,
+    dimension: &str,
+    factor: f64,
+    anchor: f64,
+    shift: f64,
+) {
+    let layer = config.active_layer();
+    let (panel, overlay) = match layer {
+        renderer::LayerRef::Subplot(i) => (Some(i), None),
+        renderer::LayerRef::SubplotOverlay(i, o) => (Some(i), Some(o)),
+        renderer::LayerRef::Overlay(o) => (None, Some(o)),
+        _ => (None, None),
+    };
+    let cfg = if let Some(i) = panel {
+        &mut config.subplots[i].config
+    } else {
+        config
+    };
+    if dimension == "y"
+        && let Some(o) = overlay
+    {
+        navigate_axis(&mut cfg.overlays[o].y_axis, factor, anchor, shift);
+    } else if dimension == "x" {
+        for axis in [&mut cfg.bottom_x, &mut cfg.top_x] {
+            navigate_axis(axis, factor, anchor, shift);
+        }
+    } else {
+        for axis in [&mut cfg.left_y, &mut cfg.right_y] {
+            navigate_axis(axis, factor, anchor, shift);
+        }
+    }
 }

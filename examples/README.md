@@ -14,6 +14,10 @@ python examples/edit_and_reuse.py --output output/edit-and-reuse
 
 ## Chart gallery
 
+[renderer_018.py](renderer_018.py) demonstrates ID-addressed grids, mapped points,
+vectors, reference fills, steps, secondary Y, polar/radar and annotations on both
+hosts. See the [feature guide](../docs/RENDERER_018_FEATURES.md) for APIs and guards.
+
 Every gallery script defines `make_figure()` and uses synthetic data. Random
 examples use a fixed seed. The checked-in images are native renderer exports,
 not mockups or upstream Rust screenshots.

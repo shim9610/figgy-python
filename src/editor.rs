@@ -73,6 +73,22 @@ pub fn theme(ctx: &egui::Context) {
 }
 
 pub fn object_name(id: &str, data: &FigureCore) -> String {
+    if let Some((prefix, element)) = id.split_once(':') {
+        if let Some(index) = prefix
+            .strip_prefix("subplot_")
+            .and_then(|v| v.parse::<usize>().ok())
+        {
+            let panel = data
+                .identity
+                .as_ref()
+                .and_then(|v| v["panels"][index + 1]["id"].as_str())
+                .unwrap_or("Panel");
+            return format!("{} · {}", panel, object_name(element, data));
+        }
+        if prefix.starts_with("overlay_") {
+            return object_name(element, data);
+        }
+    }
     let name = match id {
         "chart_title" => "Chart title",
         "data_area" => "Plot area",
@@ -465,6 +481,76 @@ impl Editor {
                 }
             });
         });
+        if let Some(identity) = c.data.identity.clone()
+            && (!c.data.chart.config().subplots.is_empty()
+                || !c.data.chart.config().overlays.is_empty()
+                || !c.data.chart.config().annotations.items.is_empty())
+        {
+            let mut layer = c.data.chart.config().active_layer();
+            let previous = layer;
+            let response = egui::ComboBox::from_id_salt("active_layer")
+                .selected_text(match layer {
+                    renderer::LayerRef::Base => {
+                        identity["panels"][0]["id"].as_str().unwrap_or("Panel")
+                    }
+                    renderer::LayerRef::Subplot(i) => {
+                        identity["panels"][i + 1]["id"].as_str().unwrap_or("Panel")
+                    }
+                    renderer::LayerRef::Overlay(i) => identity["panels"][0]["overlays"][i]
+                        .as_str()
+                        .unwrap_or("Secondary Y"),
+                    renderer::LayerRef::SubplotOverlay(i, o) => {
+                        identity["panels"][i + 1]["overlays"][o]
+                            .as_str()
+                            .unwrap_or("Secondary Y")
+                    }
+                    _ => "Annotations",
+                })
+                .show_ui(ui, |ui| {
+                    for (index, panel) in identity["panels"].as_array().unwrap().iter().enumerate()
+                    {
+                        ui.selectable_value(
+                            &mut layer,
+                            if index == 0 {
+                                renderer::LayerRef::Base
+                            } else {
+                                renderer::LayerRef::Subplot(index - 1)
+                            },
+                            panel["id"].as_str().unwrap(),
+                        );
+                        for (overlay, id) in
+                            panel["overlays"].as_array().unwrap().iter().enumerate()
+                        {
+                            ui.selectable_value(
+                                &mut layer,
+                                if index == 0 {
+                                    renderer::LayerRef::Overlay(overlay)
+                                } else {
+                                    renderer::LayerRef::SubplotOverlay(index - 1, overlay)
+                                },
+                                id.as_str().unwrap(),
+                            );
+                        }
+                    }
+                    if !c.data.chart.config().annotations.items.is_empty() {
+                        ui.selectable_value(
+                            &mut layer,
+                            renderer::LayerRef::Annotations,
+                            "Annotations",
+                        );
+                    }
+                });
+            self.controls
+                .insert("active_layer".into(), response.response.rect);
+            if layer != previous {
+                let mut config = c.data.chart.config().clone();
+                config.active_layer = layer;
+                if let Err(error) = c.commit_config(config) {
+                    self.error = error.to_string();
+                }
+                *selected = None;
+            }
+        }
         ui.add_space(8.);
         ui.label(RichText::new("OBJECT").size(11.).weak());
         let response = egui::ComboBox::from_id_salt("object")
@@ -503,7 +589,10 @@ impl Editor {
                         ui.close();
                     }
                 }
-                for series in &c.data.series {
+                for series in c.data.series.iter().filter(|s| {
+                    c.data.chart.config().layer_of_series(&s.series_id)
+                        == c.data.chart.config().active_layer()
+                }) {
                     ui.selectable_value(
                         selected,
                         Some(series.series_id.clone()),
@@ -535,6 +624,10 @@ impl Editor {
                 "index",
                 "x_index",
                 "y_index",
+                "color_value",
+                "size_value",
+                "u",
+                "v",
                 "bin_start",
                 "bin_end",
                 "x",
@@ -668,9 +761,31 @@ impl Editor {
 
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
         let mut state = serde_json::to_value(c.snapshot()).unwrap();
+        let scoped_path = match c.data.chart.config().active_layer() {
+            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                format!("/config/subplots/{i}/config")
+            }
+            _ => "/config".to_string(),
+        };
+        let overlay_target = target.contains("overlay_");
+        let overlay_index = if overlay_target {
+            match c.data.chart.config().active_layer() {
+                renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) => {
+                    Some(i)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let target = target.rsplit(':').next().unwrap_or(target);
         let mut changed = false;
-        let config = state["config"].clone();
+        let config = state.pointer(&scoped_path).unwrap().clone();
         let mut config = config;
+        let original_right = config["right_y"].clone();
+        if let Some(i) = overlay_index {
+            config["right_y"] = config["overlays"][i]["y_axis"].clone();
+        }
         let visibility = match target {
             "chart_title" => Some((&mut config["chart_title"], "visible")),
             "legend" => Some((&mut config["legend"], "visible")),
@@ -969,9 +1084,9 @@ impl Editor {
                     continue;
                 }
                 let old = if key == "colorbar" {
-                    &state["config"][key]["axis"]
+                    &state.pointer(&scoped_path).unwrap()[key]["axis"]
                 } else {
-                    &state["config"][key]
+                    &state.pointer(&scoped_path).unwrap()[key]
                 };
                 let axis = if key == "colorbar" {
                     &mut config[key]["axis"]
@@ -996,9 +1111,17 @@ impl Editor {
             }
         }
         if changed {
-            crate::axis_edit::sync_linked_axis_edit(&state["config"], &mut config, target);
+            crate::axis_edit::sync_linked_axis_edit(
+                state.pointer(&scoped_path).unwrap(),
+                &mut config,
+                target,
+            );
         }
-        state["config"] = config;
+        if let Some(i) = overlay_index {
+            config["overlays"][i]["y_axis"] = config["right_y"].clone();
+            config["right_y"] = original_right;
+        }
+        *state.pointer_mut(&scoped_path).unwrap() = config;
         if changed {
             match c.apply_settings(&state.to_string()) {
                 Ok(_) => {

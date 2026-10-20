@@ -13,6 +13,7 @@ import weakref
 
 import numpy as np
 
+from . import _document
 from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
@@ -176,7 +177,7 @@ class Figure:
     Rendering, initialization, GPU fitting and picking release the GIL.
     """
 
-    def __init__(self, figsize=(8, 5), dpi=120, *, pool_bytes=8 * 1024**2, backend="auto", retain_notebook_data=False):
+    def __init__(self, figsize=(8, 5), dpi=120, *, pool_bytes=8 * 1024**2, backend="auto", retain_notebook_data=False, grid=None, id=None):
         if not math.isfinite(float(dpi)) or dpi <= 0:
             raise ValueError("dpi must be positive and finite")
         figsize = tuple(map(float, figsize))
@@ -205,11 +206,112 @@ class Figure:
         self._windows = []
         self._selection = None
         self._next_series = 0
-        self.axes = [Axes(self)]
+        self._axes_handles = {}
+        self.axes = [Axes(self, 'main')]
+        self.subplots = _document.Subplots(self)
+        state = self.get_settings()
+        state.update(schema_version=2, identity=_document.initial_identity(id))
+        self.apply_settings(state)
+        if grid is not None:
+            self.set_layout(grid)
 
     def _require_open(self):
         if self._native is None:
             raise RuntimeError("Figure is closed")
+
+    def _axes_for(self, panel_id, overlay_id=None):
+        key = panel_id, overlay_id
+        if key not in self._axes_handles:
+            self._axes_handles[key] = Axes(self, panel_id, overlay_id)
+        return self._axes_handles[key]
+
+    @property
+    def id(self):
+        return self.get_settings()['identity']['figure']
+
+    @property
+    def shared_axes(self):
+        return copy.deepcopy(self.get_settings()['identity']['groups'])
+
+    def set_layout(self, grid, *, placement=None, row_weights=None, column_weights=None, gap=12):
+        """Place stable subplot IDs into named grid slots (repeated IDs span cells)."""
+        slots = _document.grid_slots(grid)
+        placement = dict(placement) if placement is not None else {slot: slot for slot in slots}
+        if set(placement) != set(slots):
+            raise ValueError('placement must name each occupied grid slot')
+        with self._lock:
+            state = self.get_settings()
+            if _family(state) is not None:
+                raise ValueError('bounded chart families cannot be composed as subplots')
+            old = state['identity']['panels']
+            ids = list(dict.fromkeys(placement.values()))
+            for value in ids:
+                _document.identifier(value)
+            if len(ids) != len(placement):
+                raise ValueError('a subplot cannot occupy more than one slot')
+            old_ids = [p['id'] for p in old]
+            if not state['series'] and len(old) == 1 and not state['config'].get('overlays'):
+                # The empty initial panel may take the first explicit identity.
+                old[0]['id'] = ids[0]
+                old_ids = [ids[0]]
+            if set(old_ids) - set(ids):
+                raise ValueError('layout cannot silently remove existing subplots')
+            for panel_id in ids:
+                if panel_id in old_ids:
+                    continue
+                cfg = copy.deepcopy(self._default_config)
+                for key in ('subplots', 'overlays', 'annotations', 'active_layer'):
+                    cfg.pop(key, None)
+                state['config'].setdefault('subplots', []).append(dict(config=cfg, series=[]))
+                old.append(dict(id=panel_id, overlays=[]))
+            previous = state['identity'].get('layout')
+            area = self._default_config['chart_area']
+            size = previous['size'] if previous else [area['width'], area['height']]
+            state['identity']['layout'] = dict(grid=[list(row) for row in grid], placement=placement,
+                row_weights=list(row_weights) if row_weights is not None else [1]*len(grid),
+                column_weights=list(column_weights) if column_weights is not None else [1]*len(grid[0]),
+                gap=float(gap), size=size)
+            _document.validate(state)
+            _document.place_grid(state)
+            self.apply_settings(state)
+        return self.subplots
+
+    def place(self, subplot_id, *, slot):
+        """Move a subplot to a slot, swapping an existing occupant if necessary."""
+        state = self.get_settings()
+        layout = state['identity']['layout']
+        if layout is None or slot not in _document.grid_slots(layout['grid']):
+            raise ValueError('unknown grid slot')
+        _document.panel_index(state, subplot_id)
+        placement = layout['placement']
+        previous = next((key for key, value in placement.items() if value == subplot_id), None)
+        displaced = placement.get(slot)
+        if previous is not None:
+            del placement[previous]
+        placement[slot] = subplot_id
+        if displaced is not None and displaced != subplot_id and previous is not None:
+            placement[previous] = displaced
+        _document.place_grid(state)
+        self.apply_settings(state)
+        return self.subplots[subplot_id]
+
+    def share_axes(self, axis, panels=None, *, id=None):
+        """Link ranges/scales/ticks; labels and visual styling stay panel-local."""
+        if axis not in ('x', 'y'):
+            raise ValueError('shared axis must be x or y')
+        state = self.get_settings()
+        members = list(self.subplots) if panels is None else list(panels)
+        if len(set(members)) != len(members) or len(members) < 2:
+            raise ValueError('a shared axis needs at least two distinct subplot IDs')
+        members.sort(key=lambda key: _document.panel_index(state, key))
+        root = _document.panel_index(state, members[0])
+        reference = 'Parent' if root == 0 else {'Subplot': root-1}
+        for member in members[1:]:
+            index = _document.panel_index(state, member)
+            state['config']['subplots'][index-1]['link_'+axis] = reference
+        state['identity']['groups'][_document.identifier(id or axis+'/shared')] = dict(axis=axis, members=members)
+        self.apply_settings(state)
+        return self
 
     def _require_cartesian(self):
         if _family(self.get_settings()) is not None:
@@ -247,10 +349,27 @@ class Figure:
             self._require_open()
             if expected_revision is not None and expected_revision != self.revision:
                 raise ValueError("stale edit: the Figure changed; refresh and retry")
+            if not isinstance(settings, dict):
+                raise ValueError('settings must be a document mapping')
             if reset:
                 settings = copy.deepcopy(settings)
                 settings["config"] = _merge(copy.deepcopy(self._default_config), settings["config"])
+            settings = copy.deepcopy(settings)
+            if settings.get('schema_version') == 1 and 'identity' not in settings:
+                current = self.get_settings().get('identity')
+                if current is not None:
+                    settings['identity'] = copy.deepcopy(current)
+                    settings['schema_version'] = 2
+            try:
+                _document.validate(settings)
+                _document.track_identities(self.get_settings(), settings)
+            except (AttributeError, KeyError, IndexError, StopIteration) as exc:
+                raise ValueError('invalid settings document structure') from exc
             self._native.apply_settings(json.dumps(settings, allow_nan=False))
+            accepted = json.loads(self._native.settings_json())
+            if 'identity' in accepted:
+                self.axes = [self._axes_for(p['id'], overlay) for p in accepted['identity']['panels']
+                             for overlay in [None, *p['overlays']]]
         self._changed()
         return self
 
@@ -277,7 +396,7 @@ class Figure:
         for message in self._native.take_render_warnings():
             _warn_external(message, RenderWarning)
 
-    def update(self, target, **properties):
+    def update(self, target, *, _axes=None, **properties):
         """Edit a stable series/decorative target using familiar property names.
 
         Axis/tick-label edits also patch the opposite axis when both axes had
@@ -290,11 +409,30 @@ class Figure:
             raise ValueError("editable target must be a non-empty string")
         kind = _family(self.get_settings())
         if kind is not None:
+            if target == 'chart_title':
+                state = self.get_settings()
+                chart = state[kind]
+                title = chart.get('chart_title') or dict(visible=True, text=dict(
+                    segments=_segments(chart['title']), font_size=chart['font_size']*1.5,
+                    font=chart['font_family'], color=copy.deepcopy(chart.get('text_color', chart.get('label_color'))), align='Left'))
+                title = copy.deepcopy(title)
+                for key, value in properties.items():
+                    if key == 'text':
+                        title['text']['segments'] = _segments(str(value))
+                        chart['title'] = str(value)
+                    elif key == 'fontsize': title['text']['font_size'] = float(value)*self.dpi/72
+                    elif key == 'font': title['text']['font'] = self._check_font(value)
+                    elif key == 'color': title['text']['color'] = _color(value)
+                    elif key == 'align': title['text']['align'] = str(value).title()
+                    elif key == 'visible': title['visible'] = bool(value)
+                    else: raise ValueError(f'unsupported bounded title property: {key}')
+                chart['chart_title'] = title
+                return self.apply_settings(state)
             patch = {}
             titles = {'chart_title': 'title', 'axis_title_bottom': 'category_title', 'axis_title_left': 'value_title'}
-            if kind != 'radial' and self.get_settings()[kind]['direction'] == 'Horizontal':
+            if kind not in ('radial', 'radar') and self.get_settings()[kind]['direction'] == 'Horizontal':
                 titles.update(axis_title_bottom='value_title', axis_title_left='category_title')
-            if target not in titles or (kind == 'radial' and target != 'chart_title'):
+            if target not in titles or (kind in ('radial', 'radar') and target != 'chart_title'):
                 raise ValueError('use the chart artist or configure_bounded/configure_radial for data properties')
             for key, value in properties.items():
                 if key == 'text': patch[titles[target]] = str(value)
@@ -305,7 +443,12 @@ class Figure:
         with self._lock:
             self._require_open()
             state = self.get_settings()
-            cfg = state["config"]
+            if _axes is None:
+                for index, panel in enumerate(state['config'].get('subplots', [])):
+                    if target in panel.get('series', []):
+                        _axes = self._axes_for(state['identity']['panels'][index+1]['id'])
+                        break
+            cfg = state["config"] if _axes is None else _axes._config(state)
             before_config = copy.deepcopy(cfg)
             series = next((s for s in state["series"] if s["series_id"] == target), None)
             if series is not None:
@@ -317,10 +460,15 @@ class Figure:
                             if kind in style:
                                 style[kind][field] = _color(value)
                                 matched = True
+                        if 'Vector' in series['render_type']:
+                            style['style']['color'] = _color(value)
+                            matched = True
                         if not matched:
                             raise ValueError("use cmap/vmin/vmax for field colors")
                     elif key == "linewidth" and "line" in style:
                         style["line"]["line_width"] = float(value) * self.dpi / 72
+                    elif key == 'linewidth' and 'Vector' in series['render_type']:
+                        style['style']['width_px'] = float(value)*self.dpi/72
                     elif key == "markersize" and "scatter" in style:
                         style["scatter"]["point_size"] = float(value) * self.dpi / 144
                     elif key == "linestyle" and "line" in style:
@@ -329,7 +477,7 @@ class Figure:
                         label = copy.deepcopy(cfg["legend"]["content"])
                         label["segments"] = _segments(value)
                         series["label"] = label
-                    elif key in ("cmap", "vmin", "vmax") and "matrix" in style:
+                    elif key in ("cmap", "vmin", "vmax") and ('matrix' in style or style.get('scatter', {}).get('point_color_map') or style.get('style', {}).get('color_map')):
                         bar = cfg["colorbar"]
                         if key == "cmap":
                             bar["colormap"] = _colormap(value)
@@ -409,14 +557,16 @@ class Figure:
                         node["min"], node["max"] = self._native.log_bounds("x" if axis.endswith("_x") else "y")
                     if "major_spacing" not in properties:
                         node["major_spacing"] = 1.0 if node["scale"] == "Logarithmic" else (node["max"] - node["min"]) / 5
-                state["config"] = json.loads(sync_linked_axis_edit_json(
+                reconciled = json.loads(sync_linked_axis_edit_json(
                     json.dumps(before_config, allow_nan=False), json.dumps(cfg, allow_nan=False), target))
+                cfg.clear()
+                cfg.update(reconciled)
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in state["series"]:
                 for style in spec["render_type"].values():
                     for kind, field in [("line", "line_width"), ("scatter", "point_size")]:
-                        if kind in style and (not math.isfinite(style[kind][field]) or style[kind][field] <= 0):
-                            raise ValueError(f"{field} must be positive and finite")
+                        if kind in style and (not math.isfinite(style[kind][field]) or style[kind][field] < 0):
+                            raise ValueError(f"{field} must be nonnegative and finite")
             self._native.apply_settings(json.dumps(state, allow_nan=False))
         self._changed()
         return self
@@ -453,7 +603,7 @@ class Figure:
                 raise ValueError("savefig currently supports .png")
             path.write_bytes(data)
 
-    def configure(self, *, config=None, series=None, reset=False):
+    def configure(self, *, config=None, series=None, identity=None, reset=False):
         """Apply advanced layout/style patches to existing plotted data.
 
         ``series`` maps stable series IDs to style patches. Source columns and
@@ -465,8 +615,14 @@ class Figure:
         """
         with self._lock:
             state = self.get_settings()
+            if identity is not None:
+                state["identity"] = copy.deepcopy(identity)
+                state["schema_version"] = 2
             if reset:
+                structure = {key: copy.deepcopy(state['config'][key]) for key in
+                    ('chart_area', 'subplots', 'overlays', 'polar', 'annotations', 'active_layer') if key in state['config']}
                 state["config"] = copy.deepcopy(self._default_config)
+                state['config'].update(structure)
                 state.pop("background", None)
             if config is not None:
                 if "draw_style" in config:
@@ -558,7 +714,7 @@ class Figure:
         with self._lock:
             state = self.get_settings()
             kind = kind or _family(state)
-            if kind not in ('categorical', 'boxplot') or state.get(kind) is None:
+            if kind not in ('categorical', 'boxplot', 'radar') or state.get(kind) is None:
                 raise ValueError('create the corresponding bounded chart first')
             chart = state[kind]
             if expected_categories is not None and [c['id'] for c in chart['categories']] != expected_categories:
@@ -854,12 +1010,115 @@ def _material(value):
 from ._charts import ChartMethods, family as _family
 
 
-class Axes(ChartMethods):
-    def __init__(self, figure):
+from ._features import FeatureMethods
+
+
+class Axes(FeatureMethods, ChartMethods):
+    def __init__(self, figure, panel_id='main', overlay_id=None):
         self.figure = figure
+        self.subplot_id, self.overlay_id = panel_id, overlay_id
+
+    @property
+    def id(self):
+        return self.overlay_id or self.subplot_id
+
+    @property
+    def subplot(self):
+        return self.figure.subplots[self.subplot_id]
+
+    def _config(self, state):
+        return _document.panel_config(state, self.subplot_id)
+
+    def _overlay(self, state):
+        return _document.overlay_config(state, self.subplot_id, self.overlay_id)
+
+    def configure(self, **properties):
+        state = self.figure.get_settings()
+        cfg = self._config(state)
+        if self.overlay_id:
+            if set(properties) - {'y_axis', 'legend'}:
+                raise ValueError('secondary axes own y_axis and legend only')
+            _merge(self._overlay(state), properties)
+        else:
+            if 'draw_style' in properties:
+                cfg.pop('draw_style', None)
+            _merge(cfg, properties)
+        self.figure.apply_settings(state)
+        return self
+
+    def activate(self):
+        state = self.figure.get_settings()
+        owner = state[_family(state)] if _family(state) else state['config']
+        owner['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
+        self.figure.apply_settings(state)
+        return self
+
+    def twinx(self, *, id=None):
+        state = self.figure.get_settings()
+        cfg = self._config(state)
+        if cfg.get('polar') is not None or _family(state):
+            raise ValueError('secondary Y axes require a Cartesian subplot')
+        index = _document.panel_index(state, self.subplot_id)
+        ids = state['identity']['panels'][index]['overlays']
+        oid = _document.identifier(id or f'{self.subplot_id}/y{len(ids)+2}')
+        y_axis = copy.deepcopy(cfg['left_y'])
+        y_axis['line_visible'] = True
+        y_axis['label_style']['visible'] = True
+        cfg.setdefault('overlays', []).append(dict(y_axis=y_axis, series=[]))
+        ids.append(oid)
+        self.figure.apply_settings(state)
+        return self.figure._axes_for(self.subplot_id, oid)
+
+    def set_polar(self, **options):
+        if self.overlay_id:
+            raise ValueError('secondary Y axes do not support polar coordinates')
+        defaults = dict(zero_angle_degrees=0., clockwise=False, angle_unit='Degrees', sector=None,
+                        inner_radius_fraction=0., interpolation='Chord', radial_label_angle_degrees=90.)
+        _merge(defaults, options)
+        return self.configure(polar=defaults)
+
+    def fit(self, padding=0.05):
+        with self.figure._lock:
+            self.activate()
+            if _family(self.figure.get_settings()):
+                self.figure.fit(padding)
+            else:
+                self.figure._native.fit_active(float(padding))
+        self.figure._changed()
+        return self
+
+    def _owned_series(self, state):
+        if self.overlay_id:
+            owned = set(self._overlay(state)['series'])
+        else:
+            index = _document.panel_index(state, self.subplot_id)
+            assigned = {sid for panel in state['config'].get('subplots', []) for sid in panel.get('series', [])}
+            owned = set(state['config']['subplots'][index-1].get('series', [])) if index else {
+                spec['series_id'] for spec in state['series'] if spec['series_id'] not in assigned}
+        return [spec for spec in state['series'] if spec['series_id'] in owned]
+
+    def _set_bounds(self, dimension, low, high):
+        from ._native import fitted_range_json
+        low, high = float(low), float(high)
+        if not math.isfinite(low) or not math.isfinite(high) or low >= high:
+            raise ValueError('range must be finite and increasing')
+        state = self.figure.get_settings()
+        state['config']['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
+        state['config'] = json.loads(fitted_range_json(json.dumps(state['config']), dimension, low, high))
+        self.figure.apply_settings(state)
+        return low, high
 
     def set_draw_style(self, mode="precise", **options):
-        return self.figure.set_draw_style(mode, **options)
+        if mode not in ('precise', 'sketch', 'milkyway', 'constellation'):
+            raise ValueError('draw style must be precise, sketch, milkyway or constellation')
+        if _family(self.figure.get_settings()):
+            raise ValueError('bounded charts use their own material/style properties')
+        state = self.figure.get_settings()
+        cfg = self._config(state)
+        cfg['draw_style'] = dict(mode=mode, **options)
+        cfg['chart_title']['top_margin'] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
+        self.figure.apply_settings(state)
+        return self
 
     def pie(self, values, *, labels=None, colors=None, explode=None, startangle=90,
             inner_radius=None, material="flat", tilt=0, depth=0,
@@ -871,6 +1130,8 @@ class Axes(ChartMethods):
         ``startangle=90`` starts at the top; slices proceed clockwise.
         """
         fig = self.figure
+        if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
+            raise ValueError('bounded charts require a separate single-panel Figure')
         values = _array(values)
         count = values.size
         if not 1 <= count <= 64 or not np.isfinite(values).all() or (values < 0).any() or not np.isfinite(values.sum()) or values.sum() <= 0:
@@ -912,7 +1173,7 @@ class Axes(ChartMethods):
             fig._require_open()
             if _family(fig.get_settings()) is not None:
                 raise ValueError("create a separate Figure for Cartesian series")
-            mode = fig.get_settings()["config"].get("draw_style", {}).get("mode", "precise")
+            mode = self._config(fig.get_settings()).get("draw_style", {}).get("mode", "precise")
             if mode == "milkyway" and "Line" not in render_type:
                 raise ValueError("Milkyway supports line-only series; scatter and marker lines are disabled")
             if mode == "constellation" and "ScatterLine" not in render_type:
@@ -925,6 +1186,21 @@ class Axes(ChartMethods):
             if any(s["series_id"] == sid for s in fig.get_settings()["series"]):
                 raise ValueError(f"duplicate series ID: {sid}")
             names = (f"{sid}/x", f"{sid}/y")
+            document = fig.get_settings()
+            local = self._config(document)
+            if local.get('polar') is not None and not set(render_type) <= {'Line', 'Scatter', 'ScatterLine'}:
+                raise ValueError('polar supports line, scatter and scatter-line series only')
+            if document['config'].get('polar') is not None and not set(render_type) <= {'Line', 'Scatter', 'ScatterLine'}:
+                raise ValueError('renderer 0.18 requires a Cartesian root panel when other subplots use fields, vectors, histograms or errors')
+            if config is not None:
+                local.clear()
+                local.update(copy.deepcopy(config))
+            index = _document.panel_index(document, self.subplot_id)
+            document['config']['active_layer'] = _document.target_layer(document, self.subplot_id, self.overlay_id)
+            if index:
+                document['config']['subplots'][index-1].setdefault('series', []).append(sid)
+            if self.overlay_id:
+                self._overlay(document).setdefault('series', []).append(sid)
             uploaded = []
             try:
                 for name, array in [(names[0], x), (names[1], y), *extra_columns]:
@@ -937,7 +1213,7 @@ class Axes(ChartMethods):
                     spec["label"] = rich
                 fig._native.add_series_fitted(
                     json.dumps(spec, allow_nan=False),
-                    json.dumps(config, allow_nan=False) if config is not None else None,
+                    json.dumps(document["config"], allow_nan=False),
                     bounds,
                 )
             except Exception:
@@ -948,7 +1224,49 @@ class Axes(ChartMethods):
         fig._changed()
         return Artist(fig, sid)
 
-    def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None):
+    def _add_fill_pair(self, x, lower, upper, line, label, sid):
+        fig = self.figure
+        with fig._lock:
+            state = fig.get_settings()
+            if _family(state):
+                raise ValueError('fills require coordinate series')
+            ids = {spec['series_id'] for spec in state['series']}
+            if sid in ids or sid+'/lower' in ids:
+                raise ValueError('duplicate fill series ID')
+            names = [sid+'/x', sid+'/lower/y', sid+'/y']
+            lower_style = dict(line_color=copy.deepcopy(line['line_color']), line_width=0., line_style='Solid',
+                               interpolation=line['interpolation'])
+            line = dict(line, fill={'ToSeries': sid+'/lower'})
+            rich = None
+            if label is not None:
+                rich = copy.deepcopy(self._config(state)['legend']['content'])
+                rich['segments'] = _segments(label)
+            specs = [dict(series_id=sid+'/lower', label=None, x_column=names[0], y_column=names[1],
+                          render_type={'Line': dict(line=lower_style)}),
+                     dict(series_id=sid, label=rich, x_column=names[0], y_column=names[2],
+                          render_type={'Line': dict(line=line)})]
+            index = _document.panel_index(state, self.subplot_id)
+            for spec in specs:
+                if index:
+                    state['config']['subplots'][index-1].setdefault('series', []).append(spec['series_id'])
+                if self.overlay_id:
+                    self._overlay(state).setdefault('series', []).append(spec['series_id'])
+            state['config']['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
+            uploaded = []
+            try:
+                for name, values in zip(names, (x, lower, upper)):
+                    fig._native.upload_column(name, values)
+                    uploaded.append(name)
+                fig._native.add_series_batch(json.dumps(specs, allow_nan=False), json.dumps(state['config'], allow_nan=False))
+            except Exception:
+                for name in reversed(uploaded):
+                    fig._native.remove_column(name)
+                raise
+            fig._next_series += 2
+        fig._changed()
+        return Artist(fig, sid)
+
+    def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None):
         marker_only_format = False
         if isinstance(y, str):
             if fmt is not None:
@@ -983,20 +1301,57 @@ class Axes(ChartMethods):
             raise ValueError("line and marker sizes must be positive and finite")
         # Python API uses points; renderer uses pixel widths and marker radii.
         line = {"line_style": _LINES.get(linestyle, linestyle), "line_color": color, "line_width": float(linewidth) * self.figure.dpi / 72}
+        if interpolation not in ('Linear', 'StepPre', 'StepPost', 'StepMid'):
+            raise ValueError('unsupported line interpolation')
+        line['interpolation'] = interpolation
+        if fill is not None:
+            line['fill'] = {'ToBaseline': float(fill)}
+            line['fill_color'] = _color(fill_color) if fill_color is not None else copy.deepcopy(color)
         style = {"Line": {"line": line}}
         if marker is not None:
             scatter = {"point_color": color, "point_size": float(markersize) * self.figure.dpi / 144, "point_shape": _MARKERS.get(marker, marker)}
             style = {"Scatter": {"scatter": scatter}} if marker_only_format else {"ScatterLine": {"line": line, "scatter": scatter}}
         return [self._add(x, y, style, label, id)]
 
-    def scatter(self, x, y, *, s=16, color=None, marker="o", label=None, id=None):
+    def scatter(self, x, y, *, s=16, color=None, c=None, cmap='viridis', vmin=None, vmax=None,
+                size_domain=None, size_range=(2., 12.), size_scale='area', marker="o", label=None, id=None):
+        from ._features import colorbar
         x, y = _array(x), _array(y)
-        if x.size != y.size:
-            raise ValueError("x and y must have the same length")
-        if not math.isfinite(float(s)) or s <= 0:
-            raise ValueError("s must be positive and finite")
-        style = {"Scatter": {"scatter": {"point_color": _color(color if color is not None else _COLORS[self.figure._next_series % len(_COLORS)]), "point_shape": _MARKERS.get(marker, marker), "point_size": math.sqrt(s) * self.figure.dpi / 144}}}
-        return self._add(x, y, style, label, id)
+        if x.size != y.size or not x.size:
+            raise ValueError('scatter requires equal nonempty x/y vectors')
+        sid = id or f'series_{self.figure._next_series}'
+        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
+        style = dict(point_color=_color(color if color is not None else _COLORS[self.figure._next_series % len(_COLORS)]),
+                     point_shape=_MARKERS.get(marker, marker), point_size=math.sqrt(float(s))*self.figure.dpi/144 if np.isscalar(s) else 4.)
+        columns = []
+        if c is not None:
+            values = _array(c)
+            if values.size != x.size:
+                raise ValueError('scatter color values must match x/y')
+            colorbar(cfg, values, cmap, vmin, vmax)
+            columns.append((f'{sid}/color', values))
+            style['point_color_map'] = dict(column=f'{sid}/color')
+        if np.isscalar(s):
+            if not math.isfinite(float(s)) or float(s) <= 0:
+                raise ValueError('s must be positive and finite')
+        else:
+            values = _array(s)
+            if values.size != x.size or not np.isfinite(values).all():
+                raise ValueError('scatter size values must be finite and match x/y')
+            low, high = (float(values.min()), float(values.max())) if size_domain is None else map(float, size_domain)
+            if low == high and size_domain is None:
+                high = low+max(1., abs(low)*0.01)
+            if not math.isfinite(low) or not math.isfinite(high) or low >= high:
+                raise ValueError('size_domain must be finite and increasing')
+            if len(size_range) != 2 or any(not math.isfinite(float(v)) or v < 0 for v in size_range) or size_range[0] > size_range[1]:
+                raise ValueError('size_range must contain two ordered nonnegative finite diameters')
+            if size_scale not in ('area', 'radius'):
+                raise ValueError('size_scale must be area or radius')
+            columns.append((f'{sid}/size', values))
+            style['point_size_map'] = dict(column=f'{sid}/size', domain_min=low, domain_max=high,
+                min_px=float(size_range[0])*self.figure.dpi/144, max_px=float(size_range[1])*self.figure.dpi/144,
+                scale=size_scale.title())
+        return self._add(x, y, {'Scatter': dict(scatter=style)}, label, sid, extra_columns=columns, config=cfg)
 
     def imshow(self, z, *, extent=None, origin="upper", cmap="viridis", vmin=None, vmax=None, interpolation="nearest", id=None):
         z = np.asarray(z)
@@ -1030,20 +1385,29 @@ class Axes(ChartMethods):
         bar["axis"]["min"], bar["axis"]["max"] = low, high
         bar["axis"]["major_spacing"] = (high - low) / 5
         with self.figure._lock:
-            config = self.figure.get_settings()["config"]
+            config = self._config(self.figure.get_settings())
             config["colorbar"] = bar
             for key in ("left_y", "right_y"):
                 config[key]["inverted"] = origin == "upper"
             return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
 
     def set_title(self, text, **kwargs):
-        return self.figure.update("chart_title", text=text, **kwargs)
+        return self.figure.update("chart_title", _axes=self, text=text, **kwargs)
 
     def set_xlabel(self, text, **kwargs):
-        return self.figure.update("axis_title_bottom", text=text, **kwargs)
+        return self.figure.update("axis_title_bottom", _axes=self, text=text, **kwargs)
 
     def set_ylabel(self, text, **kwargs):
-        return self.figure.update("axis_title_left", text=text, **kwargs)
+        if self.overlay_id:
+            state = self.figure.get_settings()
+            axis = self._overlay(state)['y_axis']
+            axis['title_option']['text']['segments'] = _segments(text)
+            for key, value in kwargs.items():
+                if key == 'fontsize': axis['title_option']['text']['font_size'] = float(value)*self.figure.dpi/72
+                elif key == 'color': axis['title_option']['text']['color'] = _color(value)
+                else: raise ValueError(f'unsupported title property: {key}')
+            return self.figure.apply_settings(state)
+        return self.figure.update("axis_title_left", _axes=self, text=text, **kwargs)
 
     def _set_scale(self, axis, scale):
         self.figure._require_cartesian()
@@ -1054,9 +1418,9 @@ class Axes(ChartMethods):
             state = self.figure.get_settings()
             keys = ("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")
             for key in keys:
-                node = state["config"][key]
+                node = self._overlay(state)["y_axis"] if self.overlay_id and axis == "y" else self._config(state)[key]
                 if scale == "log" and node["min"] <= 0:
-                    node["min"], node["max"] = self.figure._native.log_bounds(axis)
+                    node["min"], node["max"] = self.figure._native.log_bounds_at(axis, json.dumps(_document.target_layer(state, self.subplot_id, self.overlay_id)))
                 node["scale"] = scales[scale]
                 node["major_spacing"] = 1.0 if scale == "log" else (node["max"] - node["min"]) / 5
             self.figure.apply_settings(state)
@@ -1071,11 +1435,11 @@ class Axes(ChartMethods):
 
     def get_xscale(self):
         self.figure._require_cartesian()
-        return "log" if self.figure.get_settings()["config"]["bottom_x"]["scale"] == "Logarithmic" else "linear"
+        return "log" if self._config(self.figure.get_settings())["bottom_x"]["scale"] == "Logarithmic" else "linear"
 
     def get_yscale(self):
         self.figure._require_cartesian()
-        return "log" if self.figure.get_settings()["config"]["left_y"]["scale"] == "Logarithmic" else "linear"
+        return "log" if (self._overlay(self.figure.get_settings())["y_axis"] if self.overlay_id else self._config(self.figure.get_settings())["left_y"])["scale"] == "Logarithmic" else "linear"
 
     def set_xlim(self, left, right):
         """Set both X bounds and derive ticks/labels for the new range.
@@ -1086,18 +1450,14 @@ class Axes(ChartMethods):
         self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
-            self.figure._native.set_range("x", float(left), float(right))
-        self.figure._changed()
-        return (left, right)
+            return self._set_bounds("x", left, right)
 
     def set_ylim(self, bottom, top):
         """Set both Y bounds and derive ticks/labels, as ``set_xlim`` does."""
         self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
-            self.figure._native.set_range("y", float(bottom), float(top))
-        self.figure._changed()
-        return (bottom, top)
+            return self._set_bounds("y", bottom, top)
 
     def _set_lim_keeping_ticks(self, keys, low, high):
         low, high = float(low), float(high)
@@ -1107,7 +1467,7 @@ class Axes(ChartMethods):
             self.figure._require_open()
             state = self.figure.get_settings()
             for key in keys:
-                axis = state["config"][key]
+                axis = self._overlay(state)["y_axis"] if self.overlay_id and key.endswith("_y") else self._config(state)[key]
                 axis["min"], axis["max"] = low, high
             self.figure.apply_settings(state)
         return (low, high)
@@ -1133,26 +1493,26 @@ class Axes(ChartMethods):
 
     def grid(self, visible=True):
         kind = _family(self.figure.get_settings())
-        if kind in ('categorical', 'boxplot'):
+        if kind in ('categorical', 'boxplot', 'radar'):
             return self.figure.configure_bounded(kind, grid=bool(visible))
         self.figure._require_cartesian()
         state = self.figure.get_settings()
-        state["config"]["grid"]["show_major_x"] = bool(visible)
-        state["config"]["grid"]["show_major_y"] = bool(visible)
+        self._config(state)["grid"]["show_major_x"] = bool(visible)
+        self._config(state)["grid"]["show_major_y"] = bool(visible)
         self.figure.apply_settings(state)
 
     def legend(self, visible=True):
         kind = _family(self.figure.get_settings())
-        if kind in ('categorical', 'boxplot'):
+        if kind in ('categorical', 'boxplot', 'radar'):
             return self.figure.configure_bounded(kind, legend=bool(visible))
         self.figure._require_cartesian()
         from ._native import rebuild_legend_json
         state = self.figure.get_settings()
-        colorbar = state["config"].get("colorbar")
-        state["config"]["legend"]["content"] = json.loads(rebuild_legend_json(
-            json.dumps(state["series"]), json.dumps(state["config"]["legend"]["content"]),
+        colorbar = self._config(state).get("colorbar")
+        self._config(state)["legend"]["content"] = json.loads(rebuild_legend_json(
+            json.dumps(self._owned_series(state)), json.dumps(self._config(state)["legend"]["content"]),
             json.dumps(colorbar["colormap"]) if colorbar else None))
-        state["config"]["legend"]["visible"] = bool(visible)
+        self._config(state)["legend"]["visible"] = bool(visible)
         self.figure.apply_settings(state)
 
 
@@ -1160,9 +1520,31 @@ def figure(*args, **kwargs):
     return Figure(*args, **kwargs)
 
 
-def subplots(nrows=1, ncols=1, **kwargs):
-    """Return a Figure and Axes. A Figure currently has one panel."""
-    if (nrows, ncols) != (1, 1):
-        raise NotImplementedError(f"multiple panels are not supported in figgyplot {__version__}")
+def subplots(nrows=1, ncols=1, *, sharex=False, sharey=False, squeeze=True, subplot_kw=None, **kwargs):
+    """Construct a grid; panels are also addressable through fig.subplots[id]."""
+    if not isinstance(nrows, int) or not isinstance(ncols, int) or nrows < 1 or ncols < 1:
+        raise ValueError('nrows and ncols must be positive integers')
+    grid = [[f'panel_{r}_{c}' for c in range(ncols)] for r in range(nrows)]
     fig = Figure(**kwargs)
-    return fig, fig.axes[0]
+    try:
+        if nrows*ncols > 1:
+            fig.set_layout(grid)
+        axes = np.asarray(fig.axes, dtype=object).reshape(nrows, ncols)
+        projection = (subplot_kw or {}).get('projection', 'cartesian')
+        if set(subplot_kw or {}) - {'projection'} or projection not in ('cartesian', 'polar'):
+            raise ValueError('subplot_kw supports Cartesian or polar projection')
+        if projection == 'polar':
+            for ax in axes.flat:
+                ax.set_polar()
+        for dimension, sharing in [('x', sharex), ('y', sharey)]:
+            if sharing not in (False, True, 'all', 'row', 'col'):
+                raise ValueError('shared axes must be bool, all, row or col')
+            if sharing and nrows*ncols > 1:
+                groups = [list(axes.flat)] if sharing in (True, 'all') else (list(axes) if sharing == 'row' else list(axes.T))
+                for i, group in enumerate(groups):
+                    if len(group) > 1:
+                        fig.share_axes(dimension, [ax.subplot_id for ax in group], id=f'{dimension}/{i}')
+        return fig, axes.squeeze().item() if squeeze and axes.size == 1 else axes.squeeze() if squeeze else axes
+    except Exception:
+        fig.close()
+        raise

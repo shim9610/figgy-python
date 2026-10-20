@@ -17,7 +17,23 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         settings = json.loads(settings)
     if isinstance(defaults, str):
         defaults = json.loads(defaults)
-    for kind in ('categorical', 'boxplot'):
+    identity = settings.get('identity')
+    def with_identity(code):
+        if identity is not None:
+            code += f"{variable}.configure(identity={pprint.pformat(identity, width=96, sort_dicts=False)})\n"
+        return code
+    config = settings['config']
+    advanced = config.get('subplots') or config.get('overlays') or config.get('polar') or config.get('annotations')
+    for spec in settings['series']:
+        style = next(iter(spec['render_type'].values()))
+        advanced = advanced or 'Vector' in spec['render_type'] or any(
+            style.get('scatter', {}).get(key) is not None for key in ('point_color_map', 'point_size_map'))
+        advanced = advanced or style.get('line', {}).get('fill') is not None or style.get('line', {}).get('interpolation', 'Linear') != 'Linear'
+    if advanced:
+        return (f"# Apply the complete document to an existing Figure with matching source columns.\n"
+                f"# Source arrays stay resident; panels, layers and references commit together.\n"
+                f"{variable}.apply_settings({pprint.pformat(settings, width=96, sort_dicts=False)})\n")
+    for kind in ('categorical', 'boxplot', 'radar'):
         if settings.get(kind) is not None:
             chart = copy.deepcopy(settings[kind])
             chart['hovered'] = chart['selected'] = None
@@ -27,7 +43,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             chart['series'] = {s['id']: {k: v for k, v in s.items() if k not in ('id', 'values')} for s in chart['series']}
             args = pprint.pformat(chart, width=96, sort_dicts=False)
             canvas = pprint.pformat({'chart_area': settings['config']['chart_area']})
-            return (f"# Apply to an existing {kind} chart with matching category/series IDs and DPI.\n"
+            return with_identity(f"# Apply to an existing {kind} chart with matching category/series IDs and DPI.\n"
                     f"# Existing data values are preserved.\n"
                     f"{variable}.configure(config={canvas})\n"
                     f"{variable}.configure_bounded({kind!r}, **{args})\n")
@@ -40,7 +56,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         chart["slices"] = slices
         args = pprint.pformat(chart, width=96, sort_dicts=False)
         canvas = pprint.pformat({"chart_area": settings["config"]["chart_area"]})
-        return (f"# Apply to an existing pie/donut with the same slice count and DPI.\n"
+        return with_identity(f"# Apply to an existing pie/donut with the same slice count and DPI.\n"
                 f"# Existing category values are preserved.\n"
                 f"{variable}.configure(config={canvas})\n"
                 f"{variable}.configure_radial(expected_slices={len(slices)}, **{args})\n")
@@ -188,4 +204,4 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     if f"{segments_function}(" in code:
         alias = "" if segments_function == "text_segments" else f" as {segments_function}"
         code = f"from figgyplot import text_segments{alias}\n\n" + code
-    return code
+    return with_identity(code)

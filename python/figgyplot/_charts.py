@@ -6,7 +6,7 @@ import numpy as np
 
 
 def family(settings):
-    return next((k for k in ('radial', 'categorical', 'boxplot') if settings.get(k) is not None), None)
+    return next((k for k in ('radial', 'categorical', 'boxplot', 'radar') if settings.get(k) is not None), None)
 
 
 class BoundedArtist:
@@ -41,6 +41,8 @@ class ChartMethods:
         from .figure import _color, _text, _merge
         from ._native import default_bounded_json
         fig = self.figure
+        if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
+            raise ValueError('bounded charts require a separate single-panel Figure')
         chart = json.loads(default_bounded_json(kind))
         chart.update(categories=categories, series=series,
                      title=_text(fig.get_settings()['config']['chart_title']['text']),
@@ -269,7 +271,7 @@ class ChartMethods:
         bar['colormap'] = _colormap(cmap)
         bar['axis'].update(min=low, max=high, major_spacing=(high-low)/5)
         with self.figure._lock:
-            config = self.figure.get_settings()['config']
+            config = self._config(self.figure.get_settings())
             config['colorbar'] = bar
             return self._add(x, y, {'HeatmapContour' if filled else 'Contour': style}, id=id,
                              extra_columns=columns, config=config, bounds=(float(x[0]), float(x[-1]), float(y[0]), float(y[-1])))

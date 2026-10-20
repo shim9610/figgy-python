@@ -13,11 +13,41 @@ integration. The [interaction parity guard](../scripts/check_interaction_parity.
 rejects changes to only one host without the corresponding host/test updates.
 [Shared interaction tests](../tests/test_interaction_parity.py) cover native and
 real Jupyter WebGPU controls. Pies/donuts, categorical bars and boxplots now use
-both hosts; the historical native-only radial limitation below no longer applies.
+both hosts; radar and multi-panel documents are also covered by the renderer
+0.18 integration. The historical native-only radial limitation below no longer applies.
 See [chart types](CHART_TYPES.md) and [desktop editing](DESKTOP_EDITOR.md) for
 current supported controls. A configured check or an earlier passing run does
 not establish the result of a later commit; inspect that commit's CI result.
 
+
+## Renderer 0.18 feature integration (2026-10-20)
+
+Local verification covers all **409 current suite cases** across a complete
+integration run and focused reruns of affected and newly added cases. The final
+installed release wheel passed **72 focused cases**, including all new feature
+model/replay tests, malformed-input and concurrency checks, native window
+regressions, mixed panel styles on real Jupyter WebGPU and the actual
+maturin-action contract. Cases skipped in the complete run because the action
+path was unset were subsequently executed with the real action file.
+
+Environment: Linux x86_64, CPython 3.12.14, Rust 1.99.0, native llvmpipe
+software Vulkan, Xvfb/Openbox and headed Chromium 154 with SwiftShader.
+The complete run exercised both real hosts: editing, zoom/pan, picking,
+annotations and endpoint resizing, active panels/layers, linked axes, radar,
+vector fields, mapped points, fills/steps, polar charts and whole-document PNGs.
+Mixed precise/stylized panels replay identically at export scales 1, 1.25 and 2.
+Ordinary display checks assert no PNG transport or whole-image native readback.
+
+Workflow/asset preflight passed **112 tests**. Locked Rust compilation,
+formatting and JavaScript syntax checks passed. Wheel and sdist builds include
+the new Python/Rust modules; separate-environment installation, packaged-asset
+verification and public API smoke checks passed. The matching upstream WASM
+assets and their provenance remain unchanged from the #15 migration baseline.
+
+These are local software-GPU results. The required Actions checks must pass on
+the final PR commit independently; physical GPU, Windows/macOS and ARM64 runtime
+coverage are not established by this record. Manual plotting remains separate
+from the future #18 review controller and binary recovery cache.
 
 ## Reported issue verification (2026-10-20)
 
@@ -37,7 +67,7 @@ source work and does not replace published artifacts.
 | [#10](https://github.com/shim9610/figgy-python/issues/10) | Unknown font families raise `ValueError`; supported and default names remain accepted. |
 | [#11](https://github.com/shim9610/figgy-python/issues/11) | Unicode super/subscripts normalize to rich text. A Greek alpha in the Latin-only handwritten face uses fallback and renders differently from an unassigned character's missing-glyph box. |
 | [#12](https://github.com/shim9610/figgy-python/issues/12) | Multiline title helpers grow the title band; direct settings retain explicitly chosen geometry. |
-| [#13](https://github.com/shim9610/figgy-python/issues/13) | The unsupported multi-panel message uses the running package version. Multi-panel support is separate feature work. |
+| [#13](https://github.com/shim9610/figgy-python/issues/13) | The original unsupported multi-panel message used the running package version. The subsequent #16 integration now supports multi-panel construction and tests stable public panel addressing. |
 
 The behavioral checks are in `tests/test_issue_fixes.py`. Native/Jupyter
 interaction checks and renderer-migration coverage are recorded separately;

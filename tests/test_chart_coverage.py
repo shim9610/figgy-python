@@ -36,7 +36,7 @@ def test_native_bounded_preparation_reports_the_actual_chart_family(family, meth
 
 @pytest.mark.parametrize('method,args,kwargs,kind', CASES, ids=[c[0] for c in CASES])
 def test_all_constructors_share_native_browser_model_and_render(method, args, kwargs, kind):
-    with figgy.figure(backend='native') as native, figgy.figure(backend='webgpu') as browser:
+    with figgy.figure(backend='native', id='parity') as native, figgy.figure(backend='webgpu', id='parity') as browser:
         for fig in (native, browser):
             getattr(fig.axes[0], method)(*args, **kwargs)
             fig.axes[0].set_title('Shared chart')

@@ -9,6 +9,7 @@ pub(super) struct BoundedSurface {
     id: egui::TextureId,
     size: (u32, u32),
     frame: DocumentFrame,
+    annotations: Arc<renderer::annotation::BoundedAnnotationFrame>,
 }
 
 impl SurfaceWindow {
@@ -77,12 +78,18 @@ impl SurfaceWindow {
                         &texture.create_view(&Default::default()),
                         wgpu::FilterMode::Linear,
                     );
+                    let annotations = renderer.prepare_annotations(
+                        &c.data.document.as_ref().unwrap().chart,
+                        logical_size,
+                        scale,
+                    )?;
                     self.bounded_surface = Some(BoundedSurface {
                         renderer,
                         texture,
                         id,
                         size,
                         frame,
+                        annotations,
                     });
                 }
                 let surface = self.bounded_surface.as_mut().unwrap();
@@ -94,6 +101,11 @@ impl SurfaceWindow {
                         scale,
                     )
                     .map_err(runtime)?;
+                surface.annotations = surface.renderer.prepare_annotations(
+                    &c.data.document.as_ref().unwrap().chart,
+                    logical_size,
+                    scale,
+                )?;
                 root.painter().image(
                     surface.id,
                     image_rect,
@@ -116,8 +128,16 @@ impl SurfaceWindow {
                 let before = chart.clone();
                 let decoration = response.interact_pointer_pos().and_then(|p| {
                     let point = to_local(p);
-                    let hit = map.hit_test(point)?;
-                    let key = map.element(hit)?.id.clone();
+                    let key = match surface.annotations.hit_test_active_layer(
+                        chart.active_layer(),
+                        map,
+                        point,
+                    )? {
+                        renderer::annotation::LayerHit::Annotation { index, .. } => {
+                            renderer::DecorationId::Annotation(index)
+                        }
+                        renderer::annotation::LayerHit::Element(id) => map.element(id)?.id.clone(),
+                    };
                     if key == renderer::DecorationId::DataArea
                         && !self.editor.edit_area
                         && chart.decorations().selected != Some(key.clone())
@@ -130,6 +150,14 @@ impl SurfaceWindow {
                 if response.drag_started() {
                     self.handle = ctx.input(|i| i.pointer.press_origin()).and_then(|p| {
                         let selected = chart.decorations().selected.as_ref()?;
+                        if let renderer::DecorationId::Annotation(index) = selected {
+                            let id = surface.annotations.annotations().find(*index)?;
+                            return surface
+                                .annotations
+                                .annotations()
+                                .hit_resize_handle(id, to_local(p))
+                                .map(|h| format!("{h:?}"));
+                        }
                         let (id, _) = map.entries().find(|(_, e)| &e.id == selected)?;
                         map.hit_resize_handle(id, to_local(p))
                             .map(|h| format!("{h:?}"))
@@ -144,6 +172,7 @@ impl SurfaceWindow {
                             }
                             crate::bounded::DocumentChart::Categorical(c) => c.selected = None,
                             crate::bounded::DocumentChart::BoxPlot(c) => c.selected = None,
+                            crate::bounded::DocumentChart::Radar(c) => c.selected = None,
                         }
                     }
                 }
@@ -177,6 +206,35 @@ impl SurfaceWindow {
                         }
                     }
                 }
+                if response.dragged() {
+                    if let Some(renderer::DecorationId::Annotation(index)) =
+                        chart.decorations().selected
+                    {
+                        if let Some(id) = surface.annotations.annotations().find(index) {
+                            let delta = ctx.input(|i| i.pointer.delta());
+                            let dx = delta.x * logical_size.0 as f32 / image_rect.width();
+                            let dy = delta.y * logical_size.1 as f32 / image_rect.height();
+                            if let Some(handle) = self.handle.as_ref().and_then(|name| {
+                                ALL_HANDLES.into_iter().find(|h| format!("{h:?}") == *name)
+                            }) {
+                                surface.annotations.annotations().resize_by(
+                                    chart.annotations_mut(),
+                                    id,
+                                    handle,
+                                    dx,
+                                    dy,
+                                );
+                            } else {
+                                surface.annotations.annotations().drag_by(
+                                    chart.annotations_mut(),
+                                    id,
+                                    dx,
+                                    dy,
+                                );
+                            }
+                        }
+                    }
+                }
                 if response.drag_stopped() {
                     self.handle = None;
                 }
@@ -196,6 +254,11 @@ impl SurfaceWindow {
                     match surface.renderer.prepare(&chart, logical_size, scale) {
                         Ok(frame) => {
                             surface.frame = frame;
+                            surface.annotations = surface.renderer.prepare_annotations(
+                                &chart,
+                                logical_size,
+                                scale,
+                            )?;
                             c.set_document(chart)?;
                             self.editor.error.clear();
                         }
@@ -247,13 +310,17 @@ impl SurfaceWindow {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        load: wgpu::LoadOp::Clear(background_wgpu(Some(
+                            c.data.document.as_ref().unwrap().chart.background(),
+                        ))),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 ..Default::default()
             });
+            radial.annotations.draw_underlay(&mut pass);
             radial.frame.draw(&mut pass);
+            radial.annotations.draw_overlay(&mut pass);
         }
         for (id, deltas) in &output.textures_delta.set {
             for delta in deltas {

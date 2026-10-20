@@ -7,6 +7,7 @@
 | [Project README](../README.md) | Installation, quick start, interactive demo and chart gallery |
 | [Example index](../examples/README.md) | Runnable chart recipes, image links and commands |
 | [Chart and style API](CHART_TYPES.md) | All chart constructors, host coverage, procedural materials and draw modes |
+| [Renderer 0.18 features](RENDERER_018_FEATURES.md) | ID-addressed grids, polar/radar, vectors, maps, fills, layers, annotations and complete-document replay |
 | [Desktop editor](DESKTOP_EDITOR.md) | Zoom/pan, selection, visibility, properties, code export and windows |
 | [Edit and reuse demo](README_DEMO.md) | Real clipboard paste, batch application and recording reproduction |
 | [Hosts](HOSTS.md) | Native surface and browser WebGPU behavior, data transfer and export |

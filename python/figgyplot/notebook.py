@@ -25,6 +25,25 @@ class NotebookData:
         # Only bounded extent metadata survives transfer release, never sample arrays.
         spec = json.loads(spec_json)
         style = next(iter(spec['render_type'].values()))
+        if 'Vector' in spec['render_type'] and 'Data' in style['style']['scale'] and 'Points' in style['components']:
+            def vector_array(name):
+                dtype, data = self.columns[name]
+                return np.frombuffer(data, dtype=np.dtype(dtype).newbyteorder('<')).astype(np.float64)
+            x, y = vector_array(spec['x_column']), vector_array(spec['y_column'])
+            u, v = (vector_array(style['components']['Points'][key]) for key in ('u', 'v'))
+            factor = style['style']['scale']['Data']['factor']
+            pivot = style['style'].get('pivot', 'Tail')
+            start, end = {'Tail': (0, 1), 'Middle': (-.5, .5), 'Tip': (-1, 0)}[pivot]
+            valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(u) & np.isfinite(v)
+            extents = []
+            for origin, component in ((x, u), (y, v)):
+                values = np.concatenate(((origin+start*factor*component)[valid], (origin+end*factor*component)[valid]))
+                values = values[np.isfinite(values)]
+                if not values.size:
+                    raise ValueError('vector has no finite geometry')
+                positive = values[values > 0]
+                extents.append((float(values.min()), float(values.max()), float(positive.min()) if positive.size else None))
+            self.model.cache_fit_extent(spec['series_id'], *extents)
         if 'err_x' in style or 'err_y' in style:
             def array(name):
                 dtype, data = self.columns[name]
@@ -55,7 +74,7 @@ class NotebookData:
         self.columns.pop(id, None)
 
     def payload(self):
-        if self.sealed and not self.columns and not any(json.loads(self.model.settings_json()).get(k) for k in ('radial', 'categorical', 'boxplot')):
+        if self.sealed and not self.columns and not any(json.loads(self.model.settings_json()).get(k) for k in ('radial', 'categorical', 'boxplot', 'radar')):
             raise RuntimeError("Notebook transfer snapshots were released; create a new Figure, or set retain_notebook_data=True before upload")
         self.sealed = True
         manifest, buffers = [], []

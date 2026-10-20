@@ -197,10 +197,26 @@ pub fn config(figure: u64, input: &Config) -> Config {
         }
         subplot.config = config(figure, &subplot.config);
     }
+    // Renderer 0.18's registry validates mapped series against the document
+    // root before expansion. Subplots still draw with their own colorbars.
+    // Supply an invisible validation context only at the GPU boundary; it
+    // never becomes an additional authority in the persisted chart model.
+    if result.colorbar.is_none() {
+        if let Some(bar) = result
+            .subplots
+            .iter()
+            .find_map(|p| p.config.colorbar.as_ref())
+        {
+            let mut bar = bar.clone();
+            bar.visible = false;
+            result.colorbar = Some(bar);
+        }
+    }
     result
 }
 
-/// Only names change at the host boundary. Public SSOT retains local ids;
+/// Names and the derived registry validation context change at this boundary.
+/// Public SSOT retains local ids and its own colorbars;
 /// typed renderer models still own all validation, fitting and rendering.
 pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
     use renderer::data_config::{

@@ -14,6 +14,7 @@ CASES = {
     'radial': "ax.donut([40, 30, 30], labels=['A','B','C'], material='ceramic')",
     'categorical': "ax.bar(['A','B','C'], [4, 3, 5])",
     'boxplot': "ax.boxplot([[1,2,3],[2,4,6],[3,5,8]])",
+    'radar': "ax.radar(['A','B','C'], [[4,3,5],[2,5,3]])",
 }
 
 
@@ -1094,3 +1095,143 @@ for key in ['top_x','right_y']:
         code=page.locator('textarea[data-code]').input_value()
         assert code
         execute(f"code={code!r}; assert code==fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.plot([1,10,100],[1,10,100],id='signal'); exec(code,{{'fig':other}}); assert other.get_settings()['config']==fig.get_settings()['config']; other.close()")
+
+
+FEATURE_018 = {
+    'maps': "ax.scatter([0,1,2],[2,1,3],c=[1,2,4],s=[2,5,9],id='signal')",
+    'child_maps': "fig.set_layout([['empty','mapped']]); ax=fig.subplots['mapped'].axes; ax.scatter([0,1,2],[2,1,3],c=[1,2,4],s=[2,5,9],id='signal')",
+    'mixed_styles': "fig.set_layout([['line','field']]); ax=fig.subplots['line'].axes; ax.plot([0,1,2],[1,2,1],id='signal'); ax.set_draw_style('sketch'); fig.subplots['field'].imshow([[0,1],[1,0]],id='field')",
+    'vector_points': "ax.quiver([0,1,2],[0,2,1],[1,0,-1],[0,1,1],values=[1,2,3],scale=20,id='signal')",
+    'vector_grid': "ax.quiver([0,1],[0,1],[[1,0],[0,-1]],[[0,1],[1,0]],values=[[1,2],[3,4]],scale=20,id='signal')",
+    'fill_steps': "ax.fill_between([0,1,2],[2,4,3],[1,1,2],id='band'); ax.step([0,1,2],[1,2,1],where='post',id='signal')",
+    'polar': "ax.set_polar(); ax.plot([0,90,180,270,360],[1,2,3,2,1],id='signal'); ax.text(.5,.5,'Note',coords='ratio',id='note')",
+    'annotations': "ax.plot([0,1,2],[1,2,0],id='signal'); ax.axvspan(.5,1.,id='span'); ax.arrow(.2,.2,.4,.3,coords='ratio',id='arrow')",
+    'panels': "fig.set_layout([['left','right']]); ax=fig.subplots['left'].axes; ax.plot([0,1,2],[1,2,1],color='red',id='signal'); fig.subplots['right'].plot([0,1,2],[3,1,2],color='blue',id='other'); ax.activate()",
+    'secondary_y': "ax.plot([0,1,2],[1,2,1],id='signal'); twin=ax.twinx(id='pressure'); twin.plot([0,1,2],[100,200,150],color='red',id='other'); ax.activate()",
+}
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('feature', FEATURE_018)
+def test_renderer_018_features_display_edit_and_export_in_both_hosts(tmp_path, feature):
+    from PIL import Image
+    setup = FEATURE_018[feature]
+    with figgy.Figure(backend='native') as fig:
+        ax = fig.axes[0]
+        exec(setup, {'fig': fig, 'ax': ax})
+        handle = fig.show(block=False)
+        try:
+            inputs = Inputs(handle)
+            info = inputs.info()
+            assert info['surface_frames'] > 0 and not info['error']
+            assert fig.info['rgba_readbacks'] == fig.info['png_encodes'] == 0
+            # Settings acceptance redraws the actual surface with all panels.
+            state = fig.get_settings()
+            state['config']['grid']['show_major_x'] = False
+            fig.apply_settings(state)
+            inputs.pump()
+            assert not inputs.info()['error']
+            native = fig.render_rgba(scale=2)
+            assert native.shape == (1200, 1920, 4)
+            assert np.any(native[..., :3] < 150)
+            if feature == 'panels':
+                for half in (native[:, :960, :3], native[:, 960:, :3]):
+                    assert np.count_nonzero(half.max(axis=2)-half.min(axis=2) > 80) > 100
+        finally:
+            handle.close()
+            Inputs.pump()
+    source = "import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n" + setup + "\ndisplay(fig.widget())"
+    with notebook(tmp_path/feature, source) as (page, execute):
+        page.locator('[data-properties]').click()
+        page.locator('[data-advanced]').evaluate('(el)=>el.open=true')
+        state = page.evaluate(ROOT+'.snapshot()')
+        state['config']['grid']['show_major_x'] = False
+        page.locator('[data-settings]').fill(json.dumps(state))
+        page.locator('[data-apply]').click()
+        page.evaluate(ROOT+'.flush()')
+        execute('await fig.sync()')
+        assert not page.locator('.figgy-error').inner_text()
+        accepted = json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert accepted['schema_version'] == 2
+        assert not accepted['config']['grid']['show_major_x']
+        if feature == 'child_maps':
+            assert 'colorbar' not in accepted['config']
+            assert 'colorbar' not in page.evaluate(ROOT+'.snapshot().config')
+        if feature == 'panels':
+            page.locator('[data-layer]').select_option(label='right')
+            page.evaluate(ROOT+'.flush()')
+            assert page.evaluate(ROOT+'.snapshot().config.active_layer') == {'Subplot': 0}
+            page.locator('[data-target]').select_option('subplot_0:chart_title')
+            title = page.locator('[data-property=text]')
+            title.fill('Right panel');title.dispatch_event('change')
+            page.evaluate(ROOT+'.flush()')
+            execute('await fig.sync()')
+            accepted = json.loads(execute('print(json.dumps(fig.get_settings()))'))
+            rich = accepted['config']['subplots'][0]['config']['chart_title']['text']
+            assert ''.join(s['text'] for s in rich['segments']) == 'Right panel'
+            assert not accepted['config']['chart_title']['text']['segments']
+        path = tmp_path/'export.png'
+        execute(f'await fig.savefig_async({str(path)!r},scale=2)')
+        pixels = np.asarray(Image.open(path).convert('RGB'))
+        assert pixels.shape == (1200, 1920, 3)
+        assert np.any(pixels < 150)
+        if feature == 'panels':
+            for half in (pixels[:, :960], pixels[:, 960:]):
+                assert np.count_nonzero(half.max(axis=2)-half.min(axis=2) > 80) > 100
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('kind', ['cartesian', 'radar'])
+def test_annotation_layer_drag_and_endpoint_resize_match_hosts(tmp_path, kind):
+    import copy
+    setup = "ax.plot([0,1,2],[1,2,0],id='signal')" if kind == 'cartesian' else "ax.radar(['A','B','C'],[2,4,3])"
+    setup += "; ax.arrow(.25,.3,.25,.15,coords='ratio',id='arrow').select()"
+    def geometry(state):
+        owner = state['config'] if kind == 'cartesian' else state['radar']
+        return owner['annotations']['items'][0]['kind']['Arrow']
+    with figgy.Figure(backend='native') as fig:
+        exec(setup, {'fig': fig, 'ax': fig.axes[0]})
+        handle = fig.show(block=False)
+        try:
+            inputs = Inputs(handle)
+            target = 'annotation:arrow' if kind == 'cartesian' else 'annotation_0'
+            box = json.loads(fig._native.bounds_json(target))['rect']
+            original = copy.deepcopy(geometry(fig.get_settings()))
+            scale = inputs.info()['chart_panel'][2]/960
+            point = native_point(inputs.info(), (box[0]+box[2]/2, box[1]+box[3]/2))
+            drag_native(inputs, point, (12*scale, 6*scale))
+            moved = copy.deepcopy(geometry(fig.get_settings()))
+            assert moved['from'] != original['from'] and moved['to'] != original['to']
+            bounds = json.loads(fig._native.bounds_json(target))
+            endpoint = max(bounds['handles'], key=lambda r:r[0]+r[1])
+            point = native_point(inputs.info(), (endpoint[0]+endpoint[2]/2, endpoint[1]+endpoint[3]/2))
+            drag_native(inputs, point, (10*scale, 0))
+            resized = geometry(fig.get_settings())
+            assert resized['from'] == moved['from'] and resized['to'] != moved['to']
+            assert not inputs.info()['error']
+        finally:
+            handle.close();Inputs.pump()
+    source = "import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/kind, source) as (page, execute):
+        def screen(point):
+            if kind == 'radar':
+                return browser_point(page, point)
+            return page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""", point)
+        original = geometry(page.evaluate(ROOT+'.snapshot()'))
+        annotation = page.evaluate(ROOT+'.annotations()')[0]
+        box = annotation['rect']
+        start = screen([box[0]+box[2]/2, box[1]+box[3]/2])
+        page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+12,start[1]+6,steps=5);page.mouse.up()
+        page.evaluate(ROOT+'.flush()')
+        moved = geometry(page.evaluate(ROOT+'.snapshot()'))
+        assert moved['from'] != original['from'] and moved['to'] != original['to']
+        if page.locator('.figgy-properties').is_visible():
+            page.locator('[data-close-properties]').click()
+        annotation = page.evaluate(ROOT+'.annotations()')[0]
+        endpoint = max(annotation['handles'], key=lambda r:r[0]+r[1])
+        start = screen([endpoint[0]+endpoint[2]/2, endpoint[1]+endpoint[3]/2])
+        page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+10,start[1],steps=5);page.mouse.up()
+        page.evaluate(ROOT+'.flush()')
+        resized = geometry(page.evaluate(ROOT+'.snapshot()'))
+        assert resized['from'] == moved['from'] and resized['to'] != moved['to']
+        assert not page.locator('.figgy-error').inner_text()
