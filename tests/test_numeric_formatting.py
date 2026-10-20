@@ -36,23 +36,8 @@ def test_numeric_format_and_precision_editing_in_both_hosts(tmp_path):
         try:
             inputs = Inputs(handle)
             def click_control(key):
-                # Properties can exceed the available height; use real scrolling.
-                for _ in range(12):
-                    info=inputs.info();controls=info['controls']
-                    rect = controls.get(key)
-                    header=controls['properties_header'];footer=controls['advanced']
-                    # Widget bounds include clipped rows. Keep the entire
-                    # control between the fixed inspector header and footer.
-                    view=controls.get('properties_viewport')
-                    top=view[1]+2 if view else header[1]+header[3]+30
-                    bottom=view[1]+view[3]-2 if view else footer[1]-40
-                    if rect and top < rect[1] and rect[1]+rect[3] < bottom:
-                        inputs.click(key)
-                        return
-                    panel = info['chart_panel']
-                    inputs.xdo('mousemove','--window',inputs.wid,round(panel[0]+panel[2]+150),350)
-                    inputs.xdo('click',4 if rect and rect[1]<=top else 5);inputs.pump()
-                raise AssertionError(f'Control not visible: {target}/{key}: {rect}, viewport {top}..{bottom}')
+                # Inputs scrolls the actual property viewport, below the object tree.
+                inputs.click(key)
             for target,key in targets:
                 rect=inputs.info()['decorations'][target]
                 # The deliberately wide initial labels overlap the title at

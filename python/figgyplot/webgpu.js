@@ -105,7 +105,7 @@ export function render({model,el}) {
     const state=snapshot(),index=(kind?state[kind]:state.config).annotations.items.length-1;chart.select_annotation(index);
     selected=kind?`annotation_${index}`:`annotation:${item.id}`;inspectorTarget=null;inspectorLayer=null;
     cancelDrawing();showProperties();dirty=true;commit();
-    if(g.tool==='text')requestAnimationFrame(()=>{const input=root.querySelector('[data-property=text]');input?.focus();input?.select();});
+    if(g.tool==='text'){const target=selected;flush().then(()=>requestAnimationFrame(()=>{if(selected!==target)return;const input=root.querySelector('[data-property=text]');input?.focus();input?.select();})).catch(fail);}
   }
   root.querySelector('[data-draw]').addEventListener('click',e=>{drawingPalette.hidden=!drawingPalette.hidden;e.currentTarget.setAttribute('aria-pressed',String(!drawingPalette.hidden));cancelDrawing();});
   for(const button of root.querySelectorAll('[data-tool]'))button.addEventListener('click',()=>{cancelDrawing();drawingTool=button.dataset.tool;layoutMode(false);drawingUI();canvas.focus();});

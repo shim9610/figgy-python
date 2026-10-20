@@ -1051,16 +1051,8 @@ for key in ['top_x','right_y']:
         try:
             inputs=Inputs(handle)
             def click_control(key):
-                for _ in range(16):
-                    info=inputs.info();controls=info['controls'];rect=controls.get(key)
-                    header=controls['properties_header'];footer=controls['advanced']
-                    view=controls.get('properties_viewport');top=view[1]+2 if view else header[1]+header[3]+30;bottom=view[1]+view[3]-2 if view else footer[1]-40
-                    if rect and top<rect[1] and rect[1]+rect[3]<bottom:
-                        inputs.click(key);return
-                    panel=info['chart_panel']
-                    inputs.xdo('mousemove','--window',inputs.wid,round(panel[0]+panel[2]+150),350)
-                    inputs.xdo('click',4 if rect and rect[1]<=top else 5);inputs.pump()
-                raise AssertionError(f'Control not visible: {key}')
+                # Inputs scrolls the actual property viewport, below the object tree.
+                inputs.click(key)
             def edit(target,field,value):
                 inputs.click_rect(inputs.info()['decorations'][target])
                 assert inputs.info()['selected']==target
@@ -1417,6 +1409,8 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         page.keyboard.press('Escape');page.mouse.up();assert not items(page.evaluate(ROOT+'.snapshot()'))
         page.locator('[data-tool=text]').click();r=page.locator('canvas').bounding_box();page.mouse.click(r['x']+r['width']*.35,r['y']+r['height']*.4)
         page.wait_for_function(ROOT+f'.snapshot().{kind or "config"}.annotations.items.length===1')
+        page.evaluate(ROOT+'.flush()')
+        page.wait_for_function("document.activeElement?.dataset.property==='text'")
         text=page.locator('[data-property=text]');text.fill('Review this region');text.dispatch_event('change');page.evaluate(ROOT+'.flush()')
         assert ''.join(v['text'] for v in items(page.evaluate(ROOT+'.snapshot()'))[0]['kind']['Text']['text']['segments'])=='Review this region'
         if any(axes):page.locator('[data-anchor-data]').check()
