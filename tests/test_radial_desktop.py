@@ -54,6 +54,8 @@ class Inputs:
         self.pump()
 
     def click(self, name):
+        from object_navigation import ensure_native_control_visible
+        ensure_native_control_visible(self.info, self.xdo, self.pump, self.wid, name)
         self.click_rect(self.info()["controls"][name])
 
     def key(self, key):

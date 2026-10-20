@@ -807,7 +807,7 @@ class Figure:
             if kind:
                 state = self.get_settings()
                 state[kind]['decorations']['data_area'] = None
-                if kind == 'boxplot': state[kind]['value_range'] = None
+                if kind in ('boxplot', 'radar'): state[kind]['value_range'] = None
                 return self.apply_settings(state)
             if padding is None:
                 series = self.get_settings()['series']
@@ -1103,6 +1103,14 @@ class Axes(FeatureMethods, ChartMethods):
         if not math.isfinite(low) or not math.isfinite(high) or low >= high:
             raise ValueError('range must be finite and increasing')
         state = self.figure.get_settings()
+        kind = _family(state)
+        if kind:
+            value_axis = 'x' if kind == 'boxplot' and state[kind]['direction'] == 'Horizontal' else 'y'
+            if kind not in ('boxplot', 'radar') or dimension != value_axis:
+                raise ValueError(f'{kind} does not support an adjustable {dimension} value axis')
+            state[kind]['value_range'] = [low, high]
+            self.figure.apply_settings(state)
+            return low, high
         state['config']['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
         state['config'] = json.loads(fitted_range_json(json.dumps(state['config']), dimension, low, high))
         self.figure.apply_settings(state)
@@ -1447,14 +1455,12 @@ class Axes(FeatureMethods, ChartMethods):
         Use ``set_xlim_without_tick_auto`` or an SSOT config patch to keep
         existing tick and label settings.
         """
-        self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
             return self._set_bounds("x", left, right)
 
     def set_ylim(self, bottom, top):
         """Set both Y bounds and derive ticks/labels, as ``set_xlim`` does."""
-        self.figure._require_cartesian()
         with self.figure._lock:
             self.figure._require_open()
             return self._set_bounds("y", bottom, top)

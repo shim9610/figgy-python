@@ -106,6 +106,7 @@ impl Editor {
                     self.controls.insert("select_mode".into(), select.rect);
                     if select.clicked() {
                         self.edit_area = false;
+                        self.drawing.cancel();
                         let mut chart = c.data.document.as_ref().unwrap().chart.clone();
                         if chart.decorations().selected == Some(renderer::DecorationId::DataArea) {
                             chart.clear_selection();
@@ -125,7 +126,9 @@ impl Editor {
                     self.controls.insert("layout_mode".into(), area.rect);
                     if area.clicked() {
                         self.edit_area = true;
+                        self.drawing.cancel();
                     }
+                    self.drawing_button(ui);
                     let fit = toolbar_icon(
                         ui,
                         Icon::Fit,
@@ -137,8 +140,10 @@ impl Editor {
                     if fit.clicked() {
                         let mut chart = c.data.document.as_ref().unwrap().chart.clone();
                         chart.decorations_mut().data_area = None;
-                        if let crate::bounded::DocumentChart::BoxPlot(c) = &mut chart {
-                            c.value_range = None;
+                        match &mut chart {
+                            crate::bounded::DocumentChart::BoxPlot(c) => c.value_range = None,
+                            crate::bounded::DocumentChart::Radar(c) => c.value_range = None,
+                            _ => {}
                         }
                         match c.set_document(chart) {
                             Ok(()) => self.error.clear(),
@@ -146,24 +151,6 @@ impl Editor {
                         }
                     }
 
-                    let mut chart = c.data.document.as_ref().unwrap().chart.clone();
-                    if !chart.annotations().items.is_empty() {
-                        let mut annotations =
-                            chart.active_layer() == renderer::LayerRef::Annotations;
-                        let response = ui.checkbox(&mut annotations, "Annotations");
-                        self.controls
-                            .insert("annotation_layer".into(), response.rect);
-                        if response.changed() {
-                            chart.set_active_layer(if annotations {
-                                renderer::LayerRef::Annotations
-                            } else {
-                                renderer::LayerRef::Base
-                            });
-                            if let Err(error) = c.set_document(chart) {
-                                self.error = error.to_string();
-                            }
-                        }
-                    }
                     let advanced = ui.button("Advanced settings…");
                     self.controls.insert("advanced".into(), advanced.rect);
                     if advanced.clicked() {
@@ -233,6 +220,7 @@ impl Editor {
                     });
                 });
             });
+        self.drawing_ui(root, c);
         egui::Panel::bottom("radial_status").exact_size(30.).show(root, |ui| {
             ui.label(if !self.error.is_empty() { self.error.as_str() } else if !self.notice.is_empty() {
                 self.notice.as_str()
@@ -242,7 +230,12 @@ impl Editor {
             egui::Panel::right("radial_properties")
                 .exact_size(INSPECTOR_WIDTH)
                 .show(root, |ui| {
-                    egui::ScrollArea::vertical().show(ui, |ui| self.radial_properties(ui, c));
+                    self.bounded_navigator(ui, c);
+                    let form = egui::ScrollArea::vertical()
+                        .id_salt("bounded_properties")
+                        .show(ui, |ui| self.radial_properties(ui, c));
+                    self.controls
+                        .insert("properties_viewport".into(), form.inner_rect);
                 });
         }
         egui::CentralPanel::default()
@@ -257,10 +250,84 @@ impl Editor {
                 .default_width(INSPECTOR_WIDTH)
                 .resizable(false)
                 .show(root.ctx(), |ui| {
-                    egui::ScrollArea::vertical()
-                        .max_height(500.)
+                    self.bounded_navigator(ui, c);
+                    let form = egui::ScrollArea::vertical()
+                        .id_salt("bounded_properties")
+                        .max_height(300.)
                         .show(ui, |ui| self.radial_properties(ui, c));
+                    self.controls
+                        .insert("properties_viewport".into(), form.inner_rect);
                 });
+        }
+    }
+
+    fn bounded_navigator(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        let document = &c.data.document.as_ref().unwrap().chart;
+        let target = if let Some(id) = document.decorations().selected.as_ref() {
+            Some(id.element_id())
+        } else {
+            let selected = document.selected_json();
+            selected["series_id"]
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| selected["index"].as_u64().map(|i| format!("slice_0_{i}")))
+        };
+        let nodes = navigation::nodes(&c.snapshot());
+        if let Some(node) = self.navigator.show(
+            ui,
+            &nodes,
+            document.active_layer(),
+            target.as_deref(),
+            &mut self.controls,
+        ) {
+            let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+            chart.clear_selection();
+            chart.set_active_layer(node.layer);
+            if let Some(target) = node.target.as_deref() {
+                chart.decorations_mut().selected = if let Some(index) = target
+                    .strip_prefix("annotation_")
+                    .and_then(|s| s.parse::<usize>().ok())
+                {
+                    Some(renderer::DecorationId::Annotation(index))
+                } else {
+                    c.document_frame().ok().and_then(|frame| {
+                        frame
+                            .decorations()
+                            .entries()
+                            .find(|(_, element)| element.id.element_id() == target)
+                            .map(|(_, element)| element.id.clone())
+                    })
+                };
+                if chart.decorations().selected.is_none() && node.kind == "series" {
+                    let family = chart.family();
+                    let mut state = serde_json::to_value(c.snapshot()).unwrap();
+                    if family == "radial" {
+                        if let Some(index) = target
+                            .strip_prefix("slice_0_")
+                            .and_then(|s| s.parse::<usize>().ok())
+                        {
+                            state[family]["interaction"]["selected"] =
+                                json!({"group":0,"index":index});
+                        }
+                    } else {
+                        state[family]["selected"] = json!({"series_id":target,"category_id":state[family]["categories"][0]["id"]});
+                    }
+                    state[family]["decorations"]["selected"] = Value::Null;
+                    state[family]["active_layer"] = serde_json::to_value(node.layer).unwrap();
+                    let result = if family == "radial" {
+                        c.set_radial(&state[family].to_string())
+                    } else {
+                        c.set_bounded(family, &state[family].to_string())
+                    };
+                    if let Err(error) = result {
+                        self.error = error.to_string();
+                    }
+                    return;
+                }
+            }
+            if let Err(error) = c.set_document(chart) {
+                self.error = error.to_string();
+            }
         }
     }
 
@@ -371,7 +438,82 @@ impl Editor {
             }
         }
     }
+    fn bounded_context_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) -> bool {
+        let document = &c.data.document.as_ref().unwrap().chart;
+        if let Some(renderer::DecorationId::Annotation(index)) = document.decorations().selected {
+            let mut state = serde_json::to_value(c.snapshot()).unwrap();
+            let family = document.family();
+            if let Some(item) = state[family]["annotations"]["items"].get_mut(index) {
+                let changed = self.annotation_properties(ui, item);
+                if self.delete_annotation {
+                    state[family]["annotations"]["items"]
+                        .as_array_mut()
+                        .unwrap()
+                        .remove(index);
+                    state[family]["decorations"]["selected"] = Value::Null;
+                }
+                if changed || self.delete_annotation {
+                    let result = if family == "radial" {
+                        c.set_radial(&state[family].to_string())
+                    } else {
+                        c.set_bounded(family, &state[family].to_string())
+                    };
+                    match result {
+                        Ok(_) => self.error.clear(),
+                        Err(error) => self.error = error.to_string(),
+                    }
+                }
+            }
+            return true;
+        }
+        if let Some(view) = navigation::bounded_view(&c.snapshot()) {
+            let mut range: [f64; 2] = serde_json::from_value(view["range"].clone()).unwrap();
+            let mut automatic = view["automatic"].as_bool().unwrap();
+            ui.label(
+                egui::RichText::new(if view["axis"] == "radius" {
+                    "Radial range"
+                } else {
+                    "Value axis range"
+                })
+                .strong(),
+            );
+            let auto = ui.checkbox(&mut automatic, "Automatic range");
+            self.controls.insert("auto_range".into(), auto.rect);
+            let mut changed = auto.changed();
+            let speed = (range[1] - range[0]).abs().max(1.) * 0.01;
+            ui.horizontal(|ui| {
+                for (i, key) in ["range_min", "range_max"].into_iter().enumerate() {
+                    ui.label(if i == 0 { "Min" } else { "Max" });
+                    let response = ui.add(egui::DragValue::new(&mut range[i]).speed(speed));
+                    self.controls.insert(key.into(), response.rect);
+                    if response.changed() {
+                        automatic = false;
+                        changed = true;
+                    }
+                }
+            });
+            if changed {
+                let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                let value = if automatic { None } else { Some(range) };
+                match &mut chart {
+                    crate::bounded::DocumentChart::BoxPlot(c) => c.value_range = value,
+                    crate::bounded::DocumentChart::Radar(c) => c.value_range = value,
+                    _ => {}
+                }
+                if let Err(error) = c.set_document(chart) {
+                    self.error = error.to_string();
+                }
+            }
+            ui.small("Wheel over plot: zoom values · Fit: automatic range");
+            ui.separator();
+        }
+        false
+    }
+
     fn radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        if self.bounded_context_properties(ui, c) {
+            return;
+        }
         if c.data.document.as_ref().unwrap().chart.radial().is_none() {
             self.bounded_properties(ui, c);
             return;

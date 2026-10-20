@@ -117,6 +117,71 @@ impl SurfaceWindow {
                     egui::Id::new("radial_image"),
                     egui::Sense::click_and_drag(),
                 );
+                // Bounded value axes have their own range model; do not
+                // silently drop wheel input as if they were immutable images.
+                if response.hovered()
+                    && let Some(view) = navigation::bounded_view(&c.snapshot())
+                {
+                    let delta = root.input(|i| {
+                        i.raw
+                            .events
+                            .iter()
+                            .filter_map(|e| {
+                                if let egui::Event::MouseWheel { delta, .. } = e {
+                                    Some(delta.y)
+                                } else {
+                                    None
+                                }
+                            })
+                            .sum::<f32>()
+                    });
+                    let modifiers = root.input(|i| i.modifiers);
+                    let horizontal = view["axis"] == "x";
+                    let allowed = if horizontal {
+                        !modifiers.shift || modifiers.ctrl
+                    } else {
+                        !modifiers.ctrl || modifiers.shift
+                    };
+                    if delta != 0. && allowed {
+                        let [low, high]: [f64; 2] =
+                            serde_json::from_value(view["range"].clone()).unwrap();
+                        let area = surface
+                            .frame
+                            .decorations()
+                            .entries()
+                            .find(|(_, v)| v.id == renderer::DecorationId::DataArea)
+                            .and_then(|(id, _)| surface.frame.decorations().bounds(id));
+                        if let (Some(p), Some(area)) = (response.hover_pos(), area) {
+                            let x = (p.x - image_rect.min.x) * logical_size.0 as f32
+                                / image_rect.width();
+                            let y = (p.y - image_rect.min.y) * logical_size.1 as f32
+                                / image_rect.height();
+                            let anchor = if view["axis"] == "radius" {
+                                0.
+                            } else if horizontal {
+                                ((x - area.x) / area.width).clamp(0., 1.) as f64
+                            } else {
+                                (1. - (y - area.y) / area.height).clamp(0., 1.) as f64
+                            };
+                            let factor = (-delta as f64 / 40. * 0.1).clamp(-1.2, 1.2).exp();
+                            let pivot = low + (high - low) * anchor;
+                            let range = Some([
+                                pivot + (low - pivot) * factor,
+                                pivot + (high - pivot) * factor,
+                            ]);
+                            let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                            match &mut chart {
+                                crate::bounded::DocumentChart::BoxPlot(c) => c.value_range = range,
+                                crate::bounded::DocumentChart::Radar(c) => c.value_range = range,
+                                _ => {}
+                            }
+                            if let Err(error) = c.set_document(chart) {
+                                self.editor.error = error.to_string();
+                            }
+                            root.ctx().request_repaint();
+                        }
+                    }
+                }
                 let map = surface.frame.decorations();
                 let to_local = |p: egui::Pos2| {
                     [
@@ -124,6 +189,56 @@ impl SurfaceWindow {
                         (p.y - image_rect.min.y) * logical_size.1 as f32 / image_rect.height(),
                     ]
                 };
+                if self.editor.drawing.tool != crate::drawing::Tool::Select {
+                    if let Some(origin) = ctx.input(|i| i.pointer.press_origin()) {
+                        if image_rect.contains(origin)
+                            && self.editor.drawing.gesture.is_none()
+                            && (response.drag_started()
+                                || response.clicked()
+                                || response.is_pointer_button_down_on())
+                        {
+                            self.editor
+                                .drawing
+                                .begin(surface.frame.annotation_space(), to_local(origin));
+                        }
+                    }
+                    if let Some(p) = ctx.input(|i| i.pointer.interact_pos()) {
+                        self.editor.drawing.update(to_local(p));
+                    }
+                    self.editor.drawing.preview(root.painter(), |p| {
+                        egui::pos2(
+                            image_rect.min.x + p[0] * image_rect.width() / logical_size.0 as f32,
+                            image_rect.min.y + p[1] * image_rect.height() / logical_size.1 as f32,
+                        )
+                    });
+                    if ctx.input(|i| i.pointer.any_released()) {
+                        if let Some(item) = self.editor.drawing.finish() {
+                            if matches!(
+                                &item.kind,
+                                renderer::annotation::AnnotationKind::Text { .. }
+                            ) {
+                                self.editor.focus_annotation = Some(item.id.clone());
+                            }
+                            let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                            let index = chart.annotations().items.len();
+                            chart.annotations_mut().visible = true;
+                            chart.annotations_mut().items.push(item);
+                            chart.set_active_layer(renderer::LayerRef::Annotations);
+                            chart.clear_selection();
+                            chart.decorations_mut().selected =
+                                Some(renderer::DecorationId::Annotation(index));
+                            if let Err(e) = c.set_document(chart) {
+                                self.editor.error = e.to_string();
+                            } else {
+                                self.editor.inspector_open = true;
+                            }
+                        }
+                    }
+                    if response.dragged() || response.clicked() {
+                        ctx.request_repaint();
+                    }
+                    return Ok(());
+                }
                 let mut chart = c.data.document.as_ref().unwrap().chart.clone();
                 let before = chart.clone();
                 let decoration = response.interact_pointer_pos().and_then(|p| {

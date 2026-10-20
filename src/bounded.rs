@@ -449,6 +449,15 @@ impl DocumentRenderer {
     }
 }
 impl DocumentFrame {
+    pub fn annotation_space(&self) -> renderer::annotation::PixelSpace {
+        match self {
+            Self::Radial(f) => f.annotation_space(),
+            Self::Categorical(f) => f.annotation_space(),
+            Self::BoxPlot(f) => f.annotation_space(),
+            Self::Radar(f) => f.annotation_space(),
+        }
+    }
+
     pub fn decorations(&self) -> &renderer::decoration::DecorationMap {
         match self {
             Self::Radial(f) => f.decorations(),

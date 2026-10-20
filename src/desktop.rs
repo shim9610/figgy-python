@@ -69,6 +69,7 @@ struct SurfaceWindow {
     last_scale: f32,
     last_pool_generation: u32,
     selected: Option<String>,
+    rendered_selection: Option<String>,
     handle: Option<String>,
     dragging: bool,
     panning: bool,
@@ -185,6 +186,7 @@ impl SurfaceWindow {
             last_scale: 0.,
             last_pool_generation: 0,
             selected: None,
+            rendered_selection: None,
             handle: None,
             dragging: false,
             panning: false,
@@ -290,6 +292,12 @@ impl SurfaceWindow {
         }
     }
     fn keyboard(&mut self, key: &NamedKey) -> PyResult<()> {
+        if *key == NamedKey::Escape && self.editor.drawing.tool != crate::drawing::Tool::Select {
+            self.editor.drawing.cancel();
+            self.dragging = false;
+            self.window.request_redraw();
+            return Ok(());
+        }
         if *key == NamedKey::F11 {
             self.window
                 .set_fullscreen(if self.window.fullscreen().is_some() {
@@ -300,6 +308,9 @@ impl SurfaceWindow {
             self.window.request_redraw();
             return Ok(());
         }
+        if self.editor.drawing.tool != crate::drawing::Tool::Select {
+            return Ok(());
+        }
         let Some(core) = self.core.upgrade() else {
             return Ok(());
         };
@@ -307,6 +318,29 @@ impl SurfaceWindow {
         let gpu = Arc::clone(&data.gpu);
         let mut renderer = gpu::lock(&gpu)?;
         let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
+        if matches!(key, NamedKey::Delete | NamedKey::Backspace) {
+            if let Some(d) = &c.data.document {
+                let mut chart = d.chart.clone();
+                if let Some(renderer::DecorationId::Annotation(index)) =
+                    chart.decorations().selected
+                {
+                    chart.annotations_mut().items.remove(index);
+                    chart.clear_selection();
+                    c.set_document(chart)?;
+                }
+            } else if let Some(target) = self
+                .selected
+                .as_deref()
+                .and_then(|v| v.strip_prefix("annotation:"))
+            {
+                let mut cfg = c.data.chart.config().clone();
+                cfg.annotations.items.retain(|v| v.id != target);
+                c.commit_config(cfg)?;
+                self.selected = None;
+            }
+            self.window.request_redraw();
+            return Ok(());
+        }
         if c.data.document.is_some() {
             let mut chart = c.data.document.as_ref().unwrap().chart.clone();
             if *key == NamedKey::Escape {
@@ -412,9 +446,60 @@ impl SurfaceWindow {
             self.window.request_redraw();
             return Ok(());
         }
-        let (display, panel, scale) = self.display(&c);
+        let (mut display, panel, scale) = self.display(&c);
         self.panel = panel;
         self.scale = scale;
+        if self.editor.drawing.tool != crate::drawing::Tool::Select {
+            match event {
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    let space = renderer::annotation::pixel_space_for_config(&display);
+                    self.editor
+                        .drawing
+                        .begin(space, [self.cursor.0, self.cursor.1]);
+                    self.dragging = true;
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    self.cursor = (position.x as f32, position.y as f32);
+                    self.editor.drawing.update([self.cursor.0, self.cursor.1]);
+                }
+                WindowEvent::MouseInput {
+                    state: ElementState::Released,
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    self.dragging = false;
+                    if let Some(item) = self.editor.drawing.finish() {
+                        let target = format!("annotation:{}", item.id);
+                        if matches!(
+                            &item.kind,
+                            renderer::annotation::AnnotationKind::Text { .. }
+                        ) {
+                            self.editor.focus_annotation = Some(item.id.clone());
+                        }
+                        let mut cfg = c.data.chart.config().clone();
+                        cfg.annotations.visible = true;
+                        cfg.annotations.items.push(item);
+                        cfg.set_active_layer(renderer::LayerRef::Annotations);
+                        cfg.picked_data = None;
+                        cfg.picked_points = None;
+                        if let Err(e) = c.commit_config(cfg) {
+                            self.editor.error = e.to_string();
+                        } else {
+                            self.selected = Some(target);
+                            self.editor.inspector_open = true;
+                            self.last_revision = u64::MAX;
+                        }
+                    }
+                }
+                _ => {}
+            }
+            self.window.request_redraw();
+            return Ok(());
+        }
         match event {
             WindowEvent::CursorMoved { position, .. } => {
                 let old = self.cursor;
@@ -466,6 +551,36 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                // Resolve the clicked panel before asking its hit map. The
+                // selected tree item and the chart share this owner route.
+                let (px, py) = self.cursor;
+                let contains = |rect: Rect| {
+                    px >= rect.x as f32
+                        && py >= rect.y as f32
+                        && px < (rect.x + rect.width) as f32
+                        && py < (rect.y + rect.height) as f32
+                };
+                let panel_at = display
+                    .subplots
+                    .iter()
+                    .position(|p| contains(p.config.chart_area.0));
+                let current = match c.data.chart.config().active_layer() {
+                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                        Some(i)
+                    }
+                    _ => None,
+                };
+                if panel_at != current && (panel_at.is_some() || contains(display.chart_area.0)) {
+                    let mut config = c.data.chart.config().clone();
+                    config.active_layer = panel_at
+                        .map(renderer::LayerRef::Subplot)
+                        .unwrap_or(renderer::LayerRef::Base);
+                    config.picked_data = None;
+                    config.picked_points = None;
+                    c.commit_config(config)?;
+                    self.selected = None;
+                    display = self.display(&c).0;
+                }
                 self.chart_pressed = true;
                 self.panning = false;
                 self.pan_moved = false;
@@ -695,6 +810,11 @@ impl SurfaceWindow {
             } else {
                 self.editor
                     .show(root, &mut c, &mut self.selected, &mut self.edit_area);
+                self.editor
+                    .drawing
+                    .preview(&root.painter().with_clip_rect(self.editor.stage), |p| {
+                        egui::pos2(p[0] / ctx.pixels_per_point(), p[1] / ctx.pixels_per_point())
+                    });
             }
         });
         // Explicit export may temporarily select its RGBA target pipelines.
@@ -753,6 +873,7 @@ impl SurfaceWindow {
         }
         if !self.settings_only
             && (c.data.revision != self.last_revision
+                || self.selected != self.rendered_selection
                 || scale != self.last_scale
                 || self.last_pool_generation != c.renderer.pool().generation()
                 || self.last_panel != Some(panel))
@@ -803,6 +924,7 @@ impl SurfaceWindow {
                 })
                 .collect::<PyResult<Vec<_>>>()?;
             self.last_revision = c.data.revision;
+            self.rendered_selection = self.selected.clone();
             self.last_scale = scale;
             self.last_pool_generation = c.renderer.pool().generation();
             self.last_panel = Some(panel);
@@ -1060,6 +1182,7 @@ impl ApplicationHandler for App {
                 w.dragging = false;
                 w.panning = false;
                 w.chart_pressed = false;
+                w.editor.drawing.cancel();
                 Ok(())
             }
             WindowEvent::ModifiersChanged(modifiers) => {

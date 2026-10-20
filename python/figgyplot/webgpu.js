@@ -42,9 +42,10 @@ export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
   const paths={fit:'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l5 5m11-5-5 5m5 11-5-5M4 20l5-5',select:'M6 3v17l5-5 4 7 3-2-4-6h7Z',layout:'M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4',copy:'M8 3h9l4 4v14H8ZM8 7H3v14h2M13 11l-2 3 2 3m3-6 2 3-2 3',save:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',properties:'M3 5h18M3 12h18M3 19h18M8 2v6M16 9v6M10 16v6',fullscreen:'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6'};
   const icon=(name,label)=>`<button data-${name} title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name]}"/></svg></button>`;
-  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<span data-status>Preparing…</span></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><label>Object <select data-target></select></label><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
+  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<button data-draw aria-pressed="false">Draw</button><input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<button data-display-scale title="Use the available width instead of the requested Figure size">Fit width</button><span data-status>Preparing…</span></div><div class="figgy-drawing" hidden><div role="toolbar" aria-label="Annotation drawing tools"><button data-tool="select">Select</button><button data-tool="text">Text</button><button data-tool="arrow">Arrow</button><button data-tool="hline">Horizontal line</button><button data-tool="vline">Vertical line</button><button data-tool="hspan">Horizontal band</button><button data-tool="vspan">Vertical band</button><label><input data-anchor-data type="checkbox">Follow data</label></div><p data-drawing-help></p></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas><svg class="figgy-drawing-preview" aria-hidden="true"></svg></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><section class="figgy-navigator"><div class="figgy-navigator-heading">Objects</div><label class="figgy-search"><input type="search" data-object-search placeholder="Find a panel, axis or series…" aria-label="Find chart objects"></label><div data-object-tree role="tree" aria-label="Chart objects"></div></section><div class="figgy-inspector-scroll"><div data-context class="figgy-context"></div><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
   el.append(root);
-  const canvas=root.querySelector('canvas'), select=root.querySelector('[data-target]'), fields=root.querySelector('[data-fields]');
+  const canvas=root.querySelector('canvas'), fields=root.querySelector('[data-fields]');
+  let inspectedTarget=null,outlineNodes=clone(model.get('state').outline??[]),boundedView=clone(model.get('state').bounded_view??null);
   const error=root.querySelector('.figgy-error'), status=root.querySelector('[data-status]');
   const controls=[...root.querySelectorAll('button,input,select,textarea')];
   controls.forEach(control=>control.disabled=true);
@@ -56,6 +57,61 @@ export function render({model,el}) {
   const kind=['radial','categorical','boxplot','radar'].find(k=>local[k]);
   let hoverPoint=null,lastFrame=0,wheelArea=null;
   const textRanges=new Map();
+  let drawingTool='select',drawingGesture=null;
+  const drawingPalette=root.querySelector('.figgy-drawing'),preview=root.querySelector('.figgy-drawing-preview');
+  function drawingSupport(){
+    const owner=kind||['Base','Annotations'].includes(local.config.active_layer??'Base');
+    const rectangular=kind==='boxplot'||kind==='categorical',horizontal=rectangular&&local[kind].direction==='Horizontal';
+    return {owner,axes:kind?(rectangular?[horizontal,!horizontal]:[false,false]):[!local.config.polar,!local.config.polar],data:kind?rectangular:!local.config.polar};
+  }
+  function drawingUI(){
+    const {owner,axes,data}=drawingSupport();
+    const axis=drawingTool.startsWith('h')?1:drawingTool.startsWith('v')?0:null;
+    if(!owner||(axis!==null&&!axes[axis])){drawingTool='select';drawingGesture=null;preview.replaceChildren();}
+    for(const button of root.querySelectorAll('[data-tool]')){
+      const name=button.dataset.tool,axis=name.startsWith('h')?1:name.startsWith('v')?0:null;
+      button.disabled=name!=='select'&&(!owner||(axis!==null&&!axes[axis]));
+      button.title=!owner?'Annotations belong to the root panel; select that panel first.':axis!==null&&!axes[axis]?'This chart has no numeric value axis in this direction.':'';
+      button.setAttribute('aria-pressed',String(name===drawingTool));
+    }
+    const anchor=root.querySelector('[data-anchor-data]');anchor.disabled=!owner||!data;if(anchor.disabled)anchor.checked=false;
+    root.querySelector('[data-drawing-help]').textContent=!owner?'Select the root panel to draw annotations.':drawingTool==='select'?'Choose a tool. Select an annotation in the chart or object tree to edit.':drawingTool==='text'?'Click to place text, then edit it in Properties. Esc: cancel.':'Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges.';
+    canvas.style.cursor=drawingTool==='select'?'':'crosshair';
+  }
+  function cancelDrawing(){drawingGesture=null;drawingTool='select';preview.replaceChildren();drawingUI();}
+  function previewDrawing(){
+    preview.setAttribute('viewBox',`0 0 ${canvas.width} ${canvas.height}`);preview.replaceChildren();
+    const g=drawingGesture;if(!g)return;const [x,y]=g.start,[u,v]=g.end,[ax,ay,w,h]=g.area;
+    const node=(name,attrs)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',name);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,String(v));preview.append(n);return n;};
+    if(g.tool==='text'){node('text',{x:u,y:v,'font-size':16}).textContent='Text';}
+    else if(g.tool==='hspan'||g.tool==='vspan')node('rect',g.tool==='hspan'?{x:ax,y:Math.min(y,v),width:w,height:Math.abs(v-y),fill:'#2663ad33'}:{x:Math.min(x,u),y:ay,width:Math.abs(u-x),height:h,fill:'#2663ad33'});
+    else {const a=g.tool==='hline'?[ax,v,ax+w,v]:g.tool==='vline'?[u,ay,u,ay+h]:[x,y,u,v];node('line',{x1:a[0],y1:a[1],x2:a[2],y2:a[3],stroke:'#2663ad','stroke-width':1.5});if(g.tool==='arrow'){const t=Math.atan2(v-y,u-x);node('polyline',{points:`${u-10*Math.cos(t-.45)},${v-10*Math.sin(t-.45)} ${u},${v} ${u-10*Math.cos(t+.45)},${v-10*Math.sin(t+.45)}`,stroke:'#2663ad',fill:'none'});}}
+  }
+  function drawingArea(){return kind?JSON.parse(chart.decorations()).find(d=>d.id==='data_area')?.rect:bounds();}
+  function finishDrawing(g){
+    if(g.cancelled||g!==drawingGesture)return;
+    if(/^[hv]/.test(g.tool)){const [x,y,w,h]=g.area;g.end=[Math.max(x,Math.min(x+w,g.end[0])),Math.max(y,Math.min(y+h,g.end[1]))];}const [x,y]=g.start,[u,v]=g.end;if(['arrow','hspan','vspan'].includes(g.tool)&&Math.hypot(u-x,v-y)<3){cancelDrawing();return;}
+    const anchor=p=>JSON.parse(chart.pointer_to_anchor(...p,g.data?'Data':'Ratio'));
+    const start=anchor(g.start),end=anchor(g.end);if(!start||!end)throw Error('This chart does not support these annotation coordinates.');
+    const line={color:{r:.235,g:.235,b:.235,a:1},width:1.5,style:'Solid'},rich={segments:segments('Text'),color:{r:.137,g:.176,b:.235,a:1},font_size:16,font:''};let geometry;
+    if(g.tool==='text')geometry={Text:{anchor:end,text:rich,box_style:null}};
+    else if(g.tool==='arrow')geometry={Arrow:{from:start,to:end,style:{line,head_length:10,head_width:8},text:null}};
+    else {const axis=g.tool.startsWith('h')?'Y':'X',key=axis==='X'?'x':'y',a=JSON.parse(chart.pointer_to_anchor(x,y,'Data'))?.Data?.[key],b=JSON.parse(chart.pointer_to_anchor(u,v,'Data'))?.Data?.[key];if(!Number.isFinite(a)||!Number.isFinite(b))throw Error('This direction has no value axis.');
+      if(g.tool.endsWith('line'))geometry={ReferenceLine:{axis,value:b,style:line,label:null}};else{if(a===b){cancelDrawing();return;}geometry={Span:{axis,from:Math.min(a,b),to:Math.max(a,b),fill:{r:.149,g:.388,b:.678,a:.176}}};}}
+    const item={id:`annotation_${crypto.randomUUID()}`,kind:geometry};
+    chart.add_annotation(JSON.stringify(item));chart.set_annotations_visible(true);chart.set_active_layer(JSON.stringify('Annotations'));
+    const state=snapshot(),index=(kind?state[kind]:state.config).annotations.items.length-1;chart.select_annotation(index);
+    selected=kind?`annotation_${index}`:`annotation:${item.id}`;inspectorTarget=null;inspectorLayer=null;
+    cancelDrawing();showProperties();dirty=true;commit();
+    if(g.tool==='text')requestAnimationFrame(()=>{const input=root.querySelector('[data-property=text]');input?.focus();input?.select();});
+  }
+  root.querySelector('[data-draw]').addEventListener('click',e=>{drawingPalette.hidden=!drawingPalette.hidden;e.currentTarget.setAttribute('aria-pressed',String(!drawingPalette.hidden));cancelDrawing();});
+  for(const button of root.querySelectorAll('[data-tool]'))button.addEventListener('click',()=>{cancelDrawing();drawingTool=button.dataset.tool;layoutMode(false);drawingUI();canvas.focus();});
+  root.addEventListener('keydown',e=>{if(e.key==='Escape'&&drawingTool!=='select'){e.preventDefault();e.stopPropagation();cancelDrawing();}},true);
+  canvas.addEventListener('lostpointercapture',()=>{if(drawingGesture&&!drawingGesture.released)cancelDrawing();});
+  function rendererTarget(target){if(kind||!target?.startsWith('annotation:'))return target;const index=local.config.annotations?.items?.findIndex(v=>'annotation:'+v.id===target);return index>=0?`annotation_${index}`:target;}
+  function hostTarget(target){if(kind)return target;const index=/^annotation_(\d+)$/.exec(target??'')?.[1],item=index===undefined?null:local.config.annotations?.items?.[Number(index)];return item?'annotation:'+item.id:target;}
+
   function showProperties(open=true){root.querySelector('.figgy-properties').hidden=!open;}
   function layoutMode(enabled){if(!enabled&&kind&&chart&&selected==='data_area')enqueue(()=>{chart.clear_selection();selected=null;dirty=true;commit();});root.querySelector('[data-area]').checked=enabled;root.querySelector('[data-layout]').setAttribute('aria-pressed',String(enabled));root.querySelector('[data-select]').setAttribute('aria-pressed',String(!enabled));}
   let inputAt=null,busy=0,startInit,pendingFrame=null,frameError=null;
@@ -186,36 +242,80 @@ export function render({model,el}) {
     if(overlay!==undefined&&['axis_right','tick_labels_right','axis_title_right'].includes(name))prefix+=`overlay_${overlay}:`;
     return prefix+name;
   }
-  const layerChoice=document.createElement('select');layerChoice.dataset.layer='';layerChoice.setAttribute('aria-label','Panel and layer');
-  root.querySelector('[data-status]').before(layerChoice);
-  function layers(){
-    if(kind){
-      layerChoice.replaceChildren();
-      for(const value of ['Base','Annotations']){const option=document.createElement('option');option.value=JSON.stringify(value);option.textContent=value;layerChoice.append(option);}
-      layerChoice.value=JSON.stringify(local[kind].active_layer??'Base');layerChoice.hidden=!local[kind].annotations?.items?.length;return;
+  const tree=root.querySelector('[data-object-tree]'),search=root.querySelector('[data-object-search]');
+  const expanded=new Map();let treeSelection=null,lastTreeSignature='';
+  const layerOf=state=>(kind?state[kind]:state.config).active_layer??'Base';
+  const sameLayer=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  function allNodes(nodes=outlineNodes,path=[]){return nodes.flatMap(node=>[{node,path:[...path,node]},...allNodes(node.children,[...path,node])]);}
+  function navigateTree(reveal=false){
+    const layer=inspectorLayer??layerOf(local),target=inspectorTarget??selected??(layer==='Annotations'?null:elementName('chart_title'));
+    let entry=allNodes().find(v=>v.node.target===target&&sameLayer(v.node.layer,layer));
+    const signature=JSON.stringify([layer,target]);
+    if(signature!==lastTreeSignature){
+      if(entry){for(const ancestor of entry.path)expanded.set(ancestor.key,true);if(!inspectorTarget)search.value='';}
+      lastTreeSignature=signature;reveal=true;
     }
-    const previous=JSON.stringify(local.config.active_layer??'Base');layerChoice.replaceChildren();
-    const panels=local.identity?.panels??[{id:'main',overlays:[]}];
-    panels.forEach((panel,index)=>{
-      const append=(label,value)=>{const option=document.createElement('option');option.textContent=label;option.value=JSON.stringify(value);layerChoice.append(option);};
-      append(panel.id,index?{Subplot:index-1}:'Base');
-      panel.overlays.forEach((id,o)=>append(id,index?{SubplotOverlay:[index-1,o]}:{Overlay:o}));
-    });
-    if(local.config.annotations?.items?.length){const option=document.createElement('option');option.textContent='Annotations';option.value=JSON.stringify('Annotations');layerChoice.append(option);}
-    layerChoice.value=previous;layerChoice.hidden=layerChoice.options.length<2;
+    treeSelection=entry?.node.key??null;
+    const query=search.value.trim().toLowerCase(),focusKey=tree.contains(document.activeElement)?document.activeElement.closest('[data-node]')?.dataset.node:null;
+    const scroll=tree.scrollTop;tree.replaceChildren();
+    const matches=node=>!query||`${node.label} ${node.kind} ${node.key.split('/').at(-1)}`.toLowerCase().includes(query)||node.children.some(matches);
+    const visit=(nodes,depth)=>{for(const node of nodes){
+      if(!matches(node))continue;
+      const open=Boolean(query)||(expanded.get(node.key)??!node.collapsed);
+      const row=document.createElement('div');row.className='figgy-tree-row';row.dataset.node=node.key;row.setAttribute('role','treeitem');row.setAttribute('aria-level',depth+1);row.setAttribute('aria-selected',String(node.key===treeSelection));row.tabIndex=-1;row.title=`${node.kind} · ${node.key}`;
+      row.style.setProperty('--depth',depth);if(!node.visible)row.classList.add('figgy-object-hidden');
+      if(node.target!==null)row.dataset.object=node.target;
+      row.dataset.layer=JSON.stringify(node.layer);
+      const toggle=document.createElement('button');toggle.className='figgy-tree-toggle';toggle.tabIndex=-1;toggle.textContent=node.children.length?(open?'▾':'▸'):'';toggle.disabled=!node.children.length;
+      if(node.children.length){row.setAttribute('aria-expanded',String(Boolean(open)));toggle.setAttribute('aria-label',`${open?'Collapse':'Expand'} ${node.label}`);}
+      toggle.addEventListener('click',e=>{e.stopPropagation();expanded.set(node.key,!open);navigateTree();});
+      const label=document.createElement('span');label.className='figgy-tree-label';label.textContent=node.label;
+      const type=document.createElement('span');type.className='figgy-tree-kind';type.textContent=['group','element','figure'].includes(node.kind)?'':node.kind;
+      row.append(toggle,label,type);row.addEventListener('click',()=>{row.focus({preventScroll:true});if(node.target!==null||node.kind==='layer')chooseObject(node);else{expanded.set(node.key,!open);navigateTree();}});
+      row.addEventListener('keydown',event=>{
+        const rows=[...tree.querySelectorAll('[role=treeitem]')],index=rows.indexOf(row);
+        if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=rows[Math.max(0,Math.min(rows.length-1,index+(event.key==='ArrowDown'?1:-1)))];next.focus();return;}
+        if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();expanded.set(node.key,event.key==='ArrowRight');navigateTree();return;}
+        if(event.key==='Enter'||event.key===' '){event.preventDefault();if(node.target!==null||node.kind==='layer')chooseObject(node);else{expanded.set(node.key,!open);navigateTree();}}
+        if(event.key==='Escape'){event.preventDefault();canvas.focus();}
+      });
+      tree.append(row);if(open)visit(node.children,depth+1);
+    }};
+    visit(outlineNodes,0);
+    if(!tree.children.length){const empty=document.createElement('p');empty.className='figgy-empty';empty.textContent='No matching objects';tree.append(empty);}
+    const rows=[...tree.querySelectorAll('[role=treeitem]')],active=rows.find(r=>r.dataset.node===treeSelection);
+    (active??rows[0])?.setAttribute('tabindex','0');tree.scrollTop=scroll;
+    if(focusKey)rows.find(r=>r.dataset.node===focusKey)?.focus({preventScroll:true});
+    if(reveal&&active)active.scrollIntoView({block:'nearest',inline:'nearest'});
+    const context=root.querySelector('[data-context]');context.textContent=entry?entry.path.slice(1).map(n=>n.label).join(' / '):'Click an object in the chart or tree';context.dataset.target=target??'';
   }
-  layerChoice.addEventListener('change',()=>enqueue(()=>{
-    const state=snapshot();(kind?state[kind]:state.config).active_layer=JSON.parse(layerChoice.value);selected=null;install(state);wheelArea=null;commit();
-  }));
-  let decorationIds=[],inspectorTarget=null,inspectorGeneration=0;
+  search.addEventListener('input',()=>navigateTree());
+  search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key.split('/').at(-1)}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
+  function chooseObject(node){
+    const target=node.target,generation=++inspectorGeneration;
+    if(node.kind==='panel')expanded.set(node.key,true);
+    inspectorTarget=target;inspectorLayer=node.layer;showProperties();properties(false);
+    enqueue(()=>{
+      if(!sameLayer(layerOf(snapshot()),node.layer)){
+        const state=snapshot();(kind?state[kind]:state.config).active_layer=clone(node.layer);if(!kind)state.config.picked_data=null;install(state);wheelArea=null;
+      }
+      selected=target;
+      if(kind){const dataTarget=/^slice_/.test(target??'')||local[kind].series?.some(v=>v.id===target);if(dataTarget){chart.clear_selection();}else if(target)chart.select_decoration(target);else chart.clear_selection();}
+      else if(target?.startsWith('annotation:')){chart.select_annotation(local.config.annotations.items.findIndex(v=>'annotation:'+v.id===target));}
+      else if(!local.series.some(s=>s.series_id===target)){const bound=target?JSON.parse(chart.decoration_bounds(rendererTarget(target))):null;if(bound){chart.on_press(bound.rect[0]+bound.rect[2]/2,bound.rect[1]+bound.rect[3]/2);chart.on_release();}}
+      if(generation===inspectorGeneration){inspectorTarget=null;inspectorLayer=null;}
+      dirty=true;commit();
+    });
+  }
+  let decorationIds=[],inspectorTarget=null,inspectorLayer=null,inspectorGeneration=0;
   function properties(refresh=true){
     if(!chart)return;
     if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
-    layers();selectionProperties();
-    const previous=inspectorTarget??selected;select.replaceChildren();
-    for(const id of (kind?['chart_title',...decorationIds,...(kind==='radial'?local.radial.slices.map((_,i)=>`slice_0_${i}`):local[kind].series.map(s=>s.id))]:[...ids.map(id=>elementName(id)),...local.series.filter(s=>seriesInActiveLayer(s.series_id)).map(s=>s.series_id)])){const option=document.createElement('option');option.value=id;option.textContent=labels[id.split(':').pop()]??(text(local.series.find(s=>s.series_id===id)?.label)||caption(id));select.append(option);}
-    select.value=previous ?? elementName('chart_title');fields.replaceChildren();
-    const target=/^(subplot_|overlay_)/.test(select.value)?select.value.split(':').pop():select.value,cfg=configOf(local);
+    drawingUI();navigateTree();selectionProperties();
+    inspectedTarget=inspectorTarget??selected??elementName('chart_title');fields.replaceChildren();
+    if(layerOf(local)==='Annotations'&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent='Choose an annotation in the tree or click it in the chart.';fields.append(hint);return;}
+    if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
+    const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
     const series=local.series.find(s=>s.series_id===target);
     function applyProperty(apply,value){
       const before=snapshot(),state=clone(before);
@@ -277,8 +377,38 @@ export function render({model,el}) {
       input.parentElement.after(bar);
     }
     function preserve(old,next){let start=0,end=0;while(start<Math.min(old.length,next.length)&&old[start].text===next[start].text){next[start]=clone(old[start]);start++;}while(end<Math.min(old.length,next.length)-start&&old.at(-1-end).text===next.at(-1-end).text){next[next.length-1-end]=clone(old.at(-1-end));end++;}return next;}
+    const annotationIndex=kind?Number(/^annotation_(\d+)$/.exec(target)?.[1]??NaN):local.config.annotations?.items?.findIndex(v=>'annotation:'+v.id===target);
+    if(Number.isInteger(annotationIndex)&&annotationIndex>=0){
+      const owner=s=>kind?s[kind]:s.config,find=s=>owner(s).annotations.items[annotationIndex],item=find(local),name=Object.keys(item.kind)[0],geometry=item.kind[name],shape=s=>find(s).kind[name];
+      toggle('visible',item.visible!==false,(s,v)=>find(s).visible=v);
+      for(const key of (name==='ReferenceLine'?['value']:name==='Span'?['from','to']:[]))field(key,geometry[key],'number',(s,v)=>shape(s)[key]=v);
+      for(const key of ['anchor','from','to'])if(geometry[key]&&typeof geometry[key]==='object'){
+        const unit=Object.keys(geometry[key])[0];if(!geometry[key][unit]||typeof geometry[key][unit]!=='object')continue;
+        const note=document.createElement('p');note.textContent=`${caption(key)} · ${unit.toLowerCase()} coordinates`;fields.append(note);
+        for(const dimension of ['x','y'])field(`${key}_${dimension}`,geometry[key][unit][dimension],'number',(s,v)=>shape(s)[key][unit][dimension]=v);
+      }
+      const textKey=name==='ReferenceLine'?'label':'text';
+      if(name==='Arrow'||name==='ReferenceLine')toggle('show_label',!!geometry[textKey],(s,v)=>shape(s)[textKey]=v?{segments:segments('Label'),color:{r:.15,g:.18,b:.23,a:1},font_size:16,font:''}:null);
+      if(geometry[textKey]){const findText=s=>shape(s)[textKey];const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);
+      field('font_size',geometry[textKey].font_size,'number',(s,v)=>shape(s)[textKey].font_size=v);color('text_color',geometry[textKey].color,s=>shape(s)[textKey].color);}
+      if(geometry.fill){color('fill',geometry.fill,s=>shape(s).fill);field('opacity',geometry.fill.a,'number',(s,v)=>shape(s).fill.a=v);}
+      const style=name==='Arrow'?geometry.style?.line:geometry.style,styleOf=s=>name==='Arrow'?shape(s).style.line:shape(s).style;
+      if(style){color('color',style.color,s=>styleOf(s).color);field('line_width',style.width,'number',(s,v)=>styleOf(s).width=v);}
+      if(name==='Arrow')for(const key of ['head_length','head_width'])field(key,geometry.style[key],'number',(s,v)=>shape(s).style[key]=v);
+      if(style)choice('line_style',style.style,['Solid','Dash','Dot','DashDot','DashDotDot','ShortDash','ShortDot','ShortDashDot','LongDash','LongDashDot','LongDashDotDot'],(s,v)=>styleOf(s).style=v);
+      if(name==='Text'){toggle('text_box',!!geometry.box_style,(s,v)=>shape(s).box_style=v?{fill:{r:1,g:1,b:1,a:.9},border_color:{r:.23,g:.23,b:.23,a:1},border_width:1,padding:4}:null);if(geometry.box_style){color('box_fill',geometry.box_style.fill,s=>shape(s).box_style.fill);color('border_color',geometry.box_style.border_color,s=>shape(s).box_style.border_color);for(const key of ['border_width','padding'])field(key,geometry.box_style[key],'number',(s,v)=>shape(s).box_style[key]=v);}}
+      const remove=document.createElement('button');remove.textContent='Delete annotation';remove.dataset.deleteAnnotation='';remove.addEventListener('click',()=>enqueue(()=>{const state=snapshot();owner(state).annotations.items.splice(annotationIndex,1);if(kind)state[kind].decorations.selected=null;selected=null;inspectorTarget=null;install(state);commit();}));fields.prepend(remove);
+      root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);return;
+    }
     if(kind){
       const c=local[kind];
+      if(boundedView){
+        const range=c.value_range??boundedView.range;
+        const heading=document.createElement('strong');heading.textContent=boundedView.axis==='radius'?'Radial range':'Value axis range';fields.append(heading);
+        toggle('auto_range',c.value_range==null,(s,v)=>s[kind].value_range=v?null:clone(range));
+        for(const [i,name] of ['range_min','range_max'].entries())field(name,range[i],'number',(s,v)=>{s[kind].value_range=clone(s[kind].value_range??range);s[kind].value_range[i]=v;});
+        const hint=document.createElement('p');hint.textContent='Wheel over plot: zoom values · Fit: automatic range';fields.append(hint);
+      }
       field('title',c.title,'text',(s,v)=>{s[kind].title=v;if(s[kind].chart_title)s[kind].chart_title.text.segments=segments(v);});
       field('font_size',c.font_size,'number',(s,v)=>s[kind].font_size=v);
       field('font',c.font_family,'text',(s,v)=>s[kind].font_family=v);
@@ -326,7 +456,7 @@ export function render({model,el}) {
         const old=clone(find(s).segments);chart[helper](v);const live=JSON.parse(chart.get_config());
         if(target==='chart_title')configOf(s).chart_title=live.chart_title;else find(s).segments=path.reduce((n,k)=>n[k],live).segments;find(s).segments=preserve(old,find(s).segments);
       });
-      richControls(find,target,textInput);
+      richControls(find,inspectedTarget,textInput);
       field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
       field('font',rich.font,'text',(s,v)=>find(s).font=v);choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
     }else if(series){const kind=Object.keys(series.render_type)[0],style=series.render_type[kind];const find=s=>s.series.find(v=>v.series_id===target).render_type[kind];
@@ -388,7 +518,7 @@ export function render({model,el}) {
   }
   async function exporting(scale=1){trace('export.flush_started',{scale});await flush();trace('export.flush_completed');return enqueue(async()=>{await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-  function onState(){enqueue(()=>{const state=model.get('state');exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
+  function onState(){enqueue(()=>{const state=model.get('state');outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
@@ -398,7 +528,7 @@ export function render({model,el}) {
     if(message.client && message.client!==client)return;
     if(message.action==='ack')enqueue(()=>{
       if(message.sequence!==inflight?.sequence)return;
-      const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
+      outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
       if(message.error){pending=null;install(message.state.settings);fail(message.error);}
       else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
       properties();idle();
@@ -420,11 +550,6 @@ export function render({model,el}) {
   // Present the chosen inspector immediately without borrowing the renderer.
   // Apply interaction selection in event order so older keys/picks keep their
   // original target and cannot overwrite a newer pending inspector choice.
-  select.addEventListener('change',()=>{
-    const target=select.value,generation=++inspectorGeneration;
-    inspectorTarget=target;properties(false);
-    enqueue(()=>{selected=target;if(generation===inspectorGeneration)inspectorTarget=null;properties();});
-  });
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',async()=>{
@@ -437,8 +562,9 @@ export function render({model,el}) {
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
   root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
   root.querySelector('[data-close-properties]').addEventListener('click',()=>showProperties(false));
-  root.querySelector('[data-select]').addEventListener('click',()=>layoutMode(false));
-  root.querySelector('[data-layout]').addEventListener('click',()=>layoutMode(true));
+  root.querySelector('[data-select]').addEventListener('click',()=>{cancelDrawing();layoutMode(false);});
+  root.querySelector('[data-layout]').addEventListener('click',()=>{cancelDrawing();layoutMode(true);});
+  root.querySelector('[data-display-scale]').addEventListener('click',event=>{const fit=root.dataset.displayScale!=='fit';root.dataset.displayScale=fit?'fit':'actual';event.currentTarget.textContent=fit?'Actual size':'Fit width';resize();});
   const fullscreen=()=>{if(document.fullscreenElement===root)return document.exitFullscreen();return root.requestFullscreen();};
   root.querySelector('[data-fullscreen]').addEventListener('click',()=>fullscreen().catch(fail));
   const menu=document.createElement('div');menu.className='figgy-menu';menu.hidden=true;root.querySelector('.figgy-toolbar').append(menu);
@@ -463,7 +589,7 @@ export function render({model,el}) {
     menuKind=name;menu.replaceChildren();menu.hidden=false;local=snapshot();
     function toggle(label,path,target=null){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.dataset.visibility=label;const node=s=>path.slice(0,-1).reduce((n,k)=>n[k],s);input.checked=node(local)[path.at(-1)]&&(!target||Boolean(text(node(local).text).trim()));input.addEventListener('change',()=>enqueue(()=>{const state=snapshot();if(target)titleVisibility(state,target,input.checked);else node(state)[path.at(-1)]=input.checked;install(state);if(target&&input.checked){selected=target;showProperties();}commit();}));row.append(input,document.createTextNode(label));menu.append(row);}
     if(name==='visibility'){
-      if(kind){if(kind!=='radial')for(const key of ['legend','grid'])toggle(key,[kind,key]);else{showProperties();select.value='chart_title';properties();menu.hidden=true;}return;}
+      if(kind){if(kind!=='radial')for(const key of ['legend','grid'])toggle(key,[kind,key]);else{showProperties();selected='chart_title';properties();menu.hidden=true;}return;}
       for(const [label,path,target] of [['Chart title',['chart_title','visible'],'chart_title'],['Legend',['legend','visible'],null],...Object.entries(side).map(([k,v])=>[labels[`axis_title_${k}`],[v,'title_option','visible'],`axis_title_${k}`])])toggle(label,['config',...path],target);
     }else if(kind){showProperties();menu.hidden=true;}
     else{
@@ -485,15 +611,26 @@ export function render({model,el}) {
     const low=pivot+(lo-pivot)*factor+shift*span,high=pivot+(hi-pivot)*factor+shift*span;
     a.min=log?10**low:low;a.max=log?10**high:high;
   }
-  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e);pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
+  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e);
+    if(drawingTool!=='select'){
+      const g={tool:drawingTool,start:point,end:point,data:root.querySelector('[data-anchor-data]').checked,area:[0,0,canvas.width,canvas.height]};drawingGesture=g;
+      enqueue(()=>{if(g!==drawingGesture)return;g.area=drawingArea()??g.area;const [x,y,w,h]=g.area;if(/^[hv]/.test(g.tool)&&(g.start[0]<x||g.start[0]>x+w||g.start[1]<y||g.start[1]>y+h)){cancelDrawing();return;}previewDrawing();});return;
+    }
+    pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
     const [x,y]=point;
+    if(!kind&&local.config.subplots?.length){
+      const width=Math.max(local.config.chart_area.x+local.config.chart_area.width,...local.config.subplots.map(p=>p.config.chart_area.x+p.config.chart_area.width)),scale=canvas.width/width;
+      const contains=r=>x>=r.x*scale&&y>=r.y*scale&&x<(r.x+r.width)*scale&&y<(r.y+r.height)*scale;
+      const index=local.config.subplots.findIndex(p=>contains(p.config.chart_area)),current=local.config.active_layer?.Subplot??local.config.active_layer?.SubplotOverlay?.[0]??-1;
+      if(index!==current&&(index>=0||contains(local.config.chart_area))){const state=snapshot();state.config.active_layer=index<0?'Base':{Subplot:index};state.config.picked_data=null;install(state);wheelArea=null;}
+    }
     if(kind){
       gesture.handle=selected?chart.resize_handle(selected,x,y):null;
       gesture.target=gesture.handle?selected:chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
       selected=gesture.target;
       if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
     }else{
-      const hit=chart.hit_test(x,y);selected=hit;stats.last_pointer_hit=hit;
+      const hit=chart.hit_test(x,y);selected=hostTarget(hit);stats.last_pointer_hit=hit;
       const area=bounds(),inside=x>=area[0]&&x<=area[0]+area[2]&&y>=area[1]&&y<=area[1]+area[3];
       gesture.pan=(hit===elementName('data_area')||(hit===null&&inside))&&!root.querySelector('[data-area]').checked;
       stats.last_pointer_pan=gesture.pan;
@@ -504,26 +641,39 @@ export function render({model,el}) {
     }
     dirty=true;properties();
   });});
-  canvas.addEventListener('pointermove',e=>{if(!chart)return;const next=localPoint(e);hoverPoint=next;if(!pointer)return;const gesture=pointer;inputAt=performance.now();enqueue(()=>{
+  canvas.addEventListener('pointermove',e=>{if(!chart)return;const next=localPoint(e);hoverPoint=next;if(drawingGesture){drawingGesture.end=next;previewDrawing();return;}if(!pointer)return;const gesture=pointer;inputAt=performance.now();enqueue(()=>{
     const distance=Math.hypot(next[0]-gesture.origin[0],next[1]-gesture.origin[1]);if(distance>=3)gesture.moved=true;
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
     if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
     else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;for(const k of ['bottom_x','top_x'])navigate(configOf(s)[k],1,.5,-(next[0]-old[0])/r[2]);for(const k of ['left_y','right_y'])navigate(configOf(s)[k],1,.5,(next[1]-old[1])/r[3]);install(s);}}
     else chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
   });});
-  function release(){if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved)showProperties();commit();});}
+  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved)showProperties();commit();});}
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
-  canvas.addEventListener('wheel',e=>{if(!chart||kind||!wheelArea)return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX;enqueue(()=>{
+  canvas.addEventListener('wheel',e=>{
+    if(chart&&kind&&boundedView){
+      const horizontal=boundedView.axis==='x';if(horizontal?e.shiftKey&&!e.ctrlKey:e.ctrlKey&&!e.shiftKey)return;
+      e.preventDefault();const point=localPoint(e),delta=e.deltaY||e.deltaX;
+      enqueue(()=>{
+        const area=JSON.parse(chart.decorations()).find(d=>d.id==='data_area')?.rect;if(!area)return;
+        const [x,y,w,h]=area;if(point[0]<x||point[0]>x+w||point[1]<y||point[1]>y+h)return;
+        const state=snapshot(),range=state[kind].value_range??boundedView.range;
+        const anchor=boundedView.axis==='radius'?0:horizontal?(point[0]-x)/w:1-(point[1]-y)/h,pivot=range[0]+(range[1]-range[0])*anchor;
+        const factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1);
+        state[kind].value_range=range.map(v=>pivot+(v-pivot)*factor);install(state);commit();
+      });return;
+    }
+    if(!chart||kind||!wheelArea)return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX;enqueue(()=>{
     const s=snapshot(),r=bounds(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
     if(!shift||ctrl)for(const key of ['bottom_x','top_x'])navigate(s.config[key],factor,x);
     if(!ctrl||shift)for(const key of ['left_y','right_y'])navigate(s.config[key],factor,y);
     install(s);commit();
   });},{passive:false});
-  canvas.addEventListener('keydown',e=>{if(!chart)return;if(e.key==='F11'){e.preventDefault();fullscreen().catch(fail);return;}if(e.key!=='Escape'&&!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?10:1;enqueue(()=>{
+  canvas.addEventListener('keydown',e=>{if(!chart)return;if(e.key==='F11'){e.preventDefault();fullscreen().catch(fail);return;}if(drawingTool!=='select')return;if((e.key==='Delete'||e.key==='Backspace')&&selected&&(selected.startsWith('annotation:')||/^annotation_\d+$/.test(selected))){e.preventDefault();enqueue(()=>{const s=snapshot(),owner=kind?s[kind]:s.config,index=kind?Number(selected.slice(11)):owner.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)owner.annotations.items.splice(index,1);if(kind)owner.decorations.selected=null;selected=null;install(s);commit();});return;}if(e.key!=='Escape'&&!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?10:1;enqueue(()=>{
     if(e.key==='Escape'){selected=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}
     else{const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0,dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
       if(kind){if(selected&&!selected.startsWith('slice_')&&!local[kind].series?.some(s=>s.id===selected))chart.drag(selected,dx,dy,undefined);else if(dx!==0)chart.step_selection(dx<0);}
-      else{const cfg=JSON.parse(chart.get_config());if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected){const b=JSON.parse(chart.decoration_bounds(selected));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx,dy);chart.on_release();}}}
+      else{const cfg=JSON.parse(chart.get_config());if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected?.startsWith('annotation:')){const index=local.config.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)chart.drag_annotation(index,dx,dy,undefined);}else if(selected){const b=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx,dy);chart.on_release();}}}
     }dirty=true;commit();
   });});
   layoutMode(false);
@@ -535,7 +685,10 @@ export function render({model,el}) {
     if(!navigator.gpu)throw Error('WebGPU is unavailable. Use a supported browser/secure origin; kernel PNG fallback requires an explicit native Figure.widget(backend="png").');
     if(!kernelModule && !model.get('wasm').byteLength)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
     const module=await loadKernel(model);if(disposed)return;
-    canvas.width=local.config.chart_area.width;canvas.height=local.config.chart_area.height;
+    const rectangles=[local.config.chart_area,...(local.config.subplots??[]).map(p=>p.config.chart_area)];
+    const documentWidth=Math.max(...rectangles.map(r=>r.x+r.width)),documentHeight=Math.max(...rectangles.map(r=>r.y+r.height));
+    root.style.setProperty('--figgy-document-width',`${documentWidth}px`);
+    canvas.width=documentWidth;canvas.height=documentHeight;
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
     chart=kind?await module.FiggyBoundedChart.create(canvas,kind,JSON.stringify(local[kind]),local.config.chart_area.width,local.config.chart_area.height):await module.FiggyChart.create(canvas);if(!kind)chart.set_pool_auto_growth(true);
     if(!kind){
@@ -569,7 +722,7 @@ export function render({model,el}) {
     await readyDisplayedFrame();
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
-    controls.forEach(control=>control.disabled=false);
+    controls.forEach(control=>control.disabled=false);drawingUI();
     root.figgy={stats,diagnostics,annotations:()=>enqueue(()=>JSON.parse(chart.annotations()),true),snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);

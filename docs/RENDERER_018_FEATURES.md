@@ -86,11 +86,33 @@ constructor returns an Annotation with an ID and `set`, `select` and `remove`
 methods. Generic `annotate(kind, **geometry)` uses the upstream model; use
 `from_` for the Python spelling of a geometry's `from` field.
 
-`ax.activate()` chooses a panel/secondary-axis pointer route. Native Properties
-and the notebook toolbar expose panel/layer selection. Selecting the annotation
-layer routes movement/resizing to upstream annotation handles. Comprehensive
-property controls remain #17; complete validated settings are already editable
+`ax.activate()` chooses a panel/secondary-axis pointer route. Both hosts expose
+a searchable Objects tree inside Properties, with panels, local axes, secondary
+Y axes, series and annotations. Labels and titles identify objects; stable IDs
+remain available for search. Canvas selection reveals the selected tree item,
+and selecting another panel on the canvas activates its coordinate owner.
+The context path identifies which object's form is being edited. Selecting an
+annotation routes movement/resizing to upstream annotation handles. **Draw** opens
+a tool strip for text, arrows, reference lines and bands, with transient previews,
+Esc cancellation, immediate selection and annotation-specific Properties. The
+forms expose geometry, rich content, strokes, arrow heads, fills, text boxes and
+deletion. **Follow data** chooses data anchors for text/arrows; ratio anchors work
+on every family. Value-axis tools are disabled where unsupported, and drawing is
+scoped to the root panel. Further editor controls remain #17; complete validated settings are already editable
 through Advanced settings and the Python API.
+
+Box plots expose `ax.set_ylim(lo, hi)` for vertical charts and
+`ax.set_xlim(lo, hi)` for horizontal charts. Radar exposes `ax.set_ylim(lo, hi)`
+for the radial value domain. Both hosts offer manual/automatic range controls
+and value-axis wheel zoom; Fit restores automatic bounds. The renderer fixes
+categorical-bar domains from the supplied data and does not expose the same
+manual-domain option. Pie/donut charts have no numeric value axis to zoom.
+
+Notebook display initially respects the requested Figure size and shrinks to
+fit a smaller output cell. **Fit width** explicitly enables enlargement to the
+available width; **Actual size** restores the requested size. The docked
+inspector sits outside the canvas. These view changes preserve document/export
+dimensions, data ranges and DPI.
 
 Mapped-point selection reports `color_value`/`size_value`; point-vector selection
 reports `u`/`v` and optional `color_value`. Native readback is limited to selected

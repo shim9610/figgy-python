@@ -67,11 +67,46 @@ Explicit `backend="native"` also selects native rendering in IPython/Jupyter.
 The window opens on the desktop of the machine running the kernel. To display
 inside a browser with a remote kernel, use `backend="webgpu"` and `display(fig)`.
 
+## Draw and edit annotations
+
+Open **Draw** to reveal a tool strip: Text, Arrow, horizontal/vertical lines,
+and horizontal/vertical bands. Click to place text; drag to draw the other
+shapes. A preview follows the pointer without changing saved settings. Release
+creates one annotation, returns to Select and opens its Properties. Esc cancels
+an unfinished gesture. Drawing a zero-length arrow/band creates nothing.
+
+**Follow data** stores text/arrow anchors in data coordinates so they follow
+zooming; otherwise anchors stay at a fraction of the plot area. Numeric lines
+and bands always follow their value axis. Unsupported directions are disabled:
+bar/box charts have one value axis; pie/donut, radar and polar accept ratio
+text/arrows. Annotations belong to the root panel; select it before drawing
+in a multi-panel document.
+
+Select an annotation on the canvas or in Objects to edit its content, coordinates,
+visibility, colors and size. Arrow forms include head dimensions and stroke;
+text supports character formatting and an optional background/border box.
+Reference lines and arrows can have labels. Drag existing annotations or their
+renderer-provided handles to move/resize them. **Delete annotation** removes the
+selected item; Delete/Backspace does the same when the chart has keyboard focus.
+These tools and forms are also available in Jupyter WebGPU. Completed edits are
+part of the same settings/replay/export document as Python-created annotations.
+
 ## Properties and layout
 
 The initial view contains the chart and toolbar, with properties closed. Click a
 chart title, axis, legend or series to open that object's form on the right.
 **Properties** also opens or closes the panel. Toolbar icons have name tooltips.
+
+The Properties sidebar starts with an **Objects** tree. Panels contain their
+axes, titles, legend, series, secondary Y axes and annotations. Search by a
+human label or object ID, expand/collapse branches, then select the object to
+edit. The path above the form shows its owner. Clicking an object in the chart
+reveals the corresponding tree item; clicking another panel routes subsequent
+edits to that panel. Object and layer selection do not use dropdowns.
+
+Tree arrow keys move focus and expand/collapse branches; Enter selects an
+object. Chart arrow keys retain their sample-stepping/decoration-nudge meaning.
+Search and branch expansion are view state and do not modify saved settings.
 
 Opening properties expands a normal window horizontally while preserving the
 chart's displayed size and aspect ratio. Closing it restores the previous width.
@@ -89,12 +124,14 @@ ratio with surrounding space. PNG document dimensions stay unchanged.
 | Select | Select data or decorations; default mode |
 | Layout | Move and resize the plot area |
 | Properties / Close | Open or close properties |
-| Object list | Select named objects such as Chart title, X axis or a series |
+| Objects tree / search | Navigate panels, axes, series, secondary Y and annotations; select the target and see its ownership path |
 | Title, axis title, legend | Visibility, text, font family, size and color; individual legend labels |
 | Tick labels | Decimal, scientific or power notation; significant digits; font family, size and color |
 | Line series | Color and width |
 | Scatter series | Color and marker size |
 | Matrix series / colorbar | Shared color limits, linear/log scale, palette, number format and significant digits |
+| Box plot / radar value range | Automatic/manual minimum and maximum; wheel zoom over the plot; Fit restores automatic bounds |
+| Annotation | Visibility, text, anchors/endpoints, line and fill properties |
 | Axis | Limits, scale, tick spacing/direction/visibility, number format, significant digits, line width and color |
 | Copy Python | Export common setters and readable `fig.configure(...)` patches |
 | Save PNG | Enter a path, then Save image; export the chart at document resolution |

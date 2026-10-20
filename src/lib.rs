@@ -1682,9 +1682,11 @@ mod axis_edit;
 mod bounded;
 mod desktop;
 mod document_fit;
+mod drawing;
 mod editor;
 mod gpu;
 mod identity;
+mod navigation;
 mod notebook;
 use identity::{validate_columns, validate_identity};
 mod selection;
@@ -1847,6 +1849,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(segments_plain_text, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_range_json, m)?)?;
+    m.add_function(wrap_pyfunction!(navigation::object_outline_json, m)?)?;
+    m.add_function(wrap_pyfunction!(navigation::bounded_view_json, m)?)?;
     m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
