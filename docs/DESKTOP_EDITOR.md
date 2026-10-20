@@ -70,10 +70,22 @@ inside a browser with a remote kernel, use `backend="webgpu"` and `display(fig)`
 ## Draw and edit annotations
 
 Open **Draw** to reveal a tool strip: Text, Arrow, horizontal/vertical lines,
-and horizontal/vertical bands. Click to place text; drag to draw the other
-shapes. A preview follows the pointer without changing saved settings. Release
-creates one annotation, returns to Select and opens its Properties. Esc cancels
-an unfinished gesture. Drawing a zero-length arrow/band creates nothing.
+and horizontal/vertical bands. Click with **Text** and type directly on the chart;
+double-click existing text to edit it in place. **Enter** applies, **Shift+Enter**
+inserts a line break and **Esc** cancels. Clicking outside the input applies a
+nonempty draft. Empty or canceled drafts leave the document unchanged. Text
+editing does not automatically open Properties; use Properties for detailed
+formatting. Editing retains font and color; unchanged leading and trailing characters retain
+their character formatting.
+
+Drag to draw the other shapes. A preview follows the pointer without changing
+saved settings. Release creates one annotation and opens its Properties. Esc
+cancels an unfinished gesture. Switching windows retains the selected tool; an
+interrupted drag is canceled. Drawing a zero-length arrow/band creates nothing.
+Text drafts stay in the host until confirmation, so typing and cancellation do
+not create saved annotations or intermediate document revisions.
+
+![Text input at the annotation position, without opening Properties](images/desktop-editor-inline-text.png)
 
 **Follow data** stores text/arrow anchors in data coordinates so they follow
 zooming; otherwise anchors stay at a fraction of the plot area. Numeric lines

@@ -8,7 +8,7 @@ pub(crate) struct Editor {
     pub inspector_open: bool,
     pub(super) drawing: crate::drawing::Drawing,
     pub(super) delete_annotation: bool,
-    pub(super) focus_annotation: Option<String>,
+    pub(super) inline_text: Option<crate::drawing::InlineText>,
     pub edit_area: bool,
     pub error: String,
     pub advanced_requested: bool,
@@ -29,7 +29,7 @@ impl Default for Editor {
             inspector_open: false,
             drawing: Default::default(),
             delete_annotation: false,
-            focus_annotation: None,
+            inline_text: None,
             edit_area: false,
             error: String::new(),
             advanced_requested: false,
@@ -630,15 +630,6 @@ impl Editor {
             .desired_width(f32::INFINITY)
             .show(ui);
         self.controls.insert(key.to_owned(), output.response.rect);
-        if self
-            .focus_annotation
-            .as_ref()
-            .is_some_and(|id| key == format!("annotation_text_{id}"))
-        {
-            output.response.request_focus();
-            output.response.scroll_to_me(Some(egui::Align::Center));
-            self.focus_annotation = None;
-        }
         if let Some(range) = output.cursor_range {
             if output.response.has_focus() || output.response.lost_focus() {
                 let chars = range.as_sorted_char_range();
@@ -1285,7 +1276,7 @@ impl Editor {
 /// What a text field shows for a rich node: the text whose renderer segments
 /// these are (keeping "10⁻³" as typed), or the plain characters when the
 /// segments carry styling no plain text maps to.
-fn display_text(segments: &Value) -> String {
+pub(super) fn display_text(segments: &Value) -> String {
     serde_json::from_value::<Vec<renderer::text::RichSegment>>(segments.clone())
         .ok()
         .and_then(|segments| crate::plain_text_of(&segments))
@@ -1658,7 +1649,7 @@ fn toolbar_icon(
 mod radial_editor;
 
 // Preserve unchanged rich characters when editing the plain text input.
-fn preserve_segment_styles(old: &Value, mut fresh: Value) -> Value {
+pub(super) fn preserve_segment_styles(old: &Value, mut fresh: Value) -> Value {
     let (Some(old), Some(next)) = (old.as_array(), fresh.as_array_mut()) else {
         return fresh;
     };

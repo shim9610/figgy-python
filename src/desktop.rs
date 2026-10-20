@@ -94,6 +94,7 @@ struct SurfaceWindow {
     last_pick: Option<renderer::config::PickedDataRef>,
     modifiers: ModifiersState,
     bounded_surface: Option<bounded_host::BoundedSurface>,
+    last_text_click: Option<(Instant, String, (f32, f32))>,
 }
 #[path = "bounded_host.rs"]
 mod bounded_host;
@@ -211,6 +212,7 @@ impl SurfaceWindow {
             last_pick: None,
             modifiers: ModifiersState::empty(),
             bounded_surface: None,
+            last_text_click: None,
         })
     }
     fn resize(&mut self, w: u32, h: u32) {
@@ -292,6 +294,9 @@ impl SurfaceWindow {
         }
     }
     fn keyboard(&mut self, key: &NamedKey) -> PyResult<()> {
+        if self.editor.inline_text.is_some() {
+            return Ok(());
+        }
         if *key == NamedKey::Escape && self.editor.drawing.tool != crate::drawing::Tool::Select {
             self.editor.drawing.cancel();
             self.dragging = false;
@@ -434,6 +439,9 @@ impl SurfaceWindow {
             && self.cursor.1 < (p.y + p.height) as f32
     }
     fn pointer(&mut self, event: &WindowEvent) -> PyResult<()> {
+        if self.editor.inline_text.is_some() {
+            return Ok(());
+        }
         let input_received = Instant::now();
         let Some(core) = self.core.upgrade() else {
             return Ok(());
@@ -478,7 +486,9 @@ impl SurfaceWindow {
                             &item.kind,
                             renderer::annotation::AnnotationKind::Text { .. }
                         ) {
-                            self.editor.focus_annotation = Some(item.id.clone());
+                            self.editor.begin_inline_text(item, false);
+                            self.window.request_redraw();
+                            return Ok(());
                         }
                         let mut cfg = c.data.chart.config().clone();
                         cfg.annotations.visible = true;
@@ -551,6 +561,71 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                let text = c
+                    .data
+                    .chart
+                    .config()
+                    .annotations
+                    .visible
+                    .then(|| {
+                        let map = self.view.as_ref()?.annotation_map();
+                        let index = map
+                            .element(map.hit_test([self.cursor.0, self.cursor.1])?)?
+                            .index;
+                        let rendered = map.layer().items.get(index)?;
+                        let item = c
+                            .data
+                            .chart
+                            .config()
+                            .annotations
+                            .items
+                            .iter()
+                            .find(|item| item.id == rendered.id)?;
+                        matches!(item.kind, renderer::annotation::AnnotationKind::Text { .. })
+                            .then(|| item.clone())
+                    })
+                    .flatten();
+                if let Some(item) = text {
+                    let double = self
+                        .last_text_click
+                        .as_ref()
+                        .is_some_and(|(time, id, point)| {
+                            time.elapsed() < Duration::from_millis(450)
+                                && id == &item.id
+                                && (point.0 - self.cursor.0).hypot(point.1 - self.cursor.1) < 6.
+                        });
+                    self.last_text_click = Some((Instant::now(), item.id.clone(), self.cursor));
+                    if double {
+                        self.editor.begin_inline_text(item, true);
+                        self.last_text_click = None;
+                        self.dragging = false;
+                        self.chart_pressed = false;
+                        self.window.request_redraw();
+                        return Ok(());
+                    }
+                    let mut cfg = c.data.chart.config().clone();
+                    if cfg.active_layer() != renderer::LayerRef::Annotations
+                        || cfg.picked_data.is_some()
+                        || cfg.picked_points.is_some()
+                    {
+                        cfg.set_active_layer(renderer::LayerRef::Annotations);
+                        cfg.picked_data = None;
+                        cfg.picked_points = None;
+                        c.commit_config(cfg)?;
+                    }
+                    self.selected = Some(format!("annotation:{}", item.id));
+                    self.handle = None;
+                    self.dragging = true;
+                    self.chart_pressed = true;
+                    self.panning = false;
+                    self.pan_moved = false;
+                    self.drag_origin = self.cursor;
+                    self.last_revision = u64::MAX;
+                    self.window.request_redraw();
+                    return Ok(());
+                } else {
+                    self.last_text_click = None;
+                }
                 // Resolve the clicked panel before asking its hit map. The
                 // selected tree item and the chart share this owner route.
                 let (px, py) = self.cursor;
@@ -708,6 +783,16 @@ impl SurfaceWindow {
                 if !self.pan_moved
                     && chart_pressed
                     && self.selected.is_some()
+                    && !self
+                        .selected
+                        .as_deref()
+                        .and_then(|t| c.annotation_index(t).ok())
+                        .is_some_and(|i| {
+                            matches!(
+                                c.data.chart.config().annotations.items[i].kind,
+                                renderer::annotation::AnnotationKind::Text { .. }
+                            )
+                        })
                     && self.chart_contains_cursor()
                 {
                     self.editor.inspector_open = true;
@@ -810,6 +895,19 @@ impl SurfaceWindow {
             } else {
                 self.editor
                     .show(root, &mut c, &mut self.selected, &mut self.edit_area);
+                let display = self.display(&c).0;
+                let dpr = ctx.pixels_per_point();
+                let space = renderer::annotation::pixel_space_for_config(&display);
+                if let Some(target) = self.editor.inline_text_ui(
+                    root,
+                    &mut c,
+                    space,
+                    |p| egui::pos2(p[0] / dpr, p[1] / dpr),
+                    self.scale / dpr,
+                ) {
+                    self.selected = Some(target);
+                    self.last_revision = u64::MAX;
+                }
                 self.editor
                     .drawing
                     .preview(&root.painter().with_clip_rect(self.editor.stage), |p| {
@@ -1190,7 +1288,10 @@ impl ApplicationHandler for App {
                 w.dragging = false;
                 w.panning = false;
                 w.chart_pressed = false;
-                w.editor.drawing.cancel();
+                // Losing focus cancels an active gesture, not an armed tool.
+                if w.editor.drawing.gesture.is_some() {
+                    w.editor.drawing.cancel();
+                }
                 Ok(())
             }
             WindowEvent::ModifiersChanged(modifiers) => {

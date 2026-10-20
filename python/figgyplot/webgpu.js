@@ -75,7 +75,7 @@ export function render({model,el}) {
       button.setAttribute('aria-pressed',String(name===drawingTool));
     }
     const anchor=root.querySelector('[data-anchor-data]');anchor.disabled=!owner||!data;if(anchor.disabled)anchor.checked=false;
-    root.querySelector('[data-drawing-help]').textContent=!owner?'Select the root panel to draw annotations.':drawingTool==='select'?'Choose a tool. Select an annotation in the chart or object tree to edit.':drawingTool==='text'?'Click to place text, then edit it in Properties. Esc: cancel.':'Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges.';
+    root.querySelector('[data-drawing-help]').textContent=!owner?'Select the root panel to draw annotations.':drawingTool==='select'?'Double-click text to edit it. Drag annotations to move them.':drawingTool==='text'?'Click and type. Enter: apply. Esc: cancel.':'Drag to draw. Release to create and edit. Esc: cancel. Follow data: move with axis ranges.';
     canvas.style.cursor=drawingTool==='select'?'':'crosshair';
     root.querySelector('[data-select]').setAttribute('aria-pressed',String(drawingTool==='select'&&!root.querySelector('[data-area]').checked));
     root.querySelector('[data-layout]').setAttribute('aria-pressed',String(drawingTool==='select'&&root.querySelector('[data-area]').checked));
@@ -90,6 +90,69 @@ export function render({model,el}) {
     else {const a=g.tool==='hline'?[ax,v,ax+w,v]:g.tool==='vline'?[u,ay,u,ay+h]:[x,y,u,v];node('line',{x1:a[0],y1:a[1],x2:a[2],y2:a[3],stroke:'#2663ad','stroke-width':1.5});if(g.tool==='arrow'){const t=Math.atan2(v-y,u-x);node('polyline',{points:`${u-10*Math.cos(t-.45)},${v-10*Math.sin(t-.45)} ${u},${v} ${u-10*Math.cos(t+.45)},${v-10*Math.sin(t+.45)}`,stroke:'#2663ad',fill:'none'});}}
   }
   function drawingArea(){return kind?JSON.parse(chart.decorations()).find(d=>d.id==='data_area')?.rect:bounds();}
+  let inlineText=null;
+  const inlineBox=document.createElement('div');inlineBox.className='figgy-inline-text';inlineBox.hidden=true;
+  const inlineInput=document.createElement('textarea');inlineInput.rows=1;inlineInput.dataset.inlineText='';inlineInput.setAttribute('aria-label','Annotation text');inlineInput.placeholder='Type text';
+  const inlineHint=document.createElement('small');inlineHint.textContent='Enter: apply · Shift+Enter: new line · Esc: cancel';
+  inlineBox.append(inlineInput,inlineHint);root.querySelector('.figgy-stage').append(inlineBox);
+  function selectedAnnotation(){const state=snapshot(),items=(kind?state[kind]:state.config).annotations?.items??[];return kind?items[Number(/^annotation_(\d+)$/.exec(selected??'')?.[1])]:items.find(v=>'annotation:'+v.id===selected);}
+  function positionInline(){
+    if(!inlineText)return;
+    const r=canvas.getBoundingClientRect(),g=inlineText;
+    const width=kind?local.config.chart_area.width:canvas.width;
+    const left=g.point[0]/g.size[0]*r.width,top=g.point[1]/g.size[1]*r.height;
+    inlineInput.style.fontSize=`${Math.max(10,Math.min(72,g.item.kind.Text.text.font_size*r.width/width))}px`;
+    inlineBox.style.maxWidth=`${Math.max(80,r.width-8)}px`;
+    inlineBox.style.left=`${Math.max(0,Math.min(left-5,r.width-inlineBox.offsetWidth))}px`;
+    inlineBox.style.top=`${Math.max(0,Math.min(top-4,r.height-inlineBox.offsetHeight))}px`;
+    inlineInput.style.height='auto';inlineInput.style.height=`${Math.min(Math.max(28,inlineInput.scrollHeight),Math.max(28,r.height-40))}px`;
+  }
+  function beginInline(item,point,existing=false){
+    if(!item?.kind.Text)return;
+    inlineText={item:clone(item),original:existing?clone(item):null,point,size:kind?[local.config.chart_area.width,local.config.chart_area.height]:[canvas.width,canvas.height]};
+    inlineInput.value=existing?text(item.kind.Text.text):'';inlineBox.hidden=false;positionInline();
+    inlineInput.focus({preventScroll:true});inlineInput.select();
+    const draft=inlineText;requestAnimationFrame(()=>{if(inlineText===draft)positionInline();});
+  }
+  function finishInline(apply){
+    const draft=inlineText;if(!draft)return;inlineText=null;inlineBox.hidden=true;
+    const value=inlineInput.value;
+    if(apply&&value.trim())enqueue(()=>{
+      const state=snapshot(),owner=kind?state[kind]:state.config;owner.annotations??={visible:true,items:[]};const items=owner.annotations.items;
+      const index=items.findIndex(v=>v.id===draft.item.id);
+      if(draft.original&&(index<0||JSON.stringify(items[index])!==JSON.stringify(draft.original)))throw Error('Text changed elsewhere. Reopen it to edit the current version.');
+      if(draft.original&&value===text(draft.original.kind.Text.text))return;
+      const rich=draft.item.kind.Text.text,old=rich.segments,next=segments(value);let prefix=0,suffix=0;
+      while(prefix<Math.min(old.length,next.length)&&old[prefix].text===next[prefix].text){next[prefix]=clone(old[prefix]);prefix++;}
+      while(suffix<Math.min(old.length,next.length)-prefix&&old.at(-1-suffix).text===next.at(-1-suffix).text){next[next.length-1-suffix]=clone(old.at(-1-suffix));suffix++;}rich.segments=next;
+      if(draft.original&&JSON.stringify(draft.item)===JSON.stringify(draft.original))return;
+      const at=draft.original?index:items.length;if(draft.original)items[at]=draft.item;else items.push(draft.item);
+      owner.annotations.visible=true;owner.active_layer='Annotations';
+      if(kind)owner.decorations.selected={Annotation:at};else{owner.picked_data=null;delete owner.picked_points;}
+      install(state);selected=kind?`annotation_${at}`:`annotation:${draft.item.id}`;chart.select_annotation(at);commit();
+    });
+  }
+  inlineInput.addEventListener('input',positionInline);
+  inlineInput.addEventListener('keydown',e=>{
+    e.stopPropagation();if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Escape'||e.key==='Enter'&&!e.shiftKey){e.preventDefault();finishInline(e.key==='Enter');canvas.focus({preventScroll:true});}
+  });
+  inlineInput.addEventListener('blur',()=>finishInline(true));
+  async function annotationGeometry(){
+    await waitForFrame();
+    if(dirty){await readyDisplayedFrame();dirty=false;}
+    return JSON.parse(chart.annotations());
+  }
+  async function textAnnotationAt(point){
+    const owner=kind?snapshot()[kind]:snapshot().config;if(owner.annotations?.visible===false||!owner.annotations?.items?.some(v=>v.kind.Text&&v.visible!==false))return null;
+    const entries=await annotationGeometry(),index=chart.hit_annotation(...point);if(index===undefined||!owner.annotations?.items[index]?.kind.Text)return null;
+    const entry=entries.find(v=>v.index===index);
+    return entry?{item:owner.annotations.items[index],entry}:null;
+  }
+  canvas.addEventListener('dblclick',e=>{
+    if(!chart||drawingTool!=='select')return;e.preventDefault();const point=localPoint(e);
+    enqueue(async()=>{const hit=await textAnnotationAt(point);if(hit)beginInline(hit.item,[hit.entry.rect[0],hit.entry.rect[1]],true);});
+  });
   function finishDrawing(g){
     if(g.cancelled||g!==drawingGesture)return;
     if(/^[hv]/.test(g.tool)){const [x,y,w,h]=g.area;g.end=[Math.max(x,Math.min(x+w,g.end[0])),Math.max(y,Math.min(y+h,g.end[1]))];}const [x,y]=g.start,[u,v]=g.end;if(['arrow','hspan','vspan'].includes(g.tool)&&Math.hypot(u-x,v-y)<3){cancelDrawing();return;}
@@ -101,16 +164,18 @@ export function render({model,el}) {
     else {const axis=g.tool.startsWith('h')?'Y':'X',key=axis==='X'?'x':'y',a=JSON.parse(chart.pointer_to_anchor(x,y,'Data'))?.Data?.[key],b=JSON.parse(chart.pointer_to_anchor(u,v,'Data'))?.Data?.[key];if(!Number.isFinite(a)||!Number.isFinite(b))throw Error('This direction has no value axis.');
       if(g.tool.endsWith('line'))geometry={ReferenceLine:{axis,value:b,style:line,label:null}};else{if(a===b){cancelDrawing();return;}geometry={Span:{axis,from:Math.min(a,b),to:Math.max(a,b),fill:{r:.149,g:.388,b:.678,a:.176}}};}}
     const item={id:`annotation_${crypto.randomUUID()}`,kind:geometry};
+    if(g.tool==='text'){cancelDrawing();beginInline(item,g.end);return;}
     chart.add_annotation(JSON.stringify(item));chart.set_annotations_visible(true);chart.set_active_layer(JSON.stringify('Annotations'));
     const state=snapshot(),index=(kind?state[kind]:state.config).annotations.items.length-1;chart.select_annotation(index);
     selected=kind?`annotation_${index}`:`annotation:${item.id}`;inspectorTarget=null;inspectorLayer=null;
     cancelDrawing();showProperties();dirty=true;commit();
-    if(g.tool==='text'){const target=selected;flush().then(()=>requestAnimationFrame(()=>{if(selected!==target)return;const input=root.querySelector('[data-property=text]');input?.focus();input?.select();})).catch(fail);}
   }
   root.querySelector('[data-draw]').addEventListener('click',e=>{drawingPalette.hidden=!drawingPalette.hidden;e.currentTarget.setAttribute('aria-pressed',String(!drawingPalette.hidden));cancelDrawing();});
   for(const button of root.querySelectorAll('[data-tool]'))button.addEventListener('click',()=>{cancelDrawing();drawingTool=button.dataset.tool;layoutMode(false);drawingUI();canvas.focus();});
   root.addEventListener('keydown',e=>{if(e.key==='Escape'&&drawingTool!=='select'){e.preventDefault();e.stopPropagation();cancelDrawing();}},true);
   canvas.addEventListener('lostpointercapture',()=>{if(drawingGesture&&!drawingGesture.released)cancelDrawing();});
+  const blurDrawing=()=>{if(drawingGesture&&!drawingGesture.released)cancelDrawing();};
+  window.addEventListener('blur',blurDrawing);
   function rendererTarget(target){if(kind||!target?.startsWith('annotation:'))return target;const index=local.config.annotations?.items?.findIndex(v=>'annotation:'+v.id===target);return index>=0?`annotation_${index}`:target;}
   function hostTarget(target){if(kind)return target;const index=/^annotation_(\d+)$/.exec(target??'')?.[1],item=index===undefined?null:local.config.annotations?.items?.[Number(index)];return item?'annotation:'+item.id:target;}
 
@@ -487,7 +552,7 @@ export function render({model,el}) {
     resizeSurface();
     do{trace('ready_frame.started');await chart.first_frame_ready();trace('ready_frame.completed');if(disposed)throw Error('Widget disposed');recordFrame();}while(resizeSurface());
   }
-  const observer=new ResizeObserver(resize);
+  const observer=new ResizeObserver(()=>{resize();positionInline();});
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
   async function waitForFrame(){
     trace('display_wait.started');
@@ -613,7 +678,7 @@ export function render({model,el}) {
     const low=pivot+(lo-pivot)*factor+shift*span,high=pivot+(hi-pivot)*factor+shift*span;
     a.min=log?10**low:low;a.max=log?10**high:high;
   }
-  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e);
+  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e);
     if(drawingTool!=='select'){
       const g={tool:drawingTool,start:point,end:point,data:root.querySelector('[data-anchor-data]').checked,area:[0,0,canvas.width,canvas.height]};drawingGesture=g;
       enqueue(()=>{if(g!==drawingGesture)return;g.area=drawingArea()??g.area;const [x,y,w,h]=g.area;if(/^[hv]/.test(g.tool)&&(g.start[0]<x||g.start[0]>x+w||g.start[1]<y||g.start[1]>y+h)){cancelDrawing();return;}previewDrawing();});return;
@@ -626,6 +691,7 @@ export function render({model,el}) {
       const index=local.config.subplots.findIndex(p=>contains(p.config.chart_area)),current=local.config.active_layer?.Subplot??local.config.active_layer?.SubplotOverlay?.[0]??-1;
       if(index!==current&&(index>=0||contains(local.config.chart_area))){const state=snapshot();state.config.active_layer=index<0?'Base':{Subplot:index};state.config.picked_data=null;install(state);wheelArea=null;}
     }
+    if(await textAnnotationAt(point))chart.set_active_layer(JSON.stringify('Annotations'));
     if(kind){
       gesture.handle=selected?chart.resize_handle(selected,x,y):null;
       gesture.target=gesture.handle?selected:chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
@@ -650,9 +716,10 @@ export function render({model,el}) {
     else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;for(const k of ['bottom_x','top_x'])navigate(configOf(s)[k],1,.5,-(next[0]-old[0])/r[2]);for(const k of ['left_y','right_y'])navigate(configOf(s)[k],1,.5,(next[1]-old[1])/r[3]);install(s);}}
     else chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
   });});
-  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved)showProperties();commit();});}
+  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(!kind)chart.on_release();if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
   canvas.addEventListener('wheel',e=>{
+    if(inlineText){e.preventDefault();return;}
     if(chart&&kind&&boundedView){
       const horizontal=boundedView.axis==='x';if(horizontal?e.shiftKey&&!e.ctrlKey:e.ctrlKey&&!e.shiftKey)return;
       e.preventDefault();const point=localPoint(e),delta=e.deltaY||e.deltaX;
@@ -725,10 +792,10 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);drawingUI();
-    root.figgy={stats,diagnostics,annotations:()=>enqueue(()=>JSON.parse(chart.annotations()),true),snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
+    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(()=>kind?JSON.parse(chart.decorations()):Object.fromEntries(ids.map(id=>[id,JSON.parse(chart.decoration_bounds(id))])),true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('blur',blurDrawing);disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

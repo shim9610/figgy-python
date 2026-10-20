@@ -188,6 +188,15 @@ overlapping changes. In Jupyter, local interaction remains responsive and
 coalesced; synchronize accepted state through the existing acknowledgement
 protocol. Flush pending local edits before taking a review/export snapshot.
 
+Inline annotation text is a normal manual edit with a host-local input buffer.
+Native and notebook hosts own focus, IME/keyboard handling, confirmation and
+cancellation; the renderer supplies anchor transforms, hit testing and geometry.
+Typing does not create an annotation or a document revision. Confirmation applies
+one edit against the current document, preserving unrelated properties and
+checking the original annotation by stable ID. A changed or deleted target is
+rejected. Browser text hit testing waits for current prepared geometry after state
+acknowledgements rather than querying a cleared or outdated annotation map.
+
 Ordinary manual mode retains immediate accepted mutations. In review mode,
 edits update a draft shown in the window; approval seals the accepted turn.
 Flush edits, durably checkpoint the approved state, then close that window.
