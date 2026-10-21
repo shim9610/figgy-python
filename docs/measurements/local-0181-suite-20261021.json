@@ -1,0 +1,3614 @@
+{
+  "measured_utc": "2026-10-21",
+  "renderer": "0.18.1",
+  "model": "0.12.1",
+  "browser": "Chromium 154.0.8037.57 / SwiftShader",
+  "wheel_sha256": "b304fb9cc9218daa35735090d5581c07fd948cb71120d9565eb12c37dd6b287b",
+  "coverage": "Entire collected suite verified across resumed runs; the failed unsynchronized tick baseline was corrected and rerun. This is not a single uninterrupted full-suite pass.",
+  "ci_limit": "GitHub Chromium 156 results must be evaluated separately.",
+  "manifest_sha256": "81b49a5942f406f13cf03fc519dfb2f6f69e95e5a4cafab92c23a307e1b8e179",
+  "collected": 593,
+  "passed": 593,
+  "skipped": 0,
+  "final_failures": 0,
+  "summed_final_case_seconds": 2340.742,
+  "sessions": [
+    {
+      "report": "verified-ui",
+      "cases": 264,
+      "failures": 1,
+      "skips": 0,
+      "seconds": 1766.523
+    },
+    {
+      "report": "ticks-geometry",
+      "cases": 5,
+      "failures": 0,
+      "skips": 0,
+      "seconds": 109.257
+    },
+    {
+      "report": "remaining-ui",
+      "cases": 326,
+      "failures": 0,
+      "skips": 0,
+      "seconds": 504.199
+    },
+    {
+      "report": "final-geometry",
+      "cases": 1,
+      "failures": 0,
+      "skips": 0,
+      "seconds": 18.154
+    }
+  ],
+  "results": [
+    {
+      "node": "tests/test_browser.py::test_live_editor_select_drag_copy_and_png",
+      "outcome": "passed",
+      "seconds": 1.948,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_native_bounded_preparation_reports_the_actual_chart_family[radial-donut-args0]",
+      "outcome": "passed",
+      "seconds": 0.277,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_native_bounded_preparation_reports_the_actual_chart_family[categorical-bar-args1]",
+      "outcome": "passed",
+      "seconds": 0.033,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_native_bounded_preparation_reports_the_actual_chart_family[boxplot-boxplot-args2]",
+      "outcome": "passed",
+      "seconds": 0.055,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[bar]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[barh]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[boxplot]",
+      "outcome": "passed",
+      "seconds": 0.069,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[bxp]",
+      "outcome": "passed",
+      "seconds": 0.071,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[errorbar]",
+      "outcome": "passed",
+      "seconds": 0.073,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[hist]",
+      "outcome": "passed",
+      "seconds": 0.09,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[stairs]",
+      "outcome": "passed",
+      "seconds": 0.049,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[contour]",
+      "outcome": "passed",
+      "seconds": 0.125,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_all_constructors_share_native_browser_model_and_render[contourf]",
+      "outcome": "passed",
+      "seconds": 0.112,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_bounded_replay_preserves_data_and_rejects_other_category_layout[categorical]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_bounded_replay_preserves_data_and_rejects_other_category_layout[boxplot]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_radial_decorations_and_data_edits_remain_ssot[native]",
+      "outcome": "passed",
+      "seconds": 0.102,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_radial_decorations_and_data_edits_remain_ssot[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_horizontal_bounded_axis_titles_follow_orientation[native]",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_horizontal_bounded_axis_titles_follow_orientation[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_heatmap_fit_padding_and_mixed_series[nearest-native]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_heatmap_fit_padding_and_mixed_series[nearest-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_heatmap_fit_padding_and_mixed_series[bilinear-native]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_heatmap_fit_padding_and_mixed_series[bilinear-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_contour_fit_defaults_and_mixed_series[contour-native]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_contour_fit_defaults_and_mixed_series[contour-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.115,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_contour_fit_defaults_and_mixed_series[contourf-native]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_contour_fit_defaults_and_mixed_series[contourf-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.033,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_contour_fit_defaults_and_mixed_series[matrix_overlay-native]",
+      "outcome": "passed",
+      "seconds": 0.023,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_contour_fit_defaults_and_mixed_series[matrix_overlay-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.041,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_matrix_fit_uses_rendered_grid_after_ssot_style_change[Heatmap-native]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_matrix_fit_uses_rendered_grid_after_ssot_style_change[Heatmap-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.06,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_matrix_fit_uses_rendered_grid_after_ssot_style_change[Contour-native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_matrix_fit_uses_rendered_grid_after_ssot_style_change[Contour-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.023,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_matrix_fit_uses_rendered_grid_after_ssot_style_change[HeatmapContour-native]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_coverage.py::test_matrix_fit_uses_rendered_grid_after_ssot_style_change[HeatmapContour-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.06,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_milkyway_rejects_scatter_in_all_mutation_routes[native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_milkyway_rejects_scatter_in_all_mutation_routes[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_constellation_requires_marker_lines_and_bad_options_are_atomic[native]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_constellation_requires_marker_lines_and_bad_options_are_atomic[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_native_draw_modes_change_pixels_and_replay_exactly[sketch]",
+      "outcome": "passed",
+      "seconds": 0.274,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_native_draw_modes_change_pixels_and_replay_exactly[milkyway]",
+      "outcome": "passed",
+      "seconds": 0.503,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_native_draw_modes_change_pixels_and_replay_exactly[constellation]",
+      "outcome": "passed",
+      "seconds": 0.185,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_background_is_validated_replayed_and_reset[native]",
+      "outcome": "passed",
+      "seconds": 0.058,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_chart_styles.py::test_background_is_validated_replayed_and_reset[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[72-fig]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[72-restored]",
+      "outcome": "passed",
+      "seconds": 0.049,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[72-ax]",
+      "outcome": "passed",
+      "seconds": 0.049,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[72-text_segments]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[120-fig]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[120-restored]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[120-ax]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[120-text_segments]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[192-fig]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[192-restored]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[192-ax]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_readable_setters_replay_rich_layout_and_styles[192-text_segments]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_codegen.py::test_invalid_export_variable_and_configure_are_atomic",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_desktop_editor.py::test_editor_preserves_canvas_and_edits_in_separate_settings_window",
+      "outcome": "passed",
+      "seconds": 32.359,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_desktop_host.py::test_surface_drag_resize_reopen_and_no_png",
+      "outcome": "passed",
+      "seconds": 10.201,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_desktop_host.py::test_surface_heatmap_edits_sync_without_image_transport",
+      "outcome": "passed",
+      "seconds": 13.138,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_desktop_navigation.py::test_multiple_windows_zoom_pan_and_help",
+      "outcome": "passed",
+      "seconds": 11.936,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_undo_redo_restores_real_styles_and_keeps_resident_columns[native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_undo_redo_restores_real_styles_and_keeps_resident_columns[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_invalid_stale_and_noop_edits_do_not_create_history[native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_invalid_stale_and_noop_edits_do_not_create_history[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_one_continuous_gesture_is_one_operation_and_selection_is_transient[native]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_one_continuous_gesture_is_one_operation_and_selection_is_transient[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[radial-native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[radial-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[categorical-native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[categorical-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[boxplot-native]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[boxplot-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[radar-native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_bounded_history_restores_authored_document_and_ignores_selection[radar-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_shared_panel_history_and_independent_figures[native]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_shared_panel_history_and_independent_figures[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_reset_uses_the_marked_presentation_and_is_itself_undoable[native]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_reset_uses_the_marked_presentation_and_is_itself_undoable[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_gui_commit_boundary_retires_ids_but_explicit_history_can_restore_them[native]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_gui_commit_boundary_retires_ids_but_explicit_history_can_restore_them[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_reset_availability_remains_correct_when_undo_crosses_a_new_baseline[native]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_edit_history.py::test_reset_availability_remains_correct_when_undo_crosses_a_new_baseline[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[line-native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[line-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[vector-native]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[vector-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[histogram-native]",
+      "outcome": "passed",
+      "seconds": 0.024,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[histogram-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.024,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[contour-native]",
+      "outcome": "passed",
+      "seconds": 0.029,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_contextual_styles_have_real_commands_and_replay[contour-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.03,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_enable_contour_labels_then_edit_their_typography[native]",
+      "outcome": "passed",
+      "seconds": 0.02,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_enable_contour_labels_then_edit_their_typography[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_area_fill_is_explicit_and_can_be_removed_without_touching_arrays[native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_area_fill_is_explicit_and_can_be_removed_without_touching_arrays[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_grid_weights_and_gap_reflow_named_panels_atomically[native]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_grid_weights_and_gap_reflow_named_panels_atomically[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_wrong_owner_bad_choice_stale_revision_preserve_the_complete_document[native]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_wrong_owner_bad_choice_stale_revision_preserve_the_complete_document[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_catalog_explains_fixed_colors_and_sparse_overrides[native]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_catalog_explains_fixed_colors_and_sparse_overrides[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_value_mapping_uses_resident_extents_and_preserves_explicit_overrides[native]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_value_mapping_uses_resident_extents_and_preserves_explicit_overrides[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_named_grid_slot_swap_retains_ids_and_is_undoable[native]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_named_grid_slot_swap_retains_ids_and_is_undoable[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_vector_scale_mode_exposes_the_new_units[native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_vector_scale_mode_exposes_the_new_units[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_coordinates_convert_using_the_actual_axis_contract[cartesian-native]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_coordinates_convert_using_the_actual_axis_contract[cartesian-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_coordinates_convert_using_the_actual_axis_contract[categorical-native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_coordinates_convert_using_the_actual_axis_contract[categorical-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_coordinates_convert_using_the_actual_axis_contract[boxplot-native]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_coordinates_convert_using_the_actual_axis_contract[boxplot-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_order_tracks_stable_ids_and_restores_bounded_selection[native]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_annotation_order_tracks_stable_ids_and_restores_bounded_selection[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_compact_inspector_transport_resolves_to_the_complete_property_catalog",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_optional_shapes_palettes_and_label_placements_have_controls[native]",
+      "outcome": "passed",
+      "seconds": 0.055,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_optional_shapes_palettes_and_label_placements_have_controls[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.055,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_shared_axis_command_adopts_target_range_and_detaches_without_restyling[native]",
+      "outcome": "passed",
+      "seconds": 0.038,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_shared_axis_command_adopts_target_range_and_detaches_without_restyling[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.036,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_vector_color_source_uses_the_same_panel_scale_command[native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_vector_color_source_uses_the_same_panel_scale_command[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[radial-native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[radial-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[categorical-native]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[categorical-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[boxplot-native]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[boxplot-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[radar-native]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance[radar-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_polar_optional_controls_and_grid_vector_colors[native]",
+      "outcome": "passed",
+      "seconds": 0.029,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_polar_optional_controls_and_grid_vector_colors[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.027,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_timestamp_format_modes_are_typed_commands_and_preserve_numeric_domains[native]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_timestamp_format_modes_are_typed_commands_and_preserve_numeric_domains[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_semantic_tick_spacing_resolves_its_owner_independently_of_active_panel[native]",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_semantic_tick_spacing_resolves_its_owner_independently_of_active_panel[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_slice_optional_label_controls_remain_booleans_and_materialize_colors[native]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_slice_optional_label_controls_remain_booleans_and_materialize_colors[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_axis_membership_preserves_existing_group_ids_and_noop_commands[native]",
+      "outcome": "passed",
+      "seconds": 0.047,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_axis_membership_preserves_existing_group_ids_and_noop_commands[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.043,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_reapplying_an_enabled_optional_control_preserves_its_custom_values[native]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_reapplying_an_enabled_optional_control_preserves_its_custom_values[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_size_only_point_styles_inherit_mapped_colors_until_explicit_override[native]",
+      "outcome": "passed",
+      "seconds": 0.22,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_size_only_point_styles_inherit_mapped_colors_until_explicit_override[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.041,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_colorbar_title_command_preserves_character_style_and_replays[native]",
+      "outcome": "passed",
+      "seconds": 0.035,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_colorbar_title_command_preserves_character_style_and_replays[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.036,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_radial_detail_slice_commands_resolve_the_selected_group[native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_editor_properties.py::test_radial_detail_slice_commands_resolve_the_selected_group[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_numpy_uploads_are_reused_and_source_mutations_do_not_change_chart",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_exported_python_replays_layout_and_style",
+      "outcome": "passed",
+      "seconds": 0.041,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_explicit_prepare_reuses_resident_data_and_preserves_document",
+      "outcome": "passed",
+      "seconds": 1.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_bad_settings_and_stale_editor_commands_are_atomic",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_noncontiguous_input_and_png_scale",
+      "outcome": "passed",
+      "seconds": 0.142,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_heatmap_orientation_and_series_selection",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_widget_command_updates_native_state_and_png",
+      "outcome": "passed",
+      "seconds": 0.026,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_invalid_arrays_do_not_leak_columns",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_resident_pool_grows_without_changing_modes",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_render_and_pick_in_native_coordinates",
+      "outcome": "passed",
+      "seconds": 0.066,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_accept_nonpositive_samples_without_changing_data[values0-limits0-native]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_accept_nonpositive_samples_without_changing_data[values0-limits0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_accept_nonpositive_samples_without_changing_data[values1-limits1-native]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_accept_nonpositive_samples_without_changing_data[values1-limits1-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_accept_nonpositive_samples_without_changing_data[values2-limits2-native]",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_accept_nonpositive_samples_without_changing_data[values2-limits2-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers[x-native]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers[x-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.033,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers[y-native]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers[y-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.031,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_preserve_explicit_positive_limits_and_reject_unknown_scale[native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_log_axes_preserve_explicit_positive_limits_and_reject_unknown_scale[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_figure.py::test_device_limit_error_preserves_existing_plot",
+      "outcome": "passed",
+      "seconds": 0.07,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_gpu_observers_keep_calls_results_errors_and_bounded_history",
+      "outcome": "passed",
+      "seconds": 0.039,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_snapshot_borrow_failure_keeps_independent_host_gpu_and_gate_metadata",
+      "outcome": "passed",
+      "seconds": 0.035,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_diagnostic_artifact_saved_when_page_collection_fails[passed]",
+      "outcome": "passed",
+      "seconds": 0.001,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_diagnostic_artifact_saved_when_page_collection_fails[failed]",
+      "outcome": "passed",
+      "seconds": 0.001,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_timing_observers_preserve_gpu_and_frame_calls_without_adding_work",
+      "outcome": "passed",
+      "seconds": 0.038,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_timing_summary_deduplicates_fences_and_reports_pending_submissions",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_timed_screenshot_keeps_original_result_deadline_and_exception[False]",
+      "outcome": "passed",
+      "seconds": 0.001,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_timed_screenshot_keeps_original_result_deadline_and_exception[True]",
+      "outcome": "passed",
+      "seconds": 0.001,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_harness_diagnostics.py::test_capture_requires_current_surface_completion_and_propagates_display_errors",
+      "outcome": "passed",
+      "seconds": 0.034,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_guard.py::test_rejects_either_one_sided_change_even_with_tests",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_guard.py::test_requires_behavioral_coverage_not_just_two_files",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_guard.py::test_deleting_or_renaming_a_host_is_still_a_change",
+      "outcome": "passed",
+      "seconds": 0.057,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_legacy_settings_and_heatmap_legend_preserve_shared_host_model[native]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_legacy_settings_and_heatmap_legend_preserve_shared_host_model[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series[main-native]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series[main-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series[child-native]",
+      "outcome": "passed",
+      "seconds": 0.021,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series[child-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_offscreen_legend_keys_keep_their_symbols_after_configure[unlabelled_size-native]",
+      "outcome": "passed",
+      "seconds": 0.104,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_offscreen_legend_keys_keep_their_symbols_after_configure[unlabelled_size-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_offscreen_legend_keys_keep_their_symbols_after_configure[labelled_width-native]",
+      "outcome": "passed",
+      "seconds": 0.107,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_offscreen_legend_keys_keep_their_symbols_after_configure[labelled_width-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.02,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_offscreen_legend_keys_keep_their_symbols_after_configure[all_labelled-native]",
+      "outcome": "passed",
+      "seconds": 0.113,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_offscreen_legend_keys_keep_their_symbols_after_configure[all_labelled-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_hosts_share_drag_resize_pick_hover_and_export[radial]",
+      "outcome": "passed",
+      "seconds": 145.972,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_hosts_share_drag_resize_pick_hover_and_export[categorical]",
+      "outcome": "passed",
+      "seconds": 19.782,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_hosts_share_drag_resize_pick_hover_and_export[boxplot]",
+      "outcome": "passed",
+      "seconds": 20.415,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_hosts_share_drag_resize_pick_hover_and_export[radar]",
+      "outcome": "passed",
+      "seconds": 20.726,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_browser_coalesces_input_while_ordinary_frame_is_pending[categorical]",
+      "outcome": "passed",
+      "seconds": 12.626,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_browser_coalesces_input_while_ordinary_frame_is_pending[boxplot]",
+      "outcome": "passed",
+      "seconds": 12.756,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_browser_coalesces_input_while_ordinary_frame_is_pending[radar]",
+      "outcome": "passed",
+      "seconds": 12.602,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_cartesian_sync_accepts_edits_while_display_gpu_is_pending",
+      "outcome": "passed",
+      "seconds": 14.482,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_cartesian_hosts_share_pointer_anchored_zoom_pan_and_toolbar[linear]",
+      "outcome": "passed",
+      "seconds": 30.974,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_cartesian_hosts_share_pointer_anchored_zoom_pan_and_toolbar[log_inverted]",
+      "outcome": "passed",
+      "seconds": 31.782,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_cartesian_hosts_share_ticks_and_selected_character_formatting",
+      "outcome": "passed",
+      "seconds": 37.616,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matrix_fit_is_tight_in_both_hosts[nearest]",
+      "outcome": "passed",
+      "seconds": 17.598,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matrix_fit_is_tight_in_both_hosts[bilinear]",
+      "outcome": "passed",
+      "seconds": 17.261,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matrix_fit_is_tight_in_both_hosts[contour]",
+      "outcome": "passed",
+      "seconds": 17.356,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matrix_fit_is_tight_in_both_hosts[contourf]",
+      "outcome": "passed",
+      "seconds": 18.205,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matrix_fit_is_tight_in_both_hosts[matrix_overlay]",
+      "outcome": "passed",
+      "seconds": 19.085,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_axis_and_color_log_scale_editing_matches_both_hosts",
+      "outcome": "passed",
+      "seconds": 37.992,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_log_color_ui_masks_nonpositive_samples_in_both_hosts[True]",
+      "outcome": "passed",
+      "seconds": 18.682,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_log_color_ui_masks_nonpositive_samples_in_both_hosts[False]",
+      "outcome": "passed",
+      "seconds": 18.95,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_log_axis_ui_breaks_lines_at_nonpositive_samples_in_both_hosts",
+      "outcome": "passed",
+      "seconds": 17.89,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_histogram_selected_bin_readout_and_arrows_match_both_hosts[vertical]",
+      "outcome": "passed",
+      "seconds": 20.877,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_histogram_selected_bin_readout_and_arrows_match_both_hosts[horizontal]",
+      "outcome": "passed",
+      "seconds": 20.608,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_empty_titles_can_be_enabled_edited_and_restored_in_both_hosts",
+      "outcome": "passed",
+      "seconds": 67.177,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matching_opposite_axes_share_only_ui_edited_fields[x]",
+      "outcome": "passed",
+      "seconds": 54.876,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_matching_opposite_axes_share_only_ui_edited_fields[y]",
+      "outcome": "passed",
+      "seconds": 54.566,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[maps]",
+      "outcome": "passed",
+      "seconds": 14.884,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[child_maps]",
+      "outcome": "passed",
+      "seconds": 15.362,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[mixed_styles]",
+      "outcome": "passed",
+      "seconds": 16.753,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[vector_points]",
+      "outcome": "passed",
+      "seconds": 14.689,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[vector_grid]",
+      "outcome": "passed",
+      "seconds": 15.107,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[fill_steps]",
+      "outcome": "passed",
+      "seconds": 15.171,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[polar]",
+      "outcome": "passed",
+      "seconds": 15.197,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[annotations]",
+      "outcome": "passed",
+      "seconds": 15.363,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[panels]",
+      "outcome": "passed",
+      "seconds": 16.482,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_renderer_018_features_display_edit_and_export_in_both_hosts[secondary_y]",
+      "outcome": "passed",
+      "seconds": 15.311,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_layer_drag_and_endpoint_resize_match_hosts[cartesian]",
+      "outcome": "passed",
+      "seconds": 15.881,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_layer_drag_and_endpoint_resize_match_hosts[radar]",
+      "outcome": "passed",
+      "seconds": 12.04,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_editor_undo_redo_groups_a_real_title_drag[native]",
+      "outcome": "passed",
+      "seconds": 2.359,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_editor_undo_redo_groups_a_real_title_drag[webgpu]",
+      "outcome": "passed",
+      "seconds": 13.771,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_shared_property_controls_apply_and_undo_without_losing_the_object[native]",
+      "outcome": "passed",
+      "seconds": 4.669,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_shared_property_controls_apply_and_undo_without_losing_the_object[webgpu]",
+      "outcome": "passed",
+      "seconds": 14.278,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_object_tree_routes_secondary_axes_and_reveals_canvas_selection",
+      "outcome": "passed",
+      "seconds": 23.643,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_value_range_wheel_and_fit_work_in_both_hosts[boxplot]",
+      "outcome": "passed",
+      "seconds": 12.291,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_value_range_wheel_and_fit_work_in_both_hosts[boxplot_horizontal]",
+      "outcome": "passed",
+      "seconds": 12.797,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_bounded_value_range_wheel_and_fit_work_in_both_hosts[radar]",
+      "outcome": "passed",
+      "seconds": 12.694,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[cartesian]",
+      "outcome": "passed",
+      "seconds": 36.325,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[log_inverted]",
+      "outcome": "passed",
+      "seconds": 37.468,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[boxplot]",
+      "outcome": "passed",
+      "seconds": 29.925,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[boxplot_horizontal]",
+      "outcome": "passed",
+      "seconds": 30.767,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[categorical]",
+      "outcome": "passed",
+      "seconds": 30.474,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[radial]",
+      "outcome": "passed",
+      "seconds": 130.657,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[radar]",
+      "outcome": "passed",
+      "seconds": 26.183,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[polar]",
+      "outcome": "passed",
+      "seconds": 31.126,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]",
+      "outcome": "passed",
+      "seconds": 18.446,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]",
+      "outcome": "passed",
+      "seconds": 46.64,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]",
+      "outcome": "passed",
+      "seconds": 15.018,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]",
+      "outcome": "passed",
+      "seconds": 14.979,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_grid_focus_routes_visible_axes_and_data_without_tree[native]",
+      "outcome": "passed",
+      "seconds": 6.582,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_grid_focus_routes_visible_axes_and_data_without_tree[webgpu]",
+      "outcome": "passed",
+      "seconds": 22.033,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_coincident_series_chooser_is_view_only_until_commit[native]",
+      "outcome": "passed",
+      "seconds": 3.534,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_coincident_series_chooser_is_view_only_until_commit[webgpu]",
+      "outcome": "passed",
+      "seconds": 19.727,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_fully_overlapping_panels_keep_the_chosen_chart[native]",
+      "outcome": "passed",
+      "seconds": 6.843,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_fully_overlapping_panels_keep_the_chosen_chart[webgpu]",
+      "outcome": "passed",
+      "seconds": 19.943,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]",
+      "outcome": "passed",
+      "seconds": 12.805,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[webgpu]",
+      "outcome": "passed",
+      "seconds": 15.978,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_legend_shared_typography_precedes_entries_in_both_hosts[main]",
+      "outcome": "passed",
+      "seconds": 26.51,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_legend_shared_typography_precedes_entries_in_both_hosts[child]",
+      "outcome": "passed",
+      "seconds": 27.557,
+      "report": "verified-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts[primary]",
+      "outcome": "passed",
+      "seconds": 23.454,
+      "report": "ticks-geometry"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts[subplot]",
+      "outcome": "passed",
+      "seconds": 21.164,
+      "report": "ticks-geometry"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts[overlay]",
+      "outcome": "passed",
+      "seconds": 20.95,
+      "report": "ticks-geometry"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts[shared]",
+      "outcome": "passed",
+      "seconds": 27.437,
+      "report": "ticks-geometry"
+    },
+    {
+      "node": "tests/test_interaction_geometry.py::test_cartesian_annotation_geometry_refreshes_while_display_gpu_is_pending",
+      "outcome": "passed",
+      "seconds": 18.044,
+      "report": "final-geometry"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle[cartesian-native]",
+      "outcome": "passed",
+      "seconds": 8.384,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle[cartesian-webgpu]",
+      "outcome": "passed",
+      "seconds": 16.999,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle[categorical-native]",
+      "outcome": "passed",
+      "seconds": 7.786,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle[categorical-webgpu]",
+      "outcome": "passed",
+      "seconds": 10.106,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle[boxplot-native]",
+      "outcome": "passed",
+      "seconds": 7.771,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle[boxplot-webgpu]",
+      "outcome": "passed",
+      "seconds": 10.45,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_reset_button_restores_the_presented_chart_and_can_be_undone[native]",
+      "outcome": "passed",
+      "seconds": 10.627,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_reset_button_restores_the_presented_chart_and_can_be_undone[webgpu]",
+      "outcome": "passed",
+      "seconds": 15.261,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_all_colormap_controls_change_data_and_bar_pixels_and_undo[native]",
+      "outcome": "passed",
+      "seconds": 24.319,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_all_colormap_controls_change_data_and_bar_pixels_and_undo[webgpu]",
+      "outcome": "passed",
+      "seconds": 19.406,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_palette_entry_buttons_and_numeric_fields_use_real_controls[native]",
+      "outcome": "passed",
+      "seconds": 13.178,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_palette_entry_buttons_and_numeric_fields_use_real_controls[webgpu]",
+      "outcome": "passed",
+      "seconds": 18.709,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_timestamp_offset_accepts_negative_integer_entry_in_both_inspectors[native]",
+      "outcome": "passed",
+      "seconds": 9.859,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_timestamp_offset_accepts_negative_integer_entry_in_both_inspectors[webgpu]",
+      "outcome": "passed",
+      "seconds": 14.291,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_browser_property_ack_advances_its_base_but_rejects_external_conflicts",
+      "outcome": "passed",
+      "seconds": 14.23,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_colorbar_title_has_a_direct_text_control_in_both_hosts[native]",
+      "outcome": "passed",
+      "seconds": 5.373,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_colorbar_title_has_a_direct_text_control_in_both_hosts[webgpu]",
+      "outcome": "passed",
+      "seconds": 14.851,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_radial_detail_tree_selection_edits_only_the_chosen_child[native]",
+      "outcome": "passed",
+      "seconds": 33.344,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_radial_detail_tree_selection_edits_only_the_chosen_child[webgpu]",
+      "outcome": "passed",
+      "seconds": 56.349,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_closing_native_window_finishes_accepted_text_edit",
+      "outcome": "passed",
+      "seconds": 4.088,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_interaction_parity.py::test_large_logarithmic_values_render_at_their_projected_height_in_both_hosts",
+      "outcome": "passed",
+      "seconds": 13.298,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_failed_heatmap_registration_preserves_entire_document[native]",
+      "outcome": "passed",
+      "seconds": 0.094,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_failed_heatmap_registration_preserves_entire_document[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_finite_json_cannot_overflow_renderer_float_fields[native]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_finite_json_cannot_overflow_renderer_float_fields[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_negative_title_margin_cannot_expand_colorbar_raster_outside_canvas[native]",
+      "outcome": "passed",
+      "seconds": 0.036,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_negative_title_margin_cannot_expand_colorbar_raster_outside_canvas[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_large_valid_font_is_not_rejected_by_an_arbitrary_size_limit[native]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_large_valid_font_is_not_rejected_by_an_arbitrary_size_limit[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_invalid_target_types_and_browser_host_methods_have_domain_errors",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_unrepresentable_source_data_and_all_nonfinite_arrays_are_atomic[native]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_unrepresentable_source_data_and_all_nonfinite_arrays_are_atomic[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_heatmap_allocation_failure_preserves_existing_chart_and_pool",
+      "outcome": "passed",
+      "seconds": 0.268,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_unsafe_ranges_and_geometry_sizes_are_rejected_without_poisoning[native]",
+      "outcome": "passed",
+      "seconds": 0.055,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_unsafe_ranges_and_geometry_sizes_are_rejected_without_poisoning[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_wrong_host_flags_and_async_timeouts_fail_before_transfer",
+      "outcome": "passed",
+      "seconds": 0.102,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_invalid_state.py::test_small_randomized_campaign_in_subprocess",
+      "outcome": "passed",
+      "seconds": 2.563,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_package_version_has_one_source",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_multiple_panels_have_stable_public_addresses",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_bar_series_recolour_and_code_export",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_sketch_rejects_series_it_cannot_draw",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_unknown_font_family_is_rejected",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_grayscale_colorbar_has_no_interior_brightness_reversals",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_handwritten_greek_uses_glyph_fallback_instead_of_notdef",
+      "outcome": "passed",
+      "seconds": 0.093,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_sketch_rejects_an_existing_histogram_without_changing_the_plot",
+      "outcome": "passed",
+      "seconds": 0.07,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_unicode_superscripts_use_the_renderer_mapping",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_multi_line_title_grows_its_band_and_single_lines_keep_it",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_title_alignment_is_editable_and_exported",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[native-Linear-x-keys0]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[native-Linear-y-keys1]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[native-Logarithmic-x-keys0]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[native-Logarithmic-y-keys1]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[webgpu-Linear-x-keys0]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[webgpu-Linear-y-keys1]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[webgpu-Logarithmic-x-keys0]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edits_keep_configured_ticks[webgpu-Logarithmic-y-keys1]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edit_does_not_lock_later_fit_helpers[native]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_range_only_edit_does_not_lock_later_fit_helpers[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_tick_substitution_warns_once_per_change",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_to_code_replays_an_injected_title_margin",
+      "outcome": "passed",
+      "seconds": 0.028,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_a_secondary_axis_helper_edit_changes_only_requested_fields_on_the_pair[native]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_a_secondary_axis_helper_edit_changes_only_requested_fields_on_the_pair[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_scaled_exports_report_tick_substitutions",
+      "outcome": "passed",
+      "seconds": 0.122,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_editors_receive_the_original_text_of_styled_segments",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_issue_fixes.py::test_draw_style_change_rederives_a_clipped_title_band",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_jupyter_input.py::test_button_input_checks_geometry_without_animation_frames",
+      "outcome": "passed",
+      "seconds": 1.376,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_jupyter_webgpu.py::test_jupyter_webgpu_binary_edit_sync_export[True]",
+      "outcome": "passed",
+      "seconds": 43.948,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_jupyter_webgpu.py::test_jupyter_webgpu_binary_edit_sync_export[False]",
+      "outcome": "passed",
+      "seconds": 44.936,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_layout_defaults.py::test_default_title_tick_separation_and_native_notebook_layout_match",
+      "outcome": "passed",
+      "seconds": 0.033,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[native-bottom-bottom_x-top-top_x]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[native-top-top_x-bottom-bottom_x]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[native-left-left_y-right-right_y]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[native-right-right_y-left-left_y]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[webgpu-bottom-bottom_x-top-top_x]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[webgpu-top-top_x-bottom-bottom_x]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[webgpu-left-left_y-right-right_y]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_axis_edits_work_in_both_directions_and_preserve_unedited_differences[webgpu-right-right_y-left-left_y]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[native-bottom-bottom_x-top-top_x]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[native-top-top_x-bottom-bottom_x]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[native-left-left_y-right-right_y]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[native-right-right_y-left-left_y]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[webgpu-bottom-bottom_x-top-top_x]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[webgpu-top-top_x-bottom-bottom_x]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[webgpu-left-left_y-right-right_y]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_tick_labels_sync_changed_subfields_but_preserve_edge_offsets[webgpu-right-right_y-left-left_y]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[native-min-1.000000000001]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[native-max-101.0]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[native-scale-Logarithmic]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[native-inverted-True]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[webgpu-min-1.000000000001]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[webgpu-max-101.0]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[webgpu-scale-Logarithmic]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_distinct_coordinate_axes_remain_independent_without_rounding[webgpu-inverted-True]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_link_decision_uses_pre_edit_coordinates_and_preserves_other_axis_state[native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_link_decision_uses_pre_edit_coordinates_and_preserves_other_axis_state[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_log_scale_switch_shares_fitted_bounds_and_spacing_only_when_linked[native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_log_scale_switch_shares_fitted_bounds_and_spacing_only_when_linked[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_raw_ssot_edits_do_not_run_opposite_axis_helpers[native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_raw_ssot_edits_do_not_run_opposite_axis_helpers[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_nested_style_edits_copy_only_changed_label_fields_and_atomic_colors[native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_linked_axis_edits.py::test_nested_style_edits_copy_only_changed_label_fields_and_atomic_colors[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_native_threading.py::test_shared_native_core_with_concurrent_python_calls",
+      "outcome": "passed",
+      "seconds": 0.272,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_notebook_model.py::test_gpu_free_binary_snapshot_release_and_revision",
+      "outcome": "passed",
+      "seconds": 0.025,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_notebook_model.py::test_native_notebook_fallback_is_explicit",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_notebook_model.py::test_positive_log_bounds_survive_binary_transfer_release",
+      "outcome": "passed",
+      "seconds": 0.031,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_notebook_model.py::test_manual_preparation_requires_a_mounted_view_and_propagates_result",
+      "outcome": "passed",
+      "seconds": 0.021,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_notebook_model.py::test_widget_created_before_async_loop_recovers_across_separate_loops",
+      "outcome": "passed",
+      "seconds": 0.035,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_numeric_formatting.py::test_numeric_format_and_precision_editing_in_both_hosts",
+      "outcome": "passed",
+      "seconds": 48.053,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_outline_preserves_named_owners_after_panel_moves[native]",
+      "outcome": "passed",
+      "seconds": 0.025,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_outline_preserves_named_owners_after_panel_moves[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_boxplot_limits_control_the_actual_value_model_and_fit_restores_auto[False-native]",
+      "outcome": "passed",
+      "seconds": 0.056,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_boxplot_limits_control_the_actual_value_model_and_fit_restores_auto[False-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_boxplot_limits_control_the_actual_value_model_and_fit_restores_auto[True-native]",
+      "outcome": "passed",
+      "seconds": 0.055,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_boxplot_limits_control_the_actual_value_model_and_fit_restores_auto[True-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_radar_value_range_is_editable_and_fit_restores_auto[native]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_object_navigation.py::test_radar_value_range_is_editable_and_fit_restores_auto[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_source_asset_provenance",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_runtime_asset_check_does_not_require_tomllib",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_crlf_changes_are_rejected_with_asset_diagnostics",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_git_autocrlf_checkout_preserves_manifest_bytes[False]",
+      "outcome": "passed",
+      "seconds": 0.345,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_git_autocrlf_checkout_preserves_manifest_bytes[True]",
+      "outcome": "passed",
+      "seconds": 0.311,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_check_does_not_depend_on_callers_git_subdirectory",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_inside_another_checkout",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_must_match_built_asset_provenance[bytes]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_must_match_built_asset_provenance[missing]",
+      "outcome": "passed",
+      "seconds": 0.019,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_must_match_built_asset_provenance[hash]",
+      "outcome": "passed",
+      "seconds": 0.02,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_must_match_built_asset_provenance[path]",
+      "outcome": "passed",
+      "seconds": 0.02,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_must_match_built_asset_provenance[files]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[renderer]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[model]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[manifest]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[mode]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[crlf]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[deletion]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_host_patch_cannot_change_native_sources_or_build_configuration[invalid]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_lockfile_changes_are_rejected[checksum-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc-figgy-model]",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_lockfile_changes_are_rejected[checksum-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc-figgy-renderer]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_lockfile_changes_are_rejected[version-9.0.0-figgy-model]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_lockfile_changes_are_rejected[version-9.0.0-figgy-renderer]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_lockfile_changes_are_rejected[source-git+https://github.com/shim9610/figgy#7777777777777777777777777777777777777777-figgy-model]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_lockfile_changes_are_rejected[source-git+https://github.com/shim9610/figgy#7777777777777777777777777777777777777777-figgy-renderer]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[native_revision]",
+      "outcome": "passed",
+      "seconds": 0.021,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[wasm_revision]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[script_revision]",
+      "outcome": "passed",
+      "seconds": 0.018,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[path]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[renderer_version]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[missing]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_pairing_metadata_changes_are_rejected[duplicate]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_overrides_rejected_even_with_unchanged_lock[[patch.crates-io]\\nfiggy-renderer = { git = \"https://github.com/shim9610/figgy\", rev = \"7777777777777777777777777777777777777777\" }]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_overrides_rejected_even_with_unchanged_lock[[patch.crates-io]\\nmodel_alias = { package = \"figgy-model\", path = \"../model\" }]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_registry_overrides_rejected_even_with_unchanged_lock[[replace]\\n\"figgy-model:0.11.0\" = { path = \"../model\" }]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_direct_nonregistry_renderer_rejected[, path = \"../renderer\"]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_direct_nonregistry_renderer_rejected[, git = \"https://github.com/shim9610/figgy\"]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_direct_nonregistry_renderer_rejected[, registry = \"other\"]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_dirty_wasm_checkout_is_rejected_before_download[False]",
+      "outcome": "passed",
+      "seconds": 0.02,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_dirty_wasm_checkout_is_rejected_before_download[True]",
+      "outcome": "passed",
+      "seconds": 0.023,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[None]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[checksum]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[revision]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[dirty]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[path]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[manifest]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[source]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_packaged_assets.py::test_published_archive_matches_exact_wasm_source[inventory]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_pie_donut_render_and_data_ownership",
+      "outcome": "passed",
+      "seconds": 1.181,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_radial_invalid_edits_are_atomic_and_families_cannot_mix",
+      "outcome": "passed",
+      "seconds": 0.023,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_invalid_radial_values[values0]",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_invalid_radial_values[values1]",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_invalid_radial_values[values2]",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_invalid_radial_values[values3]",
+      "outcome": "passed",
+      "seconds": 0.002,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_materials_are_actual_different_shader_outputs",
+      "outcome": "passed",
+      "seconds": 2.385,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_radial_code_replay_preserves_new_values_and_shared_device",
+      "outcome": "passed",
+      "seconds": 0.723,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_radial_pick_prepare_and_explicit_value_replacement",
+      "outcome": "passed",
+      "seconds": 0.186,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial.py::test_radial_style_replay_rejects_a_different_slice_count",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial_desktop.py::test_radial_native_edit_copy_selection_and_no_readback",
+      "outcome": "passed",
+      "seconds": 16.421,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_radial_desktop.py::test_draw_style_menu_disables_milkyway_for_scatter",
+      "outcome": "passed",
+      "seconds": 2.618,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_real_matrix_requires_all_74_wheels",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_complete_release_manifest_contains_exact_bytes",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_maturin_can_reorder_python_specifiers",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_missing_wheel_stops_before_staging",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_duplicate_distribution_in_artifact_is_rejected",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_corrupt_or_mixed_wheel_stops_before_staging[figgyplot/assets/figgy_bg.wasm-broken-differs from source]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_corrupt_or_mixed_wheel_stops_before_staging[figgyplot/webgpu.js-broken-differs from source]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_corrupt_or_mixed_wheel_stops_before_staging[figgyplot-0.2.0.dist-info/METADATA-Name: figgyplot\\nVersion: 0.1.0\\n-name/version]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_corrupt_or_mixed_wheel_stops_before_staging[figgyplot-0.2.0.dist-info/WHEEL-Tag: cp312-cp312-win_amd64\\n-tags differ]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_platform_or_abi_in_artifact_is_rejected",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_sdist_and_wheel_assets_must_match_same_source",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_index_download_must_match_release_hash",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_index_download_cannot_use_another_build",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_download_uses_isolated_index_and_rejects_bad_bytes[None-testpypi]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_download_uses_isolated_index_and_rejects_bad_bytes[None-pypi]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_download_uses_isolated_index_and_rejects_bad_bytes[download-testpypi]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_download_uses_isolated_index_and_rejects_bad_bytes[download-pypi]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_download_uses_isolated_index_and_rejects_bad_bytes[installed-testpypi]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_download_uses_isolated_index_and_rejects_bad_bytes[installed-pypi]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_successful_testpypi_run_can_be_promoted",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_uploaded_release_with_skipped_installs_can_only_enter_recheck",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_completed_recheck_can_be_promoted",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_recheck_with_skipped_installs_is_not_trusted",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_release_only_repairs_can_reuse_existing_package[.github/workflows/publish.yml]",
+      "outcome": "passed",
+      "seconds": 0.029,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_release_only_repairs_can_reuse_existing_package[scripts/check_testpypi.py]",
+      "outcome": "passed",
+      "seconds": 0.028,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_release_only_repairs_can_reuse_existing_package[docs/PUBLISHING.md]",
+      "outcome": "passed",
+      "seconds": 0.028,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[src/lib.rs]",
+      "outcome": "passed",
+      "seconds": 0.029,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[python/figgyplot/figure.py]",
+      "outcome": "passed",
+      "seconds": 0.028,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[Cargo.toml]",
+      "outcome": "passed",
+      "seconds": 0.028,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[Cargo.lock]",
+      "outcome": "passed",
+      "seconds": 0.027,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[pyproject.toml]",
+      "outcome": "passed",
+      "seconds": 0.028,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[PYPI_README.md]",
+      "outcome": "passed",
+      "seconds": 0.026,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[.gitattributes]",
+      "outcome": "passed",
+      "seconds": 0.026,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_package_or_build_changes_cannot_reuse_tested_release[.github/workflows/wheels.yml]",
+      "outcome": "passed",
+      "seconds": 0.027,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_unrelated_history_cannot_reuse_tested_release",
+      "outcome": "passed",
+      "seconds": 0.026,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[head_sha-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-exact main commit]",
+      "outcome": "passed",
+      "seconds": 0.001,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[head_branch-unreviewed-manual publication on main]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[event-pull_request-manual publication on main]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[path-.github/workflows/pr-tests.yml-manual publication on main]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[conclusion-failure-completed successfully]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[status-in_progress-completed successfully]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_wrong_source_cannot_be_promoted[head_repository-value6-manual publication on main]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_every_real_test_index_install_is_required[failed]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_every_real_test_index_install_is_required[missing]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_every_real_test_index_install_is_required[wrong-platform]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_every_real_test_index_install_is_required[production-run]",
+      "outcome": "passed",
+      "seconds": 0.0,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_promotion_uses_exact_verified_files",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_promotion_manifest_must_match_source[version-0.3.0]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_promotion_manifest_must_match_source[commit-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_release.py::test_promotion_manifest_must_match_source[run_id-456]",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[line-0.17.0-native]",
+      "outcome": "passed",
+      "seconds": 0.14,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[line-0.17.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[line-0.18.0-native]",
+      "outcome": "passed",
+      "seconds": 0.022,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[line-0.18.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[radial-0.17.0-native]",
+      "outcome": "passed",
+      "seconds": 0.23,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[radial-0.17.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[radial-0.18.0-native]",
+      "outcome": "passed",
+      "seconds": 0.219,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[radial-0.18.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[categorical-0.17.0-native]",
+      "outcome": "passed",
+      "seconds": 0.032,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[categorical-0.17.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[categorical-0.18.0-native]",
+      "outcome": "passed",
+      "seconds": 0.03,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[categorical-0.18.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[boxplot-0.17.0-native]",
+      "outcome": "passed",
+      "seconds": 0.056,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[boxplot-0.17.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[boxplot-0.18.0-native]",
+      "outcome": "passed",
+      "seconds": 0.055,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_previous_settings_preserve_edits_and_reject_unknown_versions[boxplot-0.18.0-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_heatmap_legend_updates_colormap_and_replays_without_losing_text[native]",
+      "outcome": "passed",
+      "seconds": 0.128,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_heatmap_legend_updates_colormap_and_replays_without_losing_text[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.04,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_new_references_isolate_figures_and_survive_other_figure_close[fill]",
+      "outcome": "passed",
+      "seconds": 0.067,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_new_references_isolate_figures_and_survive_other_figure_close[maps]",
+      "outcome": "passed",
+      "seconds": 0.057,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_new_references_isolate_figures_and_survive_other_figure_close[vector_points]",
+      "outcome": "passed",
+      "seconds": 0.074,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_new_references_isolate_figures_and_survive_other_figure_close[vector_grid]",
+      "outcome": "passed",
+      "seconds": 0.078,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_tick_label_bounds_follow_both_offset_components[tick_labels_bottom-bottom_x]",
+      "outcome": "passed",
+      "seconds": 0.031,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_compat.py::test_tick_label_bounds_follow_both_offset_components[tick_labels_left-left_y]",
+      "outcome": "passed",
+      "seconds": 0.031,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[mapped_points-native]",
+      "outcome": "passed",
+      "seconds": 0.039,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[mapped_points-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[vector_points-native]",
+      "outcome": "passed",
+      "seconds": 0.046,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[vector_points-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.013,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[vector_grid-native]",
+      "outcome": "passed",
+      "seconds": 0.042,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[vector_grid-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[steps-native]",
+      "outcome": "passed",
+      "seconds": 0.034,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[steps-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[baseline_fill-native]",
+      "outcome": "passed",
+      "seconds": 0.036,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[baseline_fill-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[series_fill-native]",
+      "outcome": "passed",
+      "seconds": 0.038,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[series_fill-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.01,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[polar-native]",
+      "outcome": "passed",
+      "seconds": 0.048,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[polar-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[radar-native]",
+      "outcome": "passed",
+      "seconds": 0.075,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[radar-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[annotations-native]",
+      "outcome": "passed",
+      "seconds": 0.048,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_features_round_trip_and_replay_without_reupload[annotations-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_grid_ownership_shared_ranges_and_stable_placement[native]",
+      "outcome": "passed",
+      "seconds": 0.265,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_grid_ownership_shared_ranges_and_stable_placement[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.032,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_secondary_y_axis_is_owned_locally_and_replays[native]",
+      "outcome": "passed",
+      "seconds": 0.155,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_secondary_y_axis_is_owned_locally_and_replays[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.017,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_rejected_combinations_and_stale_edits_are_atomic[native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_rejected_combinations_and_stale_edits_are_atomic[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_selected_mapped_values_and_vector_components_remain_gpu_owned",
+      "outcome": "passed",
+      "seconds": 0.006,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_single_panel_convenience_and_explicit_legacy_migration",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_first_panel_moves_without_changing_its_identity_or_data[native]",
+      "outcome": "passed",
+      "seconds": 0.12,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_first_panel_moves_without_changing_its_identity_or_data[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_deleted_handles_and_retired_annotation_ids_are_rejected[native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_deleted_handles_and_retired_annotation_ids_are_rejected[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_native_advanced_settings_share_metadata_validation[native]",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_native_advanced_settings_share_metadata_validation[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_mapped_colormap_update_addresses_the_series_panel[native]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_mapped_colormap_update_addresses_the_series_panel[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_size_domains_and_polar_root_combinations_fail_before_upload[native]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_size_domains_and_polar_root_combinations_fail_before_upload[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_axis_helpers_use_their_panel_domain_and_preserve_other_styles[native]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_axis_helpers_use_their_panel_domain_and_preserve_other_styles[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.016,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_mixed_panel_styles_replay_identically_at_multiple_export_scales[order0]",
+      "outcome": "passed",
+      "seconds": 0.284,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_mixed_panel_styles_replay_identically_at_multiple_export_scales[order1]",
+      "outcome": "passed",
+      "seconds": 0.228,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_failed_vector_registration_does_not_leave_fit_metadata[native]",
+      "outcome": "passed",
+      "seconds": 0.008,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_failed_vector_registration_does_not_leave_fit_metadata[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_baseline_fills_fit_the_complete_filled_geometry[native]",
+      "outcome": "passed",
+      "seconds": 0.004,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_baseline_fills_fit_the_complete_filled_geometry[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.003,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_malformed_document_shapes_are_rejected_without_state_changes[native]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_malformed_document_shapes_are_rejected_without_state_changes[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_tick_intent_replays_by_owner_and_rejects_invalid_metadata[native]",
+      "outcome": "passed",
+      "seconds": 0.031,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_tick_intent_replays_by_owner_and_rejects_invalid_metadata[webgpu]",
+      "outcome": "passed",
+      "seconds": 0.03,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_shared_tick_policy_and_spacing_follow_edits_from_any_member[x-bottom_x-native]",
+      "outcome": "passed",
+      "seconds": 0.025,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_shared_tick_policy_and_spacing_follow_edits_from_any_member[x-bottom_x-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.025,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_shared_tick_policy_and_spacing_follow_edits_from_any_member[y-left_y-native]",
+      "outcome": "passed",
+      "seconds": 0.026,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_renderer_018_features.py::test_shared_tick_policy_and_spacing_follow_edits_from_any_member[y-left_y-webgpu]",
+      "outcome": "passed",
+      "seconds": 0.024,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_selected_values_survive_source_mutation_and_arrow_navigation",
+      "outcome": "passed",
+      "seconds": 0.009,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_heatmap_cell_values_and_two_dimensional_navigation",
+      "outcome": "passed",
+      "seconds": 0.007,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[counts-vertical]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[counts-horizontal]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[density-vertical]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[density-horizontal]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[weighted-vertical]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[weighted-horizontal]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[stairs-vertical]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_bin_values_and_navigation_survive_source_mutation[stairs-horizontal]",
+      "outcome": "passed",
+      "seconds": 0.005,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_navigation_switches_compatible_series_and_clamps[vertical]",
+      "outcome": "passed",
+      "seconds": 0.011,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_selection_values.py::test_histogram_navigation_switches_compatible_series_and_clamps[horizontal]",
+      "outcome": "passed",
+      "seconds": 0.012,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_shared_gpu.py::test_multiple_figures_isolate_same_ids_picks_exports_and_close",
+      "outcome": "passed",
+      "seconds": 0.854,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_shared_gpu.py::test_closed_figures_reuse_context_and_explicit_release_resets_it",
+      "outcome": "passed",
+      "seconds": 1.814,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_shared_gpu.py::test_concurrent_figures_share_initialization_without_gil_deadlock",
+      "outcome": "passed",
+      "seconds": 0.579,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_shared_gpu.py::test_failed_second_figure_upload_keeps_existing_data_and_rolls_back",
+      "outcome": "passed",
+      "seconds": 0.131,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_shared_gpu.py::test_text_size_color_and_font_change_render_and_replay",
+      "outcome": "passed",
+      "seconds": 0.101,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_actual_action_contract",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_reject_ignored_before_script_input",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_reject_duplicate_platform_tags[--compatibility manylinux_2_28]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_reject_duplicate_platform_tags[--manylinux 2_28]",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_reject_duplicate_platform_tags[--compatibility=musllinux_1_2]",
+      "outcome": "passed",
+      "seconds": 0.015,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_reject_automatic_ci",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "remaining-ui"
+    },
+    {
+      "node": "tests/test_wheel_workflow.py::test_reject_musl_install_on_glibc_host",
+      "outcome": "passed",
+      "seconds": 0.014,
+      "report": "remaining-ui"
+    }
+  ],
+  "ci_allocation": {
+    "existing_test_job_minutes": 45,
+    "local_priority_retest_seconds": 191.905,
+    "ci49_build_and_install_seconds": 289.208,
+    "ci49_build_start_utc": "2026-10-21T14:49:51.2314186Z",
+    "ci49_next_step_start_utc": "2026-10-21T14:54:40.4389557Z",
+    "interpretation": "These separate measurements motivate distinct build and test jobs; their sum is not a measured complete CI duration or a prediction of Chromium 156 performance.",
+    "result": "Build has a 20-minute job budget; integration retains 45 minutes, its priority tests, entire suite, per-test deadlines, diagnostics and assertions. The integration job checks the same-run wheel SHA-256 and fails if its build failed or was skipped."
+  }
+}

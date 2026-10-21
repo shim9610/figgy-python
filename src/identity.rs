@@ -2,6 +2,72 @@
 use super::*;
 use std::collections::HashSet;
 
+/// Enforce lifetime identities at the same boundary for Python and GUI edits.
+/// Undo/redo/reset may restore an accepted historical object explicitly.
+pub(super) fn track_identities(before: &Value, next: &mut Settings) -> PyResult<()> {
+    fn objects(state: &Value) -> HashSet<String> {
+        let mut ids = HashSet::new();
+        if let Some(panels) = state["identity"]["panels"].as_array() {
+            for panel in panels {
+                if let Some(id) = panel["id"].as_str() {
+                    ids.insert(format!("panel/{id}"));
+                }
+                if let Some(overlays) = panel["overlays"].as_array() {
+                    for id in overlays.iter().filter_map(Value::as_str) {
+                        ids.insert(format!("overlay/{id}"));
+                    }
+                }
+            }
+        }
+        fn annotations(config: &Value, ids: &mut HashSet<String>) {
+            if let Some(items) = config["annotations"]["items"].as_array() {
+                for id in items.iter().filter_map(|v| v["id"].as_str()) {
+                    ids.insert(format!("annotation/{id}"));
+                }
+            }
+            if let Some(panels) = config["subplots"].as_array() {
+                for panel in panels {
+                    annotations(&panel["config"], ids);
+                }
+            }
+        }
+        let owner = ["radial", "categorical", "boxplot", "radar"]
+            .into_iter()
+            .find_map(|k| state.get(k))
+            .unwrap_or(&state["config"]);
+        annotations(owner, &mut ids);
+        ids
+    }
+    let after = serde_json::to_value(&*next).map_err(runtime)?;
+    let Some(meta) = next.identity.as_mut() else {
+        return Ok(());
+    };
+    let active = objects(&after);
+    let mut retired: std::collections::BTreeSet<String> = meta["retired"]
+        .as_array()
+        .ok_or_else(|| invalid("identity retired must be a list"))?
+        .iter()
+        .map(|v| {
+            v.as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| invalid("invalid retired identity"))
+        })
+        .collect::<PyResult<_>>()?;
+    if before["identity"]["figure"] == meta["figure"] {
+        if let Some(old) = before["identity"]["retired"].as_array() {
+            retired.extend(old.iter().filter_map(Value::as_str).map(str::to_owned));
+        }
+        retired.extend(objects(before).difference(&active).cloned());
+    }
+    if retired.iter().any(|id| active.contains(id)) {
+        return Err(invalid(
+            "retired object IDs cannot be reused; assign a new ID",
+        ));
+    }
+    meta["retired"] = json!(retired);
+    Ok(())
+}
+
 pub(super) fn fit_member(config: &Config, id: &str, axis: &str, layer: renderer::LayerRef) -> bool {
     let (x, y) = config.series_fit_roles(layer, id);
     match axis {
@@ -70,6 +136,7 @@ pub(super) fn validate_columns(series: &[SeriesConfig], names: &HashSet<String>)
                 if matches!(
                     key.as_str(),
                     "column"
+                        | "error_bar_style_index_column"
                         | "x_column"
                         | "y_column"
                         | "point_style_index_column"

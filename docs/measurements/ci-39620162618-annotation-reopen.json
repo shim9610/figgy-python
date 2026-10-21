@@ -1,0 +1,1213 @@
+{
+  "run_url": "https://github.com/shim9610/figgy-python/actions/runs/39620162618",
+  "head": "9542f9acba975e1db783a18958a81fcbda997411",
+  "test": "tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]",
+  "failure": "Annotation double-click did not open the inline editor within the unchanged 30-second deadline.",
+  "diagnostics": {
+    "browser": {
+      "version": "156.0.8078.4",
+      "executable": "/home/runner/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+      "vulkan_driver": "vk_swiftshader_icd.json",
+      "headless": false,
+      "args": [
+        "--no-sandbox",
+        "--enable-unsafe-webgpu",
+        "--use-angle=vulkan",
+        "--enable-features=Vulkan",
+        "--disable-vulkan-surface",
+        "--enable-logging",
+        "--log-file=/home/runner/work/figgy-python/figgy-python/ci-results/layout-probe/test_inline_text_resize_multil0/cartesian/chromium.log",
+        "--gpu-watchdog-timeout-seconds=180"
+      ],
+      "host": {
+        "cpus": 4,
+        "affinity": 4,
+        "cpu_quota": null
+      }
+    },
+    "status": "Ready",
+    "host": {
+      "kind": "cartesian",
+      "busy": 0,
+      "queued": 0,
+      "dirty": false,
+      "frame_pending": false,
+      "frame_error": null,
+      "edit_inflight": null,
+      "edit_pending": false,
+      "canvas": [
+        511,
+        319
+      ],
+      "disposed": false
+    },
+    "gpu_work": {
+      "submitted": 8,
+      "completed": 8,
+      "completedCanvas": [
+        511,
+        319
+      ]
+    },
+    "preparation_gate": null,
+    "state_error": null,
+    "collection_error": null,
+    "queues": [
+      {
+        "id": 1,
+        "submitted": 8,
+        "completed": 8,
+        "pendingFences": 0,
+        "canvas": [
+          511,
+          319
+        ],
+        "globalSubmitted": 8
+      }
+    ],
+    "adapters": [
+      {
+        "id": 1,
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": "",
+        "isFallbackAdapter": true
+      }
+    ],
+    "last_host_stages": [
+      {
+        "t": 9054.899999999965,
+        "stage": "ready_frame.started",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "kind": "cartesian",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false
+      },
+      {
+        "t": 9192.5,
+        "stage": "ready_frame.completed",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "kind": "cartesian",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false
+      },
+      {
+        "t": 9778.299999999988,
+        "stage": "surface.resized",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "kind": "cartesian",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false,
+        "previous": [
+          960,
+          600
+        ]
+      }
+    ],
+    "last_events": [
+      {
+        "t": 9846.199999999953,
+        "kind": "cartesian",
+        "stage": "queue.started",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false,
+        "operationId": 11
+      },
+      {
+        "t": 9846.299999999988,
+        "kind": "cartesian",
+        "stage": "queue.finished",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false,
+        "operationId": 11
+      },
+      {
+        "t": 9882,
+        "kind": "fence-end",
+        "id": 4,
+        "queue": 1,
+        "submission": 6
+      },
+      {
+        "t": 9882,
+        "kind": "fence-end",
+        "id": 5,
+        "queue": 1,
+        "submission": 6
+      },
+      {
+        "t": 9882.199999999953,
+        "kind": "cartesian",
+        "stage": "display.settled",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false
+      },
+      {
+        "t": 10003.899999999965,
+        "kind": "cartesian",
+        "stage": "queue.enqueued",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 0,
+        "queued": 1,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false,
+        "operationId": 12
+      },
+      {
+        "t": 10004,
+        "kind": "cartesian",
+        "stage": "queue.started",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false,
+        "operationId": 12
+      },
+      {
+        "t": 10013.399999999965,
+        "kind": "submit",
+        "queue": 1,
+        "submission": 7,
+        "globalSubmission": 7,
+        "canvas": [
+          511,
+          319
+        ],
+        "cpuMs": 0
+      },
+      {
+        "t": 10013.599999999977,
+        "kind": "submit",
+        "queue": 1,
+        "submission": 8,
+        "globalSubmission": 8,
+        "canvas": [
+          511,
+          319
+        ],
+        "cpuMs": 0.09999999997671694
+      },
+      {
+        "t": 10013.599999999977,
+        "kind": "fence-start",
+        "id": 6,
+        "queue": 1,
+        "submission": 8
+      },
+      {
+        "t": 10013.599999999977,
+        "kind": "cartesian",
+        "stage": "display.submitted",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false
+      },
+      {
+        "t": 10013.799999999988,
+        "kind": "fence-start",
+        "id": 7,
+        "queue": 1,
+        "submission": 8
+      },
+      {
+        "t": 10013.899999999965,
+        "kind": "cartesian",
+        "stage": "queue.finished",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 0,
+        "queued": 0,
+        "dirty": false,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false,
+        "operationId": 12
+      },
+      {
+        "t": 10072.799999999988,
+        "kind": "fence-end",
+        "id": 6,
+        "queue": 1,
+        "submission": 8
+      },
+      {
+        "t": 10072.799999999988,
+        "kind": "fence-end",
+        "id": 7,
+        "queue": 1,
+        "submission": 8
+      },
+      {
+        "t": 10073,
+        "kind": "cartesian",
+        "stage": "display.settled",
+        "client": "d8f6eb11-2ac8-466d-afe9-569d28ffa08f",
+        "busy": 0,
+        "queued": 0,
+        "dirty": false,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          511,
+          319
+        ],
+        "disposed": false
+      }
+    ],
+    "kernel_executions": [
+      {
+        "started_unix": 1792594553.608411,
+        "characters": 201,
+        "outcome": "passed",
+        "message_id": "0b3dcb0b-9d820243574a2515d8a571f6_7608_0",
+        "duration_ms": 20.751113999949666
+      }
+    ],
+    "timing": {
+      "raf": {
+        "requested": 2182,
+        "called": 2181,
+        "cancelled": 12,
+        "frames": 2089,
+        "lastAt": 39873.399999999965,
+        "maxGapMs": 841,
+        "pending": 1
+      },
+      "timer": {
+        "samples": 391,
+        "maxGapMs": 531.9000000000233,
+        "geometryChanges": 4
+      },
+      "geometry": {
+        "root": [
+          378,
+          211.9375,
+          533,
+          601.375
+        ],
+        "canvas": [
+          511,
+          319,
+          389,
+          438.9375,
+          511,
+          319.375
+        ],
+        "visibility": "visible",
+        "focused": true,
+        "status": "Ready"
+      },
+      "pipelines": [
+        {
+          "name": "createShaderModule",
+          "t": 4691.399999999965,
+          "label": "figgy fullscreen textured shader",
+          "shaderBytes": 1745,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4691.899999999965,
+          "label": "figgy line columnar shader",
+          "shaderBytes": 50269,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.20000000001164153,
+          "elapsedMs": 0.20000000001164153
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4692.199999999953,
+          "label": "figgy scatter columnar shader",
+          "shaderBytes": 56752,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.30000000004656613,
+          "elapsedMs": 0.30000000004656613
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4692.799999999988,
+          "label": "figgy errorbar columnar shader",
+          "shaderBytes": 27673,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4693,
+          "label": "figgy bar columnar shader",
+          "shaderBytes": 36714,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4693.299999999988,
+          "label": "figgy field columnar shader",
+          "shaderBytes": 67141,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.29999999998835847,
+          "elapsedMs": 0.29999999998835847
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4693.799999999988,
+          "label": "figgy vector points shader",
+          "shaderBytes": 31663,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4694.099999999977,
+          "label": "figgy vector grid shader",
+          "shaderBytes": 38594,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4696.399999999965,
+          "label": "figgy render prewarm",
+          "shaderBytes": 1745,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 0.1000000000349246
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 4698,
+          "label": "figgy fullscreen textured pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 128.69999999995343
+        },
+        {
+          "name": "createShaderModule",
+          "t": 4842.799999999988,
+          "label": "figgy render prewarm",
+          "shaderBytes": 50269,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.20000000001164153,
+          "elapsedMs": 0.20000000001164153
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 4843.199999999953,
+          "label": "figgy line columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 125
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 4975.5,
+          "label": "figgy line area pipeline",
+          "shaderBytes": null,
+          "entry": "fs_area",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.19999999995343387,
+          "elapsedMs": 85.39999999996508
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5074.899999999965,
+          "label": "figgy line styled pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 84.10000000003492
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5175.299999999988,
+          "label": "figgy milkyway ribbon pipeline",
+          "shaderBytes": null,
+          "entry": "fs_ribbon",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 78.29999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5258.299999999988,
+          "label": "figgy milkyway stars pipeline",
+          "shaderBytes": null,
+          "entry": "fs_stars",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 97.39999999996508
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5358.299999999988,
+          "label": "figgy point constellation line pipeline",
+          "shaderBytes": null,
+          "entry": "fs_constellation_line",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 84.29999999998836
+        },
+        {
+          "name": "createShaderModule",
+          "t": 5459.199999999953,
+          "label": "figgy render prewarm",
+          "shaderBytes": 56752,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.30000000004656613,
+          "elapsedMs": 0.30000000004656613
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5459.599999999977,
+          "label": "figgy scatter columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 64.79999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5525.099999999977,
+          "label": "figgy scatter mapped pipeline",
+          "shaderBytes": null,
+          "entry": "fs_mapped",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 94.59999999997672
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5625.399999999965,
+          "label": "figgy picked point ring pipeline",
+          "shaderBytes": null,
+          "entry": "fs_pick_ring",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 46.90000000002328
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5674.699999999953,
+          "label": "figgy picked point mapped ring pipeline",
+          "shaderBytes": null,
+          "entry": "fs_pick_ring",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 70.20000000001164
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5758.799999999988,
+          "label": "figgy scatter styled pipeline",
+          "shaderBytes": null,
+          "entry": "fs_sketch",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 69.59999999997672
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5842.099999999977,
+          "label": "figgy milkyway planets pipeline",
+          "shaderBytes": null,
+          "entry": "fs_planet",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 47
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5891.299999999988,
+          "label": "figgy point constellation stars pipeline",
+          "shaderBytes": null,
+          "entry": "fs_constellation_star",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 39.09999999997672
+        },
+        {
+          "name": "createShaderModule",
+          "t": 5942.5,
+          "label": "figgy render prewarm",
+          "shaderBytes": 27673,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5942.599999999977,
+          "label": "figgy errorbar columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 28.79999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5975.5,
+          "label": "figgy errorbar mapped pipeline",
+          "shaderBytes": null,
+          "entry": "fs_mapped",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 39.29999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6024.799999999988,
+          "label": "figgy errorbar styled pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 29.29999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6058.5,
+          "label": "figgy milkyway jets pipeline",
+          "shaderBytes": null,
+          "entry": "fs_jet",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 35.59999999997672
+        },
+        {
+          "name": "createShaderModule",
+          "t": 6109.599999999977,
+          "label": "figgy render prewarm",
+          "shaderBytes": 36714,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6109.799999999988,
+          "label": "figgy bar columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 69.70000000001164
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6191.699999999953,
+          "label": "figgy mapped bar columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 73.30000000004657
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6275.199999999953,
+          "label": "histogram envelope fill",
+          "shaderBytes": null,
+          "entry": "fs_bar_envelope",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 41.70000000001164
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6325.299999999988,
+          "label": "figgy selected histogram bin pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 98.79999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6424.199999999953,
+          "label": "stream histogram persistent envelope",
+          "shaderBytes": null,
+          "entry": "fs_bar_envelope",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 37.600000000034925
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6461.799999999988,
+          "label": "stream histogram mapped full bins",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 80.5
+        },
+        {
+          "name": "createShaderModule",
+          "t": 6559.399999999965,
+          "label": "figgy render prewarm",
+          "shaderBytes": 67141,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.29999999998835847,
+          "elapsedMs": 0.29999999998835847
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6559.699999999953,
+          "label": "figgy field columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 336.4000000000233
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 6908.099999999977,
+          "label": "figgy field contour pipeline",
+          "shaderBytes": null,
+          "entry": "fs_contour",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 399.79999999998836
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 7325.299999999988,
+          "label": "figgy labelled field contour pipeline",
+          "shaderBytes": null,
+          "entry": "fs_contour_labelled",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 454.5
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 7791.5,
+          "label": "figgy selected field data pipeline",
+          "shaderBytes": null,
+          "entry": "fs_data_selection",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 536
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 8327.699999999953,
+          "label": "figgy selected labelled field data pipeline",
+          "shaderBytes": null,
+          "entry": "fs_data_selection_labelled",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 546.7000000000116
+        },
+        {
+          "name": "createShaderModule",
+          "t": 8875.199999999953,
+          "label": "figgy render prewarm",
+          "shaderBytes": 12709,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 8875.299999999988,
+          "label": "figgy contour label pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 29
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 8909,
+          "label": "figgy fullscreen textured pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 9063.699999999953,
+          "label": "figgy line columnar pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 4,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 0.1000000000349246
+        }
+      ],
+      "fences": [
+        {
+          "id": 1,
+          "queue": 1,
+          "submission": 1,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 8974.5,
+          "status": "completed",
+          "end": 9034.699999999953,
+          "waitMs": 60.199999999953434,
+          "submitToCompleteMs": 60.79999999998836
+        },
+        {
+          "id": 2,
+          "queue": 1,
+          "submission": 5,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 9065.599999999977,
+          "status": "completed",
+          "end": 9192,
+          "waitMs": 126.40000000002328,
+          "submitToCompleteMs": 126.60000000003492
+        },
+        {
+          "id": 3,
+          "queue": 1,
+          "submission": 5,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 9065.799999999988,
+          "status": "completed",
+          "end": 9192.399999999965,
+          "waitMs": 126.59999999997672,
+          "submitToCompleteMs": 127
+        },
+        {
+          "id": 4,
+          "queue": 1,
+          "submission": 6,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 9773.399999999965,
+          "status": "completed",
+          "end": 9882,
+          "waitMs": 108.60000000003492,
+          "submitToCompleteMs": 108.60000000003492
+        },
+        {
+          "id": 5,
+          "queue": 1,
+          "submission": 6,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 9774,
+          "status": "completed",
+          "end": 9882,
+          "waitMs": 108,
+          "submitToCompleteMs": 108.60000000003492
+        },
+        {
+          "id": 6,
+          "queue": 1,
+          "submission": 8,
+          "canvas": [
+            511,
+            319
+          ],
+          "t": 10013.599999999977,
+          "status": "completed",
+          "end": 10072.799999999988,
+          "waitMs": 59.20000000001164,
+          "submitToCompleteMs": 59.29999999998836
+        },
+        {
+          "id": 7,
+          "queue": 1,
+          "submission": 8,
+          "canvas": [
+            511,
+            319
+          ],
+          "t": 10013.799999999988,
+          "status": "completed",
+          "end": 10072.799999999988,
+          "waitMs": 59,
+          "submitToCompleteMs": 59.29999999998836
+        }
+      ],
+      "last_samples": [
+        {
+          "t": 39146.899999999965,
+          "gapMs": 100,
+          "rafAgeMs": 6.599999999976717,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39247,
+          "gapMs": 100.10000000003492,
+          "rafAgeMs": 7.100000000034925,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39346.899999999965,
+          "gapMs": 99.89999999996508,
+          "rafAgeMs": 6.399999999965075,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39446.79999999999,
+          "gapMs": 99.90000000002328,
+          "rafAgeMs": 6.900000000023283,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39546.899999999965,
+          "gapMs": 100.09999999997672,
+          "rafAgeMs": 6.399999999965075,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39646.899999999965,
+          "gapMs": 100,
+          "rafAgeMs": 6.7000000000116415,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39746.899999999965,
+          "gapMs": 100,
+          "rafAgeMs": 6.2000000000116415,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 39846.899999999965,
+          "gapMs": 100,
+          "rafAgeMs": 6.399999999965075,
+          "geometry": {
+            "root": [
+              378,
+              211.9375,
+              533,
+              601.375
+            ],
+            "canvas": [
+              511,
+              319,
+              389,
+              438.9375,
+              511,
+              319.375
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        }
+      ]
+    }
+  }
+}

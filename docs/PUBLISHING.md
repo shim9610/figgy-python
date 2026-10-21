@@ -43,23 +43,23 @@ other branches before building. This does not change main's branch protection.
 
 ## Versions and coordinated release order
 
-| Component | Working tree version | Published version verified 2026-10-20 |
+| Component | Working tree version | Published version verified 2026-10-21 |
 | --- | --- | --- |
-| `figgy-model` | 0.12.0 | 0.12.0 |
-| `figgy-renderer` | 0.18.0 | 0.18.0 |
+| `figgy-model` | 0.12.1 | 0.12.1 |
+| `figgy-renderer` | 0.18.1 | 0.18.1 |
 | `figgyplot` | 0.3.0 | 0.3.0 |
-| `figgy` WASM wrapper | 0.15.0 | Not a crates.io package (`publish = false`) |
+| `figgy` WASM wrapper | 0.15.1 | Not a crates.io package (`publish = false`) |
 
-Model 0.12.0 and renderer 0.18.0 are published. Python 0.3.0 was published on
+Model 0.12.1 and renderer 0.18.1 were published on 2026-10-21. Python 0.3.0 was published on
 2026-10-16 with renderer 0.17.0/model 0.11.0, as verified from its PyPI sdist.
 The migration tree still carries that package version; select a new unused
 version before building publication artifacts. Do not upload the changed source
 as 0.3.0. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
-has its own version; the WASM wrapper's 0.15.0 is not the renderer version.
+has its own version; the WASM wrapper's 0.15.1 is not the renderer version.
 The native extension consumes crates.io packages with versions and checksums
 pinned in `Cargo.lock`. The bundled WASM uses their upstream release revision
-`3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04`, recorded in
+`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d`, recorded in
 `scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
 
 When updating the renderer, update the registry dependency and lockfile, then
@@ -68,7 +68,8 @@ downloaded `.crate` checksums, `.cargo_vcs_info.json` source revision and Rust
 sources before recording provenance. Offline preflight checks that the native
 versions/checksums and WASM revision remain paired; Git/path overrides fail this
 gate. The build then applies `scripts/wasm-host.patch` to a disposable copy of
-the web host. This additive binding patch exposes non-borrowing GPU completion;
+the web host. This additive binding patch exposes non-borrowing GPU completion and renderer
+annotation preparation without waiting for display completion;
 it does not change renderer/model sources. Provenance records its hash, and
 preflight rejects a mismatched patch or changes outside the two web host files.
 Do not edit provenance by hand to bypass a source mismatch.

@@ -32,6 +32,7 @@ class EditorSession:
                     "width": rect["width"], "height": rect["height"],
                     "dpi": fig.dpi,
                     "code": fig.to_code(), "error": self.error, "last_request": self.last_request,
+                    "edit_history": fig.edit_history,
                     "texts": _display_texts(settings)}
 
     def dispatch(self, message):
@@ -44,6 +45,7 @@ class EditorSession:
                     raise ValueError("stale edit: refreshed the current Figure; retry the action")
                 action = message.get("action")
                 if action == "pick":
+                    fig._native.begin_edit('Drag object')
                     x, y = float(message["x"]), float(message["y"])
                     self.handle = None
                     if fig._selection is not None and fig.selection_bounds() is not None:
@@ -55,6 +57,8 @@ class EditorSession:
                         raise ValueError("selection changed during drag")
                     if fig.selection_bounds() is not None:
                         fig.drag(fig._selection, message["dx"], message["dy"], handle=message.get("handle"))
+                elif action == 'release':
+                    fig._native.end_edit()
                 elif action == "update":
                     fig.update(message["target"], **message["properties"])
                 elif action == "select":
@@ -64,6 +68,8 @@ class EditorSession:
                     fig.apply_settings(message["settings"], expected_revision=message["revision"])
                 elif action == "fit":
                     fig.fit()
+                elif action in ('undo', 'redo', 'reset_edits'):
+                    getattr(fig, action)(expected_revision=message['revision'])
                 else:
                     raise ValueError(f"unknown editor action: {action}")
         except (ValueError, RuntimeError, MemoryError, KeyError, TypeError) as exc:

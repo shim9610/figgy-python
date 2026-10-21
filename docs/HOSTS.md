@@ -1,7 +1,7 @@
 # Native surface / notebook WebGPU hosts
 
-The figgyplot 0.3.0 source uses the published `figgy-renderer 0.18.0` and
-`figgy-model 0.12.0` crates from crates.io. `Cargo.lock` pins their versions
+The figgyplot 0.3.0 source uses the published `figgy-renderer 0.18.1` and
+`figgy-model 0.12.1` crates from crates.io. `Cargo.lock` pins their versions
 and checksums; packaged WASM uses their release commit `3a0a6a3`.
 Provenance checks preserve this source pairing; see [publishing](PUBLISHING.md).
 Chart layout, styles, data
@@ -182,13 +182,21 @@ requires a usable kernel GPU and performs image transfers.
 ## Renderer 0.18 compatibility
 
 Native and browser settings migrate schema 1 documents stamped with renderer
-0.17.0 or 0.18.0; new snapshots use schema 2 and renderer 0.18.0, with stable
+0.17.0, 0.18.0 or 0.18.1; new snapshots use schema 2 and renderer 0.18.1, with stable
 document identities and grid metadata. Other versions are rejected
 without changing the Figure. Existing stored geometry is preserved. New
 colorbars adopt upstream's 8 px gap (previously 24 px); set `gap_px=24` through
 settings to retain the earlier spacing. The hosts keep their explicit 25 px
 right-axis margin. Heatmap legend symbols now use the chart colormap and
 refresh when it changes, preserving label text.
+
+The 0.18.1 patch uses the drawn geometry for Cartesian tick-label bounds and
+hit regions, preserves both components of label offsets, and corrects GPU
+logarithmic projection for large values. Its model keeps the 0.12.0 serialized
+fields. The host regression checks move bottom/left labels by (45, 30) pixels
+and verify bounds, hits and drawn text; a live browser check covers values from
+1e6 to 1e10. Remaining upstream geometry limits are tracked in
+[figgy #38](https://github.com/shim9610/figgy/issues/38).
 
 This migration keeps the existing single-panel Python API and manual editing
 workflow. See [renderer 0.18 features](RENDERER_018_FEATURES.md) for new
@@ -199,8 +207,8 @@ export/replay. Comprehensive editor control coverage remains
 ## Assets and builds
 
 `python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
-`crates/web` at commit `3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04` (renderer 0.18.0,
-web example 0.15.0). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
+`crates/web` at commit `f3f569c4c0e32d3d0682632444b6fe7ce84cba8d` (renderer 0.18.1,
+web example 0.15.1). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
 wasm-bindgen 0.2.129. `assets/provenance.json` records the versions, asset hashes
 and native registry package checksums. Rebuilding verifies the downloaded crate
 archives and their source commit against the WASM checkout. Offline preflight

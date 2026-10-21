@@ -151,7 +151,7 @@ def button_point_without_frames(page, selector):
         let previous;
         return selector=>{
             const button=document.querySelector(selector);
-            if(!button || button.disabled)return false;
+            if(!button || !button.matches('button') || button.disabled)return false;
             const rect=button.getBoundingClientRect(),style=getComputedStyle(button);
             const geometry=[rect.x,rect.y,rect.width,rect.height];
             const stable=previous && geometry.every((value,i)=>Math.abs(value-previous[i])<.01);
@@ -168,6 +168,19 @@ def button_point_without_frames(page, selector):
         return point.json_value()
     finally:
         point.dispose()
+
+
+def click_button(page, selector):
+    """Use real mouse input after DOM actionability checks, without awaiting RAF.
+
+    Slow GPU presentation may withhold RAF while the UI and timers remain live.
+    The same 30 s default deadline, disabled/visibility/obstruction checks and
+    post-input behavioral assertions still apply.
+    """
+    x, y = button_point_without_frames(page, selector)
+    page.evaluate("selector=>window.figgyDiagnosticEvent?.('button.actionable',{selector})", selector)
+    page.mouse.click(x, y)
+    page.evaluate("selector=>window.figgyDiagnosticEvent?.('button.input_sent',{selector})", selector)
 
 
 @contextmanager

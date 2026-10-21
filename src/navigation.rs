@@ -149,7 +149,7 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
         "Figure".into(),
         "figure",
         LayerRef::Base,
-        None,
+        Some("figure".into()),
     );
     if let Some(family) = ["radial", "categorical", "boxplot", "radar"]
         .into_iter()
@@ -228,6 +228,28 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
                     LayerRef::Base,
                     id.clone(),
                 ));
+            }
+        }
+        if family == "radial" {
+            if let Some(children) = owner["split"]["children"].as_array() {
+                let mut detail = Node::new(
+                    "bounded/split".into(),
+                    "Detail slices".into(),
+                    "group",
+                    LayerRef::Base,
+                    None,
+                );
+                for (i, item) in children.iter().enumerate() {
+                    let id = format!("slice_1_{i}");
+                    detail.children.push(leaf(
+                        &format!("bounded/series/{id}"),
+                        item["label"].as_str().unwrap_or(&id),
+                        "series",
+                        LayerRef::Base,
+                        id.clone(),
+                    ));
+                }
+                data.children.push(detail);
             }
         }
         panel.children.push(data);

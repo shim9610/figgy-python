@@ -18,6 +18,7 @@ class PNGFigureWidget(anywidget.AnyWidget):
 
     def __init__(self, figure):
         self.figure = figure
+        figure._ensure_edit_baseline()
         self._editor = EditorSession(figure)
         self._handling = False
         super().__init__()
@@ -97,6 +98,7 @@ class FigureWidget(anywidget.AnyWidget):
 
     def __init__(self, figure, *, auto_prepare=True):
         self.figure = figure
+        figure._ensure_edit_baseline()
         self._handling = False
         self._pending = {}
         self._clients = {}
@@ -117,7 +119,11 @@ class FigureWidget(anywidget.AnyWidget):
         if not self._handling:
             settings = self.figure.get_settings()
             from ._native import object_outline_json, bounded_view_json
+            catalog=self.figure._editor_catalog_transport()
             self.state = {"settings": settings, "revision": self.figure.revision, "code": self.figure.to_code(),
+                          "edit_history": self.figure.edit_history,
+                          "property_catalog": catalog['objects'],
+                          "property_columns": catalog['columns'],
                           "outline": json.loads(object_outline_json(json.dumps(settings))),
                           "bounded_view": json.loads(bounded_view_json(json.dumps(settings))),
                           "texts": _display_texts(settings),
@@ -148,6 +154,17 @@ class FigureWidget(anywidget.AnyWidget):
             if content.get("revision") == self.figure.revision:
                 self.figure.fit()
             self.refresh()
+        elif action in ('undo', 'redo', 'reset_edits', 'property'):
+            error = ''
+            try:
+                if action=='property':
+                    self.figure.edit_property(content['object_id'],content['property_id'],content['value'],expected_revision=content.get('revision'))
+                else:
+                    getattr(self.figure, action)(expected_revision=content.get('revision'))
+            except (ValueError, RuntimeError) as exc:
+                error = str(exc)
+            self.refresh()
+            self.send({'action':'history_result','operation':action,'object_id':content.get('object_id'),'client':content.get('client'),'state':self.state,'error':error})
         elif action == "edit":
             self._handling = True
             error = ""

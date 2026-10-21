@@ -85,6 +85,7 @@ impl Editor {
             .show(root, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.label(RichText::new("Figgy").size(19.).strong());
+                    self.history_controls(ui, c);
                     let props = toolbar_icon(
                         ui,
                         Icon::Properties,
@@ -263,14 +264,20 @@ impl Editor {
 
     fn bounded_navigator(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
         let document = &c.data.document.as_ref().unwrap().chart;
-        let target = if let Some(id) = document.decorations().selected.as_ref() {
+        let target = if self.figure_properties {
+            Some("figure".into())
+        } else if let Some(id) = document.decorations().selected.as_ref() {
             Some(id.element_id())
         } else {
             let selected = document.selected_json();
             selected["series_id"]
                 .as_str()
                 .map(str::to_owned)
-                .or_else(|| selected["index"].as_u64().map(|i| format!("slice_0_{i}")))
+                .or_else(|| {
+                    selected["index"]
+                        .as_u64()
+                        .map(|i| format!("slice_{}_{i}", selected["group"].as_u64().unwrap_or(0)))
+                })
         };
         let nodes = navigation::nodes(&c.snapshot());
         if let Some(node) = self.navigator.show(
@@ -280,6 +287,8 @@ impl Editor {
             target.as_deref(),
             &mut self.controls,
         ) {
+            self.figure_properties = node.kind == "figure";
+            self.inspector_owner = Some(node.key.clone());
             let mut chart = c.data.document.as_ref().unwrap().chart.clone();
             chart.clear_selection();
             chart.set_active_layer(node.layer);
@@ -302,12 +311,15 @@ impl Editor {
                     let family = chart.family();
                     let mut state = serde_json::to_value(c.snapshot()).unwrap();
                     if family == "radial" {
-                        if let Some(index) = target
-                            .strip_prefix("slice_0_")
-                            .and_then(|s| s.parse::<usize>().ok())
+                        if let Some((group, index)) = target
+                            .strip_prefix("slice_")
+                            .and_then(|s| s.split_once('_'))
+                            .and_then(|(group, index)| {
+                                Some((group.parse::<usize>().ok()?, index.parse::<usize>().ok()?))
+                            })
                         {
                             state[family]["interaction"]["selected"] =
-                                json!({"group":0,"index":index});
+                                json!({"group":group,"index":index});
                         }
                     } else {
                         state[family]["selected"] = json!({"series_id":target,"category_id":state[family]["categories"][0]["id"]});
@@ -424,9 +436,7 @@ impl Editor {
                     changed = true;
                 }
             } else {
-                ui.label(
-                    "Summary statistics: edit through Advanced settings or the Python artist.",
-                );
+                ui.label("Open Summary statistics below to edit the accepted values.");
             }
         }
         if changed {
@@ -512,6 +522,32 @@ impl Editor {
     }
 
     fn radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        self.basic_radial_properties(ui, c);
+        let chart = &c.data.document.as_ref().unwrap().chart;
+        let target = if self.figure_properties {
+            "figure".into()
+        } else {
+            chart
+                .decorations()
+                .selected
+                .as_ref()
+                .map(|v| v.element_id())
+                .unwrap_or_else(|| {
+                    let selected = chart.selected_json();
+                    selected["series_id"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .or_else(|| {
+                            selected["index"].as_u64().map(|i| {
+                                format!("slice_{}_{i}", selected["group"].as_u64().unwrap_or(0))
+                            })
+                        })
+                        .unwrap_or_else(|| "data_area".into())
+                })
+        };
+        self.catalog_properties(ui, c, &target, false);
+    }
+    fn basic_radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
         if self.bounded_context_properties(ui, c) {
             return;
         }

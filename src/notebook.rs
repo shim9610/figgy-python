@@ -11,6 +11,7 @@ pub struct NotebookFigure {
     edge_samples: HashMap<String, renderer::chart::FitExtent>,
     center_cells: HashMap<String, renderer::chart::FitExtent>,
     revision: u64,
+    history: edit_history::History,
     fit_extents: HashMap<String, [renderer::chart::FitExtent; 2]>,
 }
 #[pymethods]
@@ -40,6 +41,7 @@ impl NotebookFigure {
             edge_samples: HashMap::new(),
             center_cells: HashMap::new(),
             revision: 0,
+            history: Default::default(),
             fit_extents: HashMap::new(),
         })
     }
@@ -96,6 +98,7 @@ impl NotebookFigure {
             return Err(error);
         }
         self.revision += 1;
+        self.history = Default::default();
         Ok(())
     }
     fn settings_json(&self) -> PyResult<String> {
@@ -140,6 +143,7 @@ impl NotebookFigure {
         let old_config = self.chart.config().clone();
         let old_series = self.series.clone();
         let revision = self.revision;
+        let history = self.history.clone();
         let result = (|| {
             if let Some(config) = config {
                 let config = parse(config)?;
@@ -165,15 +169,18 @@ impl NotebookFigure {
             self.chart = Chart::new(old_config);
             self.series = old_series;
             self.revision = revision;
+            self.history = history;
             return Err(error);
         }
         self.revision = revision + 1;
+        self.history = Default::default();
         Ok(())
     }
     fn add_series_batch(&mut self, json: &str, config: &str) -> PyResult<()> {
         let previous_config = self.chart.config().clone();
         let previous_series = self.series.clone();
         let revision = self.revision;
+        let history = self.history.clone();
         let result = (|| {
             let config = parse(config)?;
             validate_config(&config)?;
@@ -187,13 +194,20 @@ impl NotebookFigure {
             self.chart = Chart::new(previous_config);
             self.series = previous_series;
             self.revision = revision;
+            self.history = history;
             return Err(error);
         }
         self.revision = revision + 1;
+        self.history = Default::default();
         Ok(())
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
+        let before: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        let base_revision = self.revision;
         let mut s: Settings = parse(json)?;
+        if !self.history.restoring_identities() {
+            identity::track_identities(&before, &mut s)?;
+        }
         s.config.sync_subplot_links(Some(self.chart.config()));
         if !supported_settings_version(s.schema_version, &s.renderer_version) {
             return Err(invalid("unsupported settings/renderer version"));
@@ -250,8 +264,56 @@ impl NotebookFigure {
             self.background = s.background;
             self.identity = s.identity;
             self.revision += 1;
+            let after: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+            self.history
+                .record(before, after, base_revision, self.revision, "Edit chart");
         }
         Ok(())
+    }
+    fn edit_history_json(&self) -> String {
+        self.history.status().to_string()
+    }
+    fn column_extents_json(&self) -> String {
+        json!(
+            self.columns
+                .iter()
+                .map(|(name, extent)| (name.clone(), json!([extent.min, extent.max])))
+                .collect::<serde_json::Map<_, _>>()
+        )
+        .to_string()
+    }
+    fn edit_operations_json(&self) -> String {
+        self.history.operations().to_string()
+    }
+    fn begin_edit(&mut self, label: &str) -> PyResult<()> {
+        let state = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        self.history.begin(state, self.revision, label);
+        Ok(())
+    }
+    fn end_edit(&mut self) -> PyResult<()> {
+        let state = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        self.history.finish(state, self.revision);
+        Ok(())
+    }
+    fn undo(&mut self) -> PyResult<()> {
+        self.replay_edit(false)
+    }
+    fn redo(&mut self) -> PyResult<()> {
+        self.replay_edit(true)
+    }
+    fn reset_edits(&mut self) -> PyResult<()> {
+        let current = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        let target = self.history.reset_target(&current)?;
+        self.begin_edit("Reset edits")?;
+        self.history.set_restoring(true);
+        let result = self.apply_settings(&target.to_string());
+        self.history.set_restoring(false);
+        self.end_edit()?;
+        result
+    }
+    fn mark_edit_baseline(&mut self) -> PyResult<()> {
+        let state = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        self.history.mark_baseline(state)
     }
     fn cache_fit_extent(
         &mut self,
@@ -374,9 +436,9 @@ impl NotebookFigure {
             active_only,
         );
         validate_config(&fitted)?;
-        self.chart = Chart::new(fitted);
-        self.revision += 1;
-        Ok(())
+        let mut state: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        state["config"] = serde_json::to_value(fitted).map_err(runtime)?;
+        self.apply_settings(&state.to_string())
     }
     fn set_range(&mut self, axis: &str, min: f64, max: f64) -> PyResult<()> {
         if !min.is_finite() || !max.is_finite() || min >= max {
@@ -384,9 +446,9 @@ impl NotebookFigure {
         }
         let next = document_fit::set_range(self.chart.config(), axis, min, max)?;
         validate_config(&next)?;
-        self.chart = Chart::new(next);
-        self.revision += 1;
-        Ok(())
+        let mut state: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        state["config"] = serde_json::to_value(next).map_err(runtime)?;
+        self.apply_settings(&state.to_string())
     }
 
     #[getter]
@@ -457,7 +519,23 @@ fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
 }
 
 impl NotebookFigure {
+    fn replay_edit(&mut self, redo: bool) -> PyResult<()> {
+        let current = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        let target = self.history.target(redo, &current)?;
+        let result = self.apply_settings(&target.to_string());
+        self.history.complete(redo, result.is_ok());
+        result
+    }
     fn set_document_model(&mut self, document: bounded::DocumentChart) -> PyResult<()> {
+        if self
+            .document
+            .as_ref()
+            .is_some_and(|d| d.family() == document.family())
+        {
+            let mut state: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+            state[document.family()] = document.value();
+            return self.apply_settings(&state.to_string());
+        }
         if !self.series.is_empty()
             || !self.columns.is_empty()
             || !self.chart.config().subplots.is_empty()
@@ -484,6 +562,7 @@ impl NotebookFigure {
         document.validate(self.chart.config().chart_area.0)?;
         self.document = Some(document);
         self.revision += 1;
+        self.history = Default::default();
         Ok(())
     }
 }

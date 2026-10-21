@@ -1,0 +1,35 @@
+{
+  "browser": "154.0.8037.57",
+  "trial_locator": "actionable",
+  "trial_budget_ms": 1000,
+  "trial_elapsed_ms": 80.11559399892576,
+  "dom_checked_real_mouse_ms": 176.23725600424223,
+  "input": {
+    "at": 19841.59999999404,
+    "gpu": {
+      "submitted": 2,
+      "completed": 1,
+      "completedCanvas": [
+        960,
+        600
+      ]
+    },
+    "host": {
+      "kind": "radial",
+      "busy": 0,
+      "queued": 0,
+      "dirty": false,
+      "frame_pending": true,
+      "frame_error": null,
+      "edit_inflight": null,
+      "edit_pending": false,
+      "canvas": [
+        878,
+        549
+      ],
+      "disposed": false
+    }
+  },
+  "renderer": "0.18.1",
+  "scope": "Live WebGPU resize with an actual GPU submission pending. The old locator trial also passed locally; this does not reproduce the CI timeout."
+}

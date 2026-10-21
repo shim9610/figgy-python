@@ -10,6 +10,15 @@ pub(super) enum DocumentChart {
     Radar(RadarChart),
 }
 impl DocumentChart {
+    pub fn value(&self) -> Value {
+        match self {
+            Self::Radial(c) => serde_json::to_value(c),
+            Self::Categorical(c) => serde_json::to_value(c),
+            Self::BoxPlot(c) => serde_json::to_value(c),
+            Self::Radar(c) => serde_json::to_value(c),
+        }
+        .unwrap()
+    }
     pub fn family(&self) -> &'static str {
         match self {
             Self::Radial(_) => "radial",
@@ -496,6 +505,16 @@ impl FigureAccess<'_> {
         })
     }
     pub(super) fn set_document(&mut self, chart: DocumentChart) -> PyResult<()> {
+        if self
+            .data
+            .document
+            .as_ref()
+            .is_some_and(|d| d.chart.family() == chart.family())
+        {
+            let mut state = serde_json::to_value(self.snapshot()).map_err(runtime)?;
+            state[chart.family()] = chart.value();
+            return self.apply_settings(&state.to_string());
+        }
         if !matches!(
             self.data.chart.config().draw_style,
             renderer::config::DrawStyle::Precise
@@ -525,6 +544,7 @@ impl FigureAccess<'_> {
             });
         }
         self.data.revision += 1;
+        self.data.history = Default::default();
         Ok(())
     }
     fn document_renderer(&mut self) -> PyResult<&mut BoundedDocument> {

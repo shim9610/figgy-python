@@ -19,6 +19,10 @@ pub(crate) struct Editor {
     save_path: String,
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
+    pub(super) property_text: HashMap<String, (String, Value, u64)>,
+    pub(super) figure_properties: bool,
+    pub(super) inspector_owner: Option<String>,
+    pub(super) history_replayed: bool,
     inspector_context: String,
     pub layout_probe: std::collections::VecDeque<Value>,
     notice: String,
@@ -43,6 +47,10 @@ impl Default for Editor {
             save_path: "figure.png".into(),
             raw: String::new(),
             text_ranges: HashMap::new(),
+            property_text: HashMap::new(),
+            figure_properties: false,
+            inspector_owner: None,
+            history_replayed: false,
             inspector_context: String::new(),
             layout_probe: Default::default(),
             notice: String::new(),
@@ -170,6 +178,66 @@ fn fit_enabled_title(config: &mut Config, target: &str) {
 }
 
 impl Editor {
+    pub(super) fn history_controls(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        let status = c.data.history.status();
+        let pending = status["pending_edit"] == true;
+        let shortcut = if !ui.ctx().egui_wants_keyboard_input() {
+            ui.input_mut(|i| {
+                if i.consume_key(
+                    egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                    egui::Key::Z,
+                ) || i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y)
+                {
+                    Some(true)
+                } else if i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z) {
+                    Some(false)
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+        let undo = ui
+            .add_enabled(
+                pending || status["can_undo"] == true,
+                egui::Button::new("Undo"),
+            )
+            .on_hover_text("Undo chart edit (Ctrl/Cmd+Z)");
+        self.controls.insert("undo".into(), undo.rect);
+        let redo = ui
+            .add_enabled(
+                !pending && status["can_redo"] == true,
+                egui::Button::new("Redo"),
+            )
+            .on_hover_text("Redo chart edit (Ctrl/Cmd+Shift+Z)");
+        self.controls.insert("redo".into(), redo.rect);
+        if let Some(redo) = shortcut.or_else(|| {
+            if undo.clicked() {
+                Some(false)
+            } else if redo.clicked() {
+                Some(true)
+            } else {
+                None
+            }
+        }) {
+            c.end_edit();
+            match c.replay_edit(redo) {
+                Ok(()) => {
+                    self.history_replayed = true;
+                    self.error.clear();
+                    self.picked = None;
+                    self.inline_text = None;
+                    self.property_text.clear();
+                    if let Some(id) = ui.memory(|m| m.focused()) {
+                        ui.memory_mut(|m| m.surrender_focus(id));
+                    }
+                }
+                Err(e) => self.error = e.to_string(),
+            }
+        }
+    }
+
     pub fn show(
         &mut self,
         root: &mut egui::Ui,
@@ -194,6 +262,8 @@ impl Editor {
                             .color(Color32::from_rgb(30, 91, 166)),
                     );
                     ui.add_space(14.);
+                    self.history_controls(ui, c);
+                    ui.separator();
                     let response = toolbar_icon(
                         ui,
                         Icon::Fit,
@@ -514,6 +584,7 @@ impl Editor {
             selected.as_deref(),
             &mut self.controls,
         ) {
+            self.inspector_owner = Some(node.key.clone());
             let mut config = c.data.chart.config().clone();
             config.active_layer = node.layer;
             config.picked_data = None;
@@ -783,11 +854,6 @@ impl Editor {
 
     pub(super) fn annotation_properties(&mut self, ui: &mut egui::Ui, item: &mut Value) -> bool {
         self.delete_annotation = false;
-        let remove =
-            ui.button(RichText::new("Delete annotation").color(Color32::from_rgb(165, 42, 37)));
-        self.controls
-            .insert("delete_annotation".into(), remove.rect);
-        self.delete_annotation = remove.clicked();
         let mut changed = false;
         let annotation_id = item["id"].as_str().unwrap_or("").to_owned();
         let mut visible = item["visible"].as_bool().unwrap_or(true);
@@ -807,6 +873,15 @@ impl Editor {
             .clone();
         ui.weak(&kind);
         let geometry = &mut item["kind"][&kind];
+        if kind == "Text" && geometry["text"].is_object() {
+            changed |= self.text_appearance(ui, &mut geometry["text"]);
+            let key = format!("annotation_text_{annotation_id}");
+            changed |= self.rich_text_editor(ui, &mut geometry["text"], &key);
+            if let Some(rect) = self.controls.get(&key).copied() {
+                self.controls.insert("annotation_text".into(), rect);
+            }
+        }
+
         for field in match kind.as_str() {
             "ReferenceLine" => vec!["value"],
             "Span" => vec!["from", "to"],
@@ -863,7 +938,7 @@ impl Editor {
                 changed = true;
             }
         }
-        if geometry[text_key].is_object() {
+        if kind != "Text" && geometry[text_key].is_object() {
             changed |= self.text_appearance(ui, &mut geometry[text_key]);
             let key = format!("annotation_text_{annotation_id}");
             changed |= self.rich_text_editor(ui, &mut geometry[text_key], &key);
@@ -959,10 +1034,39 @@ impl Editor {
                 }
             }
         }
+        let remove =
+            ui.button(RichText::new("Delete annotation").color(Color32::from_rgb(165, 42, 37)));
+        self.controls
+            .insert("delete_annotation".into(), remove.rect);
+        self.delete_annotation = remove.clicked();
         changed
     }
 
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
+        let snapshot = c.snapshot();
+        let object = crate::property_catalog::selected(
+            &snapshot,
+            target,
+            c.data.chart.config().active_layer(),
+            self.inspector_owner.as_deref(),
+        );
+        let primary = object.as_ref().is_some_and(|v| {
+            v.id.starts_with("series/")
+                || v.id.starts_with("figure/")
+                || target
+                    .rsplit(':')
+                    .next()
+                    .unwrap_or(target)
+                    .starts_with("colorbar")
+        });
+        if primary {
+            self.catalog_properties(ui, c, target, true);
+            return;
+        }
+        self.basic_properties(ui, c, target);
+        self.catalog_properties(ui, c, target, false);
+    }
+    fn basic_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
         let mut state = serde_json::to_value(c.snapshot()).unwrap();
         if let Some(id) = target.strip_prefix("annotation:") {
             if let Some(item) = state["config"]["annotations"]["items"]
@@ -1173,59 +1277,6 @@ impl Editor {
             changed |= self.font_controls(ui, node, "label_font");
             changed |= color(ui, node, "color", "Text color", &mut self.controls);
             changed |= label_format_controls(ui, node, &mut self.controls);
-        } else if let Some(series) = state["series"]
-            .as_array_mut()
-            .unwrap()
-            .iter_mut()
-            .find(|s| s["series_id"] == target)
-        {
-            let style = series["render_type"]
-                .as_object_mut()
-                .unwrap()
-                .values_mut()
-                .next()
-                .unwrap();
-            if style["line"].is_object() {
-                ui.label(RichText::new("LINE").size(11.).weak());
-                changed |= color(
-                    ui,
-                    &mut style["line"],
-                    "line_color",
-                    "Color",
-                    &mut self.controls,
-                );
-                changed |= number(
-                    ui,
-                    &mut style["line"],
-                    "line_width",
-                    "Width",
-                    " px",
-                    &mut self.controls,
-                );
-            }
-            if style["scatter"].is_object() {
-                ui.label(RichText::new("MARKERS").size(11.).weak());
-                changed |= color(
-                    ui,
-                    &mut style["scatter"],
-                    "point_color",
-                    "Color",
-                    &mut self.controls,
-                );
-                changed |= number(
-                    ui,
-                    &mut style["scatter"],
-                    "point_size",
-                    "Size",
-                    " px",
-                    &mut self.controls,
-                );
-            }
-            if style["matrix"].is_object() {
-                changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
-            }
-        } else if target == "colorbar" || target.starts_with("colorbar_") {
-            changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
             let mut automatic = crate::tick_policy::automatic(
@@ -1448,40 +1499,6 @@ fn text_field(
     }
     response.changed()
 }
-fn color_scale_properties(
-    ui: &mut egui::Ui,
-    bar: &mut Value,
-    controls: &mut HashMap<String, egui::Rect>,
-) -> bool {
-    if !bar.is_object() {
-        ui.label("No color scale is configured.");
-        return false;
-    }
-    let mut changed = scale_control(ui, &mut bar["axis"], "color_scale", controls);
-    ui.label(RichText::new("COLOR SCALE").size(11.).weak());
-    changed |= number(ui, &mut bar["axis"], "min", "Minimum", "", controls);
-    changed |= number(ui, &mut bar["axis"], "max", "Maximum", "", controls);
-    ui.label("Color map");
-    let previous = bar["colormap"].as_str().unwrap_or("Custom").to_owned();
-    let mut value = previous.clone();
-    let response = egui::ComboBox::from_id_salt("colormap")
-        .width(ui.available_width())
-        .selected_text(&value)
-        .show_ui(ui, |ui| {
-            for name in ["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"] {
-                let response = ui.selectable_value(&mut value, name.to_owned(), name);
-                controls.insert(format!("colormap_{name}"), response.rect);
-            }
-        });
-    controls.insert("colormap".into(), response.response.rect);
-    if value != previous {
-        bar["colormap"] = json!(value);
-        changed = true;
-    }
-    changed |= label_format_controls(ui, &mut bar["axis"]["label_style"], controls);
-    changed
-}
-
 fn label_format_controls(
     ui: &mut egui::Ui,
     labels: &mut Value,
@@ -1497,6 +1514,9 @@ fn label_format_controls(
                 ("Decimal", "Decimal (123.45)"),
                 ("Scientific", "Scientific (1.23e2)"),
                 ("Power", "Power (1.23 × 10²)"),
+                ("Degrees", "Degrees (90°)"),
+                ("Radians", "Radians (π/2)"),
+                ("Timestamp", "Timestamp"),
             ] {
                 let response = ui.selectable_value(&mut value, name.to_owned(), label);
                 controls.insert(format!("label_format_{name}"), response.rect);
@@ -1505,7 +1525,11 @@ fn label_format_controls(
     controls.insert("label_format".into(), response.response.rect);
     let mut changed = value != previous;
     if changed {
-        labels["format"] = json!(value);
+        labels["format"] = if value == "Timestamp" {
+            json!({"Timestamp":{}})
+        } else {
+            json!(value)
+        };
     }
     if value != "Timestamp" {
         let mut digits = labels["significant_digits"].as_u64().unwrap_or(3) as u8;

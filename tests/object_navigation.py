@@ -4,7 +4,7 @@ import json
 
 def ensure_native_control_visible(info, xdo, pump, wid, name):
     """Scroll a form with real X11 wheel input before clicking a clipped row."""
-    if name.lower() != name or name in {'advanced', 'close_properties', 'properties', 'properties_header', 'properties_viewport', 'copy', 'fit', 'select_mode', 'layout_mode', 'visibility_menu', 'draw_style_menu', 'navigation_help'} or name.startswith(('tree', 'object_', 'style_', 'save', 'draw', 'choose:', 'choice_', 'switch_chart')):
+    if (name.lower() != name and not name.startswith(('property:','section:'))) or name in {'advanced', 'close_properties', 'properties', 'properties_header', 'properties_viewport', 'copy', 'fit', 'select_mode', 'layout_mode', 'visibility_menu', 'draw_style_menu', 'navigation_help'} or name.startswith(('tree', 'object_', 'style_', 'save', 'draw', 'choose:', 'choice_', 'switch_chart')):
         return
     for _ in range(35):
         state = info()
@@ -26,7 +26,7 @@ class ObjectNavigator:
 
     def choose(self, target, *, node=None):
         search = self.page.locator('[data-object-search]')
-        search.fill(target.split(':')[-1])
+        search.fill(node.rsplit('/',1)[-1] if node else target.split(':')[-1])
         attribute, value = ('data-node', node) if node else ('data-object', target)
         row = self.page.locator(f'[role=treeitem][{attribute}={json.dumps(value)}]')
         row.click()

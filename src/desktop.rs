@@ -501,6 +501,16 @@ impl SurfaceWindow {
             && self.cursor.1 < (p.y + p.height) as f32
     }
     fn pointer(&mut self, event: &WindowEvent) -> PyResult<()> {
+        if matches!(
+            event,
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            }
+        ) {
+            self.editor.inspector_owner = None;
+        }
         if self.editor.inline_text.is_some() {
             return Ok(());
         }
@@ -1171,6 +1181,25 @@ impl SurfaceWindow {
                     });
             }
         });
+        if std::mem::take(&mut self.editor.history_replayed) {
+            fn contains(nodes: &[navigation::Node], target: &str) -> bool {
+                nodes
+                    .iter()
+                    .any(|v| v.target.as_deref() == Some(target) || contains(&v.children, target))
+            }
+            if self
+                .selected
+                .as_deref()
+                .is_some_and(|target| !contains(&navigation::nodes(&c.snapshot()), target))
+            {
+                self.selected = None;
+                self.editor.inspector_owner = None;
+            }
+            self.editor.property_text.clear();
+        }
+        if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
+            c.end_edit();
+        }
         // Explicit export may temporarily select its RGBA target pipelines.
         c.renderer
             .ensure_target_format(self.config.format)
@@ -1497,12 +1526,23 @@ impl ApplicationHandler for App {
     fn about_to_wait(&mut self, events: &ActiveEventLoop) {
         self.open_pending(events);
         self.windows.retain(|_, w| {
-            !w.control.close.load(Ordering::Acquire)
+            let keep = !w.control.close.load(Ordering::Acquire)
                 && w.core.strong_count() > 0
                 && w.parent.as_ref().is_none_or(|p| {
                     p.upgrade()
                         .is_some_and(|p| !p.close.load(Ordering::Acquire))
-                })
+                });
+            if !keep {
+                if let Some(core) = w.core.upgrade() {
+                    if let Ok(mut data) = core.lock() {
+                        let gpu = Arc::clone(&data.gpu);
+                        if let Ok(mut renderer) = gpu::lock(&gpu) {
+                            FigureAccess::new(&gpu, &mut data, &mut renderer).end_edit();
+                        }
+                    }
+                }
+            }
+            keep
         });
         let settings = self
             .windows
@@ -1562,6 +1602,27 @@ impl ApplicationHandler for App {
             return;
         }
         let response = w.input.on_window_event(&w.window, &event);
+        if matches!(
+            event,
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            }
+        ) {
+            if let Some(core) = w.core.upgrade() {
+                if let Ok(mut data) = core.lock() {
+                    let gpu = Arc::clone(&data.gpu);
+                    if let Ok(mut renderer) = gpu::lock(&gpu) {
+                        let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
+                        c.end_edit();
+                        if w.cursor.1 > 58. * w.ctx.pixels_per_point() {
+                            c.begin_edit("Edit object");
+                        }
+                    }
+                }
+            }
+        }
         let result = match event {
             WindowEvent::Focused(false) => {
                 w.chooser = None;

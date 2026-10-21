@@ -220,11 +220,17 @@ matplotlib users, but does not implement the full matplotlib API.
 | Drag inside the plot | Pan the view |
 | Drag a title or legend | Move that element |
 | Click an element | Open its properties |
+| Undo / Redo; Ctrl/Cmd + Z / Shift + Z | Restore a committed chart edit |
 | Show / hide | Toggle titles and legend, including hidden elements |
 | Esc / arrow keys | Clear / move the current selection |
 
 Layout mode moves or resizes the plot area. The properties panel keeps the chart
 size and aspect ratio; it overlays the chart in maximized/full-screen windows.
+
+Select **Figure** in the object tree for named-grid placement, spacing and
+**Reset edits**. Reset restores the initially presented document and can itself
+be undone. Contextual controls and the same Python command API are described
+in [Editor commands and history](docs/EDITOR_COMMANDS.md).
 
 ## Edit once, reuse across datasets
 
@@ -423,8 +429,8 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-The native extension uses the published **figgy-renderer 0.18.0** and
-**figgy-model 0.12.0** crates from crates.io, pinned in `Cargo.lock`.
+The native extension uses the published **figgy-renderer 0.18.1** and
+**figgy-model 0.12.1** crates from crates.io, pinned in `Cargo.lock`.
 The packaged browser kernel is built from their upstream release commit
 `3a0a6a3` with a recorded web-binding patch for non-borrowing GPU completion.
 Asset provenance checks pair the registry versions and checksums with that

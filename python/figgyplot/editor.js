@@ -3,7 +3,7 @@
 export function render({ model, el }) {
   const root = document.createElement("div"); root.className = "figgy-editor";
   root.innerHTML = `<div class="figgy-toolbar"><strong>Kernel PNG fallback</strong><button data-fit>Fit</button>
-    <label><input type="checkbox" data-area> Edit plot area</label>
+    <button data-undo>Undo</button><button data-redo>Redo</button><label><input type="checkbox" data-area> Edit plot area</label>
     <button data-copy>Copy Python</button><button data-save>Save PNG</button>
     <span data-status></span></div><div class="figgy-body">
     <div class="figgy-stage"><canvas></canvas></div><div class="figgy-properties">
@@ -87,6 +87,7 @@ export function render({ model, el }) {
     if (disposed) return;
     current = model.get("state");
     if (!current?.settings) return;
+    for(const action of ['undo','redo'])root.querySelector(`[data-${action}]`).disabled=!!pending||!current.edit_history?.[`can_${action}`]||current.edit_history.gesture_active;
     if (pending === current.last_request) {
       pending = null; handle = current.handle;
       if (pointer) pointer.target = current.selection;
@@ -138,10 +139,11 @@ export function render({ model, el }) {
     pointer.x = x; pointer.y = y;
     if (!dragTimer) dragTimer = setTimeout(flushDrag, 100);
   });
-  const stop = () => { pointer = null; if (dragTimer) clearTimeout(dragTimer); flushDrag(); };
+  const stop = () => { if(!pointer)return;pointer = null; if (dragTimer) clearTimeout(dragTimer); flushDrag();dispatch({action:'release'}); };
   canvas.addEventListener("pointerup", stop); canvas.addEventListener("pointercancel", stop);
   target.addEventListener("change", () => { localTarget = target.value; properties(); dispatch({action: "select", target: localTarget}); });
   root.querySelector("[data-fit]").addEventListener("click", () => dispatch({action: "fit"}));
+  for(const action of ['undo','redo'])root.querySelector(`[data-${action}]`).addEventListener('click',()=>dispatch({action}));
   root.querySelector("[data-apply]").addEventListener("click", () => {
     try { dispatch({action: "settings", settings: JSON.parse(root.querySelector("[data-settings]").value)}); }
     catch (e) { error.textContent = e.message; }

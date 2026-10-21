@@ -13,8 +13,8 @@ async function loadKernel(model) {
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
 const clone = value => JSON.parse(JSON.stringify(value));
-const rendererVersion = '0.18.0';
-const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0',rendererVersion].includes(settings.renderer_version);
+const rendererVersion = '0.18.1';
+const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0',rendererVersion].includes(settings.renderer_version);
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
@@ -42,16 +42,39 @@ export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
   const paths={fit:'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l5 5m11-5-5 5m5 11-5-5M4 20l5-5',select:'M6 3v17l5-5 4 7 3-2-4-6h7Z',layout:'M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4',copy:'M8 3h9l4 4v14H8ZM8 7H3v14h2M13 11l-2 3 2 3m3-6 2 3-2 3',save:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',properties:'M3 5h18M3 12h18M3 19h18M8 2v6M16 9v6M10 16v6',fullscreen:'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6'};
   const icon=(name,label)=>`<button data-${name} title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name]}"/></svg></button>`;
-  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<button data-draw aria-pressed="false">Draw</button><input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<button data-display-scale title="Use the available width instead of the requested Figure size">Fit width</button><span data-status>Preparing…</span></div><div class="figgy-drawing" hidden><div role="toolbar" aria-label="Annotation drawing tools"><button data-tool="select">Select</button><button data-tool="text">Text</button><button data-tool="arrow">Arrow</button><button data-tool="hline">Horizontal line</button><button data-tool="vline">Vertical line</button><button data-tool="hspan">Horizontal band</button><button data-tool="vspan">Vertical band</button><label><input data-anchor-data type="checkbox">Follow data</label></div><p data-drawing-help></p></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas><svg class="figgy-panel-focus" aria-hidden="true"></svg><svg class="figgy-drawing-preview" aria-hidden="true"></svg></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><section class="figgy-navigator"><div class="figgy-navigator-heading">Objects</div><label class="figgy-search"><input type="search" data-object-search placeholder="Find a panel, axis or series…" aria-label="Find chart objects"></label><div data-object-tree role="tree" aria-label="Chart objects"></div></section><div class="figgy-inspector-scroll"><div data-context class="figgy-context"></div><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
+  root.innerHTML=`<div class="figgy-toolbar"><strong>Figgy</strong><button data-undo title="Undo chart edit (Ctrl/Cmd+Z)">Undo</button><button data-redo title="Redo chart edit (Ctrl/Cmd+Shift+Z)">Redo</button>${icon('fit','Fit view')}${icon('select','Select')}${icon('layout','Move or resize plot area')}<button data-draw aria-pressed="false">Draw</button><input data-area type="checkbox" hidden><button data-visibility>Show / hide</button><button data-style>Style</button>${icon('copy','Copy Python')}${icon('save','Save PNG')}${icon('properties','Properties')}${icon('fullscreen','Full screen')}<button data-display-scale title="Use the available width instead of the requested Figure size">Fit width</button><span data-status>Preparing…</span></div><div class="figgy-drawing" hidden><div role="toolbar" aria-label="Annotation drawing tools"><button data-tool="select">Select</button><button data-tool="text">Text</button><button data-tool="arrow">Arrow</button><button data-tool="hline">Horizontal line</button><button data-tool="vline">Vertical line</button><button data-tool="hspan">Horizontal band</button><button data-tool="vspan">Vertical band</button><label><input data-anchor-data type="checkbox">Follow data</label></div><p data-drawing-help></p></div><div class="figgy-body"><div class="figgy-stage"><canvas tabindex="0" aria-label="Editable chart"></canvas><svg class="figgy-panel-focus" aria-hidden="true"></svg><svg class="figgy-drawing-preview" aria-hidden="true"></svg></div><div class="figgy-properties" hidden><header><strong>Properties</strong><button data-close-properties>Close</button></header><section class="figgy-navigator"><div class="figgy-navigator-heading">Objects</div><label class="figgy-search"><input type="search" data-object-search placeholder="Find a panel, axis or series…" aria-label="Find chart objects"></label><div data-object-tree role="tree" aria-label="Chart objects"></div></section><div class="figgy-inspector-scroll"><div data-context class="figgy-context"></div><div data-fields></div><details data-advanced><summary>Advanced settings</summary><textarea data-settings></textarea><button data-apply>Apply settings</button></details><details data-code-panel><summary>Python code</summary><textarea data-code readonly></textarea></details></div></div></div><div data-hint>Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection</div><div class="figgy-error" role="alert"></div>`;
   el.append(root);
   const canvas=root.querySelector('canvas'), fields=root.querySelector('[data-fields]');
-  let inspectedTarget=null,outlineNodes=clone(model.get('state').outline??[]),boundedView=clone(model.get('state').bounded_view??null);
+  let inspectorOwner=null,inspectedTarget=null,outlineNodes=clone(model.get('state').outline??[]),boundedView=clone(model.get('state').bounded_view??null);
   const error=root.querySelector('.figgy-error'), status=root.querySelector('[data-status]');
   const controls=[...root.querySelectorAll('button,input,select,textarea')];
   controls.forEach(control=>control.disabled=true);
   const client=crypto.randomUUID();
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
+  let editHistory=model.get('state').edit_history??{},historyBusy=false;
+  let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
+  function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
+  function replayEdit(action,args={}){
+    const operation=controlQueue.then(async()=>{
+      await queue;await flush();if(disposed)throw Error('Widget disposed');
+      const base_value=typeof args.base_value==='function'?args.base_value():args.base_value;
+      if(action==='property'){
+        const field=propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id);
+        if(!field||JSON.stringify(field.value)!==JSON.stringify(base_value))throw Error('stale edit: the property changed; refresh and retry');
+      }
+      historyBusy=true;historyControls();
+      const response=await new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args,...(action==='property'?{base_value}:{})});});
+      return {ok:!!response&&!response.error,value:propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id)?.value};
+    });
+    controlQueue=operation.catch(e=>{historyBusy=false;historyControls();fail(e);return {ok:false};});return controlQueue;
+  }
+  for(const action of ['undo','redo'])root.querySelector(`[data-${action}]`).addEventListener('click',()=>replayEdit(action));
+  root.addEventListener('keydown',e=>{
+    if(!(e.ctrlKey||e.metaKey)||e.altKey||e.target.matches('input,textarea,[contenteditable=true]'))return;
+    const action=e.key.toLowerCase()==='y'||(e.key.toLowerCase()==='z'&&e.shiftKey)?'redo':e.key.toLowerCase()==='z'?'undo':null;
+    if(action){e.preventDefault();if(editHistory[`can_${action}`])replayEdit(action);}
+  });
   let background=clone(local.background ?? null);
   const stats={backend:'browser-webgpu',binary_upload_bytes:0,column_uploads:0,surface_frames:0,png_exports:0,kernel_edit_messages:0,last_input_to_submit_ms:0};
   const kind=['radial','categorical','boxplot','radar'].find(k=>local[k]);
@@ -258,17 +281,24 @@ export function render({model,el}) {
     if(e.key==='Escape'||e.key==='Enter'&&!e.shiftKey){e.preventDefault();finishInline(e.key==='Enter');canvas.focus({preventScroll:true});}
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
+  async function geometryFrame(){
+    // Prepare the current hit map through the renderer without submitting or
+    // awaiting a display frame. Keep display work coalesced behind its fence.
+    resizeSurface();
+    if(dirty){
+      if(kind)chart.set_document(chart.get_document(),local.config.chart_area.width,local.config.chart_area.height);
+      else chart.prepare_interaction();
+    }
+  }
   async function annotationGeometry(){
-    // Bounded charts prepare their logical annotation map synchronously when
-    // adopting a document. Editing it does not depend on a material GPU fence.
-    if(kind)return JSON.parse(chart.annotations());
-    await waitForFrame();
-    if(dirty){await readyDisplayedFrame();dirty=false;}
+    await geometryFrame();
     return JSON.parse(chart.annotations());
   }
   async function textAnnotationAt(point){
     const owner=kind?snapshot()[kind]:snapshot().config;if(owner.annotations?.visible===false||!owner.annotations?.items?.some(v=>v.kind.Text&&v.visible!==false))return null;
-    const entries=await annotationGeometry(),index=chart.hit_annotation(...point);if(index===undefined||!owner.annotations?.items[index]?.kind.Text)return null;
+    const entries=await annotationGeometry(),index=chart.hit_annotation(...point);
+    if(globalThis.__figgyTrace){stats.last_annotation_hit={point:[...point],index:index??null,layer:owner.active_layer??'Base',canvas:[canvas.width,canvas.height],entries};trace('annotation.hit',stats.last_annotation_hit);}
+    if(index===undefined||!owner.annotations?.items[index]?.kind.Text)return null;
     const entry=entries.find(v=>v.index===index);
     return entry?{item:owner.annotations.items[index],entry}:null;
   }
@@ -377,7 +407,7 @@ export function render({model,el}) {
     catch(e){chart.set_series('[]');chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));clearColor(old.background);local=old;throw e;}
     local={...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};dirty=true;error.textContent='';
   }
-  function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending};pending=null;stats.kernel_edit_messages++;model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
+  function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending};pending=null;historyControls();stats.kernel_edit_messages++;model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
   function commit(){local=snapshot();pending=clone(local);post();properties();}
   function idle(){if(!inflight && !pending){for(const resolve of barriers.splice(0))resolve();}}
   function flush(){post();return !inflight&&!pending ? Promise.resolve() : new Promise(resolve=>barriers.push(resolve));}
@@ -466,7 +496,7 @@ export function render({model,el}) {
   function navigateTree(reveal=false){
     if(sidebarPointer){formRefreshPending=true;return;}
     const layer=inspectorLayer??layerOf(local),target=inspectorTarget??selected??(hasPanels()||layer==='Annotations'?null:elementName('chart_title'));
-    let entry=allNodes().find(v=>v.node.target===target&&sameLayer(v.node.layer,layer));
+    let entry=allNodes().find(v=>v.node.key===inspectorOwner&&v.node.target===target&&sameLayer(v.node.layer,layer))??allNodes().find(v=>v.node.target===target&&sameLayer(v.node.layer,layer));
     const signature=JSON.stringify([layer,target]);
     if(signature!==lastTreeSignature){
       if(entry){for(const ancestor of entry.path)expanded.set(ancestor.key,true);if(!inspectorTarget)search.value='';}
@@ -509,7 +539,7 @@ export function render({model,el}) {
   search.addEventListener('input',()=>navigateTree(!search.value));
   search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key.split('/').at(-1)}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
   function chooseObject(node){
-    const target=node.target,generation=++inspectorGeneration;
+    const target=node.target,generation=++inspectorGeneration;inspectorOwner=node.key;
     if(node.kind==='panel')expanded.set(node.key,true);
     inspectorTarget=target;inspectorLayer=node.layer;showProperties();properties(false);
     enqueue(()=>{
@@ -518,9 +548,9 @@ export function render({model,el}) {
       }
       selected=target;
       if(!kind){local=snapshot();syncPanelFocus(true);}
-      if(kind){const dataTarget=/^slice_/.test(target??'')||local[kind].series?.some(v=>v.id===target);if(dataTarget){chart.clear_selection();}else if(target)chart.select_decoration(target);else chart.clear_selection();}
+      if(kind){const dataTarget=/^slice_/.test(target??'')||local[kind].series?.some(v=>v.id===target);if(dataTarget){chart.clear_selection();}else if(target&&target!=='figure')chart.select_decoration(target);else chart.clear_selection();}
       else if(target?.startsWith('annotation:')){chart.select_annotation(local.config.annotations.items.findIndex(v=>'annotation:'+v.id===target));}
-      else if(!local.series.some(s=>s.series_id===target)){const bound=target?JSON.parse(chart.decoration_bounds(rendererTarget(target))):null;if(bound){chart.on_press(bound.rect[0]+bound.rect[2]/2,bound.rect[1]+bound.rect[3]/2);chart.on_release();}}
+      else if(target!=='figure'&&!local.series.some(s=>s.series_id===target)){const bound=target?JSON.parse(chart.decoration_bounds(rendererTarget(target))):null;if(bound){chart.on_press(bound.rect[0]+bound.rect[2]/2,bound.rect[1]+bound.rect[3]/2);chart.on_release();}}
       if(generation===inspectorGeneration){inspectorTarget=null;inspectorLayer=null;}
       dirty=true;commit();
     });
@@ -533,18 +563,24 @@ export function render({model,el}) {
   fields.addEventListener('focusout',()=>setTimeout(()=>{if(formRefreshPending&&!sidebarPointer&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0));
   function properties(refresh=true){
     if(!chart)return;
+    let restoreControl=null;
+    try{
     if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
     if(sidebarPointer){formRefreshPending=true;return;}
     syncPanelFocus();drawingUI();navigateTree();selectionProperties();
     const nextTarget=inspectorTarget??selected??elementName('chart_title'),nextContext=JSON.stringify([layerOf(local),nextTarget]);
-    if(nextContext===formContext&&fields.contains(document.activeElement)&&document.activeElement.matches('input,textarea')){formRefreshPending=true;return;}
+    if(nextContext===formContext&&fields.contains(document.activeElement)){
+      const active=document.activeElement;
+      if(active.matches('textarea,input[type=text],input[type=number],input[type=search],input:not([type])')){formRefreshPending=true;return;}
+      if(active.matches('select,input[type=checkbox],input[type=color]'))restoreControl={id:active.dataset.catalogField,property:active.dataset.property};
+    }
     if(nextContext!==formContext)root.querySelector('.figgy-inspector-scroll').scrollTop=0;
     formContext=nextContext;inspectedTarget=nextTarget;fields.replaceChildren();
     if(hasPanels()&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent=focusIndex()===null?'Select a chart on the canvas.':'Click a title, axis, legend or data series in the selected chart.';fields.append(hint);return;}
     if(layerOf(local)==='Annotations'&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent='Choose an annotation in the tree or click it in the chart.';fields.append(hint);return;}
     if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
-    const series=local.series.find(s=>s.series_id===target);
+    if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
     function applyProperty(apply,value){
       const before=snapshot(),state=clone(before);
       apply(state,value);
@@ -563,7 +599,7 @@ export function render({model,el}) {
     }
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
-      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Timestamp:'Timestamp (configured)'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
       input.addEventListener('change',()=>{const next=input.value;enqueue(()=>{try{applyProperty(apply,next);}catch(e){input.value=value;throw e;}});});row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
@@ -574,17 +610,9 @@ export function render({model,el}) {
       });
       const note=document.createElement('p');note.textContent='Log view omits zero and negative values; source data is preserved.';fields.append(note);
     }
-    function colorScale(){
-      if(!cfg.colorbar)return;
-      scaleControl('color_scale',cfg.colorbar.axis,s=>configOf(s).colorbar.axis,'z');
-      choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>configOf(s).colorbar.colormap=v);
-      field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>configOf(s).colorbar.axis.min=v);
-      field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>configOf(s).colorbar.axis.max=v);
-      numberFormat(cfg.colorbar.axis.label_style,s=>configOf(s).colorbar.axis.label_style);
-    }
     function numberFormat(style,find){
       const current=typeof style.format==='string'?style.format:'Timestamp';
-      choice('label_format',current,current==='Timestamp'?['Timestamp','Decimal','Scientific','Power']:['Decimal','Scientific','Power'],(s,v)=>{if(v!=='Timestamp')find(s).format=v;});
+      choice('label_format',current,['Decimal','Scientific','Power','Degrees','Radians','Timestamp'],(s,v)=>{find(s).format=v==='Timestamp'?{Timestamp:{}}:v;});
       if(current==='Timestamp')return;
       const digits=field('significant_digits',style.significant_digits,'number',(s,v)=>{
         if(!Number.isInteger(v)||v<1||v>15)throw Error('Significant digits must be an integer from 1 to 15');
@@ -630,6 +658,12 @@ export function render({model,el}) {
     if(Number.isInteger(annotationIndex)&&annotationIndex>=0){
       const owner=s=>kind?s[kind]:s.config,find=s=>owner(s).annotations.items[annotationIndex],item=find(local),name=Object.keys(item.kind)[0],geometry=item.kind[name],shape=s=>find(s).kind[name];
       toggle('visible',item.visible!==false,(s,v)=>find(s).visible=v);
+      if(name==='Text'){const textKey='text';
+      if(geometry[textKey]){const findText=s=>shape(s)[textKey];
+      field('font',geometry[textKey].font,'text',(s,v)=>findText(s).font=v);
+      field('font_size',geometry[textKey].font_size,'number',(s,v)=>findText(s).font_size=v);color('text_color',geometry[textKey].color,s=>findText(s).color);
+      const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);}
+      }
       for(const key of (name==='ReferenceLine'?['value']:name==='Span'?['from','to']:[]))field(key,geometry[key],'number',(s,v)=>shape(s)[key]=v);
       for(const key of ['anchor','from','to'])if(geometry[key]&&typeof geometry[key]==='object'){
         const unit=Object.keys(geometry[key])[0];if(!geometry[key][unit]||typeof geometry[key][unit]!=='object')continue;
@@ -638,17 +672,19 @@ export function render({model,el}) {
       }
       const textKey=name==='ReferenceLine'?'label':'text';
       if(name==='Arrow'||name==='ReferenceLine')toggle('show_label',!!geometry[textKey],(s,v)=>shape(s)[textKey]=v?{segments:segments('Label'),color:{r:.15,g:.18,b:.23,a:1},font_size:16,font:''}:null);
+      if(name!=='Text'){
       if(geometry[textKey]){const findText=s=>shape(s)[textKey];
       field('font',geometry[textKey].font,'text',(s,v)=>findText(s).font=v);
       field('font_size',geometry[textKey].font_size,'number',(s,v)=>findText(s).font_size=v);color('text_color',geometry[textKey].color,s=>findText(s).color);
       const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);}
+      }
       if(geometry.fill){color('fill',geometry.fill,s=>shape(s).fill);field('opacity',geometry.fill.a,'number',(s,v)=>shape(s).fill.a=v);}
       const style=name==='Arrow'?geometry.style?.line:geometry.style,styleOf=s=>name==='Arrow'?shape(s).style.line:shape(s).style;
       if(style){color('color',style.color,s=>styleOf(s).color);field('line_width',style.width,'number',(s,v)=>styleOf(s).width=v);}
       if(name==='Arrow')for(const key of ['head_length','head_width'])field(key,geometry.style[key],'number',(s,v)=>shape(s).style[key]=v);
       if(style)choice('line_style',style.style,['Solid','Dash','Dot','DashDot','DashDotDot','ShortDash','ShortDot','ShortDashDot','LongDash','LongDashDot','LongDashDotDot'],(s,v)=>styleOf(s).style=v);
       if(name==='Text'){toggle('text_box',!!geometry.box_style,(s,v)=>shape(s).box_style=v?{fill:{r:1,g:1,b:1,a:.9},border_color:{r:.23,g:.23,b:.23,a:1},border_width:1,padding:4}:null);if(geometry.box_style){color('box_fill',geometry.box_style.fill,s=>shape(s).box_style.fill);color('border_color',geometry.box_style.border_color,s=>shape(s).box_style.border_color);for(const key of ['border_width','padding'])field(key,geometry.box_style[key],'number',(s,v)=>shape(s).box_style[key]=v);}}
-      const remove=document.createElement('button');remove.textContent='Delete annotation';remove.dataset.deleteAnnotation='';remove.addEventListener('click',()=>enqueue(()=>{const state=snapshot();owner(state).annotations.items.splice(annotationIndex,1);if(kind)state[kind].decorations.selected=null;selected=null;inspectorTarget=null;install(state);commit();}));fields.prepend(remove);
+      const remove=document.createElement('button');remove.textContent='Delete annotation';remove.dataset.deleteAnnotation='';remove.addEventListener('click',()=>enqueue(()=>{const state=snapshot();owner(state).annotations.items.splice(annotationIndex,1);if(kind)state[kind].decorations.selected=null;selected=null;inspectorTarget=null;install(state);commit();}));fields.append(remove);
       root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);return;
     }
     if(kind){
@@ -684,6 +720,7 @@ export function render({model,el}) {
       }
       root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;
     }
+    if(target.startsWith('colorbar'))return;
     const visibility=target==='chart_title'?['chart_title','visible']:target==='legend'?['legend','visible']:target==='colorbar'?['colorbar','visible']:target.startsWith('axis_title_')?[side[target.slice(11)],'title_option','visible']:target.startsWith('tick_labels_')?[side[target.slice(12)],'label_style','visible']:target.startsWith('axis_')?[side[target.slice(5)],'line_visible']:null;
     if(visibility){const read=s=>visibility.slice(0,-1).reduce((n,k)=>n?.[k],configOf(s)),isTitle=target==='chart_title'||target.startsWith('axis_title_');if(read(local))toggle('visible',read(local)[visibility.at(-1)]&&(!isTitle||Boolean(text(read(local).text).trim())),(s,v)=>{if(isTitle)titleVisibility(s,target,v);else read(s)[visibility.at(-1)]=v;});}
     let path;
@@ -713,13 +750,6 @@ export function render({model,el}) {
       });
       richControls(find,inspectedTarget,textInput);}
       choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
-    }else if(series){const kind=Object.keys(series.render_type)[0],style=series.render_type[kind];const find=s=>s.series.find(v=>v.series_id===target).render_type[kind];
-      if(style.line){color('color',style.line.line_color,s=>find(s).line.line_color);field('line_width',style.line.line_width,'number',(s,v)=>find(s).line.line_width=v);}
-      if(style.scatter){color('color',style.scatter.point_color,s=>find(s).scatter.point_color);field('point_size',style.scatter.point_size,'number',(s,v)=>find(s).scatter.point_size=v);}
-      if(style.bar){color('color',style.bar.fill_color,s=>find(s).bar.fill_color);field('border_width',style.bar.border_width,'number',(s,v)=>find(s).bar.border_width=v);}
-      if(style.err_style){color('error_color',style.err_style.error_bar_color,s=>find(s).err_style.error_bar_color);field('error_width',style.err_style.error_bar_width,'number',(s,v)=>find(s).err_style.error_bar_width=v);}
-      if(style.matrix)colorScale();
-    }else if(target==='colorbar'||target.startsWith('colorbar_')){colorScale();
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
       toggle('auto_ticks',tickAutomatic(local,key),(s,v)=>{tickMode(s,key,v);if(v)retick(configOf(s)[key]);});
       scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key.endsWith('_x')?'x':'y');
@@ -730,6 +760,73 @@ export function render({model,el}) {
       for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;if(name==='major_spacing')tickMode(s,key,false);else if(['min','max'].includes(name)&&tickAutomatic(s,key))retick(configOf(s)[key]);});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
+    }finally{
+      catalogProperties();
+      if(restoreControl){const control=[...fields.querySelectorAll('input,select')].find(v=>restoreControl.id?v.dataset.catalogField===restoreControl.id:v.dataset.property===restoreControl.property);control?.focus({preventScroll:true});}
+    }
+  }
+  function inspectedObject(target){
+    const matches=v=>v.target===target&&(target==='figure'||sameLayer(v.layer,layerOf(local)));
+    const picked=local.config.picked_data?.refs?.some(v=>v.series_id===target)||(kind&&local[kind].selected?.series_id===target);
+    return propertyCatalog.find(v=>v.id===inspectorOwner&&matches(v))??(picked?propertyCatalog.find(v=>(v.id.startsWith('series/')||v.id.startsWith('bounded/series/'))&&matches(v)):null)??propertyCatalog.find(matches);
+  }
+  const propertySections=new Map();
+  function catalogProperties(){
+    if(sidebarPointer||fields.contains(document.activeElement)||fields.querySelector('[data-catalog]'))return;
+    const target=inspectorTarget??selected??elementName('chart_title');
+    if(hasPanels()&&focusIndex()===null&&target!=='figure')return;
+    const object=inspectedObject(target);
+    if(!object)return;
+    const primary=object.id.startsWith('series/')||object.id.startsWith('bounded/series/slice_')||object.id.startsWith('figure/')||target.split(':').at(-1).startsWith('colorbar'),covered=new Set([...fields.querySelectorAll('[data-property]')].map(v=>v.dataset.property));
+    const container=document.createElement('div');container.dataset.catalog='';
+    const groups=new Map();
+    for(const field of object.fields){
+      const key=field.path.split('/').at(-1);
+      if(!primary&&(covered.has(key)||(key==='scale'&&covered.has('axis_scale'))||(key==='tick'&&covered.has('tick_direction'))||(key==='format'&&covered.has('label_format'))||(key==='segments'&&covered.has('text'))||(key==='style'&&covered.has('annotation_line_style'))))continue;
+      if(!groups.has(field.group))groups.set(field.group,[]);groups.get(field.group).push(field);
+    }
+    let groupIndex=0;
+    for(const [group,entries]of groups){
+      const section=document.createElement('details');section.dataset.propertySection=group;
+      const sectionKey=JSON.stringify([object.id,group]),defaultOpen=primary&&groupIndex++<2;
+      section.open=propertySections.get(sectionKey)??defaultOpen;
+      section.addEventListener('toggle',()=>propertySections.set(sectionKey,section.open));
+      const heading=document.createElement('summary');heading.textContent=group;section.append(heading);
+      for(const field of entries){
+        if(field.kind==='action'){
+          const button=document.createElement('button');button.textContent=field.label;button.dataset.catalogField=field.id;
+          button.addEventListener('click',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:true,base_value:field.value}));section.append(button);continue;
+        }
+        const row=document.createElement('label');row.append(document.createTextNode(field.label));
+        const input=document.createElement(field.kind==='choice'?'select':'input');
+        input.dataset.catalogField=field.id;
+        const key=field.path.split('/').at(-1);
+        input.dataset.property=({'Color scale/axis/scale':'color_scale','Color scale/axis/min':'vmin','Color scale/axis/max':'vmax'})[field.id]??(key==='segments'?'text':key==='format'?'label_format':primary&&['line_color','point_color'].includes(key)&&!container.querySelector('[data-property=color]')?'color':key);
+        let base=clone(field.value);
+        input.addEventListener('focus',()=>{base=clone(propertyCatalog.find(v=>v.id===object.id)?.fields.find(v=>v.id===field.id)?.value??field.value);});
+        if(field.kind==='choice')for(const value of field.choices_ref==='columns'?[...field.choices,...propertyColumns]:field.choices){const option=document.createElement('option');option.value=value;option.textContent=field.group==='Shared axes'&&value===''?'Independent':field.id.endsWith('/source')||field.id.startsWith('Figure grid/slot/')?value:caption(value);input.append(option);}
+        if(field.kind==='boolean'){input.type='checkbox';input.checked=field.value;}
+        else if(field.kind==='color'){input.type='color';input.value='#'+['r','g','b'].map(k=>Math.round(field.value[k]*255).toString(16).padStart(2,'0')).join('');}
+        else{if(input.tagName==='INPUT')input.type=field.kind==='number'?'number':'text';input.value=field.kind==='numbers'?field.value.join(', '):field.value;if(field.kind==='number')input.step=field.integer?'1':'any';}
+        function submit(){try{
+          let value=field.kind==='boolean'?input.checked:field.kind==='number'?Number(input.value):field.kind==='numbers'?input.value.split(/[,;\s]+/).filter(Boolean).map(Number):input.value;
+          if(field.kind==='color')value={...base,...Object.fromEntries(['r','g','b'].map((k,i)=>[k,parseInt(input.value.slice(1+i*2,3+i*2),16)/255]))};
+          if((typeof value==='number'&&!Number.isFinite(value))||(Array.isArray(value)&&value.some(v=>!Number.isFinite(v))))throw Error('Enter finite numbers');
+          replayEdit('property',{object_id:object.id,property_id:field.id,value,base_value:()=>base}).then(result=>{if(result?.ok&&result.value!==undefined)base=clone(result.value);});
+        }catch(e){fail(e);}}
+        if(field.kind==='choice'){input.title=input.value;input.addEventListener('change',()=>input.title=input.value);}
+        input.addEventListener('change',submit);row.append(input);section.append(row);
+        if(field.kind==='color'){
+          const opacityRow=document.createElement('label');opacityRow.textContent=field.label+' opacity';const alpha=document.createElement('input');alpha.type='number';alpha.min=0;alpha.max=1;alpha.step=.05;alpha.value=field.value.a;alpha.dataset.catalogAlpha=field.id;
+          let colorBase=clone(field.value);alpha.addEventListener('focus',()=>{colorBase=clone(propertyCatalog.find(v=>v.id===object.id)?.fields.find(v=>v.id===field.id)?.value??field.value);});
+          alpha.addEventListener('change',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:{...colorBase,a:Number(alpha.value)},base_value:()=>colorBase}).then(result=>{if(result?.ok&&result.value!==undefined)colorBase=clone(result.value);}));opacityRow.append(alpha);section.append(opacityRow);
+        }
+      }
+      container.append(section);
+    }
+    for(const action of object.actions??[]){const button=document.createElement('button');button.textContent='Reset edits';button.dataset.resetEdits='';button.title='Restore the document at the start of this edit history. Undo restores the current edits.';button.disabled=!editHistory.can_reset;button.addEventListener('click',()=>replayEdit(action));container.append(button);}
+    for(const text of object.notices){const note=document.createElement('p');note.className='figgy-property-note';note.textContent=text;container.append(note);}
+    fields.append(container);
   }
   function displaySize(){const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;return [Math.max(1,Math.round(rect.width*dpr)),Math.max(1,Math.round(rect.height*dpr))];}
   function resizeSurface(){const [width,height]=displaySize();if(canvas.width===width&&canvas.height===height)return false;const previous=[canvas.width,canvas.height];canvas.width=width;canvas.height=height;wheelArea=null;chart.resize(width,height);positionInline();dirty=true;trace('surface.resized',{previous});return true;}
@@ -778,9 +875,9 @@ export function render({model,el}) {
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1){trace('export.flush_started',{scale});await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
+  async function exporting(scale=1){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-  function onState(){enqueue(()=>{const state=model.get('state');outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
+  function onState(){enqueue(()=>{const state=model.get('state');propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
@@ -793,12 +890,30 @@ export function render({model,el}) {
       outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
       if(message.error){pending=null;install(message.state.settings);fail(message.error);}
       else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
-      properties();idle();
+      propertyColumns=clone(message.state.property_columns??propertyColumns);propertyCatalog=clone(message.state.property_catalog??propertyCatalog);editHistory=message.state.edit_history??{};historyControls();properties();idle();
+    });
+    else if(message.action==='history_result')enqueue(()=>{
+      try{
+      historyBusy=false;editHistory=message.state.edit_history??{};revision=message.state.revision;
+      propertyColumns=clone(message.state.property_columns??propertyColumns);propertyCatalog=clone(message.state.property_catalog??propertyCatalog);
+      if(message.operation==='property'){
+        const owner=propertyCatalog.find(v=>v.id===message.object_id);
+        if(owner){selected=owner.target;inspectorOwner=owner.id;}else{selected=null;inspectorOwner=null;}
+      }else{
+        const owner=inspectorOwner&&propertyCatalog.find(v=>v.id===inspectorOwner);
+        if(owner)selected=owner.target;
+        else if(selected&&!propertyCatalog.some(v=>v.target===selected)){selected=null;inspectorOwner=null;}
+      }
+      inspectorTarget=null;
+      outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);
+      exportedCode=message.state.code??exportedCode;install(message.state.settings);historyControls();properties();
+      if(message.error)fail(message.error);
+      }catch(e){message.error=String(e);fail(e);}finally{const finish=controlFinish;controlFinish=null;finish?.(message);}
     });
     else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
       const request={requestId:message.id,action:message.action};trace('request.received',request);
       // Do not block the serialized queue while waiting for an ack processed by it.
-      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await queue;trace('request.queue_drained',request);await flush();trace('request.edits_acknowledged',request);let result=null;
+      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await controlQueue;await queue;trace('request.queue_drained',request);await flush();trace('request.edits_acknowledged',request);let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
           const start=performance.now(),stages=[];status.textContent='Preparing…';trace('prepare.started',request);
           try{await waitForFrame();if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);trace('prepare.prewarm',{...request,event});status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';trace('prepare.completed',request);
@@ -812,7 +927,7 @@ export function render({model,el}) {
   // Present the chosen inspector immediately without borrowing the renderer.
   // Apply interaction selection in event order so older keys/picks keep their
   // original target and cannot overwrite a newer pending inspector choice.
-  root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
+  root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',async()=>{
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>Object.values(s.render_type)[0].line?.fill))){
@@ -879,13 +994,14 @@ export function render({model,el}) {
     if(at!==null)setPointerLayer(baseLayer(at));
     local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;dirty=true;commit();
   }
-  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e),pointSize=[canvas.width,canvas.height];
+  canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;inspectorOwner=null;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e),pointSize=[canvas.width,canvas.height];
     if(drawingTool!=='select'){
       if(hasPanels()&&(focusIndex()===null||panelAt(point)!==focusIndex())){enqueue(()=>{cancelDrawing();selectPanelAt(point);});return;}
       const g={tool:drawingTool,start:point,end:point,data:root.querySelector('[data-anchor-data]').checked,area:[0,0,canvas.width,canvas.height]};drawingGesture=g;
       enqueue(()=>{if(g!==drawingGesture)return;g.panel=kind?[0,0,local.config.chart_area.width,local.config.chart_area.height]:panelRect(0);if(!inRect(g.start,g.panel)){cancelDrawing();return;}g.area=drawingArea()??g.area;const [x,y,w,h]=g.area;if(/^[hv]/.test(g.tool)&&(g.start[0]<x||g.start[0]>x+w||g.start[1]<y||g.start[1]>y+h)){cancelDrawing();return;}previewDrawing();});return;
     }
     pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
+    await geometryFrame();
     if(!kind){point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];gesture.size=[canvas.width,canvas.height];}
     const [x,y]=point;
     if(hasPanels()&&(panelAt(point)!==focusIndex()||focusIndex()===null)){
@@ -1013,11 +1129,11 @@ export function render({model,el}) {
     await readyDisplayedFrame();
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
-    controls.forEach(control=>control.disabled=false);drawingUI();
-    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{if(kind)return JSON.parse(chart.decorations());await waitForFrame();resizeSurface();if(dirty)await readyDisplayedFrame();return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
+    controls.forEach(control=>control.disabled=false);historyControls();drawingUI();
+    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};
