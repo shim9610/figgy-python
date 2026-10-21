@@ -450,6 +450,9 @@ impl SurfaceWindow {
                 );
             }
         });
+        if std::mem::take(&mut self.editor.history_replayed) {
+            self.editor.property_text.clear();
+        }
         if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
             c.end_edit();
         }

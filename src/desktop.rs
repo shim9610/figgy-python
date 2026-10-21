@@ -1182,7 +1182,19 @@ impl SurfaceWindow {
             }
         });
         if std::mem::take(&mut self.editor.history_replayed) {
-            self.selected = None;
+            fn contains(nodes: &[navigation::Node], target: &str) -> bool {
+                nodes
+                    .iter()
+                    .any(|v| v.target.as_deref() == Some(target) || contains(&v.children, target))
+            }
+            if self
+                .selected
+                .as_deref()
+                .is_some_and(|target| !contains(&navigation::nodes(&c.snapshot()), target))
+            {
+                self.selected = None;
+                self.editor.inspector_owner = None;
+            }
             self.editor.property_text.clear();
         }
         if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
@@ -1514,12 +1526,23 @@ impl ApplicationHandler for App {
     fn about_to_wait(&mut self, events: &ActiveEventLoop) {
         self.open_pending(events);
         self.windows.retain(|_, w| {
-            !w.control.close.load(Ordering::Acquire)
+            let keep = !w.control.close.load(Ordering::Acquire)
                 && w.core.strong_count() > 0
                 && w.parent.as_ref().is_none_or(|p| {
                     p.upgrade()
                         .is_some_and(|p| !p.close.load(Ordering::Acquire))
-                })
+                });
+            if !keep {
+                if let Some(core) = w.core.upgrade() {
+                    if let Ok(mut data) = core.lock() {
+                        let gpu = Arc::clone(&data.gpu);
+                        if let Ok(mut renderer) = gpu::lock(&gpu) {
+                            FigureAccess::new(&gpu, &mut data, &mut renderer).end_edit();
+                        }
+                    }
+                }
+            }
+            keep
         });
         let settings = self
             .windows

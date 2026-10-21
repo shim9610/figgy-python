@@ -2307,3 +2307,283 @@ def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tm
         execute('await fig.sync()');accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert accepted['identity']['tick_modes']==page.evaluate(ROOT+'.snapshot().identity.tick_modes')
         assert not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('kind',['cartesian','categorical','boxplot'])
+def test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle(tmp_path,backend,kind):
+    setup={'cartesian':"ax.plot([0,10],[0,20],id='signal');ax.set_xlim(0,10);ax.set_ylim(0,20)", 'categorical':"ax.bar(['A','B'],[5,10])",'boxplot':"ax.boxplot([[1,2,3],[2,4,6]])"}[kind]
+    setup+=";ax.text(0,5,'Keep position',coords='data',id='probe')"
+    target='annotation:probe' if kind=='cartesian' else 'annotation_0';key=('panel/main' if kind=='cartesian' else 'bounded')+'/annotation/probe'
+    if backend=='native':
+        with figgy.Figure(backend=backend,id='anchor-ui') as fig:
+            exec(setup,{'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'Keep position',key)
+                inputs.click('section:Coordinates');before=json.loads(fig._native.bounds_json(target))['rect']
+                inputs.click('property:Coordinates/anchor');inputs.click('anchor_Ratio')
+                after=json.loads(fig._native.bounds_json(target))['rect']
+                assert after==pytest.approx(before,abs=.01)
+                assert 'Ratio' in fig.get_settings()['config' if kind=='cartesian' else kind]['annotations']['items'][0]['kind']['Text']['anchor']
+                inputs.click('undo');assert json.loads(fig._native.bounds_json(target))['rect']==pytest.approx(before,abs=.01)
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu",id="anchor-ui")\nax=fig.axes[0]\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/(kind+'-anchor'),source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose(target,node=key)
+        page.locator('[data-property-section="Coordinates"] summary').click()
+        before=page.evaluate(ROOT+'.annotations()')[0]['rect']
+        page.locator('[data-catalog-field="Coordinates/anchor"]').select_option('Ratio');page.evaluate(ROOT+'.flush()')
+        after=page.evaluate(ROOT+'.annotations()')[0]['rect']
+        assert after==pytest.approx(before,abs=.01)
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert 'Ratio' in state['config' if kind=='cartesian' else kind]['annotations']['items'][0]['kind']['Text']['anchor']
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.annotations()')[0]['rect']==pytest.approx(before,abs=.01)
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_reset_button_restores_the_presented_chart_and_can_be_undone(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.plot([0,1,2],[1,3,2],id='signal');ax.set_title('Original')"
+    if backend=='native':
+        with figgy.Figure(backend=backend,id='reset-ui') as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);initial=fig.get_settings()['series'][0]['render_type']['Line']['line']['line_width']
+                inputs.click('properties');choose_native_object(inputs,'signal','series/signal')
+                inputs.click('line_width');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','8');inputs.key('Return')
+                choose_native_object(inputs,'Figure','figure/reset-ui');inputs.click('reset_edits')
+                assert fig.get_settings()['series'][0]['render_type']['Line']['line']['line_width']==initial
+                assert not fig.edit_history['can_reset']
+                inputs.click('undo');assert fig.get_settings()['series'][0]['render_type']['Line']['line']['line_width']==8
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu",id="reset-ui")\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/'reset-ui',source) as (page,execute):
+        initial=page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Line']['line']['line_width']
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('signal')
+        field=page.locator('[data-property=line_width]');field.fill('8');field.press('Tab');page.evaluate(ROOT+'.flush()')
+        ObjectNavigator(page).choose('figure',node='figure/reset-ui');page.locator('[data-reset-edits]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Line']['line']['line_width']==initial
+        assert not json.loads(execute('print(json.dumps(fig.edit_history))'))['can_reset']
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Line']['line']['line_width']==8
+        assert not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_all_colormap_controls_change_data_and_bar_pixels_and_undo(tmp_path,backend):
+    import hashlib
+    from PIL import Image
+    setup="ax=fig.axes[0];ax.scatter([0,1,2],[1,2,1],c=[0,.5,1],s=400,id='signal');ax.set_xlim(-.5,2.5);ax.set_ylim(0,3)"
+    maps=['Viridis','Magma','Turbo','RdBu','GrayScale']
+    def region(pixels,rect,inset=0):
+        x,y,w,h=rect
+        return np.asarray(pixels)[round(y+h*inset):round(y+h*(1-inset)),round(x+w*inset):round(x+w*(1-inset)),:3]
+    def hashes(pixels,boxes):
+        return tuple(hashlib.sha256(region(pixels,rect,.1 if i==0 else 0).tobytes()).hexdigest() for i,rect in enumerate(boxes))
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);inputs.click('properties');uploads=fig.info['column_uploads'];seen=[]
+                for index,cmap in enumerate(maps):
+                    if index%2:choose_native_object(inputs,'signal','series/signal')
+                    else:inputs.click_rect(inputs.info()['decorations']['colorbar'])
+                    if 'colormap' not in inputs.info()['controls']:inputs.click('section:Color scale')
+                    inputs.click('colormap');inputs.click('colormap_'+cmap)
+                    boxes=[json.loads(fig._native.bounds_json(name))['rect'] for name in ('data_area','colorbar')]
+                    pixels=fig.render_rgba();seen.append(hashes(pixels,boxes))
+                    assert fig.get_settings()['config']['colorbar']['colormap']==cmap
+                assert all(len({v[i] for v in seen})==5 for i in (0,1))
+                gray=region(pixels,boxes[0],.1).astype(int);assert np.max(gray.max(axis=2)-gray.min(axis=2))<=2
+                inputs.click('undo');assert hashes(fig.render_rgba(),boxes)==seen[-2]
+                assert fig.info['column_uploads']==uploads and not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/'colormap-pixels',source) as (page,execute):
+        page.locator('[data-properties]').click();seen=[];uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        for index,cmap in enumerate(maps):
+            ObjectNavigator(page).choose('signal' if index%2 else 'colorbar')
+            section=page.locator('[data-property-section="Color scale"]')
+            if not section.evaluate('element=>element.open'):section.locator('summary').click()
+            page.locator('[data-property=colormap]').select_option(cmap);page.evaluate(ROOT+'.flush()')
+            path=tmp_path/(cmap+'.png');execute(f'await fig.savefig_async({str(path)!r})');pixels=np.array(Image.open(path).convert('RGB'))
+            decorations=page.evaluate(ROOT+'.decorations()');w,h=page.locator('canvas').evaluate('c=>[c.width,c.height]')
+            boxes=[[r[0]*960/w,r[1]*600/h,r[2]*960/w,r[3]*600/h] for r in [decorations[name]['rect'] for name in ('data_area','colorbar')]]
+            seen.append(hashes(pixels,boxes))
+            assert page.evaluate(ROOT+'.snapshot()')['config']['colorbar']['colormap']==cmap
+        assert all(len({v[i] for v in seen})==5 for i in (0,1))
+        gray=region(pixels,boxes[0],.1).astype(int);assert np.max(gray.max(axis=2)-gray.min(axis=2))<=2
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        path=tmp_path/'undo.png';execute(f'await fig.savefig_async({str(path)!r})')
+        assert hashes(np.array(Image.open(path).convert('RGB')),boxes)==seen[-2]
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads and not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_palette_entry_buttons_and_numeric_fields_use_real_controls(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.scatter([0,1,2],[1,3,2],id='signal',label='Signal');ax.set_xlim(-.5,2.5);ax.set_ylim(0,4)"
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'signal','series/signal')
+                inputs.click('section:Marker palette');inputs.click('property:Marker palette/add')
+                inputs.click('property:Marker palette/source');inputs.click('point_style_index_column_signal/x')
+                inputs.click('property:Marker palette/entry/1/override/point_size')
+                pixels_before=fig.render_rgba().astype(int)
+                field='property:Marker palette/entry/1/point_size';inputs.click(field);inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','9');inputs.key('Return')
+                assert fig.get_settings()['series'][0]['render_type']['Scatter']['scatter']['point_style_table'][0]['point_size']==9
+                pixels_after=fig.render_rgba().astype(int)
+                blue=lambda p:np.count_nonzero((p[:,:,2]>p[:,:,0]+20)&(p[:,:,2]>p[:,:,1]+20))
+                assert blue(pixels_after)>blue(pixels_before)
+                from PIL import ImageGrab
+                geometry=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines() if '=' in line)
+                x,y,w,h=(int(geometry[key]) for key in ('X','Y','WIDTH','HEIGHT'))
+                ImageGrab.grab(xdisplay=os.environ['DISPLAY']).crop((x,y,x+w,y+h)).save(tmp_path/'native-marker-palette.png')
+                inputs.click('undo');inputs.click('undo');inputs.click('undo');inputs.click('undo')
+                assert fig.get_settings()['series'][0]['render_type']['Scatter']['scatter'].get('point_style_table') is None
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/'palette-controls',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('signal')
+        page.locator('[data-property-section="Marker palette"] summary').click()
+        page.locator('[data-catalog-field="Marker palette/add"]').click();page.evaluate(ROOT+'.flush()')
+        page.locator('[data-catalog-field="Marker palette/source"]').select_option('signal/x');page.evaluate(ROOT+'.flush()')
+        page.locator('[data-catalog-field="Marker palette/entry/1/override/point_size"]').check();page.evaluate(ROOT+'.flush()')
+        before_path=tmp_path/'palette-before.png';execute(f'await fig.savefig_async({str(before_path)!r})')
+        # A comm refresh preserves the expanded group and selected object.
+        field=page.locator('[data-catalog-field="Marker palette/entry/1/point_size"]')
+        field.fill('9');field.press('Tab');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Scatter']['scatter']['point_style_table'][0]['point_size']==9
+        from PIL import Image
+        after_path=tmp_path/'palette-after.png';execute(f'await fig.savefig_async({str(after_path)!r})')
+        blue=lambda p:np.count_nonzero((p[:,:,2]>p[:,:,0]+20)&(p[:,:,2]>p[:,:,1]+20))
+        assert blue(np.array(Image.open(after_path).convert('RGB')).astype(int))>blue(np.array(Image.open(before_path).convert('RGB')).astype(int))
+        screenshot_editor(page,tmp_path/'browser-marker-palette.png')
+        for _ in range(4):page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Scatter']['scatter'].get('point_style_table') is None
+        assert not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_timestamp_offset_accepts_negative_integer_entry_in_both_inspectors(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.plot([0,1,2],[1,3,2],id='signal');fig.configure(config={'bottom_x':{'label_style':{'format':{'Timestamp':{'timezone':{'FixedOffsetMinutes':0},'label':{'Pattern':'%H:%M'}}}}}})"
+    prop='Layout and appearance/format/Timestamp/timezone/FixedOffsetMinutes'
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'tick labels','panel/main/tick_labels_bottom')
+                inputs.click('section:Layout and appearance');inputs.click('property:'+prop);inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','--','-420');inputs.key('Return')
+                assert fig.get_settings()['config']['bottom_x']['label_style']['format']['Timestamp']['timezone']=={'FixedOffsetMinutes':-420}
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/'timestamp-offset',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('tick_labels_bottom')
+        page.locator('[data-property-section="Layout and appearance"] summary').click()
+        field=page.locator('[data-catalog-field="'+prop+'"]');field.fill('-420');field.press('Tab');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot()')['config']['bottom_x']['label_style']['format']['Timestamp']['timezone']=={'FixedOffsetMinutes':-420}
+        assert not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter inputs')
+def test_browser_property_ack_advances_its_base_but_rejects_external_conflicts(tmp_path):
+    source="import json\nimport figgyplot as fg\nfig=fg.Figure(backend='webgpu')\nfig.axes[0].plot([0,1,2],[1,3,2],id='signal')\ndisplay(fig.widget())"
+    with notebook(tmp_path/'property-conflict',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('signal')
+        field=page.locator('[data-property=line_width]')
+        for value in ('4','8'):
+            field.fill(value);field.press('Tab');page.evaluate(ROOT+'.flush()')
+            assert page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Line']['line']['line_width']==int(value)
+        field.fill('6')
+        execute("fig.configure(series={'signal':{'render_type':{'Line':{'line':{'line_width':12}}}}}); await fig.sync()")
+        assert field.input_value()=='6'
+        before=page.evaluate(ROOT+'.snapshot()')
+        field.press('Tab');page.evaluate(ROOT+'.flush()')
+        assert 'stale edit' in page.locator('.figgy-error').inner_text()
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        assert json.loads(execute('print(json.dumps(fig.get_settings()))'))==before
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot()')['series'][0]['render_type']['Line']['line']['line_width']==8
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_colorbar_title_has_a_direct_text_control_in_both_hosts(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.imshow([[0,1],[2,3]],id='field');fig.configure(config={'colorbar':{'axis':{'title_option':{'visible':True}}}})"
+    prop='Title/text/plain_text'
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'colorbar_title','panel/main/colorbar_title')
+                inputs.click('property:'+prop);inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','Temperature (K)');inputs.key('Tab')
+                rich=fig.get_settings()['config']['colorbar']['axis']['title_option']['text']
+                assert ''.join(v['text'] for v in rich['segments'])=='Temperature (K)'
+                assert json.loads(fig._native.bounds_json('colorbar_title'))['rect'][3]>0
+                history_before=fig.edit_history
+                inputs.click('undo');assert not fig.get_settings()['config']['colorbar']['axis']['title_option']['text']['segments'], (inputs.info()['error'],history_before,fig.edit_history,fig.edit_operations()[-3:])
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/'colorbar-title',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('colorbar_title')
+        field=page.locator('[data-catalog-field="'+prop+'"]');field.fill('Temperature (K)');field.press('Tab');page.evaluate(ROOT+'.flush()')
+        assert ''.join(v['text'] for v in page.evaluate(ROOT+'.snapshot()')['config']['colorbar']['axis']['title_option']['text']['segments'])=='Temperature (K)'
+        assert page.evaluate(ROOT+'.decorations()')['colorbar_title']['rect'][3]>0
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert not page.evaluate(ROOT+'.snapshot()')['config']['colorbar']['axis']['title_option']['text']['segments']
+        assert not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_radial_detail_tree_selection_edits_only_the_chosen_child(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.pie([3,2,1]);child=copy.deepcopy(fig.get_settings()['radial']['slices'][0]);child.update(value=1,label='Detail A');other=copy.deepcopy(child);other.update(value=2,label='Detail B');fig.configure_radial(split={'slice_index':0,'children':[child,other],'kind':'Pie'})"
+    if backend=='native':
+        import copy
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig,'copy':copy});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'Detail B','bounded/series/slice_1_1')
+                inputs.click('section:Series style');inputs.click('property:Series style/custom')
+                inputs.click('property:Series style/style/gap_degrees');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','5');inputs.key('Return')
+                chart=fig.get_settings()['radial'];assert chart['split']['children'][1]['style']['gap_degrees']==5
+                assert chart['split']['children'][0]['style'] is None and all(v['style'] is None for v in chart['slices'])
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source='import copy,json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
+    with notebook(tmp_path/'radial-detail',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('slice_1_1',node='bounded/series/slice_1_1')
+        page.locator('[data-property-section="Series style"] summary').click()
+        page.locator('[data-catalog-field="Series style/custom"]').check();page.evaluate(ROOT+'.flush()')
+        field=page.locator('[data-catalog-field="Series style/style/gap_degrees"]');field.fill('5');field.press('Tab');page.evaluate(ROOT+'.flush()')
+        chart=page.evaluate(ROOT+'.snapshot()')['radial'];assert chart['split']['children'][1]['style']['gap_degrees']==5
+        assert chart['split']['children'][0]['style'] is None and all(v['style'] is None for v in chart['slices'])
+        assert not page.locator('.figgy-error').inner_text()
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native inputs')
+def test_closing_native_window_finishes_accepted_text_edit():
+    with figgy.Figure(backend='native') as fig:
+        fig.axes[0].imshow([[0,1],[2,3]],id='field')
+        fig.configure(config={'colorbar':{'axis':{'title_option':{'visible':True}}}})
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'colorbar_title','panel/main/colorbar_title')
+            inputs.click('property:Title/text/plain_text');inputs.xdo('type','--clearmodifiers','Temperature');inputs.key('Tab')
+            assert fig.edit_history['pending_edit']
+        finally:
+            handle.close();Inputs.pump()
+        assert not fig.edit_history['gesture_active']
+        fig.undo()
+        assert not fig.get_settings()['config']['colorbar']['axis']['title_option']['text']['segments']

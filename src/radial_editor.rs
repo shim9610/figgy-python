@@ -273,7 +273,11 @@ impl Editor {
             selected["series_id"]
                 .as_str()
                 .map(str::to_owned)
-                .or_else(|| selected["index"].as_u64().map(|i| format!("slice_0_{i}")))
+                .or_else(|| {
+                    selected["index"]
+                        .as_u64()
+                        .map(|i| format!("slice_{}_{i}", selected["group"].as_u64().unwrap_or(0)))
+                })
         };
         let nodes = navigation::nodes(&c.snapshot());
         if let Some(node) = self.navigator.show(
@@ -307,12 +311,15 @@ impl Editor {
                     let family = chart.family();
                     let mut state = serde_json::to_value(c.snapshot()).unwrap();
                     if family == "radial" {
-                        if let Some(index) = target
-                            .strip_prefix("slice_0_")
-                            .and_then(|s| s.parse::<usize>().ok())
+                        if let Some((group, index)) = target
+                            .strip_prefix("slice_")
+                            .and_then(|s| s.split_once('_'))
+                            .and_then(|(group, index)| {
+                                Some((group.parse::<usize>().ok()?, index.parse::<usize>().ok()?))
+                            })
                         {
                             state[family]["interaction"]["selected"] =
-                                json!({"group":0,"index":index});
+                                json!({"group":group,"index":index});
                         }
                     } else {
                         state[family]["selected"] = json!({"series_id":target,"category_id":state[family]["categories"][0]["id"]});
@@ -429,9 +436,7 @@ impl Editor {
                     changed = true;
                 }
             } else {
-                ui.label(
-                    "Summary statistics: edit through Advanced settings or the Python artist.",
-                );
+                ui.label("Open Summary statistics below to edit the accepted values.");
             }
         }
         if changed {
@@ -532,6 +537,11 @@ impl Editor {
                     selected["series_id"]
                         .as_str()
                         .map(str::to_owned)
+                        .or_else(|| {
+                            selected["index"].as_u64().map(|i| {
+                                format!("slice_{}_{i}", selected["group"].as_u64().unwrap_or(0))
+                            })
+                        })
                         .unwrap_or_else(|| "data_area".into())
                 })
         };

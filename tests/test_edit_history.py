@@ -96,3 +96,45 @@ def test_shared_panel_history_and_independent_figures(backend):
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
         assert other.get_settings()==other_before and not other.edit_history['can_undo']
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_reset_uses_the_marked_presentation_and_is_itself_undoable(backend):
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot([0,1],[1,3],id='signal')
+        fig.axes[0].set_title('Authored title')
+        fig.mark_edit_baseline();before=fig.get_settings();count=fig.edit_history['undo_count']
+        assert not fig.edit_history['can_reset']
+        fig.configure(series={'signal':{'render_type':{'Line':{'line':{'line_width':9}}}}})
+        fig.update('chart_title',text='Review edit');edited=fig.get_settings()
+        fig.reset_edits(expected_revision=fig.revision)
+        assert fig.get_settings()==before and not fig.edit_history['can_reset']
+        assert fig.edit_history['undo_count']==count+3
+        assert fig.edit_operations()[-1]['label']=='Reset edits'
+        fig.undo();assert fig.get_settings()==edited
+        fig.redo();assert fig.get_settings()==before
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_gui_commit_boundary_retires_ids_but_explicit_history_can_restore_them(backend):
+    import json
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot([0,1],[1,2]);fig.axes[0].text(.3,.4,'Probe',coords='ratio',id='probe')
+        fig.mark_edit_baseline();before=fig.get_settings()
+        removed=copy.deepcopy(before);removed['config']['annotations']['items']=[]
+        fig._native.apply_settings(json.dumps(removed))  # GUI uses this validated boundary too.
+        after=fig.get_settings();assert 'annotation/probe' in after['identity']['retired']
+        with pytest.raises(ValueError,match='retired'):fig._native.apply_settings(json.dumps(before))
+        assert fig.get_settings()==after
+        fig.undo();assert fig.get_settings()==before
+        fig.redo();assert fig.get_settings()==after
+        fig.reset_edits();assert fig.get_settings()==before
+        fig.undo();assert fig.get_settings()==after
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_reset_availability_remains_correct_when_undo_crosses_a_new_baseline(backend):
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot([0,1],[1,2]);fig.update('chart_title',text='Presentation')
+        fig.mark_edit_baseline();baseline=fig.get_settings();assert not fig.edit_history['can_reset']
+        fig.undo();assert fig.edit_history['can_reset']
+        fig.reset_edits();assert fig.get_settings()==baseline and not fig.edit_history['can_reset']

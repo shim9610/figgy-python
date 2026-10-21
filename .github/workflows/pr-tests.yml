@@ -86,6 +86,7 @@ jobs:
           uv pip install --python .venv/bin/python --only-binary=:all: 'PyYAML>=6,<7' 'playwright>=1.50,<2' 'jupyterlab>=4,<5' 'nbformat>=5,<6' 'ipykernel>=6'
           .venv/bin/python scripts/check_installed.py
           .venv/bin/python scripts/check_x11_runtime.py
+          .venv/bin/python scripts/editor_control_inventory.py --check
       - name: Install Chromium and select software GPU drivers
         run: |
           .venv/bin/python -m playwright install --with-deps chromium

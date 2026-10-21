@@ -13,6 +13,7 @@ def show(figure, *, block=True):
     figure._require_open()
     if figure.backend != "native":
         raise RuntimeError("Desktop show requires backend='native'; browser data belongs to its WebGPU device")
+    figure._ensure_edit_baseline()
     handle = figure._native.show(False)
     figure._windows.append(handle)
     if block:

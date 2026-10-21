@@ -1200,6 +1200,9 @@ impl FigureAccess<'_> {
         let before = serde_json::to_value(self.snapshot()).map_err(runtime)?;
         let base_revision = self.data.revision;
         let mut next: Settings = parse(json)?;
+        if !self.data.history.restoring_identities() {
+            identity::track_identities(&before, &mut next)?;
+        }
         next.config
             .sync_subplot_links(Some(self.data.chart.config()));
         if !supported_settings_version(next.schema_version, &next.renderer_version) {
@@ -1687,6 +1690,7 @@ impl FigureAccess<'_> {
     }
 }
 
+mod annotation_edit;
 mod axis_edit;
 mod bounded;
 mod desktop;
@@ -1787,6 +1791,15 @@ impl NativeFigure {
     }
     fn redo(&self) -> PyResult<()> {
         self.with(|core| core.replay_edit(true))
+    }
+    fn reset_edits(&self) -> PyResult<()> {
+        self.with(|core| core.reset_edits())
+    }
+    fn mark_edit_baseline(&self) -> PyResult<()> {
+        self.with(|core| {
+            let state = serde_json::to_value(core.snapshot()).map_err(runtime)?;
+            core.data.history.mark_baseline(state)
+        })
     }
     fn begin_edit(&self, label: &str) -> PyResult<()> {
         self.with(|core| {

@@ -68,7 +68,7 @@ class EditorSession:
                     fig.apply_settings(message["settings"], expected_revision=message["revision"])
                 elif action == "fit":
                     fig.fit()
-                elif action in ('undo', 'redo'):
+                elif action in ('undo', 'redo', 'reset_edits'):
                     getattr(fig, action)(expected_revision=message['revision'])
                 else:
                     raise ValueError(f"unknown editor action: {action}")

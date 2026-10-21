@@ -47,6 +47,7 @@ def test_numeric_format_and_precision_editing_in_both_hosts(tmp_path):
                 assert inputs.info()['selected']==target
                 before=fig.get_settings()
                 width_before=json.loads(fig._native.bounds_json(target))['rect'][2]
+                assert 'significant_digits' in inputs.info()['controls'], (target, sorted(inputs.info()['controls']), inputs.info()['error'])
                 click_control('significant_digits');inputs.key('ctrl+a')
                 inputs.xdo('type','--clearmodifiers','2');inputs.key('Return')
                 assert style(fig.get_settings(),key)['significant_digits']==2, (target, inputs.info()['controls'].get('significant_digits'), inputs.info()['error'])

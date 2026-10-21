@@ -204,6 +204,7 @@ class Figure:
         self._default_config = copy.deepcopy(self.get_settings()["config"])
         self._widgets = weakref.WeakSet()
         self._windows = []
+        self._edit_baseline_marked = False
         self._selection = None
         self._next_series = 0
         self._axes_handles = {}
@@ -351,11 +352,15 @@ class Figure:
             self._require_open()
             return json.loads(self._native.edit_operations_json())
 
-    def editor_properties(self):
+    def editor_properties(self, object_id=None):
         """Contextual controls addressed by stable object and property IDs."""
         from ._native import editor_catalog_json
         with self._lock:
-            return json.loads(editor_catalog_json(json.dumps(self.get_settings(),allow_nan=False)))
+            return json.loads(editor_catalog_json(json.dumps(self.get_settings(),allow_nan=False),object_id))
+
+    def _editor_catalog_transport(self):
+        from ._native import editor_catalog_json
+        return json.loads(editor_catalog_json(json.dumps(self.get_settings(),allow_nan=False),compact=True))
 
     def edit_property(self, object_id, property_id, value, *, expected_revision=None):
         """Apply one shared editor command atomically through document validation."""
@@ -365,24 +370,41 @@ class Figure:
                 raise ValueError('stale edit: the Figure changed; refresh and retry')
             extents=json.loads(self._native.column_extents_json())
             if property_id=='Color scale/axis/scale' and value=='Logarithmic':
-                owner=next((v for v in self.editor_properties() if v['id']==object_id),None)
-                if owner is not None:extents['_positive']=self._native.log_bounds_at('z',json.dumps(owner['layer']))
+                owner=self.editor_properties(object_id)
+                extents['_positive']=self._native.log_bounds_at('z',json.dumps(owner['layer']))
             state=json.loads(editor_property_json(json.dumps(self.get_settings(),allow_nan=False),
                 object_id,property_id,json.dumps(value,allow_nan=False),json.dumps(extents,allow_nan=False)))
             return self.apply_settings(state,expected_revision=expected_revision)
 
     def undo(self, *, expected_revision=None):
-        return self._replay_edit(False, expected_revision)
+        return self._history_action('undo', expected_revision)
 
     def redo(self, *, expected_revision=None):
-        return self._replay_edit(True, expected_revision)
+        return self._history_action('redo', expected_revision)
 
-    def _replay_edit(self, redo, expected_revision):
+    def reset_edits(self, *, expected_revision=None):
+        """Restore the first presented document (or marked baseline); undoable."""
+        return self._history_action('reset_edits', expected_revision)
+
+    def mark_edit_baseline(self):
+        """Use the current document as Reset's target, retaining Undo/Redo."""
+        with self._lock:
+            self._require_open()
+            self._native.mark_edit_baseline()
+            self._edit_baseline_marked = True
+        self._changed()
+        return self
+
+    def _ensure_edit_baseline(self):
+        if not self._edit_baseline_marked:
+            self.mark_edit_baseline()
+
+    def _history_action(self, action, expected_revision):
         with self._lock:
             self._require_open()
             if expected_revision is not None and expected_revision != self.revision:
                 raise ValueError('stale edit: the Figure changed; refresh and retry')
-            getattr(self._native, 'redo' if redo else 'undo')()
+            getattr(self._native, action)()
             self._selection = None
             accepted = self.get_settings()
             self.axes = [self._axes_for(p['id'], overlay) for p in accepted['identity']['panels']
@@ -957,7 +979,7 @@ class Figure:
             path.write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
-        if _family(self.get_settings()) is not None:
+        if self.backend=='native' and _family(self.get_settings()) is not None:
             return {"image/png": self.to_png()}
         # Keep a live widget referenced; Jupyter displays the model once per output.
         return self.widget()._repr_mimebundle_(**kwargs)

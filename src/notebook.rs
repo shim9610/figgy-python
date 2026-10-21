@@ -205,6 +205,9 @@ impl NotebookFigure {
         let before: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
         let base_revision = self.revision;
         let mut s: Settings = parse(json)?;
+        if !self.history.restoring_identities() {
+            identity::track_identities(&before, &mut s)?;
+        }
         s.config.sync_subplot_links(Some(self.chart.config()));
         if !supported_settings_version(s.schema_version, &s.renderer_version) {
             return Err(invalid("unsupported settings/renderer version"));
@@ -297,6 +300,20 @@ impl NotebookFigure {
     }
     fn redo(&mut self) -> PyResult<()> {
         self.replay_edit(true)
+    }
+    fn reset_edits(&mut self) -> PyResult<()> {
+        let current = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        let target = self.history.reset_target(&current)?;
+        self.begin_edit("Reset edits")?;
+        self.history.set_restoring(true);
+        let result = self.apply_settings(&target.to_string());
+        self.history.set_restoring(false);
+        self.end_edit()?;
+        result
+    }
+    fn mark_edit_baseline(&mut self) -> PyResult<()> {
+        let state = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        self.history.mark_baseline(state)
     }
     fn cache_fit_extent(
         &mut self,

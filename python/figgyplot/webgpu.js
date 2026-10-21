@@ -53,19 +53,21 @@ export function render({model,el}) {
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
   let editHistory=model.get('state').edit_history??{},historyBusy=false;
-  let propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
-  function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}}
+  let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
+  function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
   function replayEdit(action,args={}){
     const operation=controlQueue.then(async()=>{
       await queue;await flush();if(disposed)throw Error('Widget disposed');
+      const base_value=typeof args.base_value==='function'?args.base_value():args.base_value;
       if(action==='property'){
         const field=propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id);
-        if(!field||JSON.stringify(field.value)!==JSON.stringify(args.base_value))throw Error('stale edit: the property changed; refresh and retry');
+        if(!field||JSON.stringify(field.value)!==JSON.stringify(base_value))throw Error('stale edit: the property changed; refresh and retry');
       }
       historyBusy=true;historyControls();
-      await new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args});});
+      const response=await new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args,...(action==='property'?{base_value}:{})});});
+      return {ok:!!response&&!response.error,value:propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id)?.value};
     });
-    controlQueue=operation.catch(e=>{historyBusy=false;historyControls();fail(e);});return controlQueue;
+    controlQueue=operation.catch(e=>{historyBusy=false;historyControls();fail(e);return {ok:false};});return controlQueue;
   }
   for(const action of ['undo','redo'])root.querySelector(`[data-${action}]`).addEventListener('click',()=>replayEdit(action));
   root.addEventListener('keydown',e=>{
@@ -279,12 +281,15 @@ export function render({model,el}) {
     if(e.key==='Escape'||e.key==='Enter'&&!e.shiftKey){e.preventDefault();finishInline(e.key==='Enter');canvas.focus({preventScroll:true});}
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
-  async function annotationGeometry(){
-    // Bounded charts prepare their logical annotation map synchronously when
-    // adopting a document. Editing it does not depend on a material GPU fence.
-    if(kind)return JSON.parse(chart.annotations());
+  async function geometryFrame(){
+    // set_document prepares bounded geometry at scale 1; frame() prepares it
+    // at the actual surface scale. Read/pick the displayed font metrics.
     await waitForFrame();
+    resizeSurface();
     if(dirty){await readyDisplayedFrame();dirty=false;}
+  }
+  async function annotationGeometry(){
+    await geometryFrame();
     return JSON.parse(chart.annotations());
   }
   async function textAnnotationAt(point){
@@ -554,19 +559,24 @@ export function render({model,el}) {
   fields.addEventListener('focusout',()=>setTimeout(()=>{if(formRefreshPending&&!sidebarPointer&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0));
   function properties(refresh=true){
     if(!chart)return;
+    let restoreControl=null;
     try{
     if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
     if(sidebarPointer){formRefreshPending=true;return;}
     syncPanelFocus();drawingUI();navigateTree();selectionProperties();
     const nextTarget=inspectorTarget??selected??elementName('chart_title'),nextContext=JSON.stringify([layerOf(local),nextTarget]);
-    if(nextContext===formContext&&fields.contains(document.activeElement)&&document.activeElement.matches('input,textarea')){formRefreshPending=true;return;}
+    if(nextContext===formContext&&fields.contains(document.activeElement)){
+      const active=document.activeElement;
+      if(active.matches('textarea,input[type=text],input[type=number],input[type=search],input:not([type])')){formRefreshPending=true;return;}
+      if(active.matches('select,input[type=checkbox],input[type=color]'))restoreControl={id:active.dataset.catalogField,property:active.dataset.property};
+    }
     if(nextContext!==formContext)root.querySelector('.figgy-inspector-scroll').scrollTop=0;
     formContext=nextContext;inspectedTarget=nextTarget;fields.replaceChildren();
     if(hasPanels()&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent=focusIndex()===null?'Select a chart on the canvas.':'Click a title, axis, legend or data series in the selected chart.';fields.append(hint);return;}
     if(layerOf(local)==='Annotations'&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent='Choose an annotation in the tree or click it in the chart.';fields.append(hint);return;}
     if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
-    const series=local.series.find(s=>s.series_id===target);
+    if(['series/','bounded/series/'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
     function applyProperty(apply,value){
       const before=snapshot(),state=clone(before);
       apply(state,value);
@@ -585,7 +595,7 @@ export function render({model,el}) {
     }
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
-      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Timestamp:'Timestamp (configured)'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
       input.addEventListener('change',()=>{const next=input.value;enqueue(()=>{try{applyProperty(apply,next);}catch(e){input.value=value;throw e;}});});row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
@@ -596,17 +606,9 @@ export function render({model,el}) {
       });
       const note=document.createElement('p');note.textContent='Log view omits zero and negative values; source data is preserved.';fields.append(note);
     }
-    function colorScale(){
-      if(!cfg.colorbar)return;
-      scaleControl('color_scale',cfg.colorbar.axis,s=>configOf(s).colorbar.axis,'z');
-      choice('colormap',cfg.colorbar.colormap,['Viridis','Magma','Turbo','GrayScale','RdBu'],(s,v)=>configOf(s).colorbar.colormap=v);
-      field('vmin',cfg.colorbar.axis.min,'number',(s,v)=>configOf(s).colorbar.axis.min=v);
-      field('vmax',cfg.colorbar.axis.max,'number',(s,v)=>configOf(s).colorbar.axis.max=v);
-      numberFormat(cfg.colorbar.axis.label_style,s=>configOf(s).colorbar.axis.label_style);
-    }
     function numberFormat(style,find){
       const current=typeof style.format==='string'?style.format:'Timestamp';
-      choice('label_format',current,current==='Timestamp'?['Timestamp','Decimal','Scientific','Power']:['Decimal','Scientific','Power'],(s,v)=>{if(v!=='Timestamp')find(s).format=v;});
+      choice('label_format',current,['Decimal','Scientific','Power','Degrees','Radians','Timestamp'],(s,v)=>{find(s).format=v==='Timestamp'?{Timestamp:{}}:v;});
       if(current==='Timestamp')return;
       const digits=field('significant_digits',style.significant_digits,'number',(s,v)=>{
         if(!Number.isInteger(v)||v<1||v>15)throw Error('Significant digits must be an integer from 1 to 15');
@@ -652,6 +654,12 @@ export function render({model,el}) {
     if(Number.isInteger(annotationIndex)&&annotationIndex>=0){
       const owner=s=>kind?s[kind]:s.config,find=s=>owner(s).annotations.items[annotationIndex],item=find(local),name=Object.keys(item.kind)[0],geometry=item.kind[name],shape=s=>find(s).kind[name];
       toggle('visible',item.visible!==false,(s,v)=>find(s).visible=v);
+      if(name==='Text'){const textKey='text';
+      if(geometry[textKey]){const findText=s=>shape(s)[textKey];
+      field('font',geometry[textKey].font,'text',(s,v)=>findText(s).font=v);
+      field('font_size',geometry[textKey].font_size,'number',(s,v)=>findText(s).font_size=v);color('text_color',geometry[textKey].color,s=>findText(s).color);
+      const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);}
+      }
       for(const key of (name==='ReferenceLine'?['value']:name==='Span'?['from','to']:[]))field(key,geometry[key],'number',(s,v)=>shape(s)[key]=v);
       for(const key of ['anchor','from','to'])if(geometry[key]&&typeof geometry[key]==='object'){
         const unit=Object.keys(geometry[key])[0];if(!geometry[key][unit]||typeof geometry[key][unit]!=='object')continue;
@@ -660,17 +668,19 @@ export function render({model,el}) {
       }
       const textKey=name==='ReferenceLine'?'label':'text';
       if(name==='Arrow'||name==='ReferenceLine')toggle('show_label',!!geometry[textKey],(s,v)=>shape(s)[textKey]=v?{segments:segments('Label'),color:{r:.15,g:.18,b:.23,a:1},font_size:16,font:''}:null);
+      if(name!=='Text'){
       if(geometry[textKey]){const findText=s=>shape(s)[textKey];
       field('font',geometry[textKey].font,'text',(s,v)=>findText(s).font=v);
       field('font_size',geometry[textKey].font_size,'number',(s,v)=>findText(s).font_size=v);color('text_color',geometry[textKey].color,s=>findText(s).color);
       const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);}
+      }
       if(geometry.fill){color('fill',geometry.fill,s=>shape(s).fill);field('opacity',geometry.fill.a,'number',(s,v)=>shape(s).fill.a=v);}
       const style=name==='Arrow'?geometry.style?.line:geometry.style,styleOf=s=>name==='Arrow'?shape(s).style.line:shape(s).style;
       if(style){color('color',style.color,s=>styleOf(s).color);field('line_width',style.width,'number',(s,v)=>styleOf(s).width=v);}
       if(name==='Arrow')for(const key of ['head_length','head_width'])field(key,geometry.style[key],'number',(s,v)=>shape(s).style[key]=v);
       if(style)choice('line_style',style.style,['Solid','Dash','Dot','DashDot','DashDotDot','ShortDash','ShortDot','ShortDashDot','LongDash','LongDashDot','LongDashDotDot'],(s,v)=>styleOf(s).style=v);
       if(name==='Text'){toggle('text_box',!!geometry.box_style,(s,v)=>shape(s).box_style=v?{fill:{r:1,g:1,b:1,a:.9},border_color:{r:.23,g:.23,b:.23,a:1},border_width:1,padding:4}:null);if(geometry.box_style){color('box_fill',geometry.box_style.fill,s=>shape(s).box_style.fill);color('border_color',geometry.box_style.border_color,s=>shape(s).box_style.border_color);for(const key of ['border_width','padding'])field(key,geometry.box_style[key],'number',(s,v)=>shape(s).box_style[key]=v);}}
-      const remove=document.createElement('button');remove.textContent='Delete annotation';remove.dataset.deleteAnnotation='';remove.addEventListener('click',()=>enqueue(()=>{const state=snapshot();owner(state).annotations.items.splice(annotationIndex,1);if(kind)state[kind].decorations.selected=null;selected=null;inspectorTarget=null;install(state);commit();}));fields.prepend(remove);
+      const remove=document.createElement('button');remove.textContent='Delete annotation';remove.dataset.deleteAnnotation='';remove.addEventListener('click',()=>enqueue(()=>{const state=snapshot();owner(state).annotations.items.splice(annotationIndex,1);if(kind)state[kind].decorations.selected=null;selected=null;inspectorTarget=null;install(state);commit();}));fields.append(remove);
       root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);return;
     }
     if(kind){
@@ -736,8 +746,6 @@ export function render({model,el}) {
       });
       richControls(find,inspectedTarget,textInput);}
       choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
-    }else if(series){
-    }else if(target==='colorbar'||target.startsWith('colorbar_')){colorScale();
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
       toggle('auto_ticks',tickAutomatic(local,key),(s,v)=>{tickMode(s,key,v);if(v)retick(configOf(s)[key]);});
       scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key.endsWith('_x')?'x':'y');
@@ -748,36 +756,51 @@ export function render({model,el}) {
       for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;if(name==='major_spacing')tickMode(s,key,false);else if(['min','max'].includes(name)&&tickAutomatic(s,key))retick(configOf(s)[key]);});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
-    }finally{catalogProperties();}
+    }finally{
+      catalogProperties();
+      if(restoreControl){const control=[...fields.querySelectorAll('input,select')].find(v=>restoreControl.id?v.dataset.catalogField===restoreControl.id:v.dataset.property===restoreControl.property);control?.focus({preventScroll:true});}
+    }
   }
+  function inspectedObject(target){
+    const matches=v=>v.target===target&&(target==='figure'||sameLayer(v.layer,layerOf(local)));
+    const picked=local.config.picked_data?.refs?.some(v=>v.series_id===target)||(kind&&local[kind].selected?.series_id===target);
+    return propertyCatalog.find(v=>v.id===inspectorOwner&&matches(v))??(picked?propertyCatalog.find(v=>(v.id.startsWith('series/')||v.id.startsWith('bounded/series/'))&&matches(v)):null)??propertyCatalog.find(matches);
+  }
+  const propertySections=new Map();
   function catalogProperties(){
     if(sidebarPointer||fields.contains(document.activeElement)||fields.querySelector('[data-catalog]'))return;
     const target=inspectorTarget??selected??elementName('chart_title');
-    if(target?.includes('annotation')||(hasPanels()&&focusIndex()===null&&target!=='figure'))return;
-    const matches=v=>v.target===target&&(target==='figure'||sameLayer(v.layer,layerOf(local)));
-    const object=propertyCatalog.find(v=>v.id===inspectorOwner&&matches(v))??propertyCatalog.find(matches);
+    if(hasPanels()&&focusIndex()===null&&target!=='figure')return;
+    const object=inspectedObject(target);
     if(!object)return;
-    const primary=local.series.some(v=>v.series_id===target)||target.split(':').at(-1).startsWith('colorbar'),covered=new Set([...fields.querySelectorAll('[data-property]')].map(v=>v.dataset.property));
+    const primary=object.id.startsWith('series/')||object.id.startsWith('bounded/series/')||object.id.startsWith('figure/')||target.split(':').at(-1).startsWith('colorbar'),covered=new Set([...fields.querySelectorAll('[data-property]')].map(v=>v.dataset.property));
     const container=document.createElement('div');container.dataset.catalog='';
     const groups=new Map();
     for(const field of object.fields){
       const key=field.path.split('/').at(-1);
-      if(!primary&&(covered.has(key)||(key==='scale'&&covered.has('axis_scale'))||(key==='tick'&&covered.has('tick_direction'))))continue;
+      if(!primary&&(covered.has(key)||(key==='scale'&&covered.has('axis_scale'))||(key==='tick'&&covered.has('tick_direction'))||(key==='format'&&covered.has('label_format'))||(key==='segments'&&covered.has('text'))||(key==='style'&&covered.has('annotation_line_style'))))continue;
       if(!groups.has(field.group))groups.set(field.group,[]);groups.get(field.group).push(field);
     }
     let groupIndex=0;
     for(const [group,entries]of groups){
-      const section=document.createElement('details');section.dataset.propertySection=group;section.open=primary&&groupIndex++<2;
+      const section=document.createElement('details');section.dataset.propertySection=group;
+      const sectionKey=JSON.stringify([object.id,group]),defaultOpen=primary&&groupIndex++<2;
+      section.open=propertySections.get(sectionKey)??defaultOpen;
+      section.addEventListener('toggle',()=>propertySections.set(sectionKey,section.open));
       const heading=document.createElement('summary');heading.textContent=group;section.append(heading);
       for(const field of entries){
+        if(field.kind==='action'){
+          const button=document.createElement('button');button.textContent=field.label;button.dataset.catalogField=field.id;
+          button.addEventListener('click',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:true,base_value:field.value}));section.append(button);continue;
+        }
         const row=document.createElement('label');row.append(document.createTextNode(field.label));
         const input=document.createElement(field.kind==='choice'?'select':'input');
         input.dataset.catalogField=field.id;
         const key=field.path.split('/').at(-1);
-        input.dataset.property=({'Color scale/axis/scale':'color_scale','Color scale/axis/min':'vmin','Color scale/axis/max':'vmax'})[field.id]??(primary&&['line_color','point_color'].includes(key)&&!container.querySelector('[data-property=color]')?'color':key);
+        input.dataset.property=({'Color scale/axis/scale':'color_scale','Color scale/axis/min':'vmin','Color scale/axis/max':'vmax'})[field.id]??(key==='segments'?'text':key==='format'?'label_format':primary&&['line_color','point_color'].includes(key)&&!container.querySelector('[data-property=color]')?'color':key);
         let base=clone(field.value);
         input.addEventListener('focus',()=>{base=clone(propertyCatalog.find(v=>v.id===object.id)?.fields.find(v=>v.id===field.id)?.value??field.value);});
-        if(field.kind==='choice')for(const value of field.choices){const option=document.createElement('option');option.value=value;option.textContent=caption(value);input.append(option);}
+        if(field.kind==='choice')for(const value of field.choices_ref==='columns'?[...field.choices,...propertyColumns]:field.choices){const option=document.createElement('option');option.value=value;option.textContent=field.group==='Shared axes'&&value===''?'Independent':field.id.endsWith('/source')||field.id.startsWith('Figure grid/slot/')?value:caption(value);input.append(option);}
         if(field.kind==='boolean'){input.type='checkbox';input.checked=field.value;}
         else if(field.kind==='color'){input.type='color';input.value='#'+['r','g','b'].map(k=>Math.round(field.value[k]*255).toString(16).padStart(2,'0')).join('');}
         else{if(input.tagName==='INPUT')input.type=field.kind==='number'?'number':'text';input.value=field.kind==='numbers'?field.value.join(', '):field.value;if(field.kind==='number')input.step=field.integer?'1':'any';}
@@ -785,16 +808,19 @@ export function render({model,el}) {
           let value=field.kind==='boolean'?input.checked:field.kind==='number'?Number(input.value):field.kind==='numbers'?input.value.split(/[,;\s]+/).filter(Boolean).map(Number):input.value;
           if(field.kind==='color')value={...base,...Object.fromEntries(['r','g','b'].map((k,i)=>[k,parseInt(input.value.slice(1+i*2,3+i*2),16)/255]))};
           if((typeof value==='number'&&!Number.isFinite(value))||(Array.isArray(value)&&value.some(v=>!Number.isFinite(v))))throw Error('Enter finite numbers');
-          replayEdit('property',{object_id:object.id,property_id:field.id,value,base_value:base});
+          replayEdit('property',{object_id:object.id,property_id:field.id,value,base_value:()=>base}).then(result=>{if(result?.ok&&result.value!==undefined)base=clone(result.value);});
         }catch(e){fail(e);}}
+        if(field.kind==='choice'){input.title=input.value;input.addEventListener('change',()=>input.title=input.value);}
         input.addEventListener('change',submit);row.append(input);section.append(row);
         if(field.kind==='color'){
           const opacityRow=document.createElement('label');opacityRow.textContent=field.label+' opacity';const alpha=document.createElement('input');alpha.type='number';alpha.min=0;alpha.max=1;alpha.step=.05;alpha.value=field.value.a;alpha.dataset.catalogAlpha=field.id;
-          alpha.addEventListener('change',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:{...field.value,a:Number(alpha.value)},base_value:field.value}));opacityRow.append(alpha);section.append(opacityRow);
+          let colorBase=clone(field.value);alpha.addEventListener('focus',()=>{colorBase=clone(propertyCatalog.find(v=>v.id===object.id)?.fields.find(v=>v.id===field.id)?.value??field.value);});
+          alpha.addEventListener('change',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:{...colorBase,a:Number(alpha.value)},base_value:()=>colorBase}).then(result=>{if(result?.ok&&result.value!==undefined)colorBase=clone(result.value);}));opacityRow.append(alpha);section.append(opacityRow);
         }
       }
       container.append(section);
     }
+    for(const action of object.actions??[]){const button=document.createElement('button');button.textContent='Reset edits';button.dataset.resetEdits='';button.title='Restore the document at the start of this edit history. Undo restores the current edits.';button.disabled=!editHistory.can_reset;button.addEventListener('click',()=>replayEdit(action));container.append(button);}
     for(const text of object.notices){const note=document.createElement('p');note.className='figgy-property-note';note.textContent=text;container.append(note);}
     fields.append(container);
   }
@@ -847,7 +873,7 @@ export function render({model,el}) {
   }
   async function exporting(scale=1){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-  function onState(){enqueue(()=>{const state=model.get('state');propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
+  function onState(){enqueue(()=>{const state=model.get('state');propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
@@ -860,15 +886,25 @@ export function render({model,el}) {
       outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
       if(message.error){pending=null;install(message.state.settings);fail(message.error);}
       else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
-      propertyCatalog=clone(message.state.property_catalog??propertyCatalog);editHistory=message.state.edit_history??{};historyControls();properties();idle();
+      propertyColumns=clone(message.state.property_columns??propertyColumns);propertyCatalog=clone(message.state.property_catalog??propertyCatalog);editHistory=message.state.edit_history??{};historyControls();properties();idle();
     });
     else if(message.action==='history_result')enqueue(()=>{
+      try{
       historyBusy=false;editHistory=message.state.edit_history??{};revision=message.state.revision;
-      if(message.operation!=='property'){selected=null;inspectorTarget=null;}
-      propertyCatalog=clone(message.state.property_catalog??propertyCatalog);outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);
+      propertyColumns=clone(message.state.property_columns??propertyColumns);propertyCatalog=clone(message.state.property_catalog??propertyCatalog);
+      if(message.operation==='property'){
+        const owner=propertyCatalog.find(v=>v.id===message.object_id);
+        if(owner){selected=owner.target;inspectorOwner=owner.id;}else{selected=null;inspectorOwner=null;}
+      }else{
+        const owner=inspectorOwner&&propertyCatalog.find(v=>v.id===inspectorOwner);
+        if(owner)selected=owner.target;
+        else if(selected&&!propertyCatalog.some(v=>v.target===selected)){selected=null;inspectorOwner=null;}
+      }
+      inspectorTarget=null;
+      outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);
       exportedCode=message.state.code??exportedCode;install(message.state.settings);historyControls();properties();
       if(message.error)fail(message.error);
-      const finish=controlFinish;controlFinish=null;finish?.();
+      }catch(e){message.error=String(e);fail(e);}finally{const finish=controlFinish;controlFinish=null;finish?.(message);}
     });
     else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
       const request={requestId:message.id,action:message.action};trace('request.received',request);
@@ -887,7 +923,7 @@ export function render({model,el}) {
   // Present the chosen inspector immediately without borrowing the renderer.
   // Apply interaction selection in event order so older keys/picks keep their
   // original target and cannot overwrite a newer pending inspector choice.
-  root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
+  root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',async()=>{
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>Object.values(s.render_type)[0].line?.fill))){
@@ -961,6 +997,7 @@ export function render({model,el}) {
       enqueue(()=>{if(g!==drawingGesture)return;g.panel=kind?[0,0,local.config.chart_area.width,local.config.chart_area.height]:panelRect(0);if(!inRect(g.start,g.panel)){cancelDrawing();return;}g.area=drawingArea()??g.area;const [x,y,w,h]=g.area;if(/^[hv]/.test(g.tool)&&(g.start[0]<x||g.start[0]>x+w||g.start[1]<y||g.start[1]>y+h)){cancelDrawing();return;}previewDrawing();});return;
     }
     pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
+    await geometryFrame();
     if(!kind){point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];gesture.size=[canvas.width,canvas.height];}
     const [x,y]=point;
     if(hasPanels()&&(panelAt(point)!==focusIndex()||focusIndex()===null)){
@@ -1089,7 +1126,7 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);historyControls();drawingUI();
-    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{if(kind)return JSON.parse(chart.decorations());await waitForFrame();resizeSurface();if(dirty)await readyDisplayedFrame();return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
+    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();

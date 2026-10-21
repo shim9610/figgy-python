@@ -1,6 +1,9 @@
 //! Shared property descriptions and stable-object commands for both editors.
 //! Descriptions are derived from accepted SSOT; they are not a second model.
 use super::*;
+use renderer::annotation::AnnotationSpace;
+mod links;
+mod optional;
 
 #[derive(Clone, Serialize)]
 pub(crate) struct Field {
@@ -20,6 +23,7 @@ pub(crate) struct Object {
     pub layer: renderer::LayerRef,
     pub fields: Vec<Field>,
     pub notices: Vec<String>,
+    pub actions: Vec<String>,
 }
 fn human(key: &str) -> String {
     let friendly = match key {
@@ -52,6 +56,8 @@ fn control_key(field: &Field) -> &str {
         "Color scale/axis/scale" => "color_scale",
         "Color scale/axis/min" => "vmin",
         "Color scale/axis/max" => "vmax",
+        _ if field.path.ends_with("/format") => "label_format",
+        _ if field.path.ends_with("/segments") => "text",
         _ => field.path.rsplit('/').next().unwrap_or(""),
     }
 }
@@ -138,12 +144,40 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
             "StarFilled",
         ],
         "pivot" => &["Tail", "Middle", "Tip"],
+        "axis" if value == "X" || value == "Y" => &["X", "Y"],
+        "style" if value == "Solid" || value == "Dash" || value == "Dot" || value == "DashDot" => {
+            &[
+                "Solid",
+                "Dash",
+                "Dot",
+                "DashDot",
+                "DashDotDot",
+                "ShortDash",
+                "ShortDot",
+                "ShortDashDot",
+                "LongDash",
+                "LongDashDot",
+                "LongDashDotDot",
+            ]
+        }
         "orientation" | "direction" if value == "Vertical" || value == "Horizontal" => {
             &["Vertical", "Horizontal"]
         }
         "scale" if value == "Area" || value == "Radius" => &["Area", "Radius"],
         "scale" if value == "Linear" || value == "Logarithmic" => &["Linear", "Logarithmic"],
         "colormap" => &["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"],
+        "format" => &[
+            "Decimal",
+            "Scientific",
+            "Power",
+            "Degrees",
+            "Radians",
+            "Timestamp",
+        ],
+        "unit" if path.contains("/Timestamp/") => {
+            &["Seconds", "Milliseconds", "Microseconds", "Nanoseconds"]
+        }
+        "tick_policy" => &["AutoCalendar", "NumericSpacing"],
         "side" => &["Left", "Right", "Top", "Bottom"],
         "tick" => &["None", "Inside", "Outside", "Both"],
         "angle_unit" => &["Radians", "Degrees"],
@@ -154,7 +188,11 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
     values.iter().map(|v| json!(v)).collect()
 }
 fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: &str, label: &str) {
-    let options = choices(path, &value);
+    let options = if value.is_string() {
+        choices(path, &value)
+    } else {
+        vec![]
+    };
     let kind = if !options.is_empty() {
         "choice"
     } else if value.is_boolean() {
@@ -182,6 +220,69 @@ fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: 
     });
 }
 fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: &str) {
+    if path.contains("/colorbar/") && value.get("segments").is_some_and(Value::is_array) {
+        field(
+            out,
+            json!(crate::editor::display_text(&value["segments"])),
+            &format!("{path}/segments"),
+            group,
+            &format!("{relative}/plain_text"),
+            "Text",
+        );
+    }
+    if path.ends_with("/format") {
+        field(
+            out,
+            json!(value.as_str().unwrap_or("Timestamp")),
+            path,
+            group,
+            relative,
+            "Number format",
+        );
+        if let Some(timestamp) = value.get("Timestamp") {
+            walk(
+                out,
+                timestamp,
+                &format!("{path}/Timestamp"),
+                group,
+                &format!("{relative}/Timestamp"),
+            );
+        }
+        return;
+    }
+    if path.contains("/Timestamp/")
+        && ["timezone", "label", "fractional"].contains(&path.rsplit('/').next().unwrap())
+    {
+        let (tag, options) = match path.rsplit('/').next().unwrap() {
+            "timezone" => (
+                "FixedOffsetMinutes",
+                vec![json!("Utc"), json!("FixedOffsetMinutes")],
+            ),
+            "label" => ("Pattern", vec![json!("Auto"), json!("Pattern")]),
+            _ => ("Fixed", vec![json!("Auto"), json!("Fixed")]),
+        };
+        optional::choice(
+            out,
+            &format!("{group}/{relative}/mode"),
+            path,
+            group,
+            &human(path.rsplit('/').next().unwrap()),
+            json!(value.as_str().unwrap_or(tag)),
+            options,
+        );
+        if value.is_object() {
+            for (key, child) in value.as_object().unwrap() {
+                walk(
+                    out,
+                    child,
+                    &format!("{path}/{key}"),
+                    group,
+                    &format!("{relative}/{key}"),
+                );
+            }
+        }
+        return;
+    }
     if value.is_object() && !["r", "g", "b", "a"].iter().all(|k| value[*k].is_number()) {
         for (key, child) in value.as_object().unwrap() {
             if [
@@ -194,7 +295,10 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
                 "columns",
                 "components",
                 "segments",
+                "target",
                 "point_style_index_column",
+                "error_bar_style_index_column",
+                "color_map",
                 "error_bar_style_index_column",
             ]
             .contains(&key.as_str())
@@ -257,8 +361,10 @@ fn columns(state: &Value) -> Vec<Value> {
     fn visit(value: &Value, key: &str, out: &mut std::collections::BTreeSet<String>) {
         match value {
             Value::String(s)
-                if ["x_column", "y_column", "column", "u", "v", "lower", "upper"]
-                    .contains(&key) =>
+                if [
+                    "x_column", "y_column", "column", "Column", "u", "v", "lower", "upper",
+                ]
+                .contains(&key) =>
             {
                 out.insert(s.clone());
             }
@@ -341,13 +447,18 @@ fn colorbar_fields(out: &mut Vec<Field>, state: &Value, panel: &str) {
         "",
     );
 }
-fn build(state: &Value, node: &navigation::Node) -> Object {
+fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
     let mut out = Object {
         id: node.key.clone(),
         target: node.target.clone(),
         layer: node.layer,
         fields: vec![],
         notices: vec![],
+        actions: if node.kind == "figure" {
+            vec!["reset_edits".into()]
+        } else {
+            vec![]
+        },
     };
     let fields = &mut out.fields;
     let target = node.target.as_deref().unwrap_or("figure");
@@ -456,7 +567,7 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                     }
                 }
                 if key == "scatter" {
-                    let sources = columns(state);
+                    optional::style_lists(fields, state, value, &path, false, sources);
                     source_field(
                         fields,
                         value["point_color_map"]
@@ -465,7 +576,7 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                             .unwrap_or(json!("Fixed")),
                         &format!("{path}/point_color_map"),
                         "Color mapping",
-                        &sources,
+                        sources,
                     );
                     source_field(
                         fields,
@@ -475,10 +586,45 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                             .unwrap_or(json!("Fixed")),
                         &format!("{path}/point_size_map"),
                         "Size mapping",
-                        &sources,
+                        sources,
                     );
                 }
                 if kind == "Vector" && key == "style" {
+                    if style["components"].get("Points").is_some() {
+                        source_field(
+                            fields,
+                            value["color_map"]
+                                .get("Column")
+                                .cloned()
+                                .unwrap_or(json!("Fixed")),
+                            &format!("{path}/color_map"),
+                            "Color mapping",
+                            sources,
+                        );
+                    }
+                    if style["components"].get("Grid").is_some() {
+                        let mut options = vec![
+                            json!("Fixed"),
+                            json!("Horizontal component"),
+                            json!("Vertical component"),
+                        ];
+                        if value["color_map"].get("Grid").is_some() {
+                            options.push(json!("Current values"));
+                        }
+                        optional::choice(
+                            fields,
+                            "Color mapping/grid_source",
+                            &format!("{path}/color_map"),
+                            "Color mapping",
+                            "Color grid",
+                            json!(if value["color_map"].is_object() {
+                                "Current values"
+                            } else {
+                                "Fixed"
+                            }),
+                            options,
+                        );
+                    }
                     add_default(
                         fields,
                         state,
@@ -503,6 +649,7 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                     });
                 }
                 if key == "contour" {
+                    optional::contours(fields, state, value, &path);
                     // A label is optional in SSOT. Enabling it creates the
                     // host's initial label style, then exposes its controls.
                     field(
@@ -523,11 +670,14 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                         );
                     }
                 }
+                if key == "err_style" {
+                    optional::style_lists(fields, state, value, &path, true, sources);
+                }
             }
         }
         colorbar_fields(fields, state, &panel);
         out.notices.push(format!(
-            "Data: {} · {}. Source arrays stay resident.",
+            "Data: {} · {}.",
             series["x_column"].as_str().unwrap_or(""),
             series["y_column"].as_str().unwrap_or("")
         ));
@@ -545,6 +695,98 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                     v.iter().filter(|v| v.get("point_color").is_some()).count()
                 });
             out.notices.push(if mapped {format!("Colors use {}. {overrides} explicit point-color overrides take precedence.",style["scatter"]["point_color_map"]["column"].as_str().unwrap_or("values"))} else {"Colors are fixed RGB. Changing an independent colorbar does not recolor this series.".into()});
+            if mapped || style["scatter"].get("point_size_map").is_some() {
+                out.notices.push("Value maps take precedence over palette entries. Point overrides take precedence over value maps.".into());
+            }
+        }
+    } else if let Some((_, id)) = node.key.split_once("/annotation/") {
+        let root = bounded.map_or("/config".into(), |kind| format!("/{kind}"));
+        let items_path = format!("{root}/annotations/items");
+        if let Some((index, item)) = state
+            .pointer(&items_path)
+            .and_then(Value::as_array)
+            .and_then(|v| v.iter().enumerate().find(|(_, v)| v["id"] == id))
+        {
+            let (kind, shape) = item["kind"].as_object().unwrap().iter().next().unwrap();
+            let path = format!("{items_path}/{index}/kind/{kind}");
+            let parsed = serde_json::from_value::<Settings>(state.clone()).unwrap();
+            let can_data = crate::annotation_edit::space(&parsed)
+                .is_ok_and(|s| s.value_axes() == [true, true]);
+            for key in ["anchor", "from", "to"] {
+                if let Some(anchor) = shape.get(key).filter(|v| {
+                    v.is_object()
+                        && v.as_object()
+                            .is_some_and(|v| v.contains_key("Data") || v.contains_key("Ratio"))
+                }) {
+                    let unit = anchor.as_object().unwrap().keys().next().unwrap();
+                    fields.push(Field {
+                        id: format!("Coordinates/{key}"),
+                        path: format!("{path}/{key}"),
+                        group: "Coordinates".into(),
+                        label: format!("{} coordinates", human(key)),
+                        kind: "choice".into(),
+                        value: json!(unit),
+                        choices: if can_data {
+                            vec![json!("Data"), json!("Ratio")]
+                        } else {
+                            vec![json!("Ratio")]
+                        },
+                        integer: false,
+                    });
+                }
+            }
+            if let Some(value) = shape.get("axis") {
+                field(
+                    fields,
+                    value.clone(),
+                    &format!("{path}/axis"),
+                    "Coordinates",
+                    "axis",
+                    "Value axis",
+                );
+            }
+            let stroke = if kind == "Arrow" {
+                format!("{path}/style/line/style")
+            } else {
+                format!("{path}/style/style")
+            };
+            if let Some(value) = state.pointer(&stroke) {
+                field(
+                    fields,
+                    value.clone(),
+                    &stroke,
+                    "Stroke",
+                    "style",
+                    "Line pattern",
+                );
+            }
+            for (relative, label) in [
+                ("box_style/fill/a", "Box fill opacity"),
+                ("box_style/border_color/a", "Box border opacity"),
+                ("style/line/color/a", "Stroke opacity"),
+                ("style/color/a", "Stroke opacity"),
+            ] {
+                let path = format!("{path}/{relative}");
+                if let Some(value) = state.pointer(&path) {
+                    field(fields, value.clone(), &path, "Opacity", relative, label);
+                }
+            }
+            fields.push(Field {
+                id: "Annotation/order".into(),
+                path: items_path,
+                group: "Layer order".into(),
+                label: "Position in annotation layer (first = 1)".into(),
+                kind: "number".into(),
+                value: json!(index + 1),
+                choices: vec![],
+                integer: true,
+            });
+            if kind == "Span" {
+                out.notices.push("Bands remain behind the data; order applies within the renderer's annotation pass.".into());
+            }
+            if !can_data {
+                out.notices.push("This chart uses plot-relative annotation coordinates; separable data anchors are unavailable.".into());
+            }
         }
     } else if let Some(kind) = bounded {
         let root = format!("/{kind}");
@@ -581,19 +823,72 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
             }
         }
         if kind == "radial" {
-            walk(
+            if chart["split"].is_object() {
+                optional::choice(
+                    fields,
+                    "Detail shape/mode",
+                    "/radial/split/kind",
+                    "Detail shape",
+                    "Detail chart shape",
+                    json!(if chart["split"]["kind"] == "Pie" {
+                        "Pie"
+                    } else {
+                        "Donut"
+                    }),
+                    vec![json!("Pie"), json!("Donut")],
+                );
+                if chart["split"]["kind"].is_object() {
+                    walk(
+                        fields,
+                        &chart["split"]["kind"],
+                        "/radial/split/kind",
+                        "Detail shape",
+                        "",
+                    );
+                }
+            }
+            if let Some(index) = target
+                .strip_prefix("slice_1_")
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|i| *i < chart["split"]["children"].as_array().map_or(0, Vec::len))
+            {
+                optional::bounded_series(
+                    fields,
+                    state,
+                    kind,
+                    &chart["split"]["children"][index],
+                    &format!("{root}/split/children/{index}"),
+                );
+            }
+            optional::choice(
                 fields,
-                &chart["kind"],
+                "Pie / donut/mode",
                 &format!("{root}/kind"),
                 "Pie / donut",
-                "",
+                "Chart shape",
+                json!(if chart["kind"] == "Pie" {
+                    "Pie"
+                } else {
+                    "Donut"
+                }),
+                vec![json!("Pie"), json!("Donut")],
             );
+            if chart["kind"].is_object() {
+                walk(
+                    fields,
+                    &chart["kind"],
+                    &format!("{root}/kind"),
+                    "Pie / donut",
+                    "",
+                );
+            }
         }
         if let Some(index) = chart["series"]
             .as_array()
             .and_then(|v| v.iter().position(|s| s["id"] == target))
         {
             let item = &chart["series"][index];
+            optional::bounded_series(fields, state, kind, item, &format!("{root}/series/{index}"));
             for key in ["color", "style"] {
                 if let Some(v) = item.get(key) {
                     walk(
@@ -604,6 +899,21 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                         key,
                     );
                 }
+            }
+        }
+        if kind == "radial" {
+            if let Some(index) = target
+                .strip_prefix("slice_0_")
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|i| *i < chart["slices"].as_array().map_or(0, Vec::len))
+            {
+                optional::bounded_series(
+                    fields,
+                    state,
+                    kind,
+                    &chart["slices"][index],
+                    &format!("{root}/slices/{index}"),
+                );
             }
         }
     } else {
@@ -644,6 +954,19 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
         };
         if short.starts_with("colorbar") {
             colorbar_fields(fields, state, &panel);
+            let path = if short == "colorbar_title" {
+                Some((format!("{panel}/colorbar/axis/title_option"), "Title"))
+            } else if short == "colorbar_tick_labels" {
+                Some((format!("{panel}/colorbar/axis/label_style"), "Tick labels"))
+            } else {
+                None
+            };
+            if let Some((path, group)) = path {
+                fields.retain(|f| !f.path.starts_with(&format!("{path}/")));
+                if let Some(value) = state.pointer(&path) {
+                    walk(fields, value, &path, group, "");
+                }
+            }
         } else if let Some(path) = path {
             if let Some(value) = state.pointer(&path) {
                 walk(
@@ -660,6 +983,7 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
             }
         }
         if short == "data_area" || target == "figure" {
+            links::fields(fields, state, node.layer);
             if let Some(polar) = config.get("polar") {
                 walk(
                     fields,
@@ -667,6 +991,28 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
                     &format!("{panel}/polar"),
                     "Polar coordinates",
                     "",
+                );
+                fields.retain(|v| v.id != "Polar coordinates/interpolation");
+                optional::choice(
+                    fields,
+                    "Polar coordinates/interpolation_mode",
+                    &format!("{panel}/polar/interpolation"),
+                    "Polar coordinates",
+                    "Connect samples with",
+                    json!(if polar["interpolation"] == "Chord" {
+                        "Chord"
+                    } else {
+                        "Arc"
+                    }),
+                    vec![json!("Chord"), json!("Arc")],
+                );
+                field(
+                    fields,
+                    json!(polar.get("sector").is_some_and(|v| !v.is_null())),
+                    &format!("{panel}/polar/sector"),
+                    "Polar coordinates",
+                    "limit_sector",
+                    "Limit angular window",
                 );
             }
             walk(
@@ -708,6 +1054,34 @@ fn build(state: &Value, node: &navigation::Node) -> Object {
             }
         }
     }
+    out.fields.sort_by_key(|field| {
+        let rank = match field.group.as_str() {
+            "Line" | "Vectors" | "Bars" | "Contours" | "Appearance" | "Figure grid" => 0,
+            "Title" | "Tick labels" => 0,
+            "Markers" => 1,
+            "Color mapping" => 2,
+            "Size mapping" => 3,
+            "Color scale" => 4,
+            "Area fill" => 7,
+            "Colorbar layout" => 6,
+            "Colorbar ticks and labels" => 5,
+            _ => 20,
+        };
+        let order = if field.group == "Title" {
+            if field.path.ends_with("/font") || field.path.ends_with("/font_size") {
+                0
+            } else if field.path.ends_with("/segments") {
+                1
+            } else {
+                2
+            }
+        } else if field.id.ends_with("/source") {
+            0
+        } else {
+            1
+        };
+        (rank, order)
+    });
     out
 }
 
@@ -719,7 +1093,6 @@ impl editor::Editor {
         target: &str,
         primary: bool,
     ) {
-        let objects = catalog(&c.snapshot());
         let layer = c
             .data
             .document
@@ -727,19 +1100,12 @@ impl editor::Editor {
             .map_or(c.data.chart.config().active_layer(), |d| {
                 d.chart.active_layer()
             });
-        let matches = |v: &&Object| {
-            v.target.as_deref() == Some(target) && (target == "figure" || v.layer == layer)
-        };
-        let object = objects
-            .iter()
-            .filter(matches)
-            .find(|v| self.inspector_owner.as_ref() == Some(&v.id))
-            .or_else(|| {
-                objects.iter().find(|v| {
-                    v.target.as_deref() == Some(target) && (target == "figure" || v.layer == layer)
-                })
-            });
-        let Some(object) = object else {
+        let Some(object) = selected(
+            &c.snapshot(),
+            target,
+            layer,
+            self.inspector_owner.as_deref(),
+        ) else {
             return;
         };
         let mut groups = Vec::<String>::new();
@@ -763,6 +1129,9 @@ impl editor::Editor {
                     primary
                         || (!covered.contains(key)
                             && !(key == "scale" && covered.contains("axis_scale"))
+                            && !(key == "format" && covered.contains("label_format"))
+                            && !(key == "segments" && covered.contains("text"))
+                            && !(key == "style" && covered.contains("annotation_line_style"))
                             && !(key == "tick" && covered.contains("tick_direction")))
                 })
                 .collect::<Vec<_>>();
@@ -776,7 +1145,13 @@ impl editor::Editor {
                     for field in fields {
                         let mut value = field.value.clone();
                         let mut changed = false;
-                        let response = match field.kind.as_str() {
+                        let response = ui.push_id((&object.id,&field.id),|ui|match field.kind.as_str() {
+                            "action" => {
+                                let r=ui.button(&field.label);
+                                changed=r.clicked();
+                                value=json!(true);
+                                r
+                            }
                             "boolean" => {
                                 let mut v = value.as_bool().unwrap();
                                 let r = ui.checkbox(&mut v, &field.label);
@@ -794,8 +1169,8 @@ impl editor::Editor {
                                         0.1
                                     }));
                                 changed = r.changed();
-                                value = if field.integer && v >= 0. && v.fract() == 0. {
-                                    json!(v as u64)
+                                value = if field.integer && v.is_finite() && v.fract() == 0. && v >= i64::MIN as f64 && v < i64::MAX as f64 {
+                                    json!(v as i64)
                                 } else {
                                     json!(v)
                                 };
@@ -817,13 +1192,13 @@ impl editor::Editor {
                             "choice" => {
                                 ui.label(&field.label);
                                 egui::ComboBox::from_id_salt((&object.id, &field.id))
-                                    .selected_text(value.as_str().unwrap_or(""))
+                                    .selected_text(if field.group=="Shared axes"&&value=="" {"Independent"}else{value.as_str().unwrap_or("")})
                                     .show_ui(ui, |ui| {
                                         for choice in &field.choices {
                                                 let response=ui.selectable_value(
                                                     &mut value,
                                                     choice.clone(),
-                                                    human(choice.as_str().unwrap_or("")),
+                                                    if field.group=="Shared axes"&&choice=="" {"Independent".into()}else if field.id.ends_with("/source")||field.id.starts_with("Figure grid/slot/")||field.group=="Shared axes" {choice.as_str().unwrap_or("").into()}else{human(choice.as_str().unwrap_or(""))},
                                                     );
                                                 changed|=response.changed();
                                                 self.controls.insert(format!("{}_{}",control_key(field),choice.as_str().unwrap_or("")),response.rect);
@@ -874,7 +1249,7 @@ impl editor::Editor {
                                 }
                                 r
                             }
-                        };
+                        }).inner;
                         self.controls
                             .insert(format!("property:{}", field.id), response.rect);
                         self.controls
@@ -897,27 +1272,92 @@ impl editor::Editor {
             self.controls
                 .insert(format!("section:{group}"), response.header_response.rect);
         }
+        for action in &object.actions {
+            if action == "reset_edits" {
+                let response=ui.add_enabled(c.data.history.status()["can_reset"]==true,egui::Button::new("Reset edits")).on_hover_text("Restore the document at the start of this edit history. Undo restores the current edits.");
+                self.controls.insert("reset_edits".into(), response.rect);
+                if response.clicked() {
+                    c.end_edit();
+                    if let Err(e) = c.reset_edits() {
+                        self.error = e.to_string();
+                    }
+                }
+            }
+        }
         for notice in &object.notices {
             ui.small(notice);
         }
     }
 }
-pub(crate) fn catalog(state: &Settings) -> Vec<Object> {
-    fn visit(nodes: &[navigation::Node], state: &Value, out: &mut Vec<Object>) {
+fn find_node<'a>(
+    nodes: &'a [navigation::Node],
+    predicate: &impl Fn(&navigation::Node) -> bool,
+) -> Option<&'a navigation::Node> {
+    nodes.iter().find_map(|node| {
+        if predicate(node) {
+            Some(node)
+        } else {
+            find_node(&node.children, predicate)
+        }
+    })
+}
+fn for_object(state: &Settings, id: &str) -> Option<Object> {
+    let nodes = navigation::nodes(state);
+    let node = find_node(&nodes, &|node| node.key == id)?;
+    let json = serde_json::to_value(state).unwrap();
+    Some(build(&json, node, &columns(&json)))
+}
+pub(super) fn selected(
+    state: &Settings,
+    target: &str,
+    layer: renderer::LayerRef,
+    preferred: Option<&str>,
+) -> Option<Object> {
+    let nodes = navigation::nodes(state);
+    let matches = |node: &navigation::Node| {
+        node.target.as_deref() == Some(target) && (node.layer == layer || node.kind == "figure")
+    };
+    let picked = state
+        .config
+        .picked_data
+        .as_ref()
+        .is_some_and(|p| p.refs.iter().any(|v| v.series_id() == target));
+    let node = preferred
+        .and_then(|key| find_node(&nodes, &|node| node.key == key && matches(node)))
+        .or_else(|| {
+            if picked {
+                find_node(&nodes, &|node| {
+                    node.key.starts_with("series/") && matches(node)
+                })
+            } else {
+                None
+            }
+        })
+        .or_else(|| find_node(&nodes, &matches))?;
+    let json = serde_json::to_value(state).unwrap();
+    Some(build(&json, node, &columns(&json)))
+}
+fn catalog_with_sources(state: &Settings, sources: &[Value]) -> Vec<Object> {
+    fn visit(nodes: &[navigation::Node], state: &Value, sources: &[Value], out: &mut Vec<Object>) {
         for node in nodes {
             if node.target.is_some() || node.kind == "figure" {
-                out.push(build(state, node));
+                out.push(build(state, node, sources));
             }
-            visit(&node.children, state, out);
+            visit(&node.children, state, sources, out);
         }
     }
     let mut out = vec![];
     visit(
         &navigation::nodes(state),
         &serde_json::to_value(state).unwrap(),
+        sources,
         &mut out,
     );
     out
+}
+pub(crate) fn catalog(state: &Settings) -> Vec<Object> {
+    let json = serde_json::to_value(state).unwrap();
+    catalog_with_sources(state, &columns(&json))
 }
 pub(crate) fn apply(
     state: &Settings,
@@ -926,11 +1366,8 @@ pub(crate) fn apply(
     value: Value,
     extents: &Value,
 ) -> PyResult<Value> {
-    let objects = catalog(state);
-    let object = objects
-        .iter()
-        .find(|v| v.id == object)
-        .ok_or_else(|| invalid("unknown or removed chart object"))?;
+    let object =
+        for_object(state, object).ok_or_else(|| invalid("unknown or removed chart object"))?;
     let field = object
         .fields
         .iter()
@@ -940,8 +1377,70 @@ pub(crate) fn apply(
         return Err(invalid("unsupported property choice"));
     }
     let mut result = serde_json::to_value(state).map_err(runtime)?;
+    if field.kind != "action" && value == field.value {
+        return Ok(result);
+    }
+    if field.group == "Shared axes" {
+        links::apply(&mut result, object.layer, &field.id, &value)?;
+        return Ok(result);
+    }
+    if optional::apply(&mut result, field, &value)? {
+        return Ok(result);
+    }
+    if field.id == "Annotation/order" {
+        let index = field.value.as_u64().unwrap() as usize - 1;
+        let to = value
+            .as_u64()
+            .filter(|v| *v > 0)
+            .ok_or_else(|| invalid("annotation position must be a positive integer"))?
+            as usize
+            - 1;
+        crate::annotation_edit::reorder(&mut result, &field.path, index, to)?;
+        return Ok(result);
+    }
     let (parent, key) = field.path.rsplit_once('/').unwrap();
-    let value = if field.id == "Color mapping/source" || field.id == "Size mapping/source" {
+    let value = if field.id.starts_with("Coordinates/") && field.id != "Coordinates/axis" {
+        crate::annotation_edit::convert(
+            state,
+            result
+                .pointer(&field.path)
+                .ok_or_else(|| invalid("annotation anchor changed"))?,
+            &value,
+        )?
+    } else if field.id == "Color mapping/grid_source" {
+        if value == "Fixed" {
+            Value::Null
+        } else {
+            let vector = result.pointer(parent.rsplit_once('/').unwrap().0).unwrap();
+            let matrix = match value.as_str().unwrap() {
+                "Horizontal component" => vector["components"]["Grid"]["u"].clone(),
+                "Vertical component" => vector["components"]["Grid"]["v"].clone(),
+                _ => vector["style"]["color_map"]["Grid"].clone(),
+            };
+            let columns = matrix["columns"]
+                .as_array()
+                .ok_or_else(|| invalid("vector color grid is unavailable"))?;
+            let bounds = columns
+                .iter()
+                .map(|name| {
+                    extents[name.as_str().unwrap()]
+                        .as_array()
+                        .filter(|v| v.len() == 2)
+                        .ok_or_else(|| invalid("grid column has no recorded finite domain"))
+                })
+                .collect::<PyResult<Vec<_>>>()?;
+            let min = bounds
+                .iter()
+                .filter_map(|v| v[0].as_f64())
+                .fold(f64::INFINITY, f64::min);
+            let max = bounds
+                .iter()
+                .filter_map(|v| v[1].as_f64())
+                .fold(f64::NEG_INFINITY, f64::max);
+            ensure_colorbar(&mut result, object.layer, min, max)?;
+            json!({"Grid":matrix})
+        }
+    } else if field.id == "Color mapping/source" || field.id == "Size mapping/source" {
         if value == "Fixed" {
             Value::Null
         } else {
@@ -962,20 +1461,12 @@ pub(crate) fn apply(
                 max = min + (min.abs() * 0.01).max(1.);
             }
             if field.id == "Color mapping/source" {
-                let panel = panel_path(object.layer);
-                let bar_path = format!("{panel}/colorbar");
-                if result.pointer(&bar_path).is_none_or(Value::is_null) {
-                    let mut bar = renderer::default::default_colorbar_options();
-                    bar.axis.min = min;
-                    bar.axis.max = max;
-                    result
-                        .pointer_mut(&panel)
-                        .unwrap()
-                        .as_object_mut()
-                        .unwrap()
-                        .insert("colorbar".into(), serde_json::to_value(bar).unwrap());
+                ensure_colorbar(&mut result, object.layer, min, max)?;
+                if field.path.contains("/Vector/") {
+                    json!({"Column":column})
+                } else {
+                    json!({"column":column})
                 }
-                json!({"column":column})
             } else {
                 json!({"column":column,"domain_min":min,"domain_max":max,"min_px":2.,"max_px":12.,"scale":"Area"})
             }
@@ -1029,6 +1520,16 @@ pub(crate) fn apply(
                 .ok_or_else(|| invalid("fill needs a line with the same x column"))?;
             json!({"ToSeries":peer.series_id})
         }
+    } else if key == "segments" && field.kind == "text" {
+        let text = value
+            .as_str()
+            .ok_or_else(|| invalid("text must be a string"))?;
+        crate::editor::preserve_segment_styles(
+            result.pointer(&field.path).unwrap(),
+            json!(renderer::text::rich_segments_from_text(text)),
+        )
+    } else if key == "format" && value == "Timestamp" {
+        json!({"Timestamp":{}})
     } else {
         value
     };
@@ -1072,6 +1573,35 @@ pub(crate) fn apply(
             json!((axis["max"].as_f64().unwrap() - axis["min"].as_f64().unwrap()) / 5.)
         };
     }
+    // Numeric axis commands carry the same tick intent as the specialised
+    // forms. Resolve the command's owner, not whichever panel happens to have
+    // keyboard focus in another view.
+    if !field.path.contains("/colorbar/")
+        && result
+            .pointer(parent)
+            .is_some_and(|axis| axis.get("major_spacing").is_some() && axis.get("scale").is_some())
+    {
+        let side = parent.rsplit('/').next().unwrap();
+        let side = if side == "y_axis" { "right_y" } else { side };
+        if key == "major_spacing" {
+            let active = result["config"].get("active_layer").cloned();
+            result["config"]["active_layer"] = serde_json::to_value(object.layer).unwrap();
+            crate::tick_policy::set_mode(&mut result, side, false);
+            crate::tick_policy::synchronize_spacing(&mut result, side);
+            if let Some(active) = active {
+                result["config"]["active_layer"] = active;
+            } else {
+                result["config"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("active_layer");
+            }
+        } else if matches!(key, "min" | "max")
+            && crate::tick_policy::automatic(state.identity.as_ref(), object.layer, side)
+        {
+            crate::tick_policy::retick_value(result.pointer_mut(parent).unwrap());
+        }
+    }
     if field.path.starts_with("/identity/layout/placement/")
         || field.path == "/identity/layout/gap"
         || field.path == "/identity/layout/row_weights"
@@ -1085,6 +1615,36 @@ pub(crate) fn apply(
     Ok(result)
 }
 
+fn ensure_colorbar(
+    result: &mut Value,
+    layer: renderer::LayerRef,
+    min: f64,
+    max: f64,
+) -> PyResult<()> {
+    if !min.is_finite() || !max.is_finite() || min > max {
+        return Err(invalid("invalid value domain"));
+    }
+    let panel = panel_path(layer);
+    if result
+        .pointer(&format!("{panel}/colorbar"))
+        .is_none_or(Value::is_null)
+    {
+        let mut bar = renderer::default::default_colorbar_options();
+        bar.axis.min = min;
+        bar.axis.max = if min == max {
+            min + (min.abs() * 0.01).max(1.)
+        } else {
+            max
+        };
+        result
+            .pointer_mut(&panel)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("colorbar".into(), serde_json::to_value(bar).unwrap());
+    }
+    Ok(())
+}
 fn reflow_grid(state: &mut Value) -> PyResult<()> {
     let layout = &state["identity"]["layout"];
     let gap = layout["gap"]
@@ -1180,8 +1740,42 @@ fn reflow_grid(state: &mut Value) -> PyResult<()> {
     Ok(())
 }
 #[pyfunction]
-pub(crate) fn editor_catalog_json(settings: &str) -> PyResult<String> {
-    Ok(serde_json::to_string(&catalog(&parse(settings)?)).map_err(runtime)?)
+#[pyo3(signature=(settings,object_id=None,compact=false))]
+pub(crate) fn editor_catalog_json(
+    settings: &str,
+    object_id: Option<&str>,
+    compact: bool,
+) -> PyResult<String> {
+    let state: Settings = parse(settings)?;
+    if let Some(id) = object_id {
+        return Ok(serde_json::to_string(
+            &for_object(&state, id).ok_or_else(|| invalid("unknown chart object"))?,
+        )
+        .map_err(runtime)?);
+    }
+    if !compact {
+        return Ok(serde_json::to_string(&catalog(&state)).map_err(runtime)?);
+    }
+    let mut objects = serde_json::to_value(catalog_with_sources(&state, &[])).map_err(runtime)?;
+    for object in objects.as_array_mut().unwrap() {
+        for field in object["fields"].as_array_mut().unwrap() {
+            if matches!(
+                field["id"].as_str(),
+                Some(
+                    "Color mapping/source"
+                        | "Size mapping/source"
+                        | "Marker palette/source"
+                        | "Error-bar palette/source"
+                )
+            ) {
+                field["choices_ref"] = json!("columns");
+            }
+        }
+    }
+    Ok(
+        json!({"objects":objects,"columns":columns(&serde_json::to_value(state).unwrap())})
+            .to_string(),
+    )
 }
 #[pyfunction]
 #[pyo3(signature=(settings,object,property,value,extents=None))]
