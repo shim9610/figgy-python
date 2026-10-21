@@ -154,5 +154,22 @@ one input value to its original value is not an Undo contract. Layout tests must
 dump and compare the complete accepted SSOT and the actual prepared geometry;
 they must not assume that gesture deltas imply an identical document.
 
+Widget state travels asynchronously from Python to the browser. `await fig.sync()`
+acknowledges accepted edits before a cross-host assertion; kernel idle or a local
+browser queue flush alone does not acknowledge a newly sent Python command.
+Annotation hit geometry is prepared from current renderer state independently of
+display-GPU completion. The [held-GPU probe](measurements/cartesian-pending-gpu-geometry-20261021.json)
+moves a Cartesian annotation while a display fence is pending and verifies the
+updated rectangle without another submission or source-column upload. Its
+negative control retains the stale rectangle on commit `9542f9a`.
+
+The [0.18.1 local run record](measurements/local-0181-suite-20261021.json)
+reconciles all 593 collected tests across resumed runs, including the corrected
+tick-baseline test, with no missing or skipped cases. It records the initial
+failure and does not claim one uninterrupted pass or a Chromium 156 CI result.
+The summed final case times are about 39 minutes. CI builds the wheel in a
+separate job and verifies its checksum before the existing integration checks,
+preserving the 45-minute test job and all individual assertions and deadlines.
+
 The LLM review mode, separate review comments and binary recovery checkpoints
 remain a separate workflow. These controls and history need no LLM session.

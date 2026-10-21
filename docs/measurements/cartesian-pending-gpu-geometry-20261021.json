@@ -1,0 +1,613 @@
+{
+  "before": [
+    274,
+    148.60000610351562,
+    56.921714782714844,
+    21
+  ],
+  "entries": [
+    {
+      "element": "annotation_0",
+      "handles": [],
+      "id": "probe",
+      "index": 0,
+      "kind": "Text",
+      "rect": [
+        600,
+        375.1000061035156,
+        56.921714782714844,
+        21
+      ],
+      "selected": false
+    }
+  ],
+  "host": {
+    "kind": "cartesian",
+    "busy": 0,
+    "queued": 0,
+    "dirty": true,
+    "frame_pending": true,
+    "frame_error": null,
+    "edit_inflight": null,
+    "edit_pending": false,
+    "canvas": [
+      960,
+      600
+    ],
+    "disposed": false
+  },
+  "submissions_before_read": 6,
+  "submissions_after_read": 6,
+  "column_uploads_before": 2,
+  "column_uploads_after": 2,
+  "accepted": {
+    "schema_version": 2,
+    "renderer_version": "0.18.1",
+    "config": {
+      "chart_area": {
+        "x": 0,
+        "y": 0,
+        "width": 960,
+        "height": 600
+      },
+      "top_x": {
+        "scale": "Linear",
+        "min": -0.05,
+        "max": 1.05,
+        "major_spacing": 0.2,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "font_size": 18,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0,
+          "label_offset_y": 0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 22,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 0,
+          "offset_y": 0
+        },
+        "out_margin": 25,
+        "line_offset": 0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "line_width": 1,
+        "line_style": "Solid",
+        "major_tick_length": 5,
+        "minor_tick_length": 3
+      },
+      "bottom_x": {
+        "scale": "Linear",
+        "min": -0.05,
+        "max": 1.05,
+        "major_spacing": 0.2,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "font_size": 18,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0,
+          "label_offset_y": 0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 22,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0,
+          "offset_y": 0
+        },
+        "out_margin": 80,
+        "line_offset": 0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "line_width": 1,
+        "line_style": "Solid",
+        "major_tick_length": 5,
+        "minor_tick_length": 3
+      },
+      "left_y": {
+        "scale": "Linear",
+        "min": 0.95,
+        "max": 2.05,
+        "major_spacing": 0.2,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "font_size": 18,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0,
+          "label_offset_y": 0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 22,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0,
+          "offset_y": 0
+        },
+        "out_margin": 110,
+        "line_offset": 0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "line_width": 1,
+        "line_style": "Solid",
+        "major_tick_length": 5,
+        "minor_tick_length": 3
+      },
+      "right_y": {
+        "scale": "Linear",
+        "min": 0.95,
+        "max": 2.05,
+        "major_spacing": 0.2,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "font_size": 18,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0,
+          "label_offset_y": 0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 22,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 0,
+          "offset_y": 0
+        },
+        "out_margin": 25,
+        "line_offset": 0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "line_width": 1,
+        "line_style": "Solid",
+        "major_tick_length": 5,
+        "minor_tick_length": 3
+      },
+      "chart_title": {
+        "text": {
+          "segments": [
+            {
+              "text": "P",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "e",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "n",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "d",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "i",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "n",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "g",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": " ",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "d",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "i",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "s",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "p",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "l",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "a",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            },
+            {
+              "text": "y",
+              "bold": false,
+              "italic": false,
+              "underline": false,
+              "superscript": false,
+              "subscript": false,
+              "greek": false
+            }
+          ],
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "font_size": 28,
+          "font": ""
+        },
+        "visible": true,
+        "offset_x": 0,
+        "offset_y": 0,
+        "top_margin": 32
+      },
+      "grid": {
+        "show_major_x": true,
+        "major_x_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1
+        },
+        "major_x_width": 1,
+        "major_x_style": "Solid",
+        "show_major_y": true,
+        "major_y_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1
+        },
+        "major_y_width": 1,
+        "major_y_style": "Solid",
+        "show_minor_x": false,
+        "minor_x_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1
+        },
+        "minor_x_width": 0.5,
+        "minor_x_style": "Dot",
+        "show_minor_y": false,
+        "minor_y_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1
+        },
+        "minor_y_width": 0.5,
+        "minor_y_style": "Dot"
+      },
+      "legend": {
+        "visible": false,
+        "content": {
+          "segments": [],
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "font_size": 14,
+          "font": ""
+        },
+        "corner": "TopRight",
+        "offset_x": 0,
+        "offset_y": 0,
+        "padding": 8,
+        "bg_color": {
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 0.85
+        },
+        "border_color": {
+          "r": 0.6,
+          "g": 0.6,
+          "b": 0.6,
+          "a": 1
+        }
+      },
+      "annotations": {
+        "visible": true,
+        "items": [
+          {
+            "id": "probe",
+            "kind": {
+              "Text": {
+                "anchor": {
+                  "Ratio": {
+                    "x": 0.6,
+                    "y": 0.7
+                  }
+                },
+                "text": {
+                  "segments": [
+                    {
+                      "text": "P",
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "superscript": false,
+                      "subscript": false,
+                      "greek": false
+                    },
+                    {
+                      "text": "r",
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "superscript": false,
+                      "subscript": false,
+                      "greek": false
+                    },
+                    {
+                      "text": "o",
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "superscript": false,
+                      "subscript": false,
+                      "greek": false
+                    },
+                    {
+                      "text": "b",
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "superscript": false,
+                      "subscript": false,
+                      "greek": false
+                    },
+                    {
+                      "text": "e",
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "superscript": false,
+                      "subscript": false,
+                      "greek": false
+                    }
+                  ],
+                  "color": {
+                    "r": 0,
+                    "g": 0,
+                    "b": 0,
+                    "a": 1
+                  },
+                  "font_size": 18.333334,
+                  "font": ""
+                },
+                "box_style": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    "series": [
+      {
+        "series_id": "signal",
+        "label": null,
+        "x_column": "signal/x",
+        "y_column": "signal/y",
+        "render_type": {
+          "Line": {
+            "line": {
+              "line_style": "Solid",
+              "line_color": {
+                "r": 0.12156863,
+                "g": 0.46666667,
+                "b": 0.7058824,
+                "a": 1
+              },
+              "line_width": 2.5
+            }
+          }
+        }
+      }
+    ],
+    "identity": {
+      "figure": "7d58fffb-3503-4eca-b51c-6edb27de3d25",
+      "groups": {},
+      "layout": null,
+      "panels": [
+        {
+          "id": "main",
+          "overlays": []
+        }
+      ],
+      "retired": []
+    }
+  },
+  "test": "tests/test_interaction_geometry.py::test_cartesian_annotation_geometry_refreshes_while_display_gpu_is_pending",
+  "renderer": "0.18.1",
+  "browser": "Chromium 154.0.8037.57, SwiftShader",
+  "measured_utc": "2026-10-21",
+  "wheel_sha256": "b304fb9cc9218daa35735090d5581c07fd948cb71120d9565eb12c37dd6b287b",
+  "negative_control": {
+    "commit": "9542f9acba975e1db783a18958a81fcbda997411",
+    "webgpu_js_and_wasm_match_commit": true,
+    "failure": "assert (274 > 274)",
+    "test_seconds": 17.275
+  }
+}

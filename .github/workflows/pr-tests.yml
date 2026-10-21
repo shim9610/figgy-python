@@ -39,12 +39,11 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - run: bash scripts/ci-preflight.sh
 
-  integration:
-    name: PR / Linux integration
+  build:
+    name: PR / Linux wheel
     needs: preflight
     runs-on: ubuntu-24.04
-    # Baseline setup/build, priority checks and the full UI suite exceed 30m.
-    timeout-minutes: 45
+    timeout-minutes: 20
     env:
       CARGO_BUILD_JOBS: '4'
       WGPU_BACKEND: vulkan
@@ -76,6 +75,7 @@ jobs:
           sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl
       - name: Build and install the exact PR wheel
         run: |
+          cargo fmt --check
           uv python install 3.12
           uv venv .venv --python 3.12
           uv pip install --python .venv/bin/python 'maturin>=1.15,<2'
@@ -87,13 +87,72 @@ jobs:
           .venv/bin/python scripts/check_installed.py
           .venv/bin/python scripts/check_x11_runtime.py
           .venv/bin/python scripts/editor_control_inventory.py --check
+          (cd dist && sha256sum ./*.whl > SHA256SUMS)
+      - name: Save the verified PR wheel
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-linux-wheel
+          path: dist/
+          retention-days: 5
+          if-no-files-found: error
+
+  integration:
+    name: PR / Linux integration
+    needs: build
+    # Keep the required check red when preflight/build fails or is skipped.
+    if: always()
+    runs-on: ubuntu-24.04
+    # Measured test workload is ~39m; build time has its own job budget.
+    timeout-minutes: 45
+    env:
+      WGPU_BACKEND: vulkan
+      FIGGY_TEST_JUPYTER: '1'
+      FIGGY_TEST_HEADFUL: '1'
+      FIGGY_TEST_TIMING: '1'
+      FIGGY_LAYOUT_PROBE: '1'
+      FIGGY_REQUIRE_INTERACTION_PARITY: '1'
+      FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Require the verified wheel
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: test "$BUILD_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PyO3/maturin-action
+          ref: e83996d129638aa358a18fbd1dfb82f0b0fb5d3b
+          path: .ci/maturin-action
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Install native software-GPU and X11 runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pr-linux-wheel
+          path: dist
+      - name: Verify and install the built wheel
+        run: |
+          (cd dist && sha256sum -c SHA256SUMS)
+          uv python install 3.12
+          uv venv .venv --python 3.12
+          for wheel in dist/*.whl; do
+            uv pip install --python .venv/bin/python --only-binary=:all: "${wheel}[test]"
+          done
+          uv pip install --python .venv/bin/python --only-binary=:all: 'PyYAML>=6,<7' 'playwright>=1.50,<2' 'jupyterlab>=4,<5' 'nbformat>=5,<6' 'ipykernel>=6'
+          .venv/bin/python scripts/check_installed.py
+          .venv/bin/python scripts/check_x11_runtime.py
       - name: Install Chromium and select software GPU drivers
         run: |
           .venv/bin/python -m playwright install --with-deps chromium
           .venv/bin/python scripts/ci_gpu_env.py
       - name: Test previous failures first, then native and Jupyter integration
         run: |
-          cargo fmt --check
           mkdir -p ci-results
           xvfb-run -a -s '-screen 0 1600x1000x24' bash <<'SCRIPT'
             set -euo pipefail

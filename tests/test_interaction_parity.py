@@ -377,7 +377,7 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
 def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path,family):
     """Slow GPU completion must not build a frame backlog ahead of PNG export."""
     setup={'categorical':"ax.bar(['A','B'],[3,5])",'boxplot':"ax.boxplot([[1,2,3],[2,4,6]])",'radar':"ax.radar(['A','B','C'],[2,4,3])"}[family]
-    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.text(.1,.1,'Probe',coords='ratio',id='probe')\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
     with notebook(tmp_path/'frame-backpressure', source) as (page,execute):
         click_button(page, '[data-properties]')
         page.locator('.figgy-properties').wait_for(state='visible')
@@ -1689,8 +1689,15 @@ def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path
         rect=page.evaluate(ROOT+'.annotations()')[0]['rect'];canvas=page.locator('canvas').bounding_box()
         # Cartesian geometry is in current physical canvas pixels; bounded maps use document units.
         size=[960,600] if family=='radial' else page.locator('canvas').evaluate('c=>[c.width,c.height]')
+        reopen={'annotation':rect,'canvas':canvas,'units':size}
+        (tmp_path/'inline-reopen-request.json').write_text(json.dumps(reopen,indent=2))
         page.mouse.dblclick(canvas['x']+(rect[0]+8)*canvas['width']/size[0],canvas['y']+(rect[1]+6)*canvas['height']/size[1])
-        entry.wait_for(state='visible');page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
+        try:
+            entry.wait_for(state='visible');page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
+        finally:
+            reopen.update(observed=page.evaluate(OBSERVE),hit=page.evaluate(ROOT+'.stats.last_annotation_hit'),annotations=page.evaluate(ROOT+'.annotations()'))
+            (tmp_path/'inline-reopen-result.json').write_text(json.dumps(reopen,indent=2))
+            print('FIGGY INLINE REOPEN '+json.dumps(reopen))
         entry.press('Control+End');entry.type('!');click_button(page, '[data-draw]');page.evaluate(ROOT+'.flush()')
         assert content(page.evaluate(ROOT+'.snapshot()'))=='First\nSecond!'
         assert annotation(page.evaluate(ROOT+'.snapshot()'))['kind']['Text']['text']['segments'][0]['bold']
@@ -1718,7 +1725,11 @@ ax.text(.95,.95,'Probe',coords='ratio',fontsize=16*72/fig.dpi,id='probe')
         before=observe(page,tmp_path,'before-resize')
         original=before['renderer']['config']['annotations']['items'][0]
         page.set_viewport_size({'width':640,'height':600})
+        # Jupyter resizes its content asynchronously. Equality with the old CSS
+        # size is not evidence that the requested shrink has happened yet.
+        page.wait_for_function("initial=>document.querySelector('.figgy-editor canvas').width<initial",arg=before['backing'][0],polling=20)
         wait_surface(page,(640,600))
+        (tmp_path/'before-queue-hold.json').write_text(json.dumps(page.evaluate(OBSERVE),indent=2))
         # Hold the existing host queue so CSS layout necessarily changes before
         # the GPU backing resize. This is a legal scheduling order, not a repair.
         page.evaluate(host+'.testHoldQueue()')
@@ -2296,7 +2307,15 @@ def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tm
         before=axis(state)['major_spacing'];zoom();state=page.evaluate(ROOT+'.snapshot()')
         assert axis(state)['major_spacing']<before
         assert axis(state)['major_spacing']==native_spacing
-        execute(manual);page.evaluate(ROOT+'.flush()');fixed=axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing'];zoom()
+        # Kernel idle does not acknowledge delivery of the widget-state update.
+        # Capture the baseline only after the browser has accepted this command.
+        accepted=json.loads(execute(manual+'; await fig.sync(); print(json.dumps(fig.get_settings()))'))
+        fixed=axis(accepted)['major_spacing']
+        browser_fixed=page.evaluate(ROOT+'.snapshot()')
+        (tmp_path/'fixed-tick-baseline.json').write_text(json.dumps({'accepted':accepted,'browser':browser_fixed},indent=2))
+        assert fixed==(3.0 if owner=='overlay' else 7.0)
+        assert axis(browser_fixed)['major_spacing']==fixed
+        zoom()
         assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']==fixed
         ObjectNavigator(page).choose(target,node=node);page.locator('[data-property=auto_ticks]').check();page.evaluate(ROOT+'.flush()')
         assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']!=fixed

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild the public web host plus the recorded, bridge-only completion patch.
+# Rebuild the public web host plus the recorded, bridge-only host patch.
 set -euo pipefail
 revision=f3f569c4c0e32d3d0682632444b6fe7ce84cba8d
 repo_root=$(cd "$(dirname "$0")/.." && pwd)

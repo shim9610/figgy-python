@@ -68,7 +68,8 @@ downloaded `.crate` checksums, `.cargo_vcs_info.json` source revision and Rust
 sources before recording provenance. Offline preflight checks that the native
 versions/checksums and WASM revision remain paired; Git/path overrides fail this
 gate. The build then applies `scripts/wasm-host.patch` to a disposable copy of
-the web host. This additive binding patch exposes non-borrowing GPU completion;
+the web host. This additive binding patch exposes non-borrowing GPU completion and renderer
+annotation preparation without waiting for display completion;
 it does not change renderer/model sources. Provenance records its hash, and
 preflight rejects a mismatched patch or changes outside the two web host files.
 Do not edit provenance by hand to bypass a source mismatch.

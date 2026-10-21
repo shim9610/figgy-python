@@ -282,10 +282,13 @@ export function render({model,el}) {
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
   async function geometryFrame(){
-    // 0.18.1 prepares edits at the current surface scale. A resize still
-    // needs a fresh CPU hit map; neither path needs GPU display completion.
-    // Keep dirty set so display submissions remain coalesced behind the fence.
-    if(resizeSurface()&&kind)chart.set_document(chart.get_document(),local.config.chart_area.width,local.config.chart_area.height);
+    // Prepare the current hit map through the renderer without submitting or
+    // awaiting a display frame. Keep display work coalesced behind its fence.
+    resizeSurface();
+    if(dirty){
+      if(kind)chart.set_document(chart.get_document(),local.config.chart_area.width,local.config.chart_area.height);
+      else chart.prepare_interaction();
+    }
   }
   async function annotationGeometry(){
     await geometryFrame();
@@ -293,7 +296,9 @@ export function render({model,el}) {
   }
   async function textAnnotationAt(point){
     const owner=kind?snapshot()[kind]:snapshot().config;if(owner.annotations?.visible===false||!owner.annotations?.items?.some(v=>v.kind.Text&&v.visible!==false))return null;
-    const entries=await annotationGeometry(),index=chart.hit_annotation(...point);if(index===undefined||!owner.annotations?.items[index]?.kind.Text)return null;
+    const entries=await annotationGeometry(),index=chart.hit_annotation(...point);
+    if(globalThis.__figgyTrace){stats.last_annotation_hit={point:[...point],index:index??null,layer:owner.active_layer??'Base',canvas:[canvas.width,canvas.height],entries};trace('annotation.hit',stats.last_annotation_hit);}
+    if(index===undefined||!owner.annotations?.items[index]?.kind.Text)return null;
     const entry=entries.find(v=>v.index===index);
     return entry?{item:owner.annotations.items[index],entry}:null;
   }
