@@ -204,20 +204,28 @@ export function render({model,el}) {
   let inlineText=null;
   const inlineBox=document.createElement('div');inlineBox.className='figgy-inline-text';inlineBox.hidden=true;
   const inlineInput=document.createElement('textarea');inlineInput.rows=1;inlineInput.dataset.inlineText='';inlineInput.setAttribute('aria-label','Annotation text');inlineInput.placeholder='Type text';
-  const inlineHint=document.createElement('small');inlineHint.textContent='Enter: apply · Shift+Enter: new line · Esc: cancel';
+  const inlineHint=document.createElement('small');inlineHint.textContent='Enter: apply · Shift+Enter: new line · Esc: cancel';inlineHint.title=inlineHint.textContent;
   inlineBox.append(inlineInput,inlineHint);root.querySelector('.figgy-stage').append(inlineBox);
   function selectedAnnotation(){const state=snapshot(),items=(kind?state[kind]:state.config).annotations?.items??[];return kind?items[Number(/^annotation_(\d+)$/.exec(selected??'')?.[1])]:items.find(v=>'annotation:'+v.id===selected);}
   function positionInline(){
     if(!inlineText)return;
     const r=canvas.getBoundingClientRect(),g=inlineText;
-    const width=kind?local.config.chart_area.width:canvas.width;
-    const left=g.point[0]/g.size[0]*r.width,top=g.point[1]/g.size[1]*r.height;
+    // Document pixels and CSS pixels share one scale. The backing surface can
+    // still have the preceding size while its resize waits in the host queue.
+    const width=local.config.chart_area.width;
     inlineInput.style.fontSize=`${Math.max(10,Math.min(72,g.item.kind.Text.text.font_size*r.width/width))}px`;
     inlineBox.style.maxWidth='calc(100% - 8px)';
     // Percent bounds update with CSS layout even before ResizeObserver runs.
     inlineBox.style.left=`clamp(0px, calc(${g.point[0]/g.size[0]*100}% - 5px), max(0px, calc(100% - min(300px, 100% - 8px))))`;
-    inlineBox.style.top=`${Math.max(0,Math.min(top-4,r.height-inlineBox.offsetHeight))}px`;
-    inlineInput.style.height='auto';inlineInput.style.height=`${Math.min(Math.max(28,inlineInput.scrollHeight),Math.max(28,r.height-40))}px`;
+    inlineHint.hidden=r.height<48;
+    inlineInput.style.height='auto';
+    const chrome=inlineBox.getBoundingClientRect().height-inlineInput.getBoundingClientRect().height;
+    const available=Math.max(0,r.height-chrome);
+    inlineInput.style.minHeight=`${Math.min(28,available)}px`;
+    inlineInput.style.height=`${Math.min(Math.max(28,inlineInput.scrollHeight),available)}px`;
+    // Constrain the complete box after text sizing, including its hint and border.
+    inlineBox.style.setProperty('--figgy-inline-height',`${inlineBox.getBoundingClientRect().height}px`);
+    inlineBox.style.top=`clamp(0px, calc(${g.point[1]/g.size[1]*100}% - 4px), max(0px, calc(100% - var(--figgy-inline-height))))`;
   }
   function beginInline(item,point,existing=false){
     if(!item?.kind.Text)return;
@@ -724,8 +732,9 @@ export function render({model,el}) {
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
   function displaySize(){const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;return [Math.max(1,Math.round(rect.width*dpr)),Math.max(1,Math.round(rect.height*dpr))];}
-  function resizeSurface(){const [width,height]=displaySize();if(canvas.width===width&&canvas.height===height)return false;const previous=[canvas.width,canvas.height];canvas.width=width;canvas.height=height;wheelArea=null;chart.resize(width,height);dirty=true;trace('surface.resized',{previous});return true;}
-  function resize(){if(!chart || disposed)return;const [width,height]=displaySize();if(canvas.width!==width||canvas.height!==height)enqueue(resizeSurface);}
+  function resizeSurface(){const [width,height]=displaySize();if(canvas.width===width&&canvas.height===height)return false;const previous=[canvas.width,canvas.height];canvas.width=width;canvas.height=height;wheelArea=null;chart.resize(width,height);positionInline();dirty=true;trace('surface.resized',{previous});return true;}
+  let resizeQueued=false;
+  function resize(){if(!chart || disposed)return;const [width,height]=displaySize();if(!resizeQueued&&(canvas.width!==width||canvas.height!==height)){resizeQueued=true;enqueue(()=>{try{return resizeSurface();}finally{resizeQueued=false;}});}}
   function recordFrame(){syncPanelFocus();if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;}
   async function readyDisplayedFrame(){
     if(disposed)throw Error('Widget disposed');
@@ -733,6 +742,7 @@ export function render({model,el}) {
     do{trace('ready_frame.started');await chart.first_frame_ready();trace('ready_frame.completed');if(disposed)throw Error('Widget disposed');recordFrame();}while(resizeSurface());
   }
   const observer=new ResizeObserver(()=>{resize();positionInline();});
+  let pixelRatio=devicePixelRatio||1;
   const position=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};
   async function waitForFrame(){
     trace('display_wait.started');
@@ -743,6 +753,11 @@ export function render({model,el}) {
     trace('display_wait.completed');
   }
   function frame(now=0){if(disposed)return;
+    // DPR can change without a CSS resize or a media-query change event. Read
+    // only the scalar each frame; measure layout through the common resize path
+    // only when the scale changes.
+    const nextPixelRatio=devicePixelRatio||1;
+    if(nextPixelRatio!==pixelRatio){pixelRatio=nextPixelRatio;resize();positionInline();}
     if(kind&&chart&&!busy&&!pendingFrame&&!frameError){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
     if(chart&&dirty&&!busy&&!pendingFrame&&!frameError)enqueue(()=>{
       if(!dirty||pendingFrame||frameError)return;

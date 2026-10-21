@@ -1592,12 +1592,15 @@ def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path
         page.locator('[data-draw]').click();page.locator('[data-tool=text]').click()
         page.mouse.click(*browser_point(page,(850,510)));entry=page.locator('[data-inline-text]');entry.wait_for(state='visible')
         entry.fill('First');entry.press('Shift+Enter');entry.type('Second')
-        from layout_probe import arm_browser, browser_readings
+        from layout_probe import arm_browser
+        from inline_editor_harness import OBSERVE, wait_surface, assert_contained
         arm_browser(page)
         page.set_viewport_size({'width':980,'height':820})
-        page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
-        rect,canvas=browser_readings(page,entry,tmp_path)
-        assert rect['x']>=canvas['x']-1 and rect['x']+rect['width']<=canvas['x']+canvas['width']+1
+        wait_surface(page,(980,820))
+        state=page.evaluate(OBSERVE)
+        (tmp_path/'inline-editor-resize.json').write_text(json.dumps(state,indent=2))
+        assert state['focused'] and state['value']=='First\nSecond'
+        assert_contained(state)
         # Enter used by an IME must not confirm or discard its current composition.
         entry.dispatch_event('keydown',{'key':'Enter','code':'Enter','isComposing':True})
         assert entry.is_visible()
@@ -1616,6 +1619,79 @@ def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path
         assert content(page.evaluate(ROOT+'.snapshot()'))=='First\nSecond!'
         assert annotation(page.evaluate(ROOT+'.snapshot()'))['kind']['Text']['text']['segments'][0]['bold']
         assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real Jupyter WebGPU widget')
+@pytest.mark.parametrize('dpr',[1,2])
+def test_inline_editor_resize_uses_current_units_and_applies_real_edits(tmp_path,dpr):
+    """Exercise queued resizes, actual draft edits, application and cancellation.
+
+    Automatic chart layout may retain history. This checks the inline editor's
+    document-unit font at document width, not whole-chart round-trip equality.
+    """
+    from inline_editor_harness import ROOT as host, instrumented_source, OBSERVE, wait_surface, observe, assert_contained, open_existing
+    source="""import json
+import figgyplot as fg
+fig,ax=fg.subplots(backend='webgpu')
+ax.plot([0,1,2],[1,3,2],id='signal')
+ax.text(.95,.95,'Probe',coords='ratio',fontsize=16*72/fig.dpi,id='probe')
+"""+instrumented_source(tmp_path)
+    with notebook(tmp_path/'inline-resize-contract',source) as (page,execute):
+        entry=open_existing(page)
+        entry.fill('First\nSecond')
+        before=observe(page,tmp_path,'before-resize')
+        original=before['renderer']['config']['annotations']['items'][0]
+        page.set_viewport_size({'width':640,'height':600})
+        wait_surface(page,(640,600))
+        # Hold the existing host queue so CSS layout necessarily changes before
+        # the GPU backing resize. This is a legal scheduling order, not a repair.
+        page.evaluate(host+'.testHoldQueue()')
+        previous_width=page.locator('canvas').evaluate('c=>c.width')
+        try:
+            page.set_viewport_size({'width':1500,'height':1000})
+            page.wait_for_function("document.querySelector('.figgy-editor canvas').getBoundingClientRect().width===960",polling=20)
+            page.wait_for_function(host+'.diagnostics().queued>0',polling=20)
+            page.wait_for_function("previous=>window.__figgyInlinePass?.cssWidth===960&&window.__figgyInlinePass?.backingWidth===previous",arg=previous_width,polling=20)
+            pending=page.evaluate(OBSERVE)
+            (tmp_path/'queued-resize.json').write_text(json.dumps(pending,indent=2))
+            assert pending['font']==16,pending
+        finally:
+            page.evaluate(host+'.testReleaseQueue()')
+        wait_surface(page,(1500,1000))
+        after=observe(page,tmp_path,'after-resize')
+        assert after['renderer']['config']['annotations']['items'][0]==original
+        assert after['font']==16 and after['focused'] and after['value']=='First\nSecond'
+        assert_contained(after)
+        # Changing DPR alone must update backing pixels without changing the
+        # authored font or the CSS-space font at the requested document width.
+        session=page.context.new_cdp_session(page)
+        session.send('Emulation.setDeviceMetricsOverride',dict(width=1500,height=1000,deviceScaleFactor=dpr,mobile=False))
+        wait_surface(page,(1500,1000),dpr)
+        for text in ('First\nSecond','\n'.join('Line '+str(n) for n in range(8)),'Pressure 10⁻⁶ Torr / μm °C '*8):
+            entry.fill(text)
+            for width,height in ((980,820),(640,600),(1500,1000)):
+                session.send('Emulation.setDeviceMetricsOverride',dict(width=width,height=height,deviceScaleFactor=dpr,mobile=False))
+                wait_surface(page,(width,height),dpr)
+                state=observe(page,tmp_path,f'layout-{len(text)}-{width}')
+                assert state['renderer']['config']['annotations']['items'][0]==original
+                assert state['value']==text and state['focused']
+                assert_contained(state)
+                if width==1500:assert state['font']==16,state
+        # Actual pointer/keyboard actions must produce the intended accepted
+        # document, independently of whether a screenshot can be captured.
+        entry.fill('First\nSecond');entry.click();entry.press('Control+End');entry.type('!');entry.press('Enter')
+        page.evaluate(host+'.flush()')
+        applied=observe(page,tmp_path,'after-apply')
+        item=applied['renderer']['config']['annotations']['items'][0]
+        assert ''.join(s['text'] for s in item['kind']['Text']['text']['segments'])=='First\nSecond!'
+        assert item['kind']['Text']['text']['font_size']==16
+        python_state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert python_state==applied['renderer']
+        entry=open_existing(page);entry.press('Control+End');entry.type(' discard');entry.press('Escape')
+        page.evaluate(host+'.flush()')
+        cancelled=observe(page,tmp_path,'after-cancel')
+        assert cancelled['renderer']['config']['annotations']['items'][0]==item
+        assert not entry.is_visible()
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
@@ -1947,10 +2023,26 @@ ax.activate()
                 drag_native(inputs,start,(16,12))
                 native_sample(inputs,samples,'after_title_drag')
                 assert inputs.info()['selected']=='overlay_0:axis_title_right'
-                r=inputs.info()['controls']['text'];v=inputs.info()['controls']['properties_viewport']
-                assert r[1]>=v[1]-1 and r[1]+r[3]<=v[1]+v[3]+1
                 assert fig.get_settings()['config']['overlays'][0]['y_axis']['title_option']!=before['config']['overlays'][0]['y_axis']['title_option']
                 assert fig.get_settings()['config']['left_y']==before['config']['left_y']
+                # Common typography precedes the text row in a scrollable form.
+                # Exercise ordinary scrolling and real editing at default and
+                # minimum supported sizes, rather than requiring every row to
+                # be visible immediately after a different object is selected.
+                for width,height in ((1312,744),(900,520)):
+                    inputs.xdo('windowsize',inputs.wid,width,height);inputs.pump()
+                    untouched=fig.get_settings();revision=fig.revision
+                    inputs.click('text')
+                    info=inputs.info();r=info['controls']['text'];v=info['controls']['properties_viewport']
+                    assert r[1]>=v[1]-1 and r[1]+r[3]<=v[1]+v[3]+1,info
+                    assert fig.get_settings()==untouched and fig.revision==revision
+                    value=f'Pressure {height}'
+                    inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers',value);inputs.key('Return')
+                    edited=fig.get_settings()
+                    rich=edited['config']['overlays'][0]['y_axis']['title_option']['text']
+                    assert ''.join(s['text'] for s in rich['segments'])==value
+                    assert rich['font_size']==untouched['config']['overlays'][0]['y_axis']['title_option']['text']['font_size']
+                    assert edited['config']['left_y']==before['config']['left_y']
                 assert fig.info['column_uploads']==uploads and not inputs.info()['error']
                 from PIL import ImageGrab
                 window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
@@ -1998,6 +2090,11 @@ ax.activate()
         changed=page.evaluate(ROOT+'.snapshot()')
         assert changed['config']['overlays'][0]['y_axis']['title_option']!=before['config']['overlays'][0]['y_axis']['title_option']
         assert changed['config']['left_y']==before['config']['left_y']
+        title_text=page.locator('[data-property=text]')
+        title_text.fill('Pressure edited');title_text.press('Tab');page.evaluate(ROOT+'.flush()')
+        edited=page.evaluate(ROOT+'.snapshot()')
+        assert ''.join(s['text'] for s in edited['config']['overlays'][0]['y_axis']['title_option']['text']['segments'])=='Pressure edited'
+        assert edited['config']['left_y']==before['config']['left_y']
         assert page.evaluate(ROOT+'.stats.column_uploads')==uploads and not page.locator('.figgy-error').inner_text()
         page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-overlay-object-edit.png'))
 

@@ -99,10 +99,12 @@ jobs:
             openbox > /tmp/figgyplot-openbox.log 2>&1 &
             wm_pid=$!
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
-            # Diagnose the two failures on cf51594 before other integration work.
-            # Original assertions and waits are retained; probes never retry them.
+            # Reject the observed stale-font/box failures before the full suite.
+            # The queue-order cases must fail on the original a1e79a8 wheel.
             .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
               --basetemp=ci-results/layout-probe --junitxml=ci-results/layout-probe.xml \
+              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]' \
+              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]' \
               'tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]' \
               'tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]' \
               2>&1 | tee ci-results/layout-probe.log

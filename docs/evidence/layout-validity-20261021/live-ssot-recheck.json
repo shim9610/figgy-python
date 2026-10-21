@@ -1,0 +1,122 @@
+{
+  "comparison": "Same instance before shrink versus after grow and GPU idle; no numeric normalization or field exclusions.",
+  "groups": {
+    "accepted": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "bd4c9ace2aff6401846d29050c6eb849abcc578e7c7e437f105ba820669adb61",
+      "after_sha256": "bd4c9ace2aff6401846d29050c6eb849abcc578e7c7e437f105ba820669adb61",
+      "diff": []
+    },
+    "composed": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "bd4c9ace2aff6401846d29050c6eb849abcc578e7c7e437f105ba820669adb61",
+      "after_sha256": "bd4c9ace2aff6401846d29050c6eb849abcc578e7c7e437f105ba820669adb61",
+      "diff": []
+    },
+    "liveConfig": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "a60c9f8d3e5f83e8f68f808b19ea7916d143caf51b903c1f73733aa8e20be47e",
+      "after_sha256": "a60c9f8d3e5f83e8f68f808b19ea7916d143caf51b903c1f73733aa8e20be47e",
+      "diff": []
+    },
+    "liveSeries": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "40c34c45ed284799e4b652fcae138e8e27431d1d015ed1dbbe711c9c550e5dfc",
+      "after_sha256": "40c34c45ed284799e4b652fcae138e8e27431d1d015ed1dbbe711c9c550e5dfc",
+      "diff": []
+    },
+    "annotationGeometry": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "c7615d165d6d3db2243cba0d94a1f1e59c99a26a0a80b50db7bf7ad719aac37b",
+      "after_sha256": "c7615d165d6d3db2243cba0d94a1f1e59c99a26a0a80b50db7bf7ad719aac37b",
+      "diff": []
+    },
+    "dataArea": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "1eb932ff3fe12680765863788cad5542faa7504df6ef7fc86e35852a74831c4f",
+      "after_sha256": "1eb932ff3fe12680765863788cad5542faa7504df6ef7fc86e35852a74831c4f",
+      "diff": []
+    },
+    "inlineDraft": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "a72611b2a20359b7af8a7ea5ec36831bb61496336708d5756be7193ad9d18190",
+      "after_sha256": "a72611b2a20359b7af8a7ea5ec36831bb61496336708d5756be7193ad9d18190",
+      "diff": []
+    },
+    "ephemeral": {
+      "exact_sorted_json_equal": true,
+      "before_sha256": "1d13be5abf585b4e7517aef9e134c585fd148b120db1c4bc376978d1ad21b84a",
+      "after_sha256": "1d13be5abf585b4e7517aef9e134c585fd148b120db1c4bc376978d1ad21b84a",
+      "diff": []
+    }
+  },
+  "same_view_inputs": {
+    "viewport": {
+      "before": [
+        1500,
+        1000,
+        1
+      ],
+      "after": [
+        1500,
+        1000,
+        1
+      ]
+    },
+    "backing": {
+      "before": [
+        960,
+        600
+      ],
+      "after": [
+        960,
+        600
+      ]
+    },
+    "focus": {
+      "before": true,
+      "after": true
+    },
+    "value": {
+      "before": "First\nSecond",
+      "after": "First\nSecond"
+    },
+    "selection": {
+      "before": [
+        12,
+        12
+      ],
+      "after": [
+        12,
+        12
+      ]
+    }
+  },
+  "css_font_before": "16px",
+  "css_font_after": "65.3617px",
+  "last_position_operands": {
+    "now": 8283.09999999404,
+    "modelFont": 16,
+    "cssWidth": 960,
+    "backingWidth": 235,
+    "formulaWidth": 235,
+    "docWidth": 960,
+    "draftPoint": [
+      887.25,
+      490.3500061035156
+    ],
+    "draftSize": [
+      960,
+      600
+    ],
+    "assignedFont": "65.3617px",
+    "frames": 5,
+    "busy": 0,
+    "queuedOperations": 1
+  },
+  "limits": [
+    "Not every renderer-internal transient cache has an export API.",
+    "No generic assumption that automatic layout is history-independent.",
+    "Python/browser JSON numeric spellings may differ; this comparison is within each dump source."
+  ]
+}

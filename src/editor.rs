@@ -532,12 +532,14 @@ impl Editor {
             self.inspector_context = context;
         }
         if let Some(target) = selected.as_ref() {
+            let form_height =
+                (ui.available_height() - if self.picked.is_some() { 250. } else { 74. }).max(100.);
             let mut form = egui::ScrollArea::vertical()
                 .id_salt("object_properties")
-                .max_height(
-                    (ui.available_height() - if self.picked.is_some() { 250. } else { 74. })
-                        .max(100.),
-                );
+                .max_height(form_height)
+                // A default wheel step can skip over an entire short form.
+                // Keep adjacent rows reachable using ordinary wheel input.
+                .wheel_scroll_multiplier(egui::vec2(1., (form_height / 240.).clamp(0.25, 1.)));
             if context_changed {
                 form = form.vertical_scroll_offset(0.);
             }

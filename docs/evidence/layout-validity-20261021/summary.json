@@ -1,0 +1,414 @@
+{
+  "measurement_commit": "a1e79a800c25df9aa10fc20cffd661347f260a77",
+  "thresholds": {
+    "exact": 0,
+    "existing_tolerance_physical_or_css_pixels": 1
+  },
+  "runs": {
+    "final-native-dpr1": {
+      "rows": 45,
+      "matrix_rows": 33,
+      "scale": 1.0,
+      "initial_exact_valid": 12,
+      "initial_existing_1px_valid": 15,
+      "ordinary_wheel_exact_reachable": 30,
+      "scroll_only_model_changes": 0,
+      "edit_checks": 6,
+      "boundary": {
+        "dpr": 1.0,
+        "last_invalid_height": 844,
+        "first_valid_height": 845
+      }
+    },
+    "final-native-dpr2": {
+      "rows": 46,
+      "matrix_rows": 33,
+      "scale": 2.0,
+      "initial_exact_valid": 9,
+      "initial_existing_1px_valid": 12,
+      "ordinary_wheel_exact_reachable": 30,
+      "scroll_only_model_changes": 0,
+      "edit_checks": 6,
+      "boundary": {
+        "dpr": 2.0,
+        "last_invalid_height": 1690,
+        "first_valid_height": 1691
+      }
+    },
+    "final-browser": {
+      "rows": 202,
+      "bounds_rows": 200,
+      "open_failures": [
+        {
+          "dpr": 1,
+          "font": 32,
+          "anchor": [
+            0.95,
+            0.95
+          ],
+          "error": "No annotation geometry after document update"
+        },
+        {
+          "dpr": 1,
+          "font": 72,
+          "anchor": [
+            0.95,
+            0.95
+          ],
+          "error": "No annotation geometry after document update"
+        }
+      ],
+      "geometry_settled": 200,
+      "input_exact_valid": 166,
+      "box_exact_valid": 126,
+      "box_existing_1px_valid": 126,
+      "all_drafts_focused": true,
+      "all_drafts_preserved": true,
+      "post_command_geometry_settle_ms": {
+        "min": 50.94794499746058,
+        "median": 95.04496400040807,
+        "p95": 179.99648000113666,
+        "max": 257.65431398758665
+      },
+      "by_scale": {
+        "1": {
+          "rows": 120,
+          "box_exact_valid": 69
+        },
+        "1.25": {
+          "rows": 40,
+          "box_exact_valid": 23
+        },
+        "2": {
+          "rows": 40,
+          "box_exact_valid": 34
+        }
+      }
+    },
+    "final-browser-focus": {
+      "observations": 16,
+      "observations_by_phase": [
+        {
+          "phase": "short_baseline",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 57.65625,
+          "gpu_frame_pending": false,
+          "settled": true
+        },
+        {
+          "phase": "eight_lines_immediate",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 0.0,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "eight_lines_after_100_additional_ms",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 0.0,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "eight_lines_after_400_additional_ms",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 0.0,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "eight_lines_after_1500_additional_ms",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 0.0,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "eight_lines_unchanged_input_intervention",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 0.0,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "shrink_640",
+          "model_font": 16,
+          "viewport": [
+            640,
+            600,
+            1
+          ],
+          "backing": [
+            235,
+            147
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": -12.0,
+          "gpu_frame_pending": true,
+          "settled": true
+        },
+        {
+          "phase": "grow_1500",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "65.3617px",
+          "box_bottom_margin": -77.34375,
+          "gpu_frame_pending": true,
+          "settled": true
+        },
+        {
+          "phase": "grow_after_100_additional_ms",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "65.3617px",
+          "box_bottom_margin": -77.34375,
+          "gpu_frame_pending": true,
+          "settled": null
+        },
+        {
+          "phase": "grow_after_400_additional_ms",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "65.3617px",
+          "box_bottom_margin": -77.34375,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "grow_after_1500_additional_ms",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "65.3617px",
+          "box_bottom_margin": -77.34375,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "grow_unchanged_input_intervention",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": true,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 123.0,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "dpr_1.25_before_input",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1.25
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": false,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 123.0,
+          "gpu_frame_pending": false,
+          "settled": false
+        },
+        {
+          "phase": "dpr_1.25_after_input",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            1.25
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": false,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 45.65625,
+          "gpu_frame_pending": false,
+          "settled": null
+        },
+        {
+          "phase": "dpr_2_before_input",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            2
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": false,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 45.65625,
+          "gpu_frame_pending": false,
+          "settled": false
+        },
+        {
+          "phase": "dpr_2_after_input",
+          "model_font": 16,
+          "viewport": [
+            1500,
+            1000,
+            2
+          ],
+          "backing": [
+            960,
+            600
+          ],
+          "backing_matches": false,
+          "actual_css_font": "16px",
+          "box_bottom_margin": 45.65625,
+          "gpu_frame_pending": false,
+          "settled": null
+        }
+      ]
+    }
+  },
+  "archives": {
+    "final-native-dpr1.jsonl.gz": {
+      "raw_sha256": "abc48581c322271e948ad4acb17660617eca1c402a615bd3d12d40c9cfc41dcf",
+      "raw_bytes": 46507948,
+      "compressed_sha256": "284997d5d4d6defb74fe12cc63c87e3ad9b297417d4af8161bcf8a85f5817856",
+      "compressed_bytes": 904657
+    },
+    "final-native-dpr2.jsonl.gz": {
+      "raw_sha256": "8c460541840c64cba994acaa2a08c037d6a8ae8b71237647c5129c564aad5f92",
+      "raw_bytes": 45273770,
+      "compressed_sha256": "c108204ea8c031294df715c5da0f8b0db133a6559b842f38c1870fe023dd5bc4",
+      "compressed_bytes": 1093153
+    },
+    "final-browser.jsonl.gz": {
+      "raw_sha256": "9729bef85dc89a9a5b6ae0e791b28e9134fb4636aa018c117252a1013b912fa1",
+      "raw_bytes": 3307312,
+      "compressed_sha256": "48ecfb83b1b961cff7f85b88906f1406f889759920fcd6f774efec05e74e7e7c",
+      "compressed_bytes": 98527
+    },
+    "final-browser-focus.jsonl.gz": {
+      "raw_sha256": "7a3eda1a45ba686aacfe2002efafb39743e6181b18397987259f0591ac44d292",
+      "raw_bytes": 6967642,
+      "compressed_sha256": "f8d4d018c3180a0220ee870c26362f9d3582d10f9619754e75bebcb3855e28c4",
+      "compressed_bytes": 94673
+    }
+  },
+  "installed_wheel": {
+    "file": "figgyplot-0.3.0-cp312-cp312-linux_x86_64.whl",
+    "sha256": "62fecd00222177a28edc09151c7eda9372ea2ae45de5b6d6ea697fd017d04f2c",
+    "native_module_sha256": "46cbcbc57b2e6ec1315277185ab987db4409fddad522c96788d853d30acf20fb",
+    "installed_native_matches_wheel": true
+  }
+}

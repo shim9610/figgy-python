@@ -1,5 +1,11 @@
 # Layout failure observation
 
+This is the historical observation-only probe contract. Subsequent measurements,
+confirmed causes, corrected interaction contracts and implementation changes are
+documented in [Local layout validity measurements](LOCAL_LAYOUT_VALIDITY.md).
+The statements below about unchanged behavior/assertions describe the probe
+commit, not the later fixes.
+
 Baseline: `cf515942e32779579d80830689f36cc431741664`, Actions run
 [39547728840](https://github.com/shim9610/figgy-python/actions/runs/39547728840).
 The full suite reported 464 passes and two failures. This instrumentation

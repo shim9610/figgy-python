@@ -1,0 +1,150 @@
+{
+  "browser": {
+    "resizes": [
+      {
+        "phase": "draft_before_resize",
+        "browser_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "python_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "cross_host_diff": [],
+        "browser_diff_from_baseline": [],
+        "python_diff_from_baseline": []
+      },
+      {
+        "phase": "draft_after_shrink",
+        "browser_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "python_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "cross_host_diff": [],
+        "browser_diff_from_baseline": [],
+        "python_diff_from_baseline": []
+      },
+      {
+        "phase": "draft_after_grow",
+        "browser_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "python_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "cross_host_diff": [],
+        "browser_diff_from_baseline": [],
+        "python_diff_from_baseline": []
+      },
+      {
+        "phase": "draft_gpu_idle",
+        "browser_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "python_hash": "2e292c39c438c11053d1d4ea706bcfb61bdff33f0b1bfe1c0dcc652304fde514",
+        "cross_host_diff": [],
+        "browser_diff_from_baseline": [],
+        "python_diff_from_baseline": []
+      }
+    ],
+    "fault": {
+      "model_font": 16,
+      "display_font": "65.3617px",
+      "canvas": {
+        "x": 389,
+        "y": 321.3125,
+        "width": 960,
+        "height": 600,
+        "top": 321.3125,
+        "right": 1349,
+        "bottom": 921.3125,
+        "left": 389
+      },
+      "editor_box": {
+        "x": 1049,
+        "y": 807.65625,
+        "width": 300,
+        "height": 191,
+        "top": 807.65625,
+        "right": 1349,
+        "bottom": 998.65625,
+        "left": 1049
+      }
+    },
+    "keyboard_edit_pass": true,
+    "enter_apply_pass": true,
+    "committed_text": "First\nSecond!",
+    "commit_changed_paths": [
+      "/config/annotations/items/0/kind/Text/text/segments"
+    ],
+    "post_apply_cross_host_diff": []
+  },
+  "native": {
+    "resizes": [
+      {
+        "requested": [
+          1312,
+          744
+        ],
+        "hash": "017405cbc95d731b5c1caf3fb3d2ebb032c8aa70c21876204759665948615b76",
+        "same_as_baseline": true,
+        "revision_unchanged": true,
+        "text_bounds": {
+          "margins": {
+            "left": 0.0,
+            "top": 238.125,
+            "right": 0.0,
+            "bottom": -100.25
+          },
+          "strict_inside": false,
+          "original_1px_inside": false
+        }
+      },
+      {
+        "requested": [
+          900,
+          520
+        ],
+        "hash": "017405cbc95d731b5c1caf3fb3d2ebb032c8aa70c21876204759665948615b76",
+        "same_as_baseline": true,
+        "revision_unchanged": true,
+        "text_bounds": {
+          "margins": {
+            "left": 0.0,
+            "top": 238.3125,
+            "right": 0.0,
+            "bottom": -169.25
+          },
+          "strict_inside": false,
+          "original_1px_inside": false
+        }
+      },
+      {
+        "requested": [
+          1312,
+          845
+        ],
+        "hash": "017405cbc95d731b5c1caf3fb3d2ebb032c8aa70c21876204759665948615b76",
+        "same_as_baseline": true,
+        "revision_unchanged": true,
+        "text_bounds": {
+          "margins": {
+            "left": 0.0,
+            "top": 238.125,
+            "right": 0.0,
+            "bottom": 0.75
+          },
+          "strict_inside": true,
+          "original_1px_inside": true
+        }
+      },
+      {
+        "requested": [
+          1312,
+          744
+        ],
+        "hash": "017405cbc95d731b5c1caf3fb3d2ebb032c8aa70c21876204759665948615b76",
+        "same_as_baseline": true,
+        "revision_unchanged": true,
+        "text_bounds": {
+          "margins": {
+            "left": 0.0,
+            "top": 238.125,
+            "right": 0.0,
+            "bottom": -100.25
+          },
+          "strict_inside": false,
+          "original_1px_inside": false
+        }
+      }
+    ],
+    "edit_pass": true
+  }
+}
