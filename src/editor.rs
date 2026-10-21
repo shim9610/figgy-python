@@ -681,7 +681,36 @@ impl Editor {
                     !range.is_empty() && segments[range.clone()].iter().all(|s| s[flag] == true);
                 let response = ui.selectable_label(active, label).on_hover_text(flag);
                 self.controls.insert(format!("{key}_{flag}"), response.rect);
-                if response.clicked() {
+                // A queued Space typed in the text field must not activate a
+                // newly Tab-focused formatting button later in the same frame.
+                let activate = response.clicked()
+                    && (response.clicked_by(egui::PointerButton::Primary)
+                        || !response.gained_focus()
+                        || ui.input(|input| {
+                            let tab = input.events.iter().rposition(|event| {
+                                matches!(
+                                    event,
+                                    egui::Event::Key {
+                                        key: egui::Key::Tab,
+                                        pressed: true,
+                                        ..
+                                    }
+                                )
+                            });
+                            tab.is_none_or(|at| {
+                                input.events[at + 1..].iter().any(|event| {
+                                    matches!(
+                                        event,
+                                        egui::Event::Key {
+                                            key: egui::Key::Space | egui::Key::Enter,
+                                            pressed: true,
+                                            ..
+                                        }
+                                    )
+                                })
+                            })
+                        }));
+                if activate {
                     for segment in &mut segments[range.clone()] {
                         segment[flag] = json!(!active);
                         if !active && flag == "superscript" {
@@ -952,6 +981,29 @@ impl Editor {
         };
         let target = target.rsplit(':').next().unwrap_or(target);
         let mut changed = false;
+        let legend_owners: std::collections::HashSet<String> = state["series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|series| {
+                let id = &series["series_id"];
+                match c.data.chart.config().active_layer() {
+                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                        state["config"]["subplots"][i]["series"]
+                            .as_array()
+                            .is_some_and(|ids| ids.contains(id))
+                    }
+                    _ => !state["config"]["subplots"]
+                        .as_array()
+                        .is_some_and(|panels| {
+                            panels
+                                .iter()
+                                .any(|p| p["series"].as_array().is_some_and(|ids| ids.contains(id)))
+                        }),
+                }
+            })
+            .filter_map(|s| s["series_id"].as_str().map(str::to_owned))
+            .collect();
         let config = state.pointer(&scoped_path).unwrap().clone();
         let mut config = config;
         let original_right = config["right_y"].clone();
@@ -1036,12 +1088,14 @@ impl Editor {
                     .as_array_mut()
                     .unwrap()
                     .iter_mut()
-                    .filter(|s| s["label"].is_object())
+                    .filter(|s| {
+                        s["label"].is_object()
+                            && s["series_id"]
+                                .as_str()
+                                .is_some_and(|id| legend_owners.contains(id))
+                    })
                     .enumerate()
                 {
-                    if !series["label"].is_object() {
-                        continue;
-                    }
                     let key = format!("legend_label_{}", series["series_id"].as_str().unwrap());
                     ui.label(format!("Entry {}", index + 1));
                     labels_changed |= self.rich_text_editor(ui, &mut series["label"], &key);
@@ -1050,7 +1104,11 @@ impl Editor {
                     let mut content: renderer::text::RichText =
                         serde_json::from_value(node.clone()).unwrap();
                     content.segments.clear();
-                    for series in state["series"].as_array().unwrap() {
+                    for series in state["series"].as_array().unwrap().iter().filter(|s| {
+                        s["series_id"]
+                            .as_str()
+                            .is_some_and(|id| legend_owners.contains(id))
+                    }) {
                         let series: SeriesConfig = serde_json::from_value(series.clone()).unwrap();
                         if let Some(label) = &series.label {
                             renderer::legend::append_legend_entry_rich(
@@ -1147,6 +1205,20 @@ impl Editor {
             changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
+            let mut automatic = crate::tick_policy::automatic(
+                c.data.identity.as_ref(),
+                c.data.chart.config().active_layer(),
+                key,
+            );
+            let response = ui.checkbox(&mut automatic, "Automatic tick spacing");
+            self.controls.insert("auto_ticks".into(), response.rect);
+            if response.changed() {
+                crate::tick_policy::set_mode(&mut state, key, automatic);
+                if automatic {
+                    crate::tick_policy::retick_value(&mut config[key]);
+                }
+                changed = true;
+            }
             let node = &mut config[key];
             changed |= scale_control(ui, node, "axis_scale", &mut self.controls);
             let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
@@ -1195,7 +1267,10 @@ impl Editor {
                 | number(ui, node, "max", "Maximum", "", &mut self.controls);
             changed |= range_changed;
             let node = &mut config[key];
-            changed |= number(
+            if range_changed && automatic {
+                crate::tick_policy::retick_value(node);
+            }
+            let spacing_changed = number(
                 ui,
                 node,
                 "major_spacing",
@@ -1203,6 +1278,10 @@ impl Editor {
                 "",
                 &mut self.controls,
             );
+            if spacing_changed {
+                crate::tick_policy::set_mode(&mut state, key, false);
+                changed = true;
+            }
             changed |= number(
                 ui,
                 node,

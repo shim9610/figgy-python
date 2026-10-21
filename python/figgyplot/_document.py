@@ -53,7 +53,7 @@ def validate(state):
     meta = state.get('identity')
     if meta is None:
         return
-    if set(meta) != {'figure', 'panels', 'layout', 'groups', 'retired'}:
+    if set(meta)-{'tick_modes'} != {'figure', 'panels', 'layout', 'groups', 'retired'}:
         raise ValueError('unknown or missing identity metadata fields')
     panels = meta['panels']
     if len(panels) != len(state['config'].get('subplots', [])) + 1:
@@ -71,6 +71,13 @@ def validate(state):
             if identifier(value) in seen:
                 raise ValueError(f'duplicate object ID: {value}')
             seen.add(value)
+    owners={p['id']:{'bottom_x','top_x','left_y','right_y'} for p in panels}
+    owners.update({o:{'y_axis'} for p in panels for o in p['overlays']})
+    modes=meta.get('tick_modes',{})
+    if not isinstance(modes,dict) or any(owner not in owners or not isinstance(axes,dict)
+        or set(axes)-owners[owner] or any(mode not in ('Auto','Fixed') for mode in axes.values())
+        for owner,axes in modes.items()):
+        raise ValueError('invalid tick mode or axes owner')
     if meta['layout'] is not None:
         layout = meta['layout']
         if set(layout) != {'grid', 'placement', 'row_weights', 'column_weights', 'gap', 'size'}:
@@ -112,6 +119,32 @@ def object_ids(state):
     return result
 
 
+def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True):
+    meta=state.get('identity')
+    if meta is None:return
+    owner=overlay_id if overlay_id and side in ('right_y','y_axis') else panel_id
+    key='y_axis' if owner==overlay_id else side
+    meta.setdefault('tick_modes',{}).setdefault(owner,{})[key]='Auto' if automatic else 'Fixed'
+    peer={'bottom_x':'top_x','top_x':'bottom_x','left_y':'right_y','right_y':'left_y'}.get(key)
+    cfg=panel_config(state,panel_id)
+    if paired and peer and all(cfg[key].get(k)==cfg[peer].get(k) for k in ('min','max','scale','inverted')):
+        meta['tick_modes'][owner][peer]='Auto' if automatic else 'Fixed'
+
+
+def manual_tick_patch(state, patch, panel_id=None, overlay_id=None):
+    """Configuration of a numeric major spacing explicitly selects fixed ticks."""
+    panel_id=panel_id or state['identity']['panels'][0]['id']
+    for key in ('bottom_x','top_x','left_y','right_y','y_axis'):
+        if isinstance(patch.get(key),dict) and 'major_spacing' in patch[key]:
+            set_tick_mode(state,panel_id,overlay_id,key,False,paired=False)
+    for i,overlay in enumerate(patch.get('overlays',[])):
+        ids=next(p['overlays'] for p in state['identity']['panels'] if p['id']==panel_id)
+        if i<len(ids):manual_tick_patch(state,overlay,panel_id,ids[i])
+    for i,panel in enumerate(patch.get('subplots',[])):
+        if i+1<len(state['identity']['panels']):
+            manual_tick_patch(state,panel.get('config',{}),state['identity']['panels'][i+1]['id'])
+
+
 def track_identities(before, after):
     """Retired IDs cannot silently acquire a different object in the same document."""
     meta = after.get('identity')
@@ -125,6 +158,14 @@ def track_identities(before, after):
     if retired & object_ids(after):
         raise ValueError('retired object IDs cannot be reused; assign a new ID')
     meta['retired'] = sorted(retired)
+
+
+def prune_tick_modes(before, after):
+    old,new=before.get('identity'),after.get('identity')
+    if not old or not new or old['figure']!=new['figure']:return
+    def owners(meta):return {v for p in meta['panels'] for v in [p['id'],*p['overlays']]}
+    for removed in owners(old)-owners(new):
+        if isinstance(new.get('tick_modes'),dict):new['tick_modes'].pop(removed,None)
 
 
 def validate_features(state):

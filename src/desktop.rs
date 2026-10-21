@@ -669,8 +669,22 @@ impl SurfaceWindow {
                         let mut cfg = c.data.chart.config().clone();
                         let dx = -(self.cursor.0 - old.0) as f64 / bounds.width.max(1.) as f64;
                         let dy = (self.cursor.1 - old.1) as f64 / bounds.height.max(1.) as f64;
-                        navigate_document_axis(&mut cfg, "x", 1., 0.5, dx);
-                        navigate_document_axis(&mut cfg, "y", 1., 0.5, dy);
+                        navigate_document_axis(
+                            &mut cfg,
+                            c.data.identity.as_ref(),
+                            "x",
+                            1.,
+                            0.5,
+                            dx,
+                        );
+                        navigate_document_axis(
+                            &mut cfg,
+                            c.data.identity.as_ref(),
+                            "y",
+                            1.,
+                            0.5,
+                            dy,
+                        );
                         c.commit_config(cfg)?;
                         self.last_input = Some(input_received);
                         self.window.request_redraw();
@@ -975,10 +989,10 @@ impl SurfaceWindow {
                 let shift = self.modifiers.shift_key();
                 // Ctrl isolates X, Shift isolates Y; plain wheel zooms both.
                 if !shift || ctrl {
-                    navigate_document_axis(&mut cfg, "x", factor, x, 0.);
+                    navigate_document_axis(&mut cfg, c.data.identity.as_ref(), "x", factor, x, 0.);
                 }
                 if !ctrl || shift {
-                    navigate_document_axis(&mut cfg, "y", factor, y, 0.);
+                    navigate_document_axis(&mut cfg, c.data.identity.as_ref(), "y", factor, y, 0.);
                 }
                 c.commit_config(cfg)?;
                 self.last_input = Some(input_received);
@@ -1720,6 +1734,7 @@ fn active_coordinate_config(config: &Config) -> Config {
 }
 fn navigate_document_axis(
     config: &mut Config,
+    identity: Option<&Value>,
     dimension: &str,
     factor: f64,
     anchor: f64,
@@ -1741,13 +1756,22 @@ fn navigate_document_axis(
         && let Some(o) = overlay
     {
         navigate_axis(&mut cfg.overlays[o].y_axis, factor, anchor, shift);
+        if factor != 1. && crate::tick_policy::automatic(identity, layer, "right_y") {
+            crate::tick_policy::retick(&mut cfg.overlays[o].y_axis);
+        }
     } else if dimension == "x" {
-        for axis in [&mut cfg.bottom_x, &mut cfg.top_x] {
+        for (key, axis) in [("bottom_x", &mut cfg.bottom_x), ("top_x", &mut cfg.top_x)] {
             navigate_axis(axis, factor, anchor, shift);
+            if factor != 1. && crate::tick_policy::automatic(identity, layer, key) {
+                crate::tick_policy::retick(axis);
+            }
         }
     } else {
-        for axis in [&mut cfg.left_y, &mut cfg.right_y] {
+        for (key, axis) in [("left_y", &mut cfg.left_y), ("right_y", &mut cfg.right_y)] {
             navigate_axis(axis, factor, anchor, shift);
+            if factor != 1. && crate::tick_policy::automatic(identity, layer, key) {
+                crate::tick_policy::retick(axis);
+            }
         }
     }
 }

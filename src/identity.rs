@@ -27,16 +27,23 @@ pub(super) fn refresh_legends(config: &mut Config, series: &[SeriesConfig]) {
         .filter(|s| !config.subplots.iter().any(|p| p.owns_series(&s.series_id)))
         .cloned()
         .collect();
+    // Python legend builders emit entries only for labelled series. The
+    // renderer helper pairs entries positionally with the supplied owners.
+    let labelled: Vec<_> = owned
+        .iter()
+        .filter(|s| s.label.is_some())
+        .cloned()
+        .collect();
     renderer::legend::update_legend_symbols_preserving_text(
         &mut config.legend.content,
-        &owned,
+        &labelled,
         config.colorbar.as_ref().map(|c| &c.colormap),
     );
     for overlay in &mut config.overlays {
         if let Some(legend) = overlay.legend.as_mut() {
             let owned: Vec<_> = owned
                 .iter()
-                .filter(|s| overlay.series.contains(&s.series_id))
+                .filter(|s| s.label.is_some() && overlay.series.contains(&s.series_id))
                 .cloned()
                 .collect();
             renderer::legend::update_legend_symbols_preserving_text(
@@ -113,6 +120,13 @@ struct Identity {
     layout: Option<Grid>,
     groups: HashMap<String, Shared>,
     retired: Vec<String>,
+    #[serde(default)]
+    tick_modes: HashMap<String, HashMap<String, TickMode>>,
+}
+#[derive(Deserialize)]
+enum TickMode {
+    Auto,
+    Fixed,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -182,6 +196,18 @@ pub(super) fn validate_identity(
         }
     }
     let panel_ids: HashSet<_> = meta.panels.iter().map(|p| p.id.as_str()).collect();
+    for (owner, modes) in &meta.tick_modes {
+        let sides: &[&str] = if panel_ids.contains(owner.as_str()) {
+            &["bottom_x", "top_x", "left_y", "right_y"]
+        } else if meta.panels.iter().any(|p| p.overlays.contains(owner)) {
+            &["y_axis"]
+        } else {
+            return Err(invalid("tick mode references unknown axes owner"));
+        };
+        if modes.keys().any(|key| !sides.contains(&key.as_str())) {
+            return Err(invalid("unknown tick mode axis"));
+        }
+    }
     if meta.retired.iter().collect::<HashSet<_>>().len() != meta.retired.len() {
         return Err(invalid("duplicate retired identity"));
     }

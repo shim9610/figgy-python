@@ -385,3 +385,35 @@ Switching scale selects a tick spacing of one decade for logarithmic scales,
 or one fifth of the range for linear scales. Direct SSOT range edits still
 require positive bounds for a logarithmic axis. Copy Python preserves the
 chosen scales. Both desktop and Jupyter expose these controls.
+
+## Shared legend typography and automatic tick spacing
+
+The legend form starts with **All legend entries**: font family, font size and
+color. Individual entry text and character formatting follow those common
+controls. A common font change preserves superscripts, subscripts and other
+character formatting. Native text fields use installed system fallback fonts
+for characters missing from the UI font, independently of the chart font.
+
+Wheel zoom recalculates tick spacing by default for the selected panel or
+secondary Y axis. Linear axes use the renderer's 1/2/5 spacing rule;
+logarithmic axes use whole decades. Panning preserves the current spacing.
+In the axis form, **Automatic tick spacing** restores automatic spacing at the
+current limits. Entering a numeric major spacing switches that axis to fixed
+spacing, which subsequent zooms preserve. Python `configure(...)` and
+`update(..., major_spacing=...)` also select fixed spacing; `set_xlim(...)` and
+`set_ylim(...)` fit the range and restore automatic spacing for that dimension.
+The conditional opposite-edge pairing rule above also applies to edits in the
+axis form; raw `configure(...)` patches remain one-sided.
+
+Saved schema-2 settings optionally include `identity.tick_modes`, addressed by
+persistent panel or overlay IDs. Panel entries use `bottom_x`, `top_x`, `left_y`
+and `right_y`; overlay entries use `y_axis`. Values are `Auto` or `Fixed`, and
+an absent entry means `Auto`. Numeric `major_spacing` remains in the renderer
+configuration in both modes. Full settings replay and Copy Python retain the
+mode along with the displayed spacing. Removing an owner removes its tick
+policy; unknown owner IDs and unknown modes are rejected.
+
+The current renderer does not label intermediate log values inside a decade.
+Automatic spacing therefore cannot yet add labels such as `2 × 10⁴` and
+`5 × 10⁴` when a log view is narrow. This renderer limitation is tracked in
+[figgy#42](https://github.com/shim9610/figgy/issues/42).

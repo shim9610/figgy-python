@@ -36,7 +36,7 @@ function reconcilePairedAxisEdit(before,state,target){
   }
 }
 const ids = ['chart_title','legend','data_area','colorbar','colorbar_axis','colorbar_tick_labels','colorbar_title',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
-const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',label_format:'Number format',significant_digits:'Significant digits',font_size:'Font size',font:'Font family',line_width:'Line width'};
+const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',label_format:'Number format',significant_digits:'Significant digits',auto_ticks:'Automatic tick spacing',font_size:'Font size',font:'Font family',line_width:'Line width'};
 const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
 export function render({model,el}) {
   const root=document.createElement('div');root.className='figgy-editor figgy-webgpu';
@@ -408,12 +408,29 @@ export function render({model,el}) {
     if(overlay===undefined)return cfg;
     const view=Object.create(cfg),node=cfg.overlays[overlay];
     Object.defineProperty(view,'right_y',{get:()=>node.y_axis,set:value=>node.y_axis=value});
+    if(node.legend)Object.defineProperty(view,'legend',{get:()=>node.legend,set:value=>node.legend=value});
     return view;
   }
   function navigateDocumentAxis(state,dimension,factor,anchor,shift=0){
     const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
-    if(dimension==='y'&&overlay!==undefined)navigate(cfg.overlays[overlay].y_axis,factor,anchor,shift);
-    else for(const key of dimension==='x'?['bottom_x','top_x']:['left_y','right_y'])navigate(cfg[key],factor,anchor,shift);
+    if(dimension==='y'&&overlay!==undefined){navigate(cfg.overlays[overlay].y_axis,factor,anchor,shift);if(factor!==1&&tickAutomatic(state,'right_y'))retick(cfg.overlays[overlay].y_axis);}
+    else for(const key of dimension==='x'?['bottom_x','top_x']:['left_y','right_y']){navigate(cfg[key],factor,anchor,shift);if(factor!==1&&tickAutomatic(state,key))retick(cfg[key]);}
+  }
+  function tickAddress(state,key){
+    const layer=state.config.active_layer,index=(layer?.Subplot??layer?.SubplotOverlay?.[0]??-1)+1,panel=state.identity?.panels?.[index];
+    const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
+    return key==='right_y'&&overlay!==undefined?[panel?.overlays?.[overlay],'y_axis']:[panel?.id,key];
+  }
+  function tickAutomatic(state,key){const [owner,side]=tickAddress(state,key);return state.identity?.tick_modes?.[owner]?.[side]!=='Fixed';}
+  function tickMode(state,key,automatic){const [owner,side]=tickAddress(state,key);if(owner===undefined)return;state.identity.tick_modes??={};state.identity.tick_modes[owner]??={};const modes=state.identity.tick_modes[owner],mode=automatic?'Auto':'Fixed';modes[side]=mode;
+    const peer={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[side],cfg=activePanel(state);
+    if(peer&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))modes[peer]=mode;
+  }
+  function retick(axis){
+    if(axis.scale==='Logarithmic'){const decades=Math.max(1,Math.ceil(Math.log10(axis.max))-Math.floor(Math.log10(axis.min)));axis.major_spacing=decades<=6?1:decades<=12?2:Math.ceil(decades/6);return;}
+    const span=axis.max-axis.min;if(!(span>0&&Number.isFinite(span)))return;
+    const base=10**Math.floor(Math.log10(span)),fraction=span/base;
+    axis.major_spacing=base>0&&Number.isFinite(base)?(fraction>=5?base:fraction>=2?base*.5:base*.2):span;
   }
   function elementName(name,state=local){
     const layer=state.config.active_layer,index=layer?.Subplot??layer?.SubplotOverlay?.[0];
@@ -555,7 +572,26 @@ export function render({model,el}) {
       });digits.min='1';digits.max='15';digits.step='1';
     }
     function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{applyProperty(apply,input.checked);}));row.append(input);fields.append(row);}
-    function syncLegend(state){chart.set_series(JSON.stringify(state.series));chart.reset_legend_from_series_labels();configOf(state).legend.content=JSON.parse(chart.get_config()).legend.content;}
+    function legendSeries(state){
+      const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
+      const index=layer?.Subplot??layer?.SubplotOverlay?.[0],children=state.config.subplots??[];
+      const assigned=new Set(children.flatMap(p=>p.series??[]));
+      const owned=new Set(overlay!==undefined&&cfg.overlays[overlay].legend?cfg.overlays[overlay].series:index===undefined?state.series.filter(s=>!assigned.has(s.series_id)).map(s=>s.series_id):children[index].series);
+      return state.series.filter(s=>s.label&&owned.has(s.series_id));
+    }
+    function syncLegend(state){
+      const labels=legendSeries(state),chars=configOf(state).legend.content.segments,anchors=[];
+      // Read the renderer's explicit symbol fields and tabs. Text may contain
+      // newlines; splitting rows on every newline would corrupt multiline labels.
+      for(let i=0;i<chars.length;){
+        if(chars[i].field_em==null){i++;continue;}
+        const start=i;while(i<chars.length&&chars[i].field_em!=null)i++;
+        while(i<chars.length&&chars[i].text===' ')i++;
+        if(chars[i]?.text==='\t'){anchors.push({start,text:i+1});i++;}
+      }
+      if(anchors.length!==labels.length)throw Error('This custom legend layout cannot be matched to its labelled series');
+      for(let i=anchors.length-1;i>=0;i--){let end=anchors[i+1]?.start??chars.length;if(i+1<anchors.length&&chars[end-1]?.text==='\n')end--;chars.splice(anchors[i].text,end-anchors[i].text,...clone(labels[i].label.segments));}
+    }
     function richControls(find,key,input){
       function remember(){textRanges.set(key,[Array.from(input.value.slice(0,input.selectionStart)).length,Array.from(input.value.slice(0,input.selectionEnd)).length]);}
       input.addEventListener('select',remember);input.addEventListener('keyup',remember);input.addEventListener('mouseup',remember);
@@ -646,7 +682,7 @@ export function render({model,el}) {
       field('font',rich.font,'text',(s,v)=>find(s).font=v);
       field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
       if(target==='legend'){const heading=document.createElement('p');heading.textContent='Legend entries · select characters to format them';fields.append(heading);}
-      if(target==='legend')for(const [index,item] of local.series.filter(s=>s.label).entries()){
+      if(target==='legend')for(const [index,item] of legendSeries(local).entries()){
         const findLabel=s=>s.series.find(v=>v.series_id===item.series_id).label,key=`legend_label_${item.series_id}`;
         const input=field(key,text(item.label),'text',(s,v)=>{findLabel(s).segments=preserve(findLabel(s).segments,segments(v));syncLegend(s);});input.parentElement.firstChild.textContent=`Entry ${index+1}`;richControls(findLabel,key,input);
       }
@@ -665,12 +701,13 @@ export function render({model,el}) {
       if(style.matrix)colorScale();
     }else if(target==='colorbar'||target.startsWith('colorbar_')){colorScale();
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
+      toggle('auto_ticks',tickAutomatic(local,key),(s,v)=>{tickMode(s,key,v);if(v)retick(configOf(s)[key]);});
       scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key.endsWith('_x')?'x':'y');
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>configOf(s)[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>configOf(s)[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>configOf(s)[key].tick=v);
       numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);
-      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
+      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;if(name==='major_spacing')tickMode(s,key,false);else if(['min','max'].includes(name)&&tickAutomatic(s,key))retick(configOf(s)[key]);});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }

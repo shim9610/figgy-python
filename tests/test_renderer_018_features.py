@@ -315,3 +315,28 @@ def test_malformed_document_shapes_are_rejected_without_state_changes(backend):
             with pytest.raises(ValueError):
                 figure.apply_settings(broken)
             assert figure.get_settings() == before and figure.revision == revision
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_tick_intent_replays_by_owner_and_rejects_invalid_metadata(backend):
+    with figgy.Figure(backend=backend,grid=[['first','second']]) as fig:
+        ax=fig.subplots['second'].axes
+        ax.plot([0,100],[1,10],id='signal')
+        ax.configure(bottom_x={'major_spacing':7})
+        twin=ax.twinx(id='pressure')
+        twin.plot([0,100],[10,100],id='pressure_data')
+        twin.configure(y_axis={'major_spacing':11})
+        state=fig.get_settings()
+        assert state['identity']['tick_modes']['second']=={'bottom_x':'Fixed'}
+        assert state['identity']['tick_modes']['pressure']=={'y_axis':'Fixed'}
+        namespace={'fig':fig};exec(fig.to_code(),namespace)
+        assert fig.get_settings()==state
+        for owner,key,mode in [('missing','bottom_x','Auto'),('second','y_axis','Auto'),('pressure','y_axis','Unknown')]:
+            bad=copy.deepcopy(state)
+            bad['identity']['tick_modes'].setdefault(owner,{})[key]=mode
+            revision=fig.revision
+            with pytest.raises(ValueError):fig.apply_settings(bad)
+            assert fig.get_settings()==state and fig.revision==revision
+        ax.set_xlim(0,50)
+        assert fig.get_settings()['identity']['tick_modes']['second']['bottom_x']=='Auto'
+        assert fig.get_settings()['identity']['tick_modes']['pressure']['y_axis']=='Fixed'

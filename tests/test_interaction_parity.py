@@ -43,6 +43,68 @@ def test_legacy_settings_and_heatmap_legend_preserve_shared_host_model(backend):
 
 NEEDS_UI = not os.environ.get('DISPLAY') or not all(shutil.which(p) for p in ['xdotool','xclip','wmctrl']) or os.environ.get('FIGGY_TEST_JUPYTER') != '1'
 
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('panel',['main','child'])
+def test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series(backend,panel):
+    from figgyplot._native import rebuild_legend_json
+    with figgy.Figure(backend=backend) as fig:
+        if panel=='child':fig.set_layout([['main','child']])
+        ax=fig.subplots[panel].axes
+        ax.plot([0,1],[1,2],marker='^',id='not_in_legend')
+        ax.scatter([0,1],[2,1],marker='o',label='Same label',id='circle')
+        ax.scatter([0,1],[3,2],marker='D',label='Same label',id='diamond')
+        ax.legend()
+        before=fig.get_settings();cfg=ax._config(before)
+        expected=json.loads(rebuild_legend_json(json.dumps(ax._owned_series(before)),json.dumps(cfg['legend']['content']),None))
+        assert cfg['legend']['content']==expected
+        fig.configure(series={'diamond':{'render_type':{'Scatter':{'scatter':{'point_size':5.6}}}}})
+        after=fig.get_settings()
+        assert ax._config(after)['legend']['content']==expected
+        assert after['series'][1]['render_type']['Scatter']['scatter']['point_shape']=='CircleFilled'
+        assert after['series'][2]['render_type']['Scatter']['scatter']['point_shape']=='DiamondFilled'
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('change',['unlabelled_size','labelled_width','all_labelled'])
+def test_offscreen_legend_keys_keep_their_symbols_after_configure(backend,change,tmp_path):
+    """Style edits preserve the labelled subset, including offscreen legend keys."""
+    from figgyplot._native import rebuild_legend_json
+    with figgy.Figure(figsize=(6,4),dpi=120,backend=backend) as fig:
+        ax=fig.axes[0];x=np.linspace(0,10,11)
+        ax.plot(x,x,color='#c44536',linestyle='--',marker='o',markersize=4,
+                label='red data' if change=='all_labelled' else None,id='data_red')
+        ax.plot(x,x+3,color='#0b6e99',linestyle=':',marker='s',markersize=4,
+                label='blue data' if change=='all_labelled' else None,id='data_blue')
+        ax.plot([-1e9,-.9e9],[1,1],color='#2a9d8f',linewidth=3,label='key green line',id='key_line')
+        ax.scatter([-1e9],[1],color='#57606a',marker='^',s=16,label='key grey triangle',id='key_tri')
+        ax.set_xlim(0,10);ax.set_ylim(0,15);ax.legend(True)
+        before=fig.get_settings();legend=before['config']['legend']['content']
+        expected=json.loads(rebuild_legend_json(json.dumps(before['series']),json.dumps(legend),None))
+        assert legend==expected
+        if backend=='native':fig.savefig(tmp_path/'before.png')
+        if change=='labelled_width':
+            patch={'key_line':{'render_type':{'Line':{'line':{'line_width':5.6}}}}}
+        else:
+            patch={'data_red':{'render_type':{'ScatterLine':{'scatter':{'point_size':5.6}}}}}
+        fig.configure(series=patch)
+        after=fig.get_settings()
+        expected=json.loads(rebuild_legend_json(json.dumps(after['series']),json.dumps(legend),None))
+        assert after['config']['legend']['content']==expected
+        if change!='labelled_width':assert expected==legend
+        if backend=='native':
+            fig.savefig(tmp_path/'after.png')
+            pixels=fig.render_rgba()[...,:3].astype(int)
+            # These keys are outside the axes: their colors can appear only in
+            # the legend, so this also checks the actual rendered symbols.
+            for color in ([42,157,143],[87,96,106]):
+                ink=255-np.array(color)
+                coverage=((255-pixels)@ink)/(ink@ink)
+                error=np.max(np.abs(pixels-(255-coverage[...,None]*ink)),axis=2)
+                assert np.count_nonzero((coverage>.35)&(coverage<=1.01)&(error<=2))>3
+        assert [s['label'] for s in after['series']]==[s['label'] for s in before['series']]
+        assert [s['render_type'].keys() for s in after['series']]==[s['render_type'].keys() for s in before['series']]
+
+
 if os.environ.get('FIGGY_REQUIRE_INTERACTION_PARITY') == '1' and NEEDS_UI:
     raise RuntimeError('Required interaction parity cannot be skipped: install X11 tools, set DISPLAY and FIGGY_TEST_JUPYTER=1')
 
@@ -1932,29 +1994,43 @@ ax.activate()
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
-def test_legend_shared_typography_precedes_entries_in_both_hosts(tmp_path):
-    setup="for i in range(3): ax.plot([0,1,2],[i,i+1,i],label=f'10⁻{chr(0x2076+i)} Torr',id=f'p{i}')\nax.legend()"
+@pytest.mark.parametrize('panel',['main','child'])
+def test_legend_shared_typography_precedes_entries_in_both_hosts(tmp_path,panel):
+    setup="ax.plot([0,1,2],[4,3,4],id='unlabelled')\nfor i in range(3): ax.plot([0,1,2],[i,i+1,i],marker=['o','s','^'][i],label=f'10⁻{chr(0x2076+i)} Torr',id=f'p{i}')\nax.legend()"
+    if panel=='child':setup="ax.plot([0,1],[8,9],label='Other panel',id='other_panel');ax.legend()\nfig.set_layout([['main','child']]);ax=fig.subplots['child'].axes\n"+setup
+    target='subplot_0:legend' if panel=='child' else 'legend'
+    tree_panel='child' if panel=='child' else 'main'
+    def config(state):return state['config']['subplots'][0]['config'] if panel=='child' else state['config']
+    def assert_scope(state):
+        if panel=='child':assert 'Other panel' in ''.join(s['text'] for s in state['config']['legend']['content']['segments'])
     def assert_style(state):
-        assert state['config']['legend']['content']['font']=='Liberation Sans'
-        assert state['config']['legend']['content']['font_size']==21
+        assert_scope(state)
+        assert config(state)['legend']['content']['font']=='Liberation Sans'
+        assert config(state)['legend']['content']['font_size']==21
         for series in state['series']:
-            assert any(s['text']=='-' and s['superscript'] for s in series['label']['segments'])
+            if series['series_id'].startswith('p') and series['label'] is not None:assert any(s['text']=='-' and s['superscript'] for s in series['label']['segments'])
+            if series['label'] is not None:assert not any(s['bold'] for s in series['label']['segments'])
     with figgy.Figure(backend='native') as fig:
         ax=fig.axes[0];exec(setup,{'fig':fig,'ax':ax});handle=fig.show(block=False)
         try:
             inputs=Inputs(handle);inputs.click('properties')
-            choose_native_object(inputs,'legend','panel/main/legend')
+            choose_native_object(inputs,'legend',f'panel/{tree_panel}/legend')
             controls=inputs.info()['controls']
+            if panel=='child':assert 'legend_label_other_panel' not in controls
             assert controls['font'][1]<controls['font_size'][1]<controls['legend_label_p0'][1]
             inputs.click('font');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','Liberation Sans');inputs.key('Tab')
             inputs.click('font_size');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','21');inputs.key('Return')
             assert_style(fig.get_settings())
+            legend=config(fig.get_settings())['legend']['content']
+            fig.configure(series={'p1':{'render_type':{'ScatterLine':{'scatter':{'point_size':5.6}}}}});inputs.pump()
+            assert config(fig.get_settings())['legend']['content']==legend
             inputs.click('legend_label_p2');inputs.key('End');inputs.xdo('type','--clearmodifiers',' updated');inputs.key('Tab')
             assert_style(fig.get_settings())
-            assert ''.join(s['text'] for s in fig.get_settings()['series'][2]['label']['segments']).endswith(' updated')
+            assert ''.join(s['text'] for s in next(s for s in fig.get_settings()['series'] if s['series_id']=='p2')['label']['segments']).endswith(' updated')
+            (tmp_path/'native-legend-settings.json').write_text(json.dumps(fig.get_settings()))
             # Return to the top so the capture shows common controls first.
-            choose_native_object(inputs,'chart_title','panel/main/chart_title')
-            choose_native_object(inputs,'legend','panel/main/legend')
+            choose_native_object(inputs,'chart_title',f'panel/{tree_panel}/chart_title')
+            choose_native_object(inputs,'legend',f'panel/{tree_panel}/legend')
             from PIL import ImageGrab
             window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
             x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
@@ -1963,16 +2039,76 @@ def test_legend_shared_typography_precedes_entries_in_both_hosts(tmp_path):
         finally:handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
     with notebook(tmp_path/'legend',source) as (page,execute):
-        page.locator('[data-properties]').click();ObjectNavigator(page).choose('legend')
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose(target)
+        if panel=='child':assert page.locator('[data-property=legend_label_other_panel]').count()==0
         order=page.locator('[data-property]').evaluate_all("els=>els.map(el=>el.dataset.property)")
         assert order.index('font')<order.index('font_size')<order.index('legend_label_p0')
         assert page.locator('[data-property=text]').count()==0
         font=page.locator('[data-property=font]');font.fill('Liberation Sans');font.dispatch_event('change');page.evaluate(ROOT+'.flush()')
         size=page.locator('[data-property=font_size]');size.fill('21');size.dispatch_event('change');page.evaluate(ROOT+'.flush()')
         assert_style(page.evaluate(ROOT+'.snapshot()'))
+        legend=config(page.evaluate(ROOT+'.snapshot()'))['legend']['content']
+        execute("fig.configure(series={'p1':{'render_type':{'ScatterLine':{'scatter':{'point_size':5.6}}}}})");page.evaluate(ROOT+'.flush()')
+        assert config(page.evaluate(ROOT+'.snapshot()'))['legend']['content']==legend
         label=page.locator('[data-property=legend_label_p2]');label.fill(label.input_value()+' updated');label.dispatch_event('change');page.evaluate(ROOT+'.flush()')
         execute('await fig.sync()');state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert_style(state)
-        assert ''.join(s['text'] for s in state['series'][2]['label']['segments']).endswith(' updated')
+        assert ''.join(s['text'] for s in next(s for s in state['series'] if s['series_id']=='p2')['label']['segments']).endswith(' updated')
         assert not page.locator('.figgy-error').inner_text()
         screenshot_editor(page,tmp_path/'browser-legend-typography.png')
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('owner',['primary','subplot','overlay'])
+def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tmp_path,owner):
+    setup="ax=fig.axes[0];ax.plot([0,1000],[1,1000],id='base');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
+    if owner=='subplot':setup+="fig.set_layout([['main','right']]);ax=fig.subplots['right'].axes;ax.plot([0,1000],[1,1000],id='other');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
+    if owner=='overlay':setup+="ax=ax.twinx(id='pressure');ax.plot([0,1000],[1,1e9],id='pressure_data');ax.set_yscale('log');ax.set_ylim(1,1e9)\n"
+    setup+='ax.activate()'
+    key='right_y' if owner=='overlay' else 'bottom_x'
+    target='overlay_0:axis_right' if owner=='overlay' else 'subplot_0:axis_bottom' if owner=='subplot' else 'axis_bottom'
+    node='panel/main/overlay/pressure/axis_right' if owner=='overlay' else 'panel/right/axis_bottom' if owner=='subplot' else 'panel/main/axis_bottom'
+    def config(state):return state['config']['subplots'][0]['config'] if owner=='subplot' else state['config']
+    def axis(state):return config(state)['overlays'][0]['y_axis'] if owner=='overlay' else config(state)[key]
+    manual="ax.configure(y_axis={'major_spacing':3.0})" if owner=='overlay' else "ax.configure(bottom_x={'major_spacing':7.0},top_x={'major_spacing':7.0})"
+    def center(state):
+        r=config(state)['chart_area'];return r['x']+r['width']/2,r['y']+r['height']/2
+    native_spacing=None
+    with figgy.Figure(backend='native') as fig:
+        exec(setup,{'fig':fig});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);before=fig.get_settings();spacing=axis(before)['major_spacing'];uploads=fig.info['column_uploads']
+            x,y=native_point(inputs.info(),center(before));modifier='shift' if owner=='overlay' else 'ctrl'
+            if owner=='subplot':inputs.click_rect([x,y,0,0])
+            def zoom():
+                inputs.xdo('mousemove','--window',inputs.wid,round(x),round(y));inputs.pump();inputs.xdo('keydown',modifier);inputs.xdo('click','--repeat',8,'--delay',15,4);inputs.xdo('keyup',modifier);inputs.pump()
+            zoom();current=fig.get_settings();native_spacing=axis(current)['major_spacing']
+            assert native_spacing<spacing
+            if owner=='overlay':assert current['config']['left_y']==before['config']['left_y']
+            if owner=='subplot':assert current['config']['bottom_x']==before['config']['bottom_x']
+            # Explicit numeric configuration selects fixed ticks and survives zoom.
+            ax=fig._axes_for('right' if owner=='subplot' else 'main','pressure' if owner=='overlay' else None)
+            exec(manual,{'ax':ax});inputs.pump();fixed=axis(fig.get_settings())['major_spacing'];zoom()
+            assert axis(fig.get_settings())['major_spacing']==fixed
+            inputs.click('properties');choose_native_object(inputs,'axis_right' if owner=='overlay' else 'axis_bottom',node)
+            inputs.click('auto_ticks');inputs.pump()
+            assert axis(fig.get_settings())['major_spacing']!=fixed
+            assert fig.info['column_uploads']==uploads
+            assert not inputs.info()['error']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/owner,source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose(target,node=node)
+        state=page.evaluate(ROOT+'.snapshot()');x,y=browser_point(page,center(state));modifier='Shift' if owner=='overlay' else 'Control'
+        def zoom():
+            page.mouse.move(x,y);page.keyboard.down(modifier);page.mouse.wheel(0,-320);page.keyboard.up(modifier);page.evaluate(ROOT+'.flush()')
+        before=axis(state)['major_spacing'];zoom();state=page.evaluate(ROOT+'.snapshot()')
+        assert axis(state)['major_spacing']<before
+        assert axis(state)['major_spacing']==native_spacing
+        execute(manual);page.evaluate(ROOT+'.flush()');fixed=axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing'];zoom()
+        assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']==fixed
+        ObjectNavigator(page).choose(target,node=node);page.locator('[data-property=auto_ticks]').check();page.evaluate(ROOT+'.flush()')
+        assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']!=fixed
+        execute('await fig.sync()');accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert accepted['identity']['tick_modes']==page.evaluate(ROOT+'.snapshot().identity.tick_modes')
+        assert not page.locator('.figgy-error').inner_text()

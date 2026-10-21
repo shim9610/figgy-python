@@ -355,14 +355,16 @@ class Figure:
                 settings = copy.deepcopy(settings)
                 settings["config"] = _merge(copy.deepcopy(self._default_config), settings["config"])
             settings = copy.deepcopy(settings)
+            previous = self.get_settings()
             if settings.get('schema_version') == 1 and 'identity' not in settings:
                 current = self.get_settings().get('identity')
                 if current is not None:
                     settings['identity'] = copy.deepcopy(current)
                     settings['schema_version'] = 2
             try:
+                _document.prune_tick_modes(previous,settings)
                 _document.validate(settings)
-                _document.track_identities(self.get_settings(), settings)
+                _document.track_identities(previous, settings)
             except (AttributeError, KeyError, IndexError, StopIteration) as exc:
                 raise ValueError('invalid settings document structure') from exc
             self._native.apply_settings(json.dumps(settings, allow_nan=False))
@@ -501,6 +503,8 @@ class Figure:
                     rich = None
                 else:
                     raise ValueError(f"unknown editable target: {target}")
+                if 'major_spacing' in properties and target.startswith('axis_') and not target.startswith('axis_title_'):
+                    _document.set_tick_mode(state,_axes.subplot_id if _axes else state['identity']['panels'][0]['id'],_axes.overlay_id if _axes else None,_axis_key(target[len('axis_'):]),False)
                 for key, value in properties.items():
                     if key == "text" and rich is not None:
                         rich["segments"] = _segments(value)
@@ -628,6 +632,7 @@ class Figure:
                 if "draw_style" in config:
                     state["config"].pop("draw_style", None)
                 state["config"] = _merge(state["config"], config)
+                _document.manual_tick_patch(state, config)
             if series is not None:
                 existing = {s["series_id"]: s for s in state["series"]}
                 for sid, patch in series.items():
@@ -1043,6 +1048,7 @@ class Axes(FeatureMethods, ChartMethods):
             if 'draw_style' in properties:
                 cfg.pop('draw_style', None)
             _merge(cfg, properties)
+        _document.manual_tick_patch(state,properties,self.subplot_id,self.overlay_id)
         self.figure.apply_settings(state)
         return self
 
@@ -1113,6 +1119,8 @@ class Axes(FeatureMethods, ChartMethods):
             return low, high
         state['config']['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
         state['config'] = json.loads(fitted_range_json(json.dumps(state['config']), dimension, low, high))
+        for key in (('bottom_x','top_x') if dimension=='x' else ('right_y',) if self.overlay_id else ('left_y','right_y')):
+            _document.set_tick_mode(state,self.subplot_id,self.overlay_id,key,True)
         self.figure.apply_settings(state)
         return low, high
 

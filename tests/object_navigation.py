@@ -24,10 +24,11 @@ class ObjectNavigator:
     def __init__(self, page):
         self.page = page
 
-    def choose(self, target):
+    def choose(self, target, *, node=None):
         search = self.page.locator('[data-object-search]')
         search.fill(target.split(':')[-1])
-        row = self.page.locator(f'[role=treeitem][data-object={json.dumps(target)}]')
+        attribute, value = ('data-node', node) if node else ('data-object', target)
+        row = self.page.locator(f'[role=treeitem][{attribute}={json.dumps(value)}]')
         row.click()
         search.fill('')
 
