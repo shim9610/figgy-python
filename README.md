@@ -432,7 +432,8 @@ rates are reported separately; they are not monitor FPS measurements.
 The native extension uses the published **figgy-renderer 0.18.1** and
 **figgy-model 0.12.1** crates from crates.io, pinned in `Cargo.lock`.
 The packaged browser kernel is built from their upstream release commit
-`3a0a6a3` with a recorded web-binding patch for non-borrowing GPU completion.
+`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d` with a recorded web-binding patch
+for non-borrowing GPU completion and current annotation hit geometry.
 Asset provenance checks pair the registry versions and checksums with that
 source revision and verify the binding patch hash. Rust owns chart layout,
 rendering, picking and drag policies; this repository adds the NumPy-facing API,

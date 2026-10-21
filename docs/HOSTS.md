@@ -2,7 +2,8 @@
 
 The figgyplot 0.3.0 source uses the published `figgy-renderer 0.18.1` and
 `figgy-model 0.12.1` crates from crates.io. `Cargo.lock` pins their versions
-and checksums; packaged WASM uses their release commit `3a0a6a3`.
+and checksums; packaged WASM uses their release commit
+`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d`.
 Provenance checks preserve this source pairing; see [publishing](PUBLISHING.md).
 Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
