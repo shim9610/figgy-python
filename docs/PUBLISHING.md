@@ -43,14 +43,14 @@ other branches before building. This does not change main's branch protection.
 
 ## Versions and coordinated release order
 
-| Component | Working tree version | Published version verified 2026-10-20 |
+| Component | Working tree version | Published version verified 2026-10-21 |
 | --- | --- | --- |
-| `figgy-model` | 0.12.0 | 0.12.0 |
-| `figgy-renderer` | 0.18.0 | 0.18.0 |
+| `figgy-model` | 0.12.1 | 0.12.1 |
+| `figgy-renderer` | 0.18.1 | 0.18.1 |
 | `figgyplot` | 0.3.0 | 0.3.0 |
-| `figgy` WASM wrapper | 0.15.0 | Not a crates.io package (`publish = false`) |
+| `figgy` WASM wrapper | 0.15.1 | Not a crates.io package (`publish = false`) |
 
-Model 0.12.0 and renderer 0.18.0 are published. Python 0.3.0 was published on
+Model 0.12.1 and renderer 0.18.1 were published on 2026-10-21. Python 0.3.0 was published on
 2026-10-16 with renderer 0.17.0/model 0.11.0, as verified from its PyPI sdist.
 The migration tree still carries that package version; select a new unused
 version before building publication artifacts. Do not upload the changed source

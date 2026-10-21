@@ -282,11 +282,10 @@ export function render({model,el}) {
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
   async function geometryFrame(){
-    // set_document prepares bounded geometry at scale 1; frame() prepares it
-    // at the actual surface scale. Read/pick the displayed font metrics.
-    await waitForFrame();
-    resizeSurface();
-    if(dirty){await readyDisplayedFrame();dirty=false;}
+    // 0.18.1 prepares edits at the current surface scale. A resize still
+    // needs a fresh CPU hit map; neither path needs GPU display completion.
+    // Keep dirty set so display submissions remain coalesced behind the fence.
+    if(resizeSurface()&&kind)chart.set_document(chart.get_document(),local.config.chart_area.width,local.config.chart_area.height);
   }
   async function annotationGeometry(){
     await geometryFrame();
@@ -576,7 +575,7 @@ export function render({model,el}) {
     if(layerOf(local)==='Annotations'&&selected===null&&inspectorTarget===null){const hint=document.createElement('p');hint.textContent='Choose an annotation in the tree or click it in the chart.';fields.append(hint);return;}
     if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
-    if(['series/','bounded/series/'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
+    if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
     function applyProperty(apply,value){
       const before=snapshot(),state=clone(before);
       apply(state,value);
@@ -773,7 +772,7 @@ export function render({model,el}) {
     if(hasPanels()&&focusIndex()===null&&target!=='figure')return;
     const object=inspectedObject(target);
     if(!object)return;
-    const primary=object.id.startsWith('series/')||object.id.startsWith('bounded/series/')||object.id.startsWith('figure/')||target.split(':').at(-1).startsWith('colorbar'),covered=new Set([...fields.querySelectorAll('[data-property]')].map(v=>v.dataset.property));
+    const primary=object.id.startsWith('series/')||object.id.startsWith('bounded/series/slice_')||object.id.startsWith('figure/')||target.split(':').at(-1).startsWith('colorbar'),covered=new Set([...fields.querySelectorAll('[data-property]')].map(v=>v.dataset.property));
     const container=document.createElement('div');container.dataset.catalog='';
     const groups=new Map();
     for(const field of object.fields){

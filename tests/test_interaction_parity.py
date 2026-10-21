@@ -373,9 +373,11 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
-def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
+@pytest.mark.parametrize('family',['categorical','boxplot','radar'])
+def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path,family):
     """Slow GPU completion must not build a frame backlog ahead of PNG export."""
-    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\nax.bar(['A','B'],[3,5])\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
+    setup={'categorical':"ax.bar(['A','B'],[3,5])",'boxplot':"ax.boxplot([[1,2,3],[2,4,6]])",'radar':"ax.radar(['A','B','C'],[2,4,3])"}[family]
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
     with notebook(tmp_path/'frame-backpressure', source) as (page,execute):
         click_button(page, '[data-properties]')
         page.locator('.figgy-properties').wait_for(state='visible')
@@ -408,11 +410,12 @@ def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
             page.mouse.move(*end, steps=5)
             page.mouse.up()
             # Changing the inspector target is pure DOM work. Its controls must
-            # match the dropdown immediately, even while renderer work is held.
+            # match the selected object immediately, even while renderer work is held.
             target=ObjectNavigator(page)
-            series_id=page.evaluate(ROOT+'.snapshot().categorical.series[0].id')
+            series_id=page.evaluate(ROOT+f'.snapshot().{family}.series[0].id')
             target.choose(series_id)
             assert page.locator('[data-property=label]').count() == 1
+            label=page.locator('[data-property=label]');label.fill('Edited series');label.press('Tab')
             target.choose('chart_title')
             assert page.locator('[data-property=label]').count() == 0
             # An earlier queued Arrow still belongs to the title, even when
@@ -432,14 +435,15 @@ def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
             # Keep the actual completion fence held until this barrier returns.
             execute('await fig.sync(timeout=5)')
             accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
-            assert offset(accepted['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2)
+            assert accepted[family]['series'][0]['label']=='Edited series'
+            assert offset(accepted[family],'ChartTitle') == pytest.approx([13,6],abs=.2)
             assert target.selected() == series_id
         finally:
             page.evaluate('window.figgyFrameGate.release()')
         page.wait_for_function('before=>window.figgyGPUWork.submitted>before',arg=submitted,polling=100)
         execute('await fig.sync()')
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
-        assert offset(state['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2), target.selected()
+        assert offset(state[family],'ChartTitle') == pytest.approx([13,6],abs=.2), target.selected()
         assert target.selected() == series_id
         path=tmp_path/'coalesced-export.png'
         execute(f'await fig.savefig_async({str(path)!r})')
