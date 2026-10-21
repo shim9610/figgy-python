@@ -23,6 +23,7 @@ winit = "0.30.13"
 egui = "0.36.2"
 egui-wgpu = "0.36.2"
 egui-winit = "0.36.2"
+fontdb = "0.24"
 
 [profile.release]
 lto = "thin"

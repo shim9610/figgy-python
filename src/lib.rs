@@ -1690,6 +1690,7 @@ mod interaction;
 mod navigation;
 mod notebook;
 mod target_chooser;
+mod ui_fonts;
 use identity::{validate_columns, validate_identity};
 mod selection;
 

@@ -680,6 +680,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "figgy-renderer",
+ "fontdb",
  "numpy",
  "pollster",
  "pyo3",

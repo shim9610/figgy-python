@@ -349,6 +349,7 @@ impl Editor {
             "Box plot"
         });
         let mut changed = false;
+        changed |= self.font_controls(ui, &mut value, "font_family");
         for key in ["title", "category_title", "value_title"]
             .into_iter()
             .filter(|key| family != "radar" || *key == "title")
@@ -529,6 +530,12 @@ impl Editor {
             .clone();
         let mut changed = false;
         ui.heading("Pie / donut");
+        let mut fonts = json!({"font_family":chart.font_family,"font_size":chart.font_size});
+        if self.font_controls(ui, &mut fonts, "font_family") {
+            chart.font_family = fonts["font_family"].as_str().unwrap().to_owned();
+            chart.font_size = fonts["font_size"].as_f64().unwrap() as f32;
+            changed = true;
+        }
         ui.label("Title");
         let title = ui.text_edit_singleline(&mut chart.title);
         self.controls.insert("radial_title".into(), title.rect);

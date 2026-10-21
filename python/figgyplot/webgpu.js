@@ -582,8 +582,10 @@ export function render({model,el}) {
       }
       const textKey=name==='ReferenceLine'?'label':'text';
       if(name==='Arrow'||name==='ReferenceLine')toggle('show_label',!!geometry[textKey],(s,v)=>shape(s)[textKey]=v?{segments:segments('Label'),color:{r:.15,g:.18,b:.23,a:1},font_size:16,font:''}:null);
-      if(geometry[textKey]){const findText=s=>shape(s)[textKey];const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);
-      field('font_size',geometry[textKey].font_size,'number',(s,v)=>shape(s)[textKey].font_size=v);color('text_color',geometry[textKey].color,s=>shape(s)[textKey].color);}
+      if(geometry[textKey]){const findText=s=>shape(s)[textKey];
+      field('font',geometry[textKey].font,'text',(s,v)=>findText(s).font=v);
+      field('font_size',geometry[textKey].font_size,'number',(s,v)=>findText(s).font_size=v);color('text_color',geometry[textKey].color,s=>findText(s).color);
+      const input=field('text',text(geometry[textKey]),'text',(s,v)=>findText(s).segments=preserve(findText(s).segments,segments(v)));richControls(findText,inspectedTarget,input);}
       if(geometry.fill){color('fill',geometry.fill,s=>shape(s).fill);field('opacity',geometry.fill.a,'number',(s,v)=>shape(s).fill.a=v);}
       const style=name==='Arrow'?geometry.style?.line:geometry.style,styleOf=s=>name==='Arrow'?shape(s).style.line:shape(s).style;
       if(style){color('color',style.color,s=>styleOf(s).color);field('line_width',style.width,'number',(s,v)=>styleOf(s).width=v);}
@@ -602,9 +604,9 @@ export function render({model,el}) {
         for(const [i,name] of ['range_min','range_max'].entries())field(name,range[i],'number',(s,v)=>{s[kind].value_range=clone(s[kind].value_range??range);s[kind].value_range[i]=v;});
         const hint=document.createElement('p');hint.textContent='Wheel over plot: zoom values · Fit: automatic range';fields.append(hint);
       }
-      field('title',c.title,'text',(s,v)=>{s[kind].title=v;if(s[kind].chart_title)s[kind].chart_title.text.segments=segments(v);});
-      field('font_size',c.font_size,'number',(s,v)=>s[kind].font_size=v);
       field('font',c.font_family,'text',(s,v)=>s[kind].font_family=v);
+      field('font_size',c.font_size,'number',(s,v)=>s[kind].font_size=v);
+      field('title',c.title,'text',(s,v)=>{s[kind].title=v;if(s[kind].chart_title)s[kind].chart_title.text.segments=segments(v);});
       if(kind==='radial'){
         choice('material',c.style.material,['Flat','Matte','Ceramic','BrushedMetal','Paper','Wood','SatinMetal','Toon','Enamel','Hatch','Pearl'],(s,v)=>s.radial.style.material=v);
         for(const name of ['tilt_degrees','depth','texture_strength','texture_scale','roughness','gloss','gap_degrees','inner_corner','outer_corner'])field(name,c.style[name],'number',(s,v)=>s.radial.style[name]=v);
@@ -640,18 +642,21 @@ export function render({model,el}) {
       // Titles go through the renderer's title helpers: its super/subscript
       // mapping, and set_title's title-band fit.
       const helper={chart_title:'set_title',axis_title_bottom:'set_x_title',axis_title_left:'set_y_title'}[target];
-      if(target==='legend')for(const item of local.series.filter(s=>s.label)){
+      if(target==='legend'){const heading=document.createElement('strong');heading.textContent='All legend entries';fields.append(heading);}
+      field('font',rich.font,'text',(s,v)=>find(s).font=v);
+      field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
+      if(target==='legend'){const heading=document.createElement('p');heading.textContent='Legend entries · select characters to format them';fields.append(heading);}
+      if(target==='legend')for(const [index,item] of local.series.filter(s=>s.label).entries()){
         const findLabel=s=>s.series.find(v=>v.series_id===item.series_id).label,key=`legend_label_${item.series_id}`;
-        const input=field(key,text(item.label),'text',(s,v)=>{findLabel(s).segments=preserve(findLabel(s).segments,segments(v));syncLegend(s);});richControls(findLabel,key,input);
+        const input=field(key,text(item.label),'text',(s,v)=>{findLabel(s).segments=preserve(findLabel(s).segments,segments(v));syncLegend(s);});input.parentElement.firstChild.textContent=`Entry ${index+1}`;richControls(findLabel,key,input);
       }
-      const textInput=field('text',shown,'text',(s,v)=>{
+      if(target!=='legend'){const textInput=field('text',shown,'text',(s,v)=>{
         if(!helper||local.config.subplots?.length||local.config.overlays?.length){find(s).segments=preserve(find(s).segments,segments(v));return;}
         const old=clone(find(s).segments);chart[helper](v);const live=JSON.parse(chart.get_config());
         if(target==='chart_title')configOf(s).chart_title=live.chart_title;else find(s).segments=path.reduce((n,k)=>n[k],live).segments;find(s).segments=preserve(old,find(s).segments);
       });
-      richControls(find,inspectedTarget,textInput);
-      field('font_size',rich.font_size,'number',(s,v)=>find(s).font_size=v);color('color',rich.color,s=>find(s).color);
-      field('font',rich.font,'text',(s,v)=>find(s).font=v);choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
+      richControls(find,inspectedTarget,textInput);}
+      choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
     }else if(series){const kind=Object.keys(series.render_type)[0],style=series.render_type[kind];const find=s=>s.series.find(v=>v.series_id===target).render_type[kind];
       if(style.line){color('color',style.line.line_color,s=>find(s).line.line_color);field('line_width',style.line.line_width,'number',(s,v)=>find(s).line.line_width=v);}
       if(style.scatter){color('color',style.scatter.point_color,s=>find(s).scatter.point_color);field('point_size',style.scatter.point_size,'number',(s,v)=>find(s).scatter.point_size=v);}
@@ -666,7 +671,7 @@ export function render({model,el}) {
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>configOf(s)[key].tick=v);
       numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);
       for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
-    }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);}
+    }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
   }
   function displaySize(){const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;return [Math.max(1,Math.round(rect.width*dpr)),Math.max(1,Math.round(rect.height*dpr))];}

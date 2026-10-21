@@ -1929,3 +1929,50 @@ ax.activate()
         assert changed['config']['left_y']==before['config']['left_y']
         assert page.evaluate(ROOT+'.stats.column_uploads')==uploads and not page.locator('.figgy-error').inner_text()
         page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-overlay-object-edit.png'))
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+def test_legend_shared_typography_precedes_entries_in_both_hosts(tmp_path):
+    setup="for i in range(3): ax.plot([0,1,2],[i,i+1,i],label=f'10⁻{chr(0x2076+i)} Torr',id=f'p{i}')\nax.legend()"
+    def assert_style(state):
+        assert state['config']['legend']['content']['font']=='Liberation Sans'
+        assert state['config']['legend']['content']['font_size']==21
+        for series in state['series']:
+            assert any(s['text']=='-' and s['superscript'] for s in series['label']['segments'])
+    with figgy.Figure(backend='native') as fig:
+        ax=fig.axes[0];exec(setup,{'fig':fig,'ax':ax});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('properties')
+            choose_native_object(inputs,'legend','panel/main/legend')
+            controls=inputs.info()['controls']
+            assert controls['font'][1]<controls['font_size'][1]<controls['legend_label_p0'][1]
+            inputs.click('font');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','Liberation Sans');inputs.key('Tab')
+            inputs.click('font_size');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','21');inputs.key('Return')
+            assert_style(fig.get_settings())
+            inputs.click('legend_label_p2');inputs.key('End');inputs.xdo('type','--clearmodifiers',' updated');inputs.key('Tab')
+            assert_style(fig.get_settings())
+            assert ''.join(s['text'] for s in fig.get_settings()['series'][2]['label']['segments']).endswith(' updated')
+            # Return to the top so the capture shows common controls first.
+            choose_native_object(inputs,'chart_title','panel/main/chart_title')
+            choose_native_object(inputs,'legend','panel/main/legend')
+            from PIL import ImageGrab
+            window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+            x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+            ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-legend-typography.png')
+            assert not inputs.info()['error']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'legend',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('legend')
+        order=page.locator('[data-property]').evaluate_all("els=>els.map(el=>el.dataset.property)")
+        assert order.index('font')<order.index('font_size')<order.index('legend_label_p0')
+        assert page.locator('[data-property=text]').count()==0
+        font=page.locator('[data-property=font]');font.fill('Liberation Sans');font.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        size=page.locator('[data-property=font_size]');size.fill('21');size.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        assert_style(page.evaluate(ROOT+'.snapshot()'))
+        label=page.locator('[data-property=legend_label_p2]');label.fill(label.input_value()+' updated');label.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        execute('await fig.sync()');state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert_style(state)
+        assert ''.join(s['text'] for s in state['series'][2]['label']['segments']).endswith(' updated')
+        assert not page.locator('.figgy-error').inner_text()
+        screenshot_editor(page,tmp_path/'browser-legend-typography.png')

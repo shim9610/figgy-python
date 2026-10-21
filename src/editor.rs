@@ -51,6 +51,7 @@ impl Default for Editor {
 }
 
 pub fn theme(ctx: &egui::Context) {
+    crate::ui_fonts::install(ctx);
     ctx.set_theme(egui::ThemePreference::Light);
     let mut visuals = egui::Visuals::light();
     visuals.override_text_color = Some(Color32::from_rgb(32, 43, 59));
@@ -634,7 +635,10 @@ impl Editor {
 
     fn rich_text_editor(&mut self, ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
         let mut text = display_text(&node["segments"]);
-        ui.label("Text (select characters to format)");
+        if !key.starts_with("legend_label_") {
+            ui.label("Text");
+            ui.small("Select characters to format them.");
+        }
         let output = egui::TextEdit::singleline(&mut text)
             .id_salt(key)
             .desired_width(f32::INFINITY)
@@ -663,6 +667,8 @@ impl Editor {
             .unwrap_or(0..count);
         let range = range.start.min(count)..range.end.min(count);
         ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.;
+            ui.spacing_mut().button_padding = egui::vec2(6., 4.);
             for (flag, label) in [
                 ("bold", "B"),
                 ("italic", "I"),
@@ -689,6 +695,37 @@ impl Editor {
                 }
             }
         });
+        changed
+    }
+
+    pub(super) fn font_controls(
+        &mut self,
+        ui: &mut egui::Ui,
+        node: &mut Value,
+        family: &str,
+    ) -> bool {
+        let mut changed = text_field(
+            ui,
+            node,
+            family,
+            "Font family",
+            "Default font",
+            &mut self.controls,
+        );
+        changed |= number(
+            ui,
+            node,
+            "font_size",
+            "Font size",
+            " px",
+            &mut self.controls,
+        );
+        changed
+    }
+
+    fn text_appearance(&mut self, ui: &mut egui::Ui, node: &mut Value) -> bool {
+        let mut changed = self.font_controls(ui, node, "font");
+        changed |= color(ui, node, "color", "Text color", &mut self.controls);
         changed
     }
 
@@ -775,26 +812,12 @@ impl Editor {
             }
         }
         if geometry[text_key].is_object() {
+            changed |= self.text_appearance(ui, &mut geometry[text_key]);
             let key = format!("annotation_text_{annotation_id}");
             changed |= self.rich_text_editor(ui, &mut geometry[text_key], &key);
             if let Some(rect) = self.controls.get(&key).copied() {
                 self.controls.insert("annotation_text".into(), rect);
             }
-            changed |= number(
-                ui,
-                &mut geometry[text_key],
-                "font_size",
-                "Font size",
-                " px",
-                &mut self.controls,
-            );
-            changed |= color(
-                ui,
-                &mut geometry[text_key],
-                "color",
-                "Text color",
-                &mut self.controls,
-            );
         }
         if kind == "Arrow" {
             for key in ["head_length", "head_width"] {
@@ -1001,13 +1024,26 @@ impl Editor {
         };
         if let Some(node) = rich {
             if target == "legend" {
+                ui.strong("All legend entries");
+            }
+            changed |= self.text_appearance(ui, node);
+            ui.separator();
+            if target == "legend" {
                 let mut labels_changed = false;
                 ui.label("Legend entries");
-                for series in state["series"].as_array_mut().unwrap() {
+                ui.small("Select characters in an entry to format them.");
+                for (index, series) in state["series"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .filter(|s| s["label"].is_object())
+                    .enumerate()
+                {
                     if !series["label"].is_object() {
                         continue;
                     }
                     let key = format!("legend_label_{}", series["series_id"].as_str().unwrap());
+                    ui.label(format!("Entry {}", index + 1));
                     labels_changed |= self.rich_text_editor(ui, &mut series["label"], &key);
                 }
                 if labels_changed {
@@ -1038,23 +1074,6 @@ impl Editor {
             } else {
                 changed |= self.rich_text_editor(ui, node, "text");
             }
-            changed |= text_field(
-                ui,
-                node,
-                "font",
-                "Font family",
-                "Default font",
-                &mut self.controls,
-            );
-            changed |= number(
-                ui,
-                node,
-                "font_size",
-                "Font size",
-                " px",
-                &mut self.controls,
-            );
-            changed |= color(ui, node, "color", "Text color", &mut self.controls);
             let previous = node["align"].as_str().unwrap_or("Left").to_owned();
             let mut align = previous.clone();
             ui.horizontal(|ui| {
@@ -1070,24 +1089,9 @@ impl Editor {
         } else if target.starts_with("tick_labels_") {
             let key = axis_key(target.trim_start_matches("tick_labels_"));
             let node = &mut config[key]["label_style"];
-            changed |= label_format_controls(ui, node, &mut self.controls);
-            changed |= text_field(
-                ui,
-                node,
-                "label_font",
-                "Font family",
-                "Default font",
-                &mut self.controls,
-            );
-            changed |= number(
-                ui,
-                node,
-                "font_size",
-                "Font size",
-                " px",
-                &mut self.controls,
-            );
+            changed |= self.font_controls(ui, node, "label_font");
             changed |= color(ui, node, "color", "Text color", &mut self.controls);
+            changed |= label_format_controls(ui, node, &mut self.controls);
         } else if let Some(series) = state["series"]
             .as_array_mut()
             .unwrap()
