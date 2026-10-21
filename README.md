@@ -234,6 +234,13 @@ in [Editor commands and history](docs/EDITOR_COMMANDS.md).
 
 ## Edit once, reuse across datasets
 
+For an optional multi-Figure agent review workflow, use
+[`figgyplot.review.Session`](docs/REVIEW_MODE.md) and the
+[review controller example](examples/review_workflow.py). Review comments are
+separate from chart annotations. Approval checkpoints exact SSOT edits and binary
+source data before closing the view; the complete next round is published after
+source execution and rendering validation. The ordinary editor needs no session.
+
 Run the example shown in the GIF:
 
 ```bash

@@ -456,6 +456,7 @@ impl SurfaceWindow {
         if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
             c.end_edit();
         }
+        self.editor.finalize_review(c.data.revision);
         if let Some(error) = error {
             return Err(error);
         }

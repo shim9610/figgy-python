@@ -54,6 +54,40 @@ export function render({model,el}) {
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
   let editHistory=model.get('state').edit_history??{},historyBusy=false;
   let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
+  // Session metadata is separate from chart SSOT and ordinary inspector fields.
+  const reviewPanel=document.createElement('section');reviewPanel.className='figgy-review';reviewPanel.hidden=true;
+  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><span data-review-status role="status"></span></div>';
+  root.append(reviewPanel);
+  const reviewComment=reviewPanel.querySelector('textarea'),reviewStatus=reviewPanel.querySelector('[data-review-status]');
+  let reviewBusy=false,reviewLoaded=false;
+  function reviewState(){
+    const state=model.get('review')??{};reviewPanel.hidden=!state.enabled;
+    reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||model.get('status')!=='ready'||!!state.approved);
+    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewLoaded=true;}
+    if(state.approved)reviewStatus.textContent='Review saved';
+  }
+  async function submitReview(disposition){
+    if(reviewBusy)return;
+    reviewBusy=true;reviewPanel.querySelectorAll('button,textarea').forEach(v=>v.disabled=true);
+    reviewStatus.textContent='Saving review…';
+    try{
+      await finishInline(true);await controlQueue;await queue;await flush();
+      root.querySelector('.figgy-body').inert=true;root.querySelector('.figgy-toolbar').inert=true;
+      trace('review.send',{revision,disposition});
+      model.send({action:'review_submit',disposition,comments:reviewComment.value,revision});
+    }catch(e){reviewFailure(String(e));}
+  }
+  function reviewFailure(message){
+    reviewBusy=false;reviewPanel.querySelectorAll('button,textarea').forEach(v=>v.disabled=false);
+    root.querySelector('.figgy-body').inert=false;root.querySelector('.figgy-toolbar').inert=false;
+    reviewStatus.textContent=message;
+    reviewState();
+  }
+  const reviewMessage=message=>{if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
+  reviewPanel.querySelector('[data-review-changes]').addEventListener('click',()=>submitReview('request_changes'));
+  reviewPanel.querySelector('[data-review-accept]').addEventListener('click',()=>submitReview('accept'));
+  reviewComment.addEventListener('change',()=>model.send({action:'review_comment',comments:reviewComment.value}));
+  model.on('change:review',reviewState);model.on('change:status',reviewState);model.on('msg:custom',reviewMessage);reviewState();
   function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
   function replayEdit(action,args={}){
     const operation=controlQueue.then(async()=>{
@@ -1134,6 +1168,6 @@ export function render({model,el}) {
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

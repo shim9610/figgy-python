@@ -1903,6 +1903,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<desktop::WindowHandle>()?;
     m.add_function(wrap_pyfunction!(desktop::poll_events, m)?)?;
     m.add_function(wrap_pyfunction!(desktop::run_events, m)?)?;
+    m.add_function(wrap_pyfunction!(persistent_settings_json, m)?)?;
     m.add_function(wrap_pyfunction!(default_colorbar_json, m)?)?;
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
     m.add_function(wrap_pyfunction!(bounded::default_radial_json, m)?)?;
@@ -1920,6 +1921,12 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
+}
+
+#[pyfunction]
+fn persistent_settings_json(settings: &str) -> PyResult<String> {
+    let state: Value = parse(settings)?;
+    serde_json::to_string(&edit_history::persistent(state)).map_err(runtime)
 }
 
 /// Whether a font family resolves to a registered or installed face rather

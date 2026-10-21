@@ -184,7 +184,7 @@ def click_button(page, selector):
 
 
 @contextmanager
-def notebook(tmp_path, source):
+def notebook(tmp_path, source, *, allow_closed=False, initial_views=1):
     import nbformat
     from playwright.sync_api import sync_playwright
     from jupyter_client import BlockingKernelClient
@@ -270,8 +270,8 @@ def notebook(tmp_path, source):
                 # Ready includes async pipeline compilation and GPU completion.
                 # Cold software-GPU startup has its own budget; gesture checks
                 # keep Playwright's normal timeout and strict result assertions.
-                page.wait_for_function("['Ready','WebGPU failed'].includes(document.querySelector('.figgy-editor [data-status]')?.textContent)", timeout=180000)
-                assert page.locator('.figgy-editor [data-status]').inner_text() == 'Ready', page.locator('.figgy-error').inner_text()
+                page.wait_for_function("(count)=>{const states=Array.from(document.querySelectorAll('.figgy-editor [data-status]'));return states.length===count && states.every(s=>['Ready','WebGPU failed'].includes(s.textContent));}", arg=initial_views, timeout=180000)
+                assert page.locator('.figgy-editor [data-status]').all_text_contents() == ['Ready']*initial_views, page.locator('.figgy-error').all_text_contents()
                 with urllib.request.urlopen(base+'/api/sessions') as response:
                     session = next(s for s in json.load(response) if s['path'] == 'check.ipynb')
                 client = BlockingKernelClient(connection_file=str(runtime/f"kernel-{session['kernel']['id']}.json"))
@@ -305,7 +305,10 @@ def notebook(tmp_path, source):
                         entry['duration_ms'] = (time.monotonic()-started)*1000
                 yield page, execute
                 assert not errors
-                assert page.locator('.figgy-error').inner_text() == ''
+                if allow_closed:
+                    assert all(value=='' for value in page.locator('.figgy-error').all_text_contents())
+                else:
+                    assert page.locator('.figgy-error').inner_text() == ''
                 outcome = 'passed'
             except Exception:
                 import traceback

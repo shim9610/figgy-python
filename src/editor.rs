@@ -5,6 +5,7 @@ use egui::{Color32, RichText, Stroke};
 pub const INSPECTOR_WIDTH: f32 = 320.;
 
 pub(crate) struct Editor {
+    pub(crate) review: Option<Arc<Mutex<Value>>>,
     pub inspector_open: bool,
     pub selection_hint: String,
     pub panel_focused: bool,
@@ -33,6 +34,7 @@ pub(crate) struct Editor {
 impl Default for Editor {
     fn default() -> Self {
         Self {
+            review: None,
             inspector_open: false,
             selection_hint: String::new(),
             panel_focused: true,
@@ -56,6 +58,86 @@ impl Default for Editor {
             notice: String::new(),
             stage: egui::Rect::NOTHING,
             controls: HashMap::new(),
+        }
+    }
+}
+
+impl Editor {
+    pub(crate) fn review_ui(&mut self, root: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        let Some(shared) = self.review.clone() else {
+            return;
+        };
+        let mut state = shared.lock().unwrap();
+        if state.is_null() {
+            return;
+        }
+        let pending = !state["request"].is_null();
+        let mut comments = state["comments"].as_str().unwrap_or("").to_owned();
+        egui::Panel::bottom("review_comments")
+            .exact_size(148.)
+            .frame(
+                egui::Frame::NONE
+                    .fill(Color32::from_rgb(245, 248, 252))
+                    .inner_margin(12),
+            )
+            .show(root, |ui| {
+                ui.label(RichText::new("Review comments").strong());
+                ui.add_enabled_ui(!pending, |ui| {
+                    let input = egui::ScrollArea::vertical()
+                        .id_salt("review_comment_scroll")
+                        .max_height(48.)
+                        .min_scrolled_height(48.)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut comments)
+                                    .desired_width(f32::INFINITY)
+                                    .desired_rows(2)
+                                    .hint_text("Describe changes for the next version…"),
+                            )
+                        });
+                    self.controls.insert(
+                        "review_comments".into(),
+                        input.inner.rect.intersect(input.inner_rect),
+                    );
+                    ui.horizontal(|ui| {
+                        for (key, label, disposition) in [
+                            ("review_changes", "Request changes", "request_changes"),
+                            ("review_accept", "Accept", "accept"),
+                        ] {
+                            let button = ui.button(label);
+                            self.controls.insert(key.into(), button.rect);
+                            if button.clicked() {
+                                c.end_edit();
+                                state["request"] = json!({"disposition":disposition,
+                                    "comments":comments,"revision":c.data.revision,"finalized":false});
+                                state["error"] = json!("");
+                            }
+                        }
+                        if pending {
+                            ui.label("Saving review…");
+                        } else if let Some(error) =
+                            state["error"].as_str().filter(|s| !s.is_empty())
+                        {
+                            ui.colored_label(Color32::from_rgb(170, 45, 45), error);
+                        } else {
+                            ui.weak("Submitted after every Figure is reviewed");
+                        }
+                    });
+                });
+            });
+        state["comments"] = json!(comments);
+    }
+
+    pub(crate) fn finalize_review(&self, revision: u64) {
+        if let Some(shared) = &self.review {
+            let mut state = shared.lock().unwrap();
+            if state["request"].is_object() && state["request"]["finalized"] == false {
+                // Inline text blur can commit later in the same frame than the
+                // review button. Seal the revision after those accepted edits.
+                state["request"]["revision"] = json!(revision);
+                state["request"]["finalized"] = json!(true);
+            }
         }
     }
 }
@@ -553,6 +635,7 @@ impl Editor {
                         });
                 });
         }
+        self.review_ui(root, c);
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(root, |ui| {

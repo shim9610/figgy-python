@@ -239,6 +239,7 @@ impl Editor {
                         .insert("properties_viewport".into(), form.inner_rect);
                 });
         }
+        self.review_ui(root, c);
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.inner_margin(16.))
             .show(root, |ui| {
