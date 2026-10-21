@@ -421,10 +421,21 @@ export function render({model,el}) {
     const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
     return key==='right_y'&&overlay!==undefined?[panel?.overlays?.[overlay],'y_axis']:[panel?.id,key];
   }
-  function tickAutomatic(state,key){const [owner,side]=tickAddress(state,key);return state.identity?.tick_modes?.[owner]?.[side]!=='Fixed';}
-  function tickMode(state,key,automatic){const [owner,side]=tickAddress(state,key);if(owner===undefined)return;state.identity.tick_modes??={};state.identity.tick_modes[owner]??={};const modes=state.identity.tick_modes[owner],mode=automatic?'Auto':'Fixed';modes[side]=mode;
-    const peer={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[side],cfg=activePanel(state);
-    if(peer&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))modes[peer]=mode;
+  function tickOwners(state,owner,key){
+    const owners=new Set([owner]),dimension={bottom_x:'x',left_y:'y'}[key];
+    if(dimension)for(let old=-1;old!==owners.size;){old=owners.size;for(const group of Object.values(state.identity.groups))if(group.axis===dimension&&group.members.some(id=>owners.has(id)))for(const id of group.members)owners.add(id);}
+    return owners;
+  }
+  function tickAutomatic(state,key){const [owner,side]=tickAddress(state,key);return [...tickOwners(state,owner,side)].every(id=>state.identity?.tick_modes?.[id]?.[side]!=='Fixed');}
+  function tickMode(state,key,automatic){const [owner,side]=tickAddress(state,key);if(owner===undefined)return;state.identity.tick_modes??={};
+    const peer={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[side],cfg=activePanel(state),keys=[side];
+    if(peer&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))keys.push(peer);
+    for(const key of keys)for(const id of tickOwners(state,owner,key)){state.identity.tick_modes[id]??={};state.identity.tick_modes[id][key]=automatic?'Auto':'Fixed';}
+  }
+  function syncTickSpacing(state,key){
+    const [owner,side]=tickAddress(state,key);if(!['bottom_x','left_y'].includes(side))return;
+    const spacing=activePanel(state)[key].major_spacing;
+    for(const id of tickOwners(state,owner,side)){const index=state.identity.panels.findIndex(p=>p.id===id);panelConfig(index,state)[key].major_spacing=spacing;}
   }
   function retick(axis){
     if(axis.scale==='Logarithmic'){const decades=Math.max(1,Math.ceil(Math.log10(axis.max))-Math.floor(Math.log10(axis.min)));axis.major_spacing=decades<=6?1:decades<=12?2:Math.ceil(decades/6);return;}
@@ -531,6 +542,7 @@ export function render({model,el}) {
       apply(state,value);
       const secondary=before.config.active_layer?.Overlay??before.config.active_layer?.SubplotOverlay?.[1];
       if(!kind&&!(secondary!==undefined&&/^(axis|tick_labels)_right$/.test(target)))reconcilePairedAxisEdit({config:configOf(before)},{config:configOf(state)},target);
+      if(/^axis_(bottom|top|left|right)$/.test(target))for(const key of ['bottom_x','left_y'])syncTickSpacing(state,key);
       install(state);commit();
     }
     function field(label,value,type,apply){

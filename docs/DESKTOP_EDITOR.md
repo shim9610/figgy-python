@@ -417,3 +417,8 @@ The current renderer does not label intermediate log values inside a decade.
 Automatic spacing therefore cannot yet add labels such as `2 × 10⁴` and
 `5 × 10⁴` when a log view is narrow. This renderer limitation is tracked in
 [figgy#42](https://github.com/shim9610/figgy/issues/42).
+
+Members of an explicitly shared X/Y group also share the primary axis's
+automatic/fixed tick policy. A numeric spacing edit from any member updates the
+shared spacing; enabling automatic spacing from any member restores it for the
+group. Opposite-edge styling and secondary Y axes remain locally owned.

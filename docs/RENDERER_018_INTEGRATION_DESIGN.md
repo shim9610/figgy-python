@@ -91,6 +91,14 @@ data references. Host metadata must not duplicate axis ranges, series styles
 or annotation geometry into another authoritative tree. Logical shared-axis
 ownership resolves to upstream's canonical linked values at the adapter boundary.
 
+Automatic/fixed tick intent uses optional `identity.tick_modes` entries keyed
+by persistent panel or overlay IDs. The upstream model stores numeric spacing,
+but does not retain that intent; axis values therefore remain in the upstream
+configuration. Named shared-axis groups share primary tick intent and spacing.
+A spacing-only member edit is applied to the shared root before upstream link
+synchronization, which otherwise restores the root spacing. Opposite-edge
+styling and secondary axes keep their existing local ownership.
+
 Keep runtime revisions outside the persistent payload. Loading a saved document
 into an existing Figure is a new mutation, not a reset of its revision counter.
 Validate the payload and identity metadata together before accepting either.

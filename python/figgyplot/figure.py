@@ -504,7 +504,7 @@ class Figure:
                 else:
                     raise ValueError(f"unknown editable target: {target}")
                 if 'major_spacing' in properties and target.startswith('axis_') and not target.startswith('axis_title_'):
-                    _document.set_tick_mode(state,_axes.subplot_id if _axes else state['identity']['panels'][0]['id'],_axes.overlay_id if _axes else None,_axis_key(target[len('axis_'):]),False)
+                    _document.set_tick_mode(state,_axes.subplot_id if _axes else state['identity']['panels'][0]['id'],_axes.overlay_id if _axes else None,_axis_key(target[len('axis_'):]),False,spacing=properties['major_spacing'])
                 for key, value in properties.items():
                     if key == "text" and rich is not None:
                         rich["segments"] = _segments(value)

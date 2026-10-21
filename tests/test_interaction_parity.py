@@ -2059,16 +2059,17 @@ def test_legend_shared_typography_precedes_entries_in_both_hosts(tmp_path,panel)
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
-@pytest.mark.parametrize('owner',['primary','subplot','overlay'])
+@pytest.mark.parametrize('owner',['primary','subplot','overlay','shared'])
 def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tmp_path,owner):
     setup="ax=fig.axes[0];ax.plot([0,1000],[1,1000],id='base');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
-    if owner=='subplot':setup+="fig.set_layout([['main','right']]);ax=fig.subplots['right'].axes;ax.plot([0,1000],[1,1000],id='other');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
+    if owner in ('subplot','shared'):setup+="fig.set_layout([['main','right']]);ax=fig.subplots['right'].axes;ax.plot([0,1000],[1,1000],id='other');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
     if owner=='overlay':setup+="ax=ax.twinx(id='pressure');ax.plot([0,1000],[1,1e9],id='pressure_data');ax.set_yscale('log');ax.set_ylim(1,1e9)\n"
+    if owner=='shared':setup+="fig.share_axes('x')\n"
     setup+='ax.activate()'
     key='right_y' if owner=='overlay' else 'bottom_x'
-    target='overlay_0:axis_right' if owner=='overlay' else 'subplot_0:axis_bottom' if owner=='subplot' else 'axis_bottom'
-    node='panel/main/overlay/pressure/axis_right' if owner=='overlay' else 'panel/right/axis_bottom' if owner=='subplot' else 'panel/main/axis_bottom'
-    def config(state):return state['config']['subplots'][0]['config'] if owner=='subplot' else state['config']
+    target='overlay_0:axis_right' if owner=='overlay' else 'subplot_0:axis_bottom' if owner in ('subplot','shared') else 'axis_bottom'
+    node='panel/main/overlay/pressure/axis_right' if owner=='overlay' else 'panel/right/axis_bottom' if owner in ('subplot','shared') else 'panel/main/axis_bottom'
+    def config(state):return state['config']['subplots'][0]['config'] if owner in ('subplot','shared') else state['config']
     def axis(state):return config(state)['overlays'][0]['y_axis'] if owner=='overlay' else config(state)[key]
     manual="ax.configure(y_axis={'major_spacing':3.0})" if owner=='overlay' else "ax.configure(bottom_x={'major_spacing':7.0},top_x={'major_spacing':7.0})"
     def center(state):
@@ -2079,7 +2080,7 @@ def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tm
         try:
             inputs=Inputs(handle);before=fig.get_settings();spacing=axis(before)['major_spacing'];uploads=fig.info['column_uploads']
             x,y=native_point(inputs.info(),center(before));modifier='shift' if owner=='overlay' else 'ctrl'
-            if owner=='subplot':inputs.click_rect([x,y,0,0])
+            if owner in ('subplot','shared'):inputs.click_rect([x,y,0,0])
             def zoom():
                 inputs.xdo('mousemove','--window',inputs.wid,round(x),round(y));inputs.pump();inputs.xdo('keydown',modifier);inputs.xdo('click','--repeat',8,'--delay',15,4);inputs.xdo('keyup',modifier);inputs.pump()
             zoom();current=fig.get_settings();native_spacing=axis(current)['major_spacing']
@@ -2087,12 +2088,20 @@ def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tm
             if owner=='overlay':assert current['config']['left_y']==before['config']['left_y']
             if owner=='subplot':assert current['config']['bottom_x']==before['config']['bottom_x']
             # Explicit numeric configuration selects fixed ticks and survives zoom.
-            ax=fig._axes_for('right' if owner=='subplot' else 'main','pressure' if owner=='overlay' else None)
+            ax=fig._axes_for('right' if owner in ('subplot','shared') else 'main','pressure' if owner=='overlay' else None)
             exec(manual,{'ax':ax});inputs.pump();fixed=axis(fig.get_settings())['major_spacing'];zoom()
             assert axis(fig.get_settings())['major_spacing']==fixed
             inputs.click('properties');choose_native_object(inputs,'axis_right' if owner=='overlay' else 'axis_bottom',node)
             inputs.click('auto_ticks');inputs.pump()
             assert axis(fig.get_settings())['major_spacing']!=fixed
+            if owner=='shared':
+                state=fig.get_settings()
+                assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']
+                assert state['identity']['tick_modes']['main']['bottom_x']=='Auto'
+                inputs.click('major_spacing');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','13');inputs.key('Return')
+                state=fig.get_settings()
+                assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']==13
+                assert state['identity']['tick_modes']['main']['bottom_x']=='Fixed'
             assert fig.info['column_uploads']==uploads
             assert not inputs.info()['error']
         finally:handle.close();Inputs.pump()
@@ -2109,6 +2118,14 @@ def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tm
         assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']==fixed
         ObjectNavigator(page).choose(target,node=node);page.locator('[data-property=auto_ticks]').check();page.evaluate(ROOT+'.flush()')
         assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']!=fixed
+        if owner=='shared':
+            state=page.evaluate(ROOT+'.snapshot()')
+            assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']
+            assert state['identity']['tick_modes']['main']['bottom_x']=='Auto'
+            spacing=page.locator('[data-property=major_spacing]');spacing.fill('13');spacing.press('Tab');page.evaluate(ROOT+'.flush()')
+            state=page.evaluate(ROOT+'.snapshot()')
+            assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']==13
+            assert state['identity']['tick_modes']['main']['bottom_x']=='Fixed'
         execute('await fig.sync()');accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
         assert accepted['identity']['tick_modes']==page.evaluate(ROOT+'.snapshot().identity.tick_modes')
         assert not page.locator('.figgy-error').inner_text()

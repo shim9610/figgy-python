@@ -1356,6 +1356,16 @@ impl Editor {
             config["right_y"] = original_right;
         }
         *state.pointer_mut(&scoped_path).unwrap() = config;
+        if changed
+            && matches!(
+                target,
+                "axis_bottom" | "axis_top" | "axis_left" | "axis_right"
+            )
+        {
+            for side in ["bottom_x", "left_y"] {
+                crate::tick_policy::synchronize_spacing(&mut state, side);
+            }
+        }
         if changed {
             match c.apply_settings(&state.to_string()) {
                 Ok(_) => {

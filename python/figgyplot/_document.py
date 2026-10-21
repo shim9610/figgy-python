@@ -119,30 +119,47 @@ def object_ids(state):
     return result
 
 
-def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True):
+def tick_owners(meta, owner, key):
+    owners={owner};dimension={'bottom_x':'x','left_y':'y'}.get(key)
+    if dimension is None:return owners
+    while True:
+        before=len(owners)
+        for group in meta['groups'].values():
+            if group['axis']==dimension and owners.intersection(group['members']):owners.update(group['members'])
+        if len(owners)==before:return owners
+
+
+def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True, spacing=None):
     meta=state.get('identity')
     if meta is None:return
     owner=overlay_id if overlay_id and side in ('right_y','y_axis') else panel_id
     key='y_axis' if owner==overlay_id else side
-    meta.setdefault('tick_modes',{}).setdefault(owner,{})[key]='Auto' if automatic else 'Fixed'
+    for member in tick_owners(meta,owner,key):
+        meta.setdefault('tick_modes',{}).setdefault(member,{})[key]='Auto' if automatic else 'Fixed'
+        if spacing is not None and key in ('bottom_x','left_y'):panel_config(state,member)[key]['major_spacing']=spacing
     peer={'bottom_x':'top_x','top_x':'bottom_x','left_y':'right_y','right_y':'left_y'}.get(key)
     cfg=panel_config(state,panel_id)
     if paired and peer and all(cfg[key].get(k)==cfg[peer].get(k) for k in ('min','max','scale','inverted')):
-        meta['tick_modes'][owner][peer]='Auto' if automatic else 'Fixed'
+        for member in tick_owners(meta,owner,peer):meta['tick_modes'].setdefault(member,{})[peer]='Auto' if automatic else 'Fixed'
 
 
-def manual_tick_patch(state, patch, panel_id=None, overlay_id=None):
+def manual_tick_patch(state, patch, panel_id=None, overlay_id=None, _claimed=None):
     """Configuration of a numeric major spacing explicitly selects fixed ticks."""
     panel_id=panel_id or state['identity']['panels'][0]['id']
+    if _claimed is None:_claimed=set()
     for key in ('bottom_x','top_x','left_y','right_y','y_axis'):
         if isinstance(patch.get(key),dict) and 'major_spacing' in patch[key]:
-            set_tick_mode(state,panel_id,overlay_id,key,False,paired=False)
+            owner=overlay_id if overlay_id and key in ('right_y','y_axis') else panel_id
+            claim=(tuple(sorted(tick_owners(state['identity'],owner,key))),key)
+            if claim in _claimed:continue
+            _claimed.add(claim)
+            set_tick_mode(state,panel_id,overlay_id,key,False,paired=False,spacing=patch[key]['major_spacing'])
     for i,overlay in enumerate(patch.get('overlays',[])):
         ids=next(p['overlays'] for p in state['identity']['panels'] if p['id']==panel_id)
-        if i<len(ids):manual_tick_patch(state,overlay,panel_id,ids[i])
+        if i<len(ids):manual_tick_patch(state,overlay,panel_id,ids[i],_claimed)
     for i,panel in enumerate(patch.get('subplots',[])):
         if i+1<len(state['identity']['panels']):
-            manual_tick_patch(state,panel.get('config',{}),state['identity']['panels'][i+1]['id'])
+            manual_tick_patch(state,panel.get('config',{}),state['identity']['panels'][i+1]['id'],_claimed=_claimed)
 
 
 def track_identities(before, after):

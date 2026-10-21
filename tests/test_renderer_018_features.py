@@ -340,3 +340,25 @@ def test_tick_intent_replays_by_owner_and_rejects_invalid_metadata(backend):
         ax.set_xlim(0,50)
         assert fig.get_settings()['identity']['tick_modes']['second']['bottom_x']=='Auto'
         assert fig.get_settings()['identity']['tick_modes']['pressure']['y_axis']=='Fixed'
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('dimension,key',[('x','bottom_x'),('y','left_y')])
+def test_shared_tick_policy_and_spacing_follow_edits_from_any_member(backend,dimension,key):
+    with figgy.Figure(backend=backend,grid=[['first','second']]) as fig:
+        first,second=fig.subplots['first'].axes,fig.subplots['second'].axes
+        first.plot([0,1000],[0,1],id='a');second.plot([0,1000],[0,1],id='b')
+        getattr(first,'set_'+dimension+'lim')(0,1000);getattr(second,'set_'+dimension+'lim')(0,1000);fig.share_axes(dimension)
+        for ax,value in [(first,7),(second,13)]:
+            ax.configure(**{key:{'major_spacing':value}})
+            state=fig.get_settings()
+            assert state['config'][key]['major_spacing']==value
+            assert state['config']['subplots'][0]['config'][key]['major_spacing']==value
+            for owner in ('first','second'):assert state['identity']['tick_modes'][owner][key]=='Fixed'
+        getattr(second,'set_'+dimension+'lim')(0,200)
+        for owner in ('first','second'):assert fig.get_settings()['identity']['tick_modes'][owner][key]=='Auto'
+        children=copy.deepcopy(fig.get_settings()['config']['subplots'])
+        children[0]['config'][key]['major_spacing']=17
+        fig.configure(config={key:{'major_spacing':11},'subplots':children})
+        state=fig.get_settings()
+        assert state['config'][key]['major_spacing']==state['config']['subplots'][0]['config'][key]['major_spacing']==11
