@@ -51,6 +51,7 @@ jobs:
       FIGGY_TEST_JUPYTER: '1'
       FIGGY_TEST_HEADFUL: '1'
       FIGGY_TEST_TIMING: '1'
+      FIGGY_LAYOUT_PROBE: '1'
       FIGGY_REQUIRE_INTERACTION_PARITY: '1'
       FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
       PYTHONUNBUFFERED: '1'
@@ -98,6 +99,13 @@ jobs:
             openbox > /tmp/figgyplot-openbox.log 2>&1 &
             wm_pid=$!
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
+            # Diagnose the two failures on cf51594 before other integration work.
+            # Original assertions and waits are retained; probes never retry them.
+            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
+              --basetemp=ci-results/layout-probe --junitxml=ci-results/layout-probe.xml \
+              'tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]' \
+              'tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]' \
+              2>&1 | tee ci-results/layout-probe.log
             # Measure the last failed radial screenshot before the full suite.
             # Await current surface completion before the unchanged capture deadline.
             .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \

@@ -20,6 +20,7 @@ pub(crate) struct Editor {
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
     inspector_context: String,
+    pub layout_probe: std::collections::VecDeque<Value>,
     notice: String,
     pub stage: egui::Rect,
     pub controls: HashMap<String, egui::Rect>,
@@ -43,6 +44,7 @@ impl Default for Editor {
             raw: String::new(),
             text_ranges: HashMap::new(),
             inspector_context: String::new(),
+            layout_probe: Default::default(),
             notice: String::new(),
             stage: egui::Rect::NOTHING,
             controls: HashMap::new(),
@@ -542,6 +544,25 @@ impl Editor {
             let form = form.show(ui, |ui| self.properties(ui, c, target));
             self.controls
                 .insert("properties_viewport".into(), form.inner_rect);
+            // Observation only: do not request repaint, focus, scroll or model edits.
+            if std::env::var_os("FIGGY_LAYOUT_PROBE").is_some() {
+                let rect = |r: egui::Rect| [r.min.x, r.min.y, r.width(), r.height()];
+                self.layout_probe.push_back(json!({
+                    "frame":ui.ctx().cumulative_frame_nr(),
+                    "time":ui.input(|i|i.time),
+                    "context":self.inspector_context,"context_changed":context_changed,
+                    "reset_requested":context_changed,"target":target,
+                    "scroll_id":format!("{:?}",form.id),
+                    "scroll_offset":[form.state.offset.x,form.state.offset.y],
+                    "content_size":[form.content_size.x,form.content_size.y],
+                    "viewport":rect(form.inner_rect),"clip":rect(ui.clip_rect()),
+                    "pixels_per_point":ui.ctx().pixels_per_point(),
+                    "controls":self.controls.iter().map(|(k,v)|(k.clone(),json!(rect(*v)))).collect::<serde_json::Map<_,_>>()
+                }));
+                if self.layout_probe.len() > 64 {
+                    self.layout_probe.pop_front();
+                }
+            }
         } else {
             ui.label(
                 RichText::new("Select a title, axis, legend or data series in the chart.").weak(),

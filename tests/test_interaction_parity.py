@@ -1592,9 +1592,11 @@ def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path
         page.locator('[data-draw]').click();page.locator('[data-tool=text]').click()
         page.mouse.click(*browser_point(page,(850,510)));entry=page.locator('[data-inline-text]');entry.wait_for(state='visible')
         entry.fill('First');entry.press('Shift+Enter');entry.type('Second')
+        from layout_probe import arm_browser, browser_readings
+        arm_browser(page)
         page.set_viewport_size({'width':980,'height':820})
         page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
-        rect=entry.bounding_box();canvas=page.locator('canvas').bounding_box()
+        rect,canvas=browser_readings(page,entry,tmp_path)
         assert rect['x']>=canvas['x']-1 and rect['x']+rect['width']<=canvas['x']+canvas['width']+1
         # Enter used by an IME must not confirm or discard its current composition.
         entry.dispatch_event('keydown',{'key':'Enter','code':'Enter','isComposing':True})
@@ -1913,8 +1915,11 @@ ax.activate()
     if backend=='native':
         with figgy.Figure(backend=backend) as fig:
             exec(setup,{'fig':fig});handle=fig.show(block=False)
+            from layout_probe import native_sample, save_native
+            samples=[];inputs=None
             try:
                 inputs=Inputs(handle);before=fig.get_settings();uploads=fig.info['column_uploads']
+                native_sample(inputs,samples,'initial')
                 assert before['config'].get('active_layer','Base')=='Base'
                 primary_left=inputs.info()['decorations']['axis_left']
                 area=inputs.info()['decorations']['data_area'];scale=inputs.info()['chart_panel'][2]/960
@@ -1938,7 +1943,9 @@ ax.activate()
                 assert fig.get_settings()['config'].get('active_layer','Base')=='Base'
                 before=fig.get_settings()
                 start=(rect[0]+rect[2]/2,rect[1]+rect[3]/2)
+                native_sample(inputs,samples,'before_title_drag')
                 drag_native(inputs,start,(16,12))
+                native_sample(inputs,samples,'after_title_drag')
                 assert inputs.info()['selected']=='overlay_0:axis_title_right'
                 r=inputs.info()['controls']['text'];v=inputs.info()['controls']['properties_viewport']
                 assert r[1]>=v[1]-1 and r[1]+r[3]<=v[1]+v[3]+1
@@ -1949,7 +1956,9 @@ ax.activate()
                 window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
                 x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
                 ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-overlay-object-edit.png')
-            finally:handle.close();Inputs.pump()
+            finally:
+                if inputs is not None:save_native(inputs,samples,tmp_path)
+                handle.close();Inputs.pump()
         return
     source="import figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
     with notebook(tmp_path/'overlay-objects',source) as (page,execute):
