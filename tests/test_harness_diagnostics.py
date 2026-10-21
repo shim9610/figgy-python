@@ -103,3 +103,86 @@ def test_diagnostic_artifact_saved_when_page_collection_fails(tmp_path, capsys, 
     assert 'page unavailable' in saved['collection_error']
     assert (tmp_path/'widget-state.json').exists()
     assert ('FIGGY FAILURE DIAGNOSTICS' in capsys.readouterr().out) == (outcome == 'failed')
+
+
+def test_timing_observers_preserve_gpu_and_frame_calls_without_adding_work():
+    from browser_timing import TIMING_INIT
+    run_node(r"""
+import assert from 'node:assert/strict';
+globalThis.window=globalThis;
+const rect={x:0,y:0,width:960,height:600};
+const canvas={width:960,height:600,getBoundingClientRect:()=>({...rect})};
+const root={getBoundingClientRect:()=>({...rect}),querySelector:s=>s==='canvas'?canvas:{textContent:'Ready'}};
+globalThis.document={querySelector:s=>s==='.figgy-editor'?root:canvas,visibilityState:'visible',hasFocus:()=>true};
+let tick,frame,frameThis,resolveFence;
+const counts={submit:0,fence:0,pipeline:0,raf:0,cancel:0};
+globalThis.setInterval=callback=>{tick=callback;return 1;};globalThis.clearInterval=()=>{};
+globalThis.requestAnimationFrame=function(callback){counts.raf++;frame=callback;return 7;};
+globalThis.cancelAnimationFrame=function(id){assert.equal(id,7);counts.cancel++;};
+const result={},failure=new Error('original failure');
+class Queue {
+ submit(){assert.equal(this,queue);counts.submit++;return result;}
+ onSubmittedWorkDone(){assert.equal(this,queue);counts.fence++;return new Promise(resolve=>resolveFence=resolve);}
+}
+class Device {
+ createRenderPipeline(descriptor){counts.pipeline++;if(descriptor.fail)throw failure;return result;}
+ createRenderPipelineAsync(){counts.pipeline++;return Promise.resolve(result);}
+}
+globalThis.GPUQueue=Queue;globalThis.GPUDevice=Device;
+const queue=new Queue(),device=new Device();
+let hostCalls=0;window.__figgyTrace=()=>hostCalls++;
+""" + TIMING_INIT + r"""
+assert.deepEqual(counts,{submit:0,fence:0,pipeline:0,raf:0,cancel:0});
+assert.equal(queue.submit([]),result);
+const fence=queue.onSubmittedWorkDone();assert.equal(figgyTiming.snapshot().fences[0].status,'pending');
+resolveFence(result);assert.equal(await fence,result);
+assert.equal(device.createRenderPipeline({label:'radial'}),result);
+assert.equal(await device.createRenderPipelineAsync({label:'radial async'}),result);
+assert.throws(()=>device.createRenderPipeline({fail:true}),e=>e===failure);
+const id=window.requestAnimationFrame(function(stamp){assert.equal(stamp,12);frameThis=this;});assert.equal(id,7);
+const context={};frame.call(context,12);assert.equal(frameThis,context);
+window.cancelAnimationFrame(id);tick();tick();rect.x=1;tick();
+__figgyTrace('queue.started',{operationId:1});__figgyTrace('queue.finished',{operationId:1});
+__figgyTrace('display.submitted',{kind:'radial'});figgyTiming.mark('screenshot.start',{name:'plot.png'});
+const stats=figgyTiming.snapshot();
+assert.equal(hostCalls,3);assert.ok(stats.events.some(e=>e.kind==='host-stage'&&e.chartKind==='radial'));assert.equal(stats.events.at(-1).stage,'screenshot.start');assert.equal(stats.raf.frames,1);assert.equal(stats.raf.pending,0);
+assert.equal(stats.timer.geometryChanges,1);assert.equal(stats.fences[0].status,'completed');
+assert.equal(stats.submissions.length,1);assert.equal(stats.pipelines.length,3);
+assert.deepEqual(counts,{submit:1,fence:1,pipeline:3,raf:1,cancel:1});
+figgyTiming.stop();
+""")
+
+
+def test_timing_summary_deduplicates_fences_and_reports_pending_submissions():
+    from browser_timing import timing_summary
+    result=timing_summary({'now':1000,'fences':[
+        {'id':1,'queue':1,'submission':2,'canvas':[960,600],'t':100,'status':'completed','waitMs':400,'submitToCompleteMs':450},
+        {'id':2,'queue':1,'submission':2,'canvas':[960,600],'t':110,'status':'completed','waitMs':390,'submitToCompleteMs':450},
+        {'id':3,'queue':1,'submission':3,'canvas':[699,437],'t':600,'status':'pending'},
+    ],'samples':[{'t':200,'geometry':{'root':[0,0,960,600]}},{'t':500,'geometry':{'root':[0,0,699,437]}},{'t':900,'geometry':{'root':[0,0,699,437]}}]})
+    assert len(result['submissions'])==2
+    assert result['submissions'][0]['submitToCompleteMs']==450
+    assert result['submissions'][1]['status']=='pending' and result['submissions'][1]['waitMs']==400
+    assert result['stableGeometryMs']==500
+
+
+@pytest.mark.parametrize('failure', [False, True])
+def test_timed_screenshot_keeps_original_result_deadline_and_exception(tmp_path, monkeypatch, failure):
+    from browser_timing import screenshot_editor
+    monkeypatch.setenv('FIGGY_TEST_TIMING','1')
+    original=TimeoutError('original screenshot timeout')
+    calls=[]
+    class Page:
+        def evaluate(self,*args):
+            raise RuntimeError('diagnostics unavailable')
+        def locator(self,selector):
+            assert selector=='.figgy-editor';return self
+        def screenshot(self,**kwargs):
+            calls.append(kwargs)
+            if failure:raise original
+            return b'png'
+    if failure:
+        with pytest.raises(TimeoutError) as caught:screenshot_editor(Page(),tmp_path/'plot.png')
+        assert caught.value is original
+    else:assert screenshot_editor(Page(),tmp_path/'plot.png')==b'png'
+    assert calls==[{'path':str(tmp_path/'plot.png')}]

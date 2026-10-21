@@ -9,6 +9,7 @@ import pytest
 import figgyplot as figgy
 from test_radial_desktop import Inputs
 from jupyter_harness import notebook, button_point_without_frames
+from browser_timing import screenshot_editor
 
 ROOT = "document.querySelector('.figgy-editor').figgy"
 CASES = {
@@ -1456,7 +1457,7 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         place_browser_text();entry.fill('Review this region')
         assert not items(page.evaluate(ROOT+'.snapshot()'))
         assert not page.locator('.figgy-properties').is_visible()
-        page.locator('.figgy-editor').screenshot(path=str(tmp_path/f'{family}-inline-text.png'))
+        screenshot_editor(page,tmp_path/f'{family}-inline-text.png')
         entry.press('Enter');page.evaluate(ROOT+'.flush()')
         assert not page.locator('.figgy-error').inner_text()
         assert ''.join(v['text'] for v in items(page.evaluate(ROOT+'.snapshot()'))[0]['kind']['Text']['text']['segments'])=='Review this region'
@@ -1486,7 +1487,7 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         count=len(items(state));page.locator('[data-delete-annotation]').click();page.evaluate(ROOT+'.flush()')
         assert len(items(page.evaluate(ROOT+'.snapshot()')))==count-1
         assert page.evaluate(ROOT+'.stats.png_exports')==0
-        page.locator('.figgy-editor').screenshot(path=str(tmp_path/f'{family}-drawing.png'))
+        screenshot_editor(page,tmp_path/f'{family}-drawing.png')
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')

@@ -102,6 +102,7 @@ DIAGNOSTIC_SNAPSHOT = r"""()=>{
         canvas:canvas?{width:canvas.width,height:canvas.height,css:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},dpr:devicePixelRatio}:null,
         preparation_gate:gate?{armedAt:gate.armedAt,entered:gate.entered,enteredAt:gate.enteredAt,enteredCount:gate.enteredCount,
             releasedAt:gate.releasedAt,gpuCompletedAt:gate.gpuCompletedAt,durationMs:(gate.releasedAt??now)-gate.armedAt}:null};
+    if(window.figgyTiming)result.timing=window.figgyTiming.snapshot();
     // Each independent read survives a borrowed/unavailable WASM snapshot.
     for(const [key,read] of Object.entries({stats:()=>f?.stats,host:()=>typeof f?.diagnostics==='function'?f.diagnostics():f?.diagnostics,state:()=>f?.snapshot()})){
         try{result[key]=read();}catch(error){result[key+'_error']=String(error);}
@@ -124,12 +125,18 @@ def save_browser_diagnostics(page, folder, browser_info, outcome, errors, consol
             (folder/name).write_text(json.dumps(value, default=str))
         except Exception as error:
             print(f'Figgy diagnostic write failed ({name}): {error}', file=sys.stderr)
+    if result.get('timing'):
+        from browser_timing import timing_summary
+        print('FIGGY TIMING DIAGNOSTICS '+json.dumps({'outcome':outcome,'browser':browser_info,'timing':timing_summary(result['timing'])}),flush=True)
     if outcome == 'failed':
         trace = result.get('trace') or {}
         summary = {key: result.get(key) for key in ('browser', 'status', 'host', 'gpu_work', 'preparation_gate', 'state_error', 'collection_error')}
         summary.update(queues=trace.get('queues'), adapters=trace.get('adapters'),
                        last_host_stages=(trace.get('hostStages') or [])[-12:],
                        last_events=(trace.get('events') or [])[-16:], kernel_executions=(kernel_executions or [])[-5:])
+        if result.get('timing'):
+            timing=result['timing'];summary['timing']={key:timing.get(key) for key in ('raf','timer','geometry','pipelines','fences')}
+            summary['timing']['last_samples']=(timing.get('samples') or [])[-8:]
         try:
             print('FIGGY FAILURE DIAGNOSTICS ' + json.dumps(summary, default=str), flush=True)
         except Exception:
@@ -221,6 +228,10 @@ def notebook(tmp_path, source):
                 'headless': os.environ.get('FIGGY_TEST_HEADFUL') != '1',
                 'args': browser_args,
             }
+            if os.environ.get('FIGGY_TEST_TIMING') == '1':
+                quota=Path('/sys/fs/cgroup/cpu.max')
+                browser_info['host']={'cpus':os.cpu_count(),'affinity':len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None,
+                    'cpu_quota':quota.read_text().strip() if quota.exists() else None}
             (tmp_path/'browser-info.json').write_text(json.dumps(browser_info))
             context = browser.new_context(viewport={'width': 1500, 'height': 1000}, permissions=['clipboard-read', 'clipboard-write'], accept_downloads=True)
             context.route('https://**/*', lambda route: route.abort())
@@ -230,6 +241,9 @@ def notebook(tmp_path, source):
             page.on('pageerror', lambda e: errors.append(e.stack or str(e)))
             page.on('console', lambda m: console_errors.append(m.text) if m.type == 'error' else None)
             page.add_init_script(GPU_TRACE_INIT)
+            if os.environ.get('FIGGY_TEST_TIMING') == '1':
+                from browser_timing import TIMING_INIT
+                page.add_init_script(TIMING_INIT)
             outcome = 'failed'
             diagnostics_saved = False
             kernel_executions = []

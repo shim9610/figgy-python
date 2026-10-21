@@ -1,0 +1,5585 @@
+{
+  "application_commit": "6258686397dca2e7557c6ced63d7f282f6660bfa",
+  "renderer_revision": "3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04",
+  "browser": {
+    "version": "154.0.8037.57",
+    "executable": "/usr/bin/chromium",
+    "vulkan_driver": "vk_swiftshader_icd.json",
+    "headless": false,
+    "args": [
+      "--no-sandbox",
+      "--enable-unsafe-webgpu",
+      "--use-angle=vulkan",
+      "--enable-features=Vulkan",
+      "--disable-vulkan-surface",
+      "--enable-logging",
+      "--log-file=/tmp/figgy-timing-154/test_annotation_drawing_editin0/radial/chromium.log",
+      "--gpu-watchdog-timeout-seconds=180"
+    ]
+  },
+  "cpu": {
+    "affinity": 5,
+    "cpu_quota": "400000 100000"
+  },
+  "radial_style": {
+    "material": "Flat",
+    "tilt_degrees": 0,
+    "depth": 0,
+    "bevel": 0.015,
+    "gap_degrees": 0,
+    "roughness": 0.35,
+    "texture_strength": 0.2,
+    "texture_scale": 1,
+    "light": [
+      -0.5,
+      -0.6,
+      1
+    ],
+    "shadow": false,
+    "inner_corner": 0,
+    "outer_corner": 0,
+    "outline": {
+      "rim": false,
+      "separators": false,
+      "emphasis": false,
+      "width": 1,
+      "color": {
+        "r": 0.08,
+        "g": 0.12,
+        "b": 0.2,
+        "a": 1
+      }
+    },
+    "hover_lift": 0.08,
+    "hover_brightness": 0.04,
+    "gloss": 0.55,
+    "texture_angle_degrees": 0
+  },
+  "annotation_scenario": {
+    "screenshot_ms": 13171.583609000663,
+    "outcome": "passed",
+    "timing": {
+      "now": 100809.89999999851,
+      "raf": {
+        "requested": 172,
+        "called": 169,
+        "cancelled": 15,
+        "frames": 100,
+        "lastAt": 100808.39999999851,
+        "maxGapMs": 14142.59999999404,
+        "pending": 1
+      },
+      "timer": {
+        "samples": 988,
+        "maxGapMs": 663.7999999970198,
+        "geometryChanges": 7
+      },
+      "stableGeometryMs": 13352.0,
+      "submissions": [
+        {
+          "queue": 1,
+          "submission": 1,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 14268.89999999851,
+          "submitToCompleteMs": 14269.39999999851
+        },
+        {
+          "queue": 1,
+          "submission": 2,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 14109.19999999553,
+          "submitToCompleteMs": 14109.5
+        },
+        {
+          "queue": 1,
+          "submission": 3,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 12692.29999999702,
+          "submitToCompleteMs": 12692.60000000149
+        },
+        {
+          "queue": 1,
+          "submission": 4,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 12723.20000000298,
+          "submitToCompleteMs": 12723.70000000298
+        },
+        {
+          "queue": 1,
+          "submission": 5,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 12468.89999999851,
+          "submitToCompleteMs": 12469.10000000149
+        },
+        {
+          "queue": 1,
+          "submission": 6,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 12614.89999999851,
+          "submitToCompleteMs": 12615.29999999702
+        },
+        {
+          "queue": 1,
+          "submission": 7,
+          "canvas": [
+            699,
+            437
+          ],
+          "status": "completed",
+          "waitMs": 6432.20000000298,
+          "submitToCompleteMs": 6432.30000000447
+        },
+        {
+          "queue": 1,
+          "submission": 8,
+          "canvas": [
+            699,
+            437
+          ],
+          "status": "completed",
+          "waitMs": 6635.70000000298,
+          "submitToCompleteMs": 6636
+        }
+      ],
+      "submitCpuMaxMs": 0.20000000298023224,
+      "pipelines": [
+        {
+          "name": "createShaderModule",
+          "t": 5967,
+          "label": "figgy render prewarm",
+          "shaderBytes": 13903,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.10000000149011612,
+          "elapsedMs": 0.10000000149011612
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5967.70000000298,
+          "label": "radial surfaces",
+          "shaderBytes": null,
+          "entry": "fs",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.19999999552965164,
+          "elapsedMs": 546.6999999955297
+        },
+        {
+          "name": "createShaderModule",
+          "t": 6516.30000000447,
+          "label": "radial surfaces",
+          "shaderBytes": 13903,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999403953552,
+          "elapsedMs": 0.09999999403953552
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 6517,
+          "label": "radial surfaces",
+          "shaderBytes": null,
+          "entry": "fs",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.10000000149011612,
+          "elapsedMs": 0.10000000149011612
+        },
+        {
+          "name": "createShaderModule",
+          "t": 49214.89999999851,
+          "label": "figgy fullscreen textured shader",
+          "shaderBytes": 1745,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 49215,
+          "label": "figgy fullscreen textured pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        }
+      ],
+      "longTasks": [
+        {
+          "type": "long-animation-frame",
+          "t": 49243.80000000447,
+          "durationMs": 12738.79999999702,
+          "blockingDuration": 3.2,
+          "renderStart": 61979.70000000298,
+          "styleAndLayoutStart": 61982.39999999851
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 62047.80000000447,
+          "durationMs": 12471.29999999702,
+          "blockingDuration": 0,
+          "renderStart": 74517.89999999851,
+          "styleAndLayoutStart": 74518.30000000447
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 74520.30000000447,
+          "durationMs": 53.19999999552965,
+          "blockingDuration": 0,
+          "renderStart": 74572.20000000298,
+          "styleAndLayoutStart": 74572.5
+        },
+        {
+          "type": "longtask",
+          "t": 74979.80000000447,
+          "durationMs": 62,
+          "blockingDuration": null,
+          "renderStart": null,
+          "styleAndLayoutStart": null
+        },
+        {
+          "type": "longtask",
+          "t": 75159.89999999851,
+          "durationMs": 54,
+          "blockingDuration": null,
+          "renderStart": null,
+          "styleAndLayoutStart": null
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 74678.30000000447,
+          "durationMs": 12718.89999999851,
+          "blockingDuration": 26.2,
+          "renderStart": 87388.10000000149,
+          "styleAndLayoutStart": 87397.10000000149
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 94043.60000000149,
+          "durationMs": 6617.60000000149,
+          "blockingDuration": 0,
+          "renderStart": 100660.5,
+          "styleAndLayoutStart": 100660.89999999851
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 87451.80000000447,
+          "durationMs": 6485.5,
+          "blockingDuration": 0,
+          "renderStart": 93931,
+          "styleAndLayoutStart": 93937.20000000298
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 100682.30000000447,
+          "durationMs": 63.599999994039536,
+          "blockingDuration": 0,
+          "renderStart": 100745.70000000298,
+          "styleAndLayoutStart": 100745.89999999851
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 93963.39999999851,
+          "durationMs": 78.10000000149012,
+          "blockingDuration": 0,
+          "renderStart": 94040.39999999851,
+          "styleAndLayoutStart": 94040.5
+        }
+      ],
+      "marks": [
+        {
+          "t": 48777.39999999851,
+          "kind": "mark",
+          "name": "radial-inline-text.png"
+        },
+        {
+          "t": 49088.30000000447,
+          "kind": "mark",
+          "name": "radial-inline-text.png",
+          "outcome": "passed",
+          "elapsedMs": 308.79984999774024
+        },
+        {
+          "t": 87645.89999999851,
+          "kind": "mark",
+          "name": "radial-drawing.png"
+        },
+        {
+          "t": 100809.89999999851,
+          "kind": "mark",
+          "name": "radial-drawing.png",
+          "outcome": "passed",
+          "elapsedMs": 13171.583609000663
+        }
+      ]
+    }
+  },
+  "controls": [
+    {
+      "kind": "radial",
+      "phase": "half",
+      "timing": {
+        "now": 22438.60000000149,
+        "raf": {
+          "requested": 99,
+          "called": 98,
+          "cancelled": 9,
+          "frames": 45,
+          "lastAt": 22430.10000000149,
+          "maxGapMs": 13368.10000000149,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 213,
+          "maxGapMs": 503,
+          "geometryChanges": 3
+        },
+        "stableGeometryMs": 3274.3000000044703,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 13421.60000000149,
+            "submitToCompleteMs": 13422.29999999702
+          },
+          {
+            "queue": 1,
+            "submission": 2,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 3255.0999999940395,
+            "submitToCompleteMs": 3255.1999999955297
+          }
+        ],
+        "submitCpuMaxMs": 0.29999999701976776,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4800.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4801.39999999851,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 457.29999999701977
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5261,
+            "label": "radial surfaces",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 5261.69999999553,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 3971.89999999851,
+            "durationMs": 113.79999999701977,
+            "blockingDuration": 21.3,
+            "renderStart": 4082.7999999970198,
+            "styleAndLayoutStart": 4085.6999999955297
+          },
+          {
+            "type": "longtask",
+            "t": 4246.39999999851,
+            "durationMs": 219,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4086.60000000149,
+            "durationMs": 98.79999999701977,
+            "blockingDuration": 48.5,
+            "renderStart": 4179.19999999553,
+            "styleAndLayoutStart": 4185.29999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4626.10000000149,
+            "durationMs": 94.5,
+            "blockingDuration": 0,
+            "renderStart": 4720.29999999702,
+            "styleAndLayoutStart": 4720.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4211.19999999553,
+            "durationMs": 304.1000000014901,
+            "blockingDuration": 171.5,
+            "renderStart": 4513.60000000149,
+            "styleAndLayoutStart": 4513.60000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4518.19999999553,
+            "durationMs": 53.80000000447035,
+            "blockingDuration": 0,
+            "renderStart": 4571.39999999851,
+            "styleAndLayoutStart": 4571.89999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5394.69999999553,
+            "durationMs": 13368.80000000447,
+            "blockingDuration": 0,
+            "renderStart": 18756.60000000149,
+            "styleAndLayoutStart": 18763.19999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19108.60000000149,
+            "durationMs": 103.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 19211.39999999851,
+            "styleAndLayoutStart": 19212
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 18802.60000000149,
+            "durationMs": 283.59999999403954,
+            "blockingDuration": 0,
+            "renderStart": 19084.19999999553,
+            "styleAndLayoutStart": 19085.10000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19216.10000000149,
+            "durationMs": 3154,
+            "blockingDuration": 0,
+            "renderStart": 22369.89999999851,
+            "styleAndLayoutStart": 22370.10000000149
+          }
+        ],
+        "marks": [
+          {
+            "t": 18808.69999999553,
+            "kind": "mark",
+            "name": "half",
+            "width": 502
+          }
+        ]
+      }
+    },
+    {
+      "kind": "radial",
+      "phase": "full",
+      "timing": {
+        "now": 35228.10000000149,
+        "raf": {
+          "requested": 107,
+          "called": 105,
+          "cancelled": 9,
+          "frames": 52,
+          "lastAt": 22601.29999999702,
+          "maxGapMs": 13368.10000000149,
+          "pending": 2
+        },
+        "timer": {
+          "samples": 341,
+          "maxGapMs": 503,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 12663.90000000596,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 13421.60000000149,
+            "submitToCompleteMs": 13422.29999999702
+          },
+          {
+            "queue": 1,
+            "submission": 2,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 3255.0999999940395,
+            "submitToCompleteMs": 3255.1999999955297
+          },
+          {
+            "queue": 1,
+            "submission": 3,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 12690.20000000298,
+            "submitToCompleteMs": 12690.20000000298
+          }
+        ],
+        "submitCpuMaxMs": 0.29999999701976776,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4800.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4801.39999999851,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 457.29999999701977
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5261,
+            "label": "radial surfaces",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 5261.69999999553,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "longtask",
+            "t": 4246.39999999851,
+            "durationMs": 219,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4086.60000000149,
+            "durationMs": 98.79999999701977,
+            "blockingDuration": 48.5,
+            "renderStart": 4179.19999999553,
+            "styleAndLayoutStart": 4185.29999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4626.10000000149,
+            "durationMs": 94.5,
+            "blockingDuration": 0,
+            "renderStart": 4720.29999999702,
+            "styleAndLayoutStart": 4720.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4211.19999999553,
+            "durationMs": 304.1000000014901,
+            "blockingDuration": 171.5,
+            "renderStart": 4513.60000000149,
+            "styleAndLayoutStart": 4513.60000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4518.19999999553,
+            "durationMs": 53.80000000447035,
+            "blockingDuration": 0,
+            "renderStart": 4571.39999999851,
+            "styleAndLayoutStart": 4571.89999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5394.69999999553,
+            "durationMs": 13368.80000000447,
+            "blockingDuration": 0,
+            "renderStart": 18756.60000000149,
+            "styleAndLayoutStart": 18763.19999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19108.60000000149,
+            "durationMs": 103.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 19211.39999999851,
+            "styleAndLayoutStart": 19212
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 18802.60000000149,
+            "durationMs": 283.59999999403954,
+            "blockingDuration": 0,
+            "renderStart": 19084.19999999553,
+            "styleAndLayoutStart": 19085.10000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19216.10000000149,
+            "durationMs": 3154,
+            "blockingDuration": 0,
+            "renderStart": 22369.89999999851,
+            "styleAndLayoutStart": 22370.10000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 22521.39999999851,
+            "durationMs": 62.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 22583.69999999553,
+            "styleAndLayoutStart": 22584
+          }
+        ],
+        "marks": [
+          {
+            "t": 18808.69999999553,
+            "kind": "mark",
+            "name": "half",
+            "width": 502
+          },
+          {
+            "t": 22484.39999999851,
+            "kind": "mark",
+            "name": "full",
+            "width": 982
+          }
+        ]
+      }
+    },
+    {
+      "kind": "radial",
+      "phase": "warm-edit",
+      "timing": {
+        "now": 48404.79999999702,
+        "raf": {
+          "requested": 120,
+          "called": 119,
+          "cancelled": 9,
+          "frames": 64,
+          "lastAt": 48395.60000000149,
+          "maxGapMs": 13368.10000000149,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 473,
+          "maxGapMs": 503,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 25840.60000000149,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 13421.60000000149,
+            "submitToCompleteMs": 13422.29999999702
+          },
+          {
+            "queue": 1,
+            "submission": 2,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 3255.0999999940395,
+            "submitToCompleteMs": 3255.1999999955297
+          },
+          {
+            "queue": 1,
+            "submission": 3,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 12690.20000000298,
+            "submitToCompleteMs": 12690.20000000298
+          },
+          {
+            "queue": 1,
+            "submission": 4,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 12967.5,
+            "submitToCompleteMs": 12967.80000000447
+          }
+        ],
+        "submitCpuMaxMs": 0.29999999701976776,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4800.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4801.39999999851,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 457.29999999701977
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5261,
+            "label": "radial surfaces",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 5261.69999999553,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 4626.10000000149,
+            "durationMs": 94.5,
+            "blockingDuration": 0,
+            "renderStart": 4720.29999999702,
+            "styleAndLayoutStart": 4720.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4211.19999999553,
+            "durationMs": 304.1000000014901,
+            "blockingDuration": 171.5,
+            "renderStart": 4513.60000000149,
+            "styleAndLayoutStart": 4513.60000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4518.19999999553,
+            "durationMs": 53.80000000447035,
+            "blockingDuration": 0,
+            "renderStart": 4571.39999999851,
+            "styleAndLayoutStart": 4571.89999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5394.69999999553,
+            "durationMs": 13368.80000000447,
+            "blockingDuration": 0,
+            "renderStart": 18756.60000000149,
+            "styleAndLayoutStart": 18763.19999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19108.60000000149,
+            "durationMs": 103.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 19211.39999999851,
+            "styleAndLayoutStart": 19212
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 18802.60000000149,
+            "durationMs": 283.59999999403954,
+            "blockingDuration": 0,
+            "renderStart": 19084.19999999553,
+            "styleAndLayoutStart": 19085.10000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19216.10000000149,
+            "durationMs": 3154,
+            "blockingDuration": 0,
+            "renderStart": 22369.89999999851,
+            "styleAndLayoutStart": 22370.10000000149
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 22521.39999999851,
+            "durationMs": 62.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 22583.69999999553,
+            "styleAndLayoutStart": 22584
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 22601.5,
+            "durationMs": 12656.5,
+            "blockingDuration": 0,
+            "renderStart": 35257.69999999553,
+            "styleAndLayoutStart": 35258
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 35418.69999999553,
+            "durationMs": 12961.40000000596,
+            "blockingDuration": 0,
+            "renderStart": 48379.69999999553,
+            "styleAndLayoutStart": 48380
+          }
+        ],
+        "marks": [
+          {
+            "t": 18808.69999999553,
+            "kind": "mark",
+            "name": "half",
+            "width": 502
+          },
+          {
+            "t": 22484.39999999851,
+            "kind": "mark",
+            "name": "full",
+            "width": 982
+          },
+          {
+            "t": 35304.60000000149,
+            "kind": "mark",
+            "name": "warm-edit"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cartesian",
+      "phase": "half",
+      "timing": {
+        "now": 8460,
+        "raf": {
+          "requested": 315,
+          "called": 314,
+          "cancelled": 9,
+          "frames": 230,
+          "lastAt": 8451.5,
+          "maxGapMs": 806.2000000029802,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 75,
+          "maxGapMs": 503.29999999701977,
+          "geometryChanges": 3
+        },
+        "stableGeometryMs": 104.20000000298023,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 56.79999999701977,
+            "submitToCompleteMs": 57.70000000298023
+          },
+          {
+            "queue": 1,
+            "submission": 5,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 122.30000000447035,
+            "submitToCompleteMs": 122.40000000596046
+          },
+          {
+            "queue": 1,
+            "submission": 7,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 89,
+            "submitToCompleteMs": 89.19999999552965
+          }
+        ],
+        "submitCpuMaxMs": 0.4000000059604645,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4921.69999999553,
+            "label": "figgy fullscreen textured shader",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.30000000447034836,
+            "elapsedMs": 0.30000000447034836
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.19999999553,
+            "label": "figgy line columnar shader",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.39999999851,
+            "label": "figgy scatter columnar shader",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.79999999702,
+            "label": "figgy errorbar columnar shader",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923,
+            "label": "figgy bar columnar shader",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.0999999940395,
+            "label": "figgy field columnar shader",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.30000000447034836,
+            "elapsedMs": 0.30000000447034836
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.69999999553,
+            "label": "figgy vector points shader",
+            "shaderBytes": 30302,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.79999999702,
+            "label": "figgy vector grid shader",
+            "shaderBytes": 33651,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4938.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4939.0999999940395,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 82.5
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5036.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5036.69999999553,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 77.30000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5118.79999999702,
+            "label": "figgy line area pipeline",
+            "shaderBytes": null,
+            "entry": "fs_area",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 61.600000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5185.29999999702,
+            "label": "figgy line styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 70.70000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5268.89999999851,
+            "label": "figgy milkyway ribbon pipeline",
+            "shaderBytes": null,
+            "entry": "fs_ribbon",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 66.60000000149012
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5352.39999999851,
+            "label": "figgy milkyway stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_stars",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 91.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5452.5,
+            "label": "figgy point constellation line pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_line",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 70
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5536.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5536.89999999851,
+            "label": "figgy scatter columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 58.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5602.0999999940395,
+            "label": "figgy scatter mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 84
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5702,
+            "label": "figgy picked point ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 27
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5735.5999999940395,
+            "label": "figgy picked point mapped ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 46.20000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5785.79999999702,
+            "label": "figgy scatter styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_sketch",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 58.79999999701977
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5851.79999999702,
+            "label": "figgy milkyway planets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_planet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 38.100000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5902,
+            "label": "figgy point constellation stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_star",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 29.69999999552965
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5936.69999999553,
+            "label": "figgy render prewarm",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5936.89999999851,
+            "label": "figgy errorbar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5968.5,
+            "label": "figgy errorbar mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 30.799999997019768
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6001.89999999851,
+            "label": "figgy errorbar styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 21.600000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6035.5,
+            "label": "figgy milkyway jets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_jet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 28
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6069.79999999702,
+            "label": "figgy render prewarm",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6070,
+            "label": "figgy bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 44.399999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6118.29999999702,
+            "label": "figgy mapped bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 48.100000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6168.39999999851,
+            "label": "histogram envelope fill",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 26.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6201.69999999553,
+            "label": "figgy selected histogram bin pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 27.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6229.5999999940395,
+            "label": "stream histogram persistent envelope",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6252.29999999702,
+            "label": "stream histogram mapped full bins",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 50
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6319.0999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6319.39999999851,
+            "label": "figgy field columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 305.1000000014901
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6635.0999999940395,
+            "label": "figgy field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 376.80000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7019.39999999851,
+            "label": "figgy labelled field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour_labelled",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 381.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7402.5,
+            "label": "figgy selected field data pipeline",
+            "shaderBytes": null,
+            "entry": "fs_data_selection",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 456.3999999985099
+          },
+          {
+            "name": "createShaderModule",
+            "t": 7869.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 12570,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7869.5,
+            "label": "figgy contour label pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 23.899999998509884
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7903,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 0.09999999403953552
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 8053.29999999702,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "longtask",
+            "t": 4253.79999999702,
+            "durationMs": 95,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 3819.2999999970198,
+            "durationMs": 257.1000000014901,
+            "blockingDuration": 0,
+            "renderStart": 4071.89999999851,
+            "styleAndLayoutStart": 4076
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4142,
+            "durationMs": 110.69999999552965,
+            "blockingDuration": 19.4,
+            "renderStart": 4249.89999999851,
+            "styleAndLayoutStart": 4250
+          },
+          {
+            "type": "longtask",
+            "t": 4444.39999999851,
+            "durationMs": 180,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4253.79999999702,
+            "durationMs": 104.10000000149012,
+            "blockingDuration": 53.8,
+            "renderStart": 4349.29999999702,
+            "styleAndLayoutStart": 4357.79999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4370.89999999851,
+            "durationMs": 314.19999999552965,
+            "blockingDuration": 131,
+            "renderStart": 4684.29999999702,
+            "styleAndLayoutStart": 4685.0999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4730,
+            "durationMs": 120.89999999850988,
+            "blockingDuration": 0,
+            "renderStart": 4850.39999999851,
+            "styleAndLayoutStart": 4850.69999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8068.69999999553,
+            "durationMs": 141.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8207,
+            "styleAndLayoutStart": 8209.79999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8335.19999999553,
+            "durationMs": 73.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8408.39999999851,
+            "styleAndLayoutStart": 8408.89999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8224.5,
+            "durationMs": 81.29999999701977,
+            "blockingDuration": 0,
+            "renderStart": 8303,
+            "styleAndLayoutStart": 8304
+          }
+        ],
+        "marks": [
+          {
+            "t": 8245,
+            "kind": "mark",
+            "name": "half",
+            "width": 502
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cartesian",
+      "phase": "full",
+      "timing": {
+        "now": 8698.19999999553,
+        "raf": {
+          "requested": 325,
+          "called": 324,
+          "cancelled": 9,
+          "frames": 240,
+          "lastAt": 8685.5,
+          "maxGapMs": 806.2000000029802,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 77,
+          "maxGapMs": 503.29999999701977,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 142.69999999552965,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 56.79999999701977,
+            "submitToCompleteMs": 57.70000000298023
+          },
+          {
+            "queue": 1,
+            "submission": 5,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 122.30000000447035,
+            "submitToCompleteMs": 122.40000000596046
+          },
+          {
+            "queue": 1,
+            "submission": 7,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 89,
+            "submitToCompleteMs": 89.19999999552965
+          },
+          {
+            "queue": 1,
+            "submission": 9,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 81.39999999850988,
+            "submitToCompleteMs": 81.5
+          }
+        ],
+        "submitCpuMaxMs": 0.4000000059604645,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4921.69999999553,
+            "label": "figgy fullscreen textured shader",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.30000000447034836,
+            "elapsedMs": 0.30000000447034836
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.19999999553,
+            "label": "figgy line columnar shader",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.39999999851,
+            "label": "figgy scatter columnar shader",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.79999999702,
+            "label": "figgy errorbar columnar shader",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923,
+            "label": "figgy bar columnar shader",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.0999999940395,
+            "label": "figgy field columnar shader",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.30000000447034836,
+            "elapsedMs": 0.30000000447034836
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.69999999553,
+            "label": "figgy vector points shader",
+            "shaderBytes": 30302,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.79999999702,
+            "label": "figgy vector grid shader",
+            "shaderBytes": 33651,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4938.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4939.0999999940395,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 82.5
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5036.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5036.69999999553,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 77.30000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5118.79999999702,
+            "label": "figgy line area pipeline",
+            "shaderBytes": null,
+            "entry": "fs_area",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 61.600000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5185.29999999702,
+            "label": "figgy line styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 70.70000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5268.89999999851,
+            "label": "figgy milkyway ribbon pipeline",
+            "shaderBytes": null,
+            "entry": "fs_ribbon",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 66.60000000149012
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5352.39999999851,
+            "label": "figgy milkyway stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_stars",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 91.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5452.5,
+            "label": "figgy point constellation line pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_line",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 70
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5536.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5536.89999999851,
+            "label": "figgy scatter columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 58.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5602.0999999940395,
+            "label": "figgy scatter mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 84
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5702,
+            "label": "figgy picked point ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 27
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5735.5999999940395,
+            "label": "figgy picked point mapped ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 46.20000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5785.79999999702,
+            "label": "figgy scatter styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_sketch",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 58.79999999701977
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5851.79999999702,
+            "label": "figgy milkyway planets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_planet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 38.100000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5902,
+            "label": "figgy point constellation stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_star",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 29.69999999552965
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5936.69999999553,
+            "label": "figgy render prewarm",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5936.89999999851,
+            "label": "figgy errorbar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5968.5,
+            "label": "figgy errorbar mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 30.799999997019768
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6001.89999999851,
+            "label": "figgy errorbar styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 21.600000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6035.5,
+            "label": "figgy milkyway jets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_jet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 28
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6069.79999999702,
+            "label": "figgy render prewarm",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6070,
+            "label": "figgy bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 44.399999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6118.29999999702,
+            "label": "figgy mapped bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 48.100000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6168.39999999851,
+            "label": "histogram envelope fill",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 26.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6201.69999999553,
+            "label": "figgy selected histogram bin pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 27.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6229.5999999940395,
+            "label": "stream histogram persistent envelope",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6252.29999999702,
+            "label": "stream histogram mapped full bins",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 50
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6319.0999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6319.39999999851,
+            "label": "figgy field columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 305.1000000014901
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6635.0999999940395,
+            "label": "figgy field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 376.80000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7019.39999999851,
+            "label": "figgy labelled field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour_labelled",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 381.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7402.5,
+            "label": "figgy selected field data pipeline",
+            "shaderBytes": null,
+            "entry": "fs_data_selection",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 456.3999999985099
+          },
+          {
+            "name": "createShaderModule",
+            "t": 7869.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 12570,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7869.5,
+            "label": "figgy contour label pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 23.899999998509884
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7903,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 0.09999999403953552
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 8053.29999999702,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 3819.2999999970198,
+            "durationMs": 257.1000000014901,
+            "blockingDuration": 0,
+            "renderStart": 4071.89999999851,
+            "styleAndLayoutStart": 4076
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4142,
+            "durationMs": 110.69999999552965,
+            "blockingDuration": 19.4,
+            "renderStart": 4249.89999999851,
+            "styleAndLayoutStart": 4250
+          },
+          {
+            "type": "longtask",
+            "t": 4444.39999999851,
+            "durationMs": 180,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4253.79999999702,
+            "durationMs": 104.10000000149012,
+            "blockingDuration": 53.8,
+            "renderStart": 4349.29999999702,
+            "styleAndLayoutStart": 4357.79999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4370.89999999851,
+            "durationMs": 314.19999999552965,
+            "blockingDuration": 131,
+            "renderStart": 4684.29999999702,
+            "styleAndLayoutStart": 4685.0999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4730,
+            "durationMs": 120.89999999850988,
+            "blockingDuration": 0,
+            "renderStart": 4850.39999999851,
+            "styleAndLayoutStart": 4850.69999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8068.69999999553,
+            "durationMs": 141.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8207,
+            "styleAndLayoutStart": 8209.79999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8335.19999999553,
+            "durationMs": 73.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8408.39999999851,
+            "styleAndLayoutStart": 8408.89999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8224.5,
+            "durationMs": 81.29999999701977,
+            "blockingDuration": 0,
+            "renderStart": 8303,
+            "styleAndLayoutStart": 8304
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8569.09999999404,
+            "durationMs": 55.30000000447035,
+            "blockingDuration": 0,
+            "renderStart": 8624.09999999404,
+            "styleAndLayoutStart": 8624.39999999851
+          }
+        ],
+        "marks": [
+          {
+            "t": 8245,
+            "kind": "mark",
+            "name": "half",
+            "width": 502
+          },
+          {
+            "t": 8485.39999999851,
+            "kind": "mark",
+            "name": "full",
+            "width": 982
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cartesian",
+      "phase": "warm-edit",
+      "timing": {
+        "now": 8843.39999999851,
+        "raf": {
+          "requested": 333,
+          "called": 332,
+          "cancelled": 9,
+          "frames": 248,
+          "lastAt": 8838.29999999702,
+          "maxGapMs": 806.2000000029802,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 78,
+          "maxGapMs": 503.29999999701977,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 287.8999999985099,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 56.79999999701977,
+            "submitToCompleteMs": 57.70000000298023
+          },
+          {
+            "queue": 1,
+            "submission": 5,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 122.30000000447035,
+            "submitToCompleteMs": 122.40000000596046
+          },
+          {
+            "queue": 1,
+            "submission": 7,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 89,
+            "submitToCompleteMs": 89.19999999552965
+          },
+          {
+            "queue": 1,
+            "submission": 9,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 81.39999999850988,
+            "submitToCompleteMs": 81.5
+          },
+          {
+            "queue": 1,
+            "submission": 10,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 20.799999997019768,
+            "submitToCompleteMs": 20.899999998509884
+          }
+        ],
+        "submitCpuMaxMs": 0.4000000059604645,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4921.69999999553,
+            "label": "figgy fullscreen textured shader",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.30000000447034836,
+            "elapsedMs": 0.30000000447034836
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.19999999553,
+            "label": "figgy line columnar shader",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.39999999851,
+            "label": "figgy scatter columnar shader",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4922.79999999702,
+            "label": "figgy errorbar columnar shader",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923,
+            "label": "figgy bar columnar shader",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.0999999940395,
+            "label": "figgy field columnar shader",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.30000000447034836,
+            "elapsedMs": 0.30000000447034836
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.69999999553,
+            "label": "figgy vector points shader",
+            "shaderBytes": 30302,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4923.79999999702,
+            "label": "figgy vector grid shader",
+            "shaderBytes": 33651,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4938.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4939.0999999940395,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 82.5
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5036.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5036.69999999553,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 77.30000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5118.79999999702,
+            "label": "figgy line area pipeline",
+            "shaderBytes": null,
+            "entry": "fs_area",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 61.600000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5185.29999999702,
+            "label": "figgy line styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 70.70000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5268.89999999851,
+            "label": "figgy milkyway ribbon pipeline",
+            "shaderBytes": null,
+            "entry": "fs_ribbon",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 66.60000000149012
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5352.39999999851,
+            "label": "figgy milkyway stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_stars",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 91.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5452.5,
+            "label": "figgy point constellation line pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_line",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 70
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5536.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5536.89999999851,
+            "label": "figgy scatter columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 58.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5602.0999999940395,
+            "label": "figgy scatter mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 84
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5702,
+            "label": "figgy picked point ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 27
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5735.5999999940395,
+            "label": "figgy picked point mapped ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 46.20000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5785.79999999702,
+            "label": "figgy scatter styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_sketch",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 58.79999999701977
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5851.79999999702,
+            "label": "figgy milkyway planets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_planet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 38.100000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5902,
+            "label": "figgy point constellation stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_star",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 29.69999999552965
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5936.69999999553,
+            "label": "figgy render prewarm",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5936.89999999851,
+            "label": "figgy errorbar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5968.5,
+            "label": "figgy errorbar mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 30.799999997019768
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6001.89999999851,
+            "label": "figgy errorbar styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 21.600000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6035.5,
+            "label": "figgy milkyway jets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_jet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 28
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6069.79999999702,
+            "label": "figgy render prewarm",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6070,
+            "label": "figgy bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 44.399999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6118.29999999702,
+            "label": "figgy mapped bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 48.100000001490116
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6168.39999999851,
+            "label": "histogram envelope fill",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 26.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6201.69999999553,
+            "label": "figgy selected histogram bin pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 27.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6229.5999999940395,
+            "label": "stream histogram persistent envelope",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6252.29999999702,
+            "label": "stream histogram mapped full bins",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 50
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6319.0999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6319.39999999851,
+            "label": "figgy field columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 305.1000000014901
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6635.0999999940395,
+            "label": "figgy field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 376.80000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7019.39999999851,
+            "label": "figgy labelled field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour_labelled",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 381.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7402.5,
+            "label": "figgy selected field data pipeline",
+            "shaderBytes": null,
+            "entry": "fs_data_selection",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 456.3999999985099
+          },
+          {
+            "name": "createShaderModule",
+            "t": 7869.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 12570,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7869.5,
+            "label": "figgy contour label pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 23.899999998509884
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7903,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 0.09999999403953552
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 8053.29999999702,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 3819.2999999970198,
+            "durationMs": 257.1000000014901,
+            "blockingDuration": 0,
+            "renderStart": 4071.89999999851,
+            "styleAndLayoutStart": 4076
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4142,
+            "durationMs": 110.69999999552965,
+            "blockingDuration": 19.4,
+            "renderStart": 4249.89999999851,
+            "styleAndLayoutStart": 4250
+          },
+          {
+            "type": "longtask",
+            "t": 4444.39999999851,
+            "durationMs": 180,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4253.79999999702,
+            "durationMs": 104.10000000149012,
+            "blockingDuration": 53.8,
+            "renderStart": 4349.29999999702,
+            "styleAndLayoutStart": 4357.79999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4370.89999999851,
+            "durationMs": 314.19999999552965,
+            "blockingDuration": 131,
+            "renderStart": 4684.29999999702,
+            "styleAndLayoutStart": 4685.0999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4730,
+            "durationMs": 120.89999999850988,
+            "blockingDuration": 0,
+            "renderStart": 4850.39999999851,
+            "styleAndLayoutStart": 4850.69999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8068.69999999553,
+            "durationMs": 141.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8207,
+            "styleAndLayoutStart": 8209.79999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8335.19999999553,
+            "durationMs": 73.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8408.39999999851,
+            "styleAndLayoutStart": 8408.89999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8224.5,
+            "durationMs": 81.29999999701977,
+            "blockingDuration": 0,
+            "renderStart": 8303,
+            "styleAndLayoutStart": 8304
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8569.09999999404,
+            "durationMs": 55.30000000447035,
+            "blockingDuration": 0,
+            "renderStart": 8624.09999999404,
+            "styleAndLayoutStart": 8624.39999999851
+          }
+        ],
+        "marks": [
+          {
+            "t": 8245,
+            "kind": "mark",
+            "name": "half",
+            "width": 502
+          },
+          {
+            "t": 8485.39999999851,
+            "kind": "mark",
+            "name": "full",
+            "width": 982
+          },
+          {
+            "t": 8721.39999999851,
+            "kind": "mark",
+            "name": "warm-edit"
+          }
+        ]
+      }
+    }
+  ],
+  "replication_controls": [
+    {
+      "kind": "radial",
+      "phase": "half",
+      "timing": {
+        "now": 22626.60000000149,
+        "raf": {
+          "requested": 96,
+          "called": 95,
+          "cancelled": 9,
+          "frames": 45,
+          "lastAt": 22621.90000000596,
+          "maxGapMs": 13553,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 215,
+          "maxGapMs": 542.3999999985099,
+          "geometryChanges": 3
+        },
+        "stableGeometryMs": 3167.1999999955297,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 13549,
+            "submitToCompleteMs": 13549.5
+          },
+          {
+            "queue": 1,
+            "submission": 2,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 3187.9000000059605,
+            "submitToCompleteMs": 3188.1999999955297
+          }
+        ],
+        "submitCpuMaxMs": 0.20000000298023224,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4971.80000000447,
+            "label": "figgy render prewarm",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4972.5,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 475.6000000014901
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5450.4000000059605,
+            "label": "radial surfaces",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 5451.10000000149,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "longtask",
+            "t": 4456.20000000298,
+            "durationMs": 236,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4277,
+            "durationMs": 103.40000000596046,
+            "blockingDuration": 51.5,
+            "renderStart": 4372.30000000447,
+            "styleAndLayoutStart": 4380.4000000059605
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4408.30000000447,
+            "durationMs": 338.19999999552965,
+            "blockingDuration": 187.2,
+            "renderStart": 4745.9000000059605,
+            "styleAndLayoutStart": 4746.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4749.10000000149,
+            "durationMs": 71.10000000149012,
+            "blockingDuration": 0,
+            "renderStart": 4819.5,
+            "styleAndLayoutStart": 4820.20000000298
+          },
+          {
+            "type": "longtask",
+            "t": 5449.30000000447,
+            "durationMs": 51,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5447.80000000447,
+            "durationMs": 51.899999998509884,
+            "blockingDuration": 0.4,
+            "renderStart": 5449.30000000447,
+            "styleAndLayoutStart": 5499.4000000059605
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5553.5,
+            "durationMs": 13535.40000000596,
+            "blockingDuration": 0,
+            "renderStart": 19087.70000000298,
+            "styleAndLayoutStart": 19088.70000000298
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19122.40000000596,
+            "durationMs": 285.8999999985099,
+            "blockingDuration": 0,
+            "renderStart": 19406.10000000149,
+            "styleAndLayoutStart": 19407
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19428.90000000596,
+            "durationMs": 107.09999999403954,
+            "blockingDuration": 0,
+            "renderStart": 19535.80000000447,
+            "styleAndLayoutStart": 19536
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19539.70000000298,
+            "durationMs": 3080.2000000029802,
+            "blockingDuration": 0,
+            "renderStart": 22619.70000000298,
+            "styleAndLayoutStart": 22619.90000000596
+          }
+        ],
+        "marks": [
+          {
+            "t": 19126.30000000447,
+            "kind": "mark",
+            "stage": "half",
+            "width": 502
+          }
+        ]
+      }
+    },
+    {
+      "kind": "radial",
+      "phase": "full",
+      "timing": {
+        "now": 35512.5,
+        "raf": {
+          "requested": 106,
+          "called": 104,
+          "cancelled": 9,
+          "frames": 54,
+          "lastAt": 22821.70000000298,
+          "maxGapMs": 13553,
+          "pending": 2
+        },
+        "timer": {
+          "samples": 344,
+          "maxGapMs": 542.3999999985099,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 12751.79999999702,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 13549,
+            "submitToCompleteMs": 13549.5
+          },
+          {
+            "queue": 1,
+            "submission": 2,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 3187.9000000059605,
+            "submitToCompleteMs": 3188.1999999955297
+          },
+          {
+            "queue": 1,
+            "submission": 3,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 12760.80000000447,
+            "submitToCompleteMs": 12760.90000000596
+          }
+        ],
+        "submitCpuMaxMs": 0.20000000298023224,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4971.80000000447,
+            "label": "figgy render prewarm",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4972.5,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 475.6000000014901
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5450.4000000059605,
+            "label": "radial surfaces",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 5451.10000000149,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 4277,
+            "durationMs": 103.40000000596046,
+            "blockingDuration": 51.5,
+            "renderStart": 4372.30000000447,
+            "styleAndLayoutStart": 4380.4000000059605
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4408.30000000447,
+            "durationMs": 338.19999999552965,
+            "blockingDuration": 187.2,
+            "renderStart": 4745.9000000059605,
+            "styleAndLayoutStart": 4746.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4749.10000000149,
+            "durationMs": 71.10000000149012,
+            "blockingDuration": 0,
+            "renderStart": 4819.5,
+            "styleAndLayoutStart": 4820.20000000298
+          },
+          {
+            "type": "longtask",
+            "t": 5449.30000000447,
+            "durationMs": 51,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5447.80000000447,
+            "durationMs": 51.899999998509884,
+            "blockingDuration": 0.4,
+            "renderStart": 5449.30000000447,
+            "styleAndLayoutStart": 5499.4000000059605
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5553.5,
+            "durationMs": 13535.40000000596,
+            "blockingDuration": 0,
+            "renderStart": 19087.70000000298,
+            "styleAndLayoutStart": 19088.70000000298
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19122.40000000596,
+            "durationMs": 285.8999999985099,
+            "blockingDuration": 0,
+            "renderStart": 19406.10000000149,
+            "styleAndLayoutStart": 19407
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19428.90000000596,
+            "durationMs": 107.09999999403954,
+            "blockingDuration": 0,
+            "renderStart": 19535.80000000447,
+            "styleAndLayoutStart": 19536
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19539.70000000298,
+            "durationMs": 3080.2000000029802,
+            "blockingDuration": 0,
+            "renderStart": 22619.70000000298,
+            "styleAndLayoutStart": 22619.90000000596
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 22747.70000000298,
+            "durationMs": 61.29999999701977,
+            "blockingDuration": 0,
+            "renderStart": 22808.60000000149,
+            "styleAndLayoutStart": 22809
+          }
+        ],
+        "marks": [
+          {
+            "t": 19126.30000000447,
+            "kind": "mark",
+            "stage": "half",
+            "width": 502
+          },
+          {
+            "t": 22723.40000000596,
+            "kind": "mark",
+            "stage": "full",
+            "width": 982
+          }
+        ]
+      }
+    },
+    {
+      "kind": "radial",
+      "phase": "warm-edit",
+      "timing": {
+        "now": 47808.20000000298,
+        "raf": {
+          "requested": 116,
+          "called": 114,
+          "cancelled": 9,
+          "frames": 63,
+          "lastAt": 35676.10000000149,
+          "maxGapMs": 13553,
+          "pending": 2
+        },
+        "timer": {
+          "samples": 467,
+          "maxGapMs": 542.3999999985099,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 25047.5,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 13549,
+            "submitToCompleteMs": 13549.5
+          },
+          {
+            "queue": 1,
+            "submission": 2,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 3187.9000000059605,
+            "submitToCompleteMs": 3188.1999999955297
+          },
+          {
+            "queue": 1,
+            "submission": 3,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 12760.80000000447,
+            "submitToCompleteMs": 12760.90000000596
+          },
+          {
+            "queue": 1,
+            "submission": 4,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 12142.89999999851,
+            "submitToCompleteMs": 12143.10000000149
+          }
+        ],
+        "submitCpuMaxMs": 0.20000000298023224,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4971.80000000447,
+            "label": "figgy render prewarm",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4972.5,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 475.6000000014901
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5450.4000000059605,
+            "label": "radial surfaces",
+            "shaderBytes": 13903,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 5451.10000000149,
+            "label": "radial surfaces",
+            "shaderBytes": null,
+            "entry": "fs",
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 4408.30000000447,
+            "durationMs": 338.19999999552965,
+            "blockingDuration": 187.2,
+            "renderStart": 4745.9000000059605,
+            "styleAndLayoutStart": 4746.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4749.10000000149,
+            "durationMs": 71.10000000149012,
+            "blockingDuration": 0,
+            "renderStart": 4819.5,
+            "styleAndLayoutStart": 4820.20000000298
+          },
+          {
+            "type": "longtask",
+            "t": 5449.30000000447,
+            "durationMs": 51,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5447.80000000447,
+            "durationMs": 51.899999998509884,
+            "blockingDuration": 0.4,
+            "renderStart": 5449.30000000447,
+            "styleAndLayoutStart": 5499.4000000059605
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 5553.5,
+            "durationMs": 13535.40000000596,
+            "blockingDuration": 0,
+            "renderStart": 19087.70000000298,
+            "styleAndLayoutStart": 19088.70000000298
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19122.40000000596,
+            "durationMs": 285.8999999985099,
+            "blockingDuration": 0,
+            "renderStart": 19406.10000000149,
+            "styleAndLayoutStart": 19407
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19428.90000000596,
+            "durationMs": 107.09999999403954,
+            "blockingDuration": 0,
+            "renderStart": 19535.80000000447,
+            "styleAndLayoutStart": 19536
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 19539.70000000298,
+            "durationMs": 3080.2000000029802,
+            "blockingDuration": 0,
+            "renderStart": 22619.70000000298,
+            "styleAndLayoutStart": 22619.90000000596
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 22747.70000000298,
+            "durationMs": 61.29999999701977,
+            "blockingDuration": 0,
+            "renderStart": 22808.60000000149,
+            "styleAndLayoutStart": 22809
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 22821.80000000447,
+            "durationMs": 12731.39999999851,
+            "blockingDuration": 0,
+            "renderStart": 35552.70000000298,
+            "styleAndLayoutStart": 35553.10000000149
+          }
+        ],
+        "marks": [
+          {
+            "t": 19126.30000000447,
+            "kind": "mark",
+            "stage": "half",
+            "width": 502
+          },
+          {
+            "t": 22723.40000000596,
+            "kind": "mark",
+            "stage": "full",
+            "width": 982
+          },
+          {
+            "t": 35595,
+            "kind": "mark",
+            "stage": "warm-edit"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cartesian",
+      "phase": "half",
+      "timing": {
+        "now": 8247.19999999553,
+        "raf": {
+          "requested": 308,
+          "called": 307,
+          "cancelled": 9,
+          "frames": 221,
+          "lastAt": 8238.19999999553,
+          "maxGapMs": 788.4000000059605,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 71,
+          "maxGapMs": 418.79999999701977,
+          "geometryChanges": 3
+        },
+        "stableGeometryMs": 88.10000000149012,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 45,
+            "submitToCompleteMs": 45.5
+          },
+          {
+            "queue": 1,
+            "submission": 5,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 109.60000000149012,
+            "submitToCompleteMs": 109.70000000298023
+          },
+          {
+            "queue": 1,
+            "submission": 7,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 87.90000000596046,
+            "submitToCompleteMs": 88.10000000149012
+          }
+        ],
+        "submitCpuMaxMs": 0.19999999552965164,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4876,
+            "label": "figgy fullscreen textured shader",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4876.29999999702,
+            "label": "figgy line columnar shader",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4876.5,
+            "label": "figgy scatter columnar shader",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877,
+            "label": "figgy errorbar columnar shader",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.19999999553,
+            "label": "figgy bar columnar shader",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.29999999702,
+            "label": "figgy field columnar shader",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.89999999851,
+            "label": "figgy vector points shader",
+            "shaderBytes": 30302,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4878.0999999940395,
+            "label": "figgy vector grid shader",
+            "shaderBytes": 33651,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4892,
+            "label": "figgy render prewarm",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4892.5,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 102.69999999552965
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5006.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5006.79999999702,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 97.79999999701977
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5105.39999999851,
+            "label": "figgy line area pipeline",
+            "shaderBytes": null,
+            "entry": "fs_area",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 63.899999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5171.79999999702,
+            "label": "figgy line styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 66
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5254.39999999851,
+            "label": "figgy milkyway ribbon pipeline",
+            "shaderBytes": null,
+            "entry": "fs_ribbon",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 64.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5321.19999999553,
+            "label": "figgy milkyway stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_stars",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 77.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5405.19999999553,
+            "label": "figgy point constellation line pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_line",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 67.60000000149012
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5489.29999999702,
+            "label": "figgy render prewarm",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5489.5999999940395,
+            "label": "figgy scatter columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 58.400000005960464
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5555.39999999851,
+            "label": "figgy scatter mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 81.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5638.19999999553,
+            "label": "figgy picked point ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 29.200000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5672,
+            "label": "figgy picked point mapped ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 45.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5721.29999999702,
+            "label": "figgy scatter styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_sketch",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 62
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5788.0999999940395,
+            "label": "figgy milkyway planets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_planet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 37.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5838.39999999851,
+            "label": "figgy point constellation stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_star",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 30.5
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5873,
+            "label": "figgy render prewarm",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5873.0999999940395,
+            "label": "figgy errorbar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 21.900000005960464
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5904.69999999553,
+            "label": "figgy errorbar mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 30.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5938.39999999851,
+            "label": "figgy errorbar styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 21.899999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5971.79999999702,
+            "label": "figgy milkyway jets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_jet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 28.600000001490116
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6005.69999999553,
+            "label": "figgy render prewarm",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6005.89999999851,
+            "label": "figgy bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 44.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6054.5999999940395,
+            "label": "figgy mapped bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 48.70000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6104.69999999553,
+            "label": "histogram envelope fill",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 25.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6138.19999999553,
+            "label": "figgy selected histogram bin pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 27.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6165.89999999851,
+            "label": "stream histogram persistent envelope",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22.399999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6188.5,
+            "label": "stream histogram mapped full bins",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 47.899999998509884
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6238.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6238.89999999851,
+            "label": "figgy field columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 264.6000000014901
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6505.0999999940395,
+            "label": "figgy field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 350.90000000596046
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6871.69999999553,
+            "label": "figgy labelled field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour_labelled",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 373.80000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7254.79999999702,
+            "label": "figgy selected field data pipeline",
+            "shaderBytes": null,
+            "entry": "fs_data_selection",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 438.3999999985099
+          },
+          {
+            "name": "createShaderModule",
+            "t": 7706.0999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 12570,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7706.29999999702,
+            "label": "figgy contour label pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 22
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7738.89999999851,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7871.69999999553,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "long-animation-frame",
+            "t": 4021,
+            "durationMs": 99.5,
+            "blockingDuration": 8.3,
+            "renderStart": 4117.79999999702,
+            "styleAndLayoutStart": 4120.5
+          },
+          {
+            "type": "longtask",
+            "t": 4315.19999999553,
+            "durationMs": 190,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "longtask",
+            "t": 4505.19999999553,
+            "durationMs": 57,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4122,
+            "durationMs": 103.69999999552965,
+            "blockingDuration": 53.4,
+            "renderStart": 4212.5999999940395,
+            "styleAndLayoutStart": 4225.5999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4584.5,
+            "durationMs": 64.5,
+            "blockingDuration": 0,
+            "renderStart": 4648.79999999702,
+            "styleAndLayoutStart": 4649
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4238.39999999851,
+            "durationMs": 344.69999999552965,
+            "blockingDuration": 148.9,
+            "renderStart": 4582,
+            "styleAndLayoutStart": 4583.0999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4654.89999999851,
+            "durationMs": 183.60000000149012,
+            "blockingDuration": 0,
+            "renderStart": 4838.19999999553,
+            "styleAndLayoutStart": 4838.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 7901.29999999702,
+            "durationMs": 115.20000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8014,
+            "styleAndLayoutStart": 8016.29999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8132.79999999702,
+            "durationMs": 76.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8208.69999999553,
+            "styleAndLayoutStart": 8209.19999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8040.19999999553,
+            "durationMs": 69.89999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8107.5,
+            "styleAndLayoutStart": 8108.39999999851
+          }
+        ],
+        "marks": [
+          {
+            "t": 8040.39999999851,
+            "kind": "mark",
+            "stage": "half",
+            "width": 502
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cartesian",
+      "phase": "full",
+      "timing": {
+        "now": 8486,
+        "raf": {
+          "requested": 318,
+          "called": 317,
+          "cancelled": 9,
+          "frames": 231,
+          "lastAt": 8471.39999999851,
+          "maxGapMs": 788.4000000059605,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 74,
+          "maxGapMs": 418.79999999701977,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 126.90000000596046,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 45,
+            "submitToCompleteMs": 45.5
+          },
+          {
+            "queue": 1,
+            "submission": 5,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 109.60000000149012,
+            "submitToCompleteMs": 109.70000000298023
+          },
+          {
+            "queue": 1,
+            "submission": 7,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 87.90000000596046,
+            "submitToCompleteMs": 88.10000000149012
+          },
+          {
+            "queue": 1,
+            "submission": 9,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 98.60000000149012,
+            "submitToCompleteMs": 98.89999999850988
+          }
+        ],
+        "submitCpuMaxMs": 0.19999999552965164,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4876,
+            "label": "figgy fullscreen textured shader",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4876.29999999702,
+            "label": "figgy line columnar shader",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4876.5,
+            "label": "figgy scatter columnar shader",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877,
+            "label": "figgy errorbar columnar shader",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.19999999553,
+            "label": "figgy bar columnar shader",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.29999999702,
+            "label": "figgy field columnar shader",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.89999999851,
+            "label": "figgy vector points shader",
+            "shaderBytes": 30302,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4878.0999999940395,
+            "label": "figgy vector grid shader",
+            "shaderBytes": 33651,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4892,
+            "label": "figgy render prewarm",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4892.5,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 102.69999999552965
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5006.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5006.79999999702,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 97.79999999701977
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5105.39999999851,
+            "label": "figgy line area pipeline",
+            "shaderBytes": null,
+            "entry": "fs_area",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 63.899999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5171.79999999702,
+            "label": "figgy line styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 66
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5254.39999999851,
+            "label": "figgy milkyway ribbon pipeline",
+            "shaderBytes": null,
+            "entry": "fs_ribbon",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 64.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5321.19999999553,
+            "label": "figgy milkyway stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_stars",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 77.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5405.19999999553,
+            "label": "figgy point constellation line pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_line",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 67.60000000149012
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5489.29999999702,
+            "label": "figgy render prewarm",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5489.5999999940395,
+            "label": "figgy scatter columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 58.400000005960464
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5555.39999999851,
+            "label": "figgy scatter mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 81.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5638.19999999553,
+            "label": "figgy picked point ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 29.200000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5672,
+            "label": "figgy picked point mapped ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 45.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5721.29999999702,
+            "label": "figgy scatter styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_sketch",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 62
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5788.0999999940395,
+            "label": "figgy milkyway planets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_planet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 37.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5838.39999999851,
+            "label": "figgy point constellation stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_star",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 30.5
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5873,
+            "label": "figgy render prewarm",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5873.0999999940395,
+            "label": "figgy errorbar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 21.900000005960464
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5904.69999999553,
+            "label": "figgy errorbar mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 30.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5938.39999999851,
+            "label": "figgy errorbar styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 21.899999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5971.79999999702,
+            "label": "figgy milkyway jets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_jet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 28.600000001490116
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6005.69999999553,
+            "label": "figgy render prewarm",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6005.89999999851,
+            "label": "figgy bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 44.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6054.5999999940395,
+            "label": "figgy mapped bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 48.70000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6104.69999999553,
+            "label": "histogram envelope fill",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 25.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6138.19999999553,
+            "label": "figgy selected histogram bin pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 27.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6165.89999999851,
+            "label": "stream histogram persistent envelope",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22.399999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6188.5,
+            "label": "stream histogram mapped full bins",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 47.899999998509884
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6238.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6238.89999999851,
+            "label": "figgy field columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 264.6000000014901
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6505.0999999940395,
+            "label": "figgy field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 350.90000000596046
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6871.69999999553,
+            "label": "figgy labelled field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour_labelled",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 373.80000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7254.79999999702,
+            "label": "figgy selected field data pipeline",
+            "shaderBytes": null,
+            "entry": "fs_data_selection",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 438.3999999985099
+          },
+          {
+            "name": "createShaderModule",
+            "t": 7706.0999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 12570,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7706.29999999702,
+            "label": "figgy contour label pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 22
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7738.89999999851,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7871.69999999553,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "longtask",
+            "t": 4505.19999999553,
+            "durationMs": 57,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4122,
+            "durationMs": 103.69999999552965,
+            "blockingDuration": 53.4,
+            "renderStart": 4212.5999999940395,
+            "styleAndLayoutStart": 4225.5999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4584.5,
+            "durationMs": 64.5,
+            "blockingDuration": 0,
+            "renderStart": 4648.79999999702,
+            "styleAndLayoutStart": 4649
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4238.39999999851,
+            "durationMs": 344.69999999552965,
+            "blockingDuration": 148.9,
+            "renderStart": 4582,
+            "styleAndLayoutStart": 4583.0999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4654.89999999851,
+            "durationMs": 183.60000000149012,
+            "blockingDuration": 0,
+            "renderStart": 4838.19999999553,
+            "styleAndLayoutStart": 4838.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 7901.29999999702,
+            "durationMs": 115.20000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8014,
+            "styleAndLayoutStart": 8016.29999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8132.79999999702,
+            "durationMs": 76.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8208.69999999553,
+            "styleAndLayoutStart": 8209.19999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8040.19999999553,
+            "durationMs": 69.89999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8107.5,
+            "styleAndLayoutStart": 8108.39999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8315.09999999404,
+            "durationMs": 53.30000000447035,
+            "blockingDuration": 0,
+            "renderStart": 8368.09999999404,
+            "styleAndLayoutStart": 8368.39999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8371.29999999702,
+            "durationMs": 65.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8436.79999999702,
+            "styleAndLayoutStart": 8437
+          }
+        ],
+        "marks": [
+          {
+            "t": 8040.39999999851,
+            "kind": "mark",
+            "stage": "half",
+            "width": 502
+          },
+          {
+            "t": 8277.19999999553,
+            "kind": "mark",
+            "stage": "full",
+            "width": 982
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cartesian",
+      "phase": "warm-edit",
+      "timing": {
+        "now": 8637,
+        "raf": {
+          "requested": 326,
+          "called": 325,
+          "cancelled": 9,
+          "frames": 239,
+          "lastAt": 8621.5,
+          "maxGapMs": 788.4000000059605,
+          "pending": 1
+        },
+        "timer": {
+          "samples": 75,
+          "maxGapMs": 418.79999999701977,
+          "geometryChanges": 4
+        },
+        "stableGeometryMs": 277.90000000596046,
+        "submissions": [
+          {
+            "queue": 1,
+            "submission": 1,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 45,
+            "submitToCompleteMs": 45.5
+          },
+          {
+            "queue": 1,
+            "submission": 5,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 109.60000000149012,
+            "submitToCompleteMs": 109.70000000298023
+          },
+          {
+            "queue": 1,
+            "submission": 7,
+            "canvas": [
+              480,
+              300
+            ],
+            "status": "completed",
+            "waitMs": 87.90000000596046,
+            "submitToCompleteMs": 88.10000000149012
+          },
+          {
+            "queue": 1,
+            "submission": 9,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 98.60000000149012,
+            "submitToCompleteMs": 98.89999999850988
+          },
+          {
+            "queue": 1,
+            "submission": 10,
+            "canvas": [
+              960,
+              600
+            ],
+            "status": "completed",
+            "waitMs": 20.899999998509884,
+            "submitToCompleteMs": 21
+          }
+        ],
+        "submitCpuMaxMs": 0.19999999552965164,
+        "pipelines": [
+          {
+            "name": "createShaderModule",
+            "t": 4876,
+            "label": "figgy fullscreen textured shader",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4876.29999999702,
+            "label": "figgy line columnar shader",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4876.5,
+            "label": "figgy scatter columnar shader",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.19999999552965164,
+            "elapsedMs": 0.19999999552965164
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877,
+            "label": "figgy errorbar columnar shader",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.19999999553,
+            "label": "figgy bar columnar shader",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.29999999702,
+            "label": "figgy field columnar shader",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4877.89999999851,
+            "label": "figgy vector points shader",
+            "shaderBytes": 30302,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4878.0999999940395,
+            "label": "figgy vector grid shader",
+            "shaderBytes": 33651,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createShaderModule",
+            "t": 4892,
+            "label": "figgy render prewarm",
+            "shaderBytes": 1745,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 4892.5,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 102.69999999552965
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5006.39999999851,
+            "label": "figgy render prewarm",
+            "shaderBytes": 48929,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5006.79999999702,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 97.79999999701977
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5105.39999999851,
+            "label": "figgy line area pipeline",
+            "shaderBytes": null,
+            "entry": "fs_area",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 63.899999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5171.79999999702,
+            "label": "figgy line styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 66
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5254.39999999851,
+            "label": "figgy milkyway ribbon pipeline",
+            "shaderBytes": null,
+            "entry": "fs_ribbon",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 64.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5321.19999999553,
+            "label": "figgy milkyway stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_stars",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 77.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5405.19999999553,
+            "label": "figgy point constellation line pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_line",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 67.60000000149012
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5489.29999999702,
+            "label": "figgy render prewarm",
+            "shaderBytes": 49936,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.29999999701976776,
+            "elapsedMs": 0.29999999701976776
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5489.5999999940395,
+            "label": "figgy scatter columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 58.400000005960464
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5555.39999999851,
+            "label": "figgy scatter mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 81.39999999850988
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5638.19999999553,
+            "label": "figgy picked point ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 29.200000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5672,
+            "label": "figgy picked point mapped ring pipeline",
+            "shaderBytes": null,
+            "entry": "fs_pick_ring",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 45.69999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5721.29999999702,
+            "label": "figgy scatter styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_sketch",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 62
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5788.0999999940395,
+            "label": "figgy milkyway planets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_planet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 37.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5838.39999999851,
+            "label": "figgy point constellation stars pipeline",
+            "shaderBytes": null,
+            "entry": "fs_constellation_star",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 30.5
+          },
+          {
+            "name": "createShaderModule",
+            "t": 5873,
+            "label": "figgy render prewarm",
+            "shaderBytes": 27534,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5873.0999999940395,
+            "label": "figgy errorbar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 21.900000005960464
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5904.69999999553,
+            "label": "figgy errorbar mapped pipeline",
+            "shaderBytes": null,
+            "entry": "fs_mapped",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 30.700000002980232
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5938.39999999851,
+            "label": "figgy errorbar styled pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 21.899999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 5971.79999999702,
+            "label": "figgy milkyway jets pipeline",
+            "shaderBytes": null,
+            "entry": "fs_jet",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 28.600000001490116
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6005.69999999553,
+            "label": "figgy render prewarm",
+            "shaderBytes": 33405,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6005.89999999851,
+            "label": "figgy bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 44.19999999552965
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6054.5999999940395,
+            "label": "figgy mapped bar columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 48.70000000298023
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6104.69999999553,
+            "label": "histogram envelope fill",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 25.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6138.19999999553,
+            "label": "figgy selected histogram bin pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 27.5
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6165.89999999851,
+            "label": "stream histogram persistent envelope",
+            "shaderBytes": null,
+            "entry": "fs_bar_envelope",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 22.399999998509884
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6188.5,
+            "label": "stream histogram mapped full bins",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.09999999403953552,
+            "elapsedMs": 47.899999998509884
+          },
+          {
+            "name": "createShaderModule",
+            "t": 6238.5999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 62956,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.20000000298023224,
+            "elapsedMs": 0.20000000298023224
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6238.89999999851,
+            "label": "figgy field columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 264.6000000014901
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6505.0999999940395,
+            "label": "figgy field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 350.90000000596046
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 6871.69999999553,
+            "label": "figgy labelled field contour pipeline",
+            "shaderBytes": null,
+            "entry": "fs_contour_labelled",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 373.80000000447035
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7254.79999999702,
+            "label": "figgy selected field data pipeline",
+            "shaderBytes": null,
+            "entry": "fs_data_selection",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 438.3999999985099
+          },
+          {
+            "name": "createShaderModule",
+            "t": 7706.0999999940395,
+            "label": "figgy render prewarm",
+            "shaderBytes": 12570,
+            "entry": null,
+            "samples": 1,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 0.10000000149011612
+          },
+          {
+            "name": "createRenderPipelineAsync",
+            "t": 7706.29999999702,
+            "label": "figgy contour label pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0.10000000149011612,
+            "elapsedMs": 22
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7738.89999999851,
+            "label": "figgy fullscreen textured pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          },
+          {
+            "name": "createRenderPipeline",
+            "t": 7871.69999999553,
+            "label": "figgy line columnar pipeline",
+            "shaderBytes": null,
+            "entry": "fs_main",
+            "samples": 4,
+            "status": "completed",
+            "cpuMs": 0,
+            "elapsedMs": 0
+          }
+        ],
+        "longTasks": [
+          {
+            "type": "longtask",
+            "t": 4505.19999999553,
+            "durationMs": 57,
+            "blockingDuration": null,
+            "renderStart": null,
+            "styleAndLayoutStart": null
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4122,
+            "durationMs": 103.69999999552965,
+            "blockingDuration": 53.4,
+            "renderStart": 4212.5999999940395,
+            "styleAndLayoutStart": 4225.5999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4584.5,
+            "durationMs": 64.5,
+            "blockingDuration": 0,
+            "renderStart": 4648.79999999702,
+            "styleAndLayoutStart": 4649
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4238.39999999851,
+            "durationMs": 344.69999999552965,
+            "blockingDuration": 148.9,
+            "renderStart": 4582,
+            "styleAndLayoutStart": 4583.0999999940395
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 4654.89999999851,
+            "durationMs": 183.60000000149012,
+            "blockingDuration": 0,
+            "renderStart": 4838.19999999553,
+            "styleAndLayoutStart": 4838.5
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 7901.29999999702,
+            "durationMs": 115.20000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8014,
+            "styleAndLayoutStart": 8016.29999999702
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8132.79999999702,
+            "durationMs": 76.39999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8208.69999999553,
+            "styleAndLayoutStart": 8209.19999999553
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8040.19999999553,
+            "durationMs": 69.89999999850988,
+            "blockingDuration": 0,
+            "renderStart": 8107.5,
+            "styleAndLayoutStart": 8108.39999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8315.09999999404,
+            "durationMs": 53.30000000447035,
+            "blockingDuration": 0,
+            "renderStart": 8368.09999999404,
+            "styleAndLayoutStart": 8368.39999999851
+          },
+          {
+            "type": "long-animation-frame",
+            "t": 8371.29999999702,
+            "durationMs": 65.70000000298023,
+            "blockingDuration": 0,
+            "renderStart": 8436.79999999702,
+            "styleAndLayoutStart": 8437
+          }
+        ],
+        "marks": [
+          {
+            "t": 8040.39999999851,
+            "kind": "mark",
+            "stage": "half",
+            "width": 502
+          },
+          {
+            "t": 8277.19999999553,
+            "kind": "mark",
+            "stage": "full",
+            "width": 982
+          },
+          {
+            "t": 8515.29999999702,
+            "kind": "mark",
+            "stage": "warm-edit"
+          }
+        ]
+      }
+    }
+  ]
+}
