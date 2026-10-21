@@ -19,6 +19,10 @@ pub(crate) struct Editor {
     save_path: String,
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
+    pub(super) property_text: HashMap<String, (String, Value, u64)>,
+    pub(super) figure_properties: bool,
+    pub(super) inspector_owner: Option<String>,
+    pub(super) history_replayed: bool,
     inspector_context: String,
     pub layout_probe: std::collections::VecDeque<Value>,
     notice: String,
@@ -43,6 +47,10 @@ impl Default for Editor {
             save_path: "figure.png".into(),
             raw: String::new(),
             text_ranges: HashMap::new(),
+            property_text: HashMap::new(),
+            figure_properties: false,
+            inspector_owner: None,
+            history_replayed: false,
             inspector_context: String::new(),
             layout_probe: Default::default(),
             notice: String::new(),
@@ -170,6 +178,61 @@ fn fit_enabled_title(config: &mut Config, target: &str) {
 }
 
 impl Editor {
+    pub(super) fn history_controls(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        let status = c.data.history.status();
+        let active = status["gesture_active"] == true;
+        let shortcut = if !ui.ctx().egui_wants_keyboard_input() {
+            ui.input_mut(|i| {
+                if i.consume_key(
+                    egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                    egui::Key::Z,
+                ) || i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y)
+                {
+                    Some(true)
+                } else if i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z) {
+                    Some(false)
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+        let undo = ui
+            .add_enabled(
+                !active && status["can_undo"] == true,
+                egui::Button::new("Undo"),
+            )
+            .on_hover_text("Undo chart edit (Ctrl/Cmd+Z)");
+        self.controls.insert("undo".into(), undo.rect);
+        let redo = ui
+            .add_enabled(
+                !active && status["can_redo"] == true,
+                egui::Button::new("Redo"),
+            )
+            .on_hover_text("Redo chart edit (Ctrl/Cmd+Shift+Z)");
+        self.controls.insert("redo".into(), redo.rect);
+        if let Some(redo) = shortcut.or_else(|| {
+            if undo.clicked() {
+                Some(false)
+            } else if redo.clicked() {
+                Some(true)
+            } else {
+                None
+            }
+        }) {
+            match c.replay_edit(redo) {
+                Ok(()) => {
+                    self.history_replayed = true;
+                    self.error.clear();
+                    self.picked = None;
+                    self.inline_text = None;
+                }
+                Err(e) => self.error = e.to_string(),
+            }
+        }
+    }
+
     pub fn show(
         &mut self,
         root: &mut egui::Ui,
@@ -194,6 +257,8 @@ impl Editor {
                             .color(Color32::from_rgb(30, 91, 166)),
                     );
                     ui.add_space(14.);
+                    self.history_controls(ui, c);
+                    ui.separator();
                     let response = toolbar_icon(
                         ui,
                         Icon::Fit,
@@ -514,6 +579,7 @@ impl Editor {
             selected.as_deref(),
             &mut self.controls,
         ) {
+            self.inspector_owner = Some(node.key.clone());
             let mut config = c.data.chart.config().clone();
             config.active_layer = node.layer;
             config.picked_data = None;
@@ -963,6 +1029,20 @@ impl Editor {
     }
 
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
+        let primary = c.data.series.iter().any(|s| s.series_id == target)
+            || target
+                .rsplit(':')
+                .next()
+                .unwrap_or(target)
+                .starts_with("colorbar");
+        if primary {
+            self.catalog_properties(ui, c, target, true);
+            return;
+        }
+        self.basic_properties(ui, c, target);
+        self.catalog_properties(ui, c, target, false);
+    }
+    fn basic_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
         let mut state = serde_json::to_value(c.snapshot()).unwrap();
         if let Some(id) = target.strip_prefix("annotation:") {
             if let Some(item) = state["config"]["annotations"]["items"]

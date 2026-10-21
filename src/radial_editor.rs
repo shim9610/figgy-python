@@ -85,6 +85,7 @@ impl Editor {
             .show(root, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.label(RichText::new("Figgy").size(19.).strong());
+                    self.history_controls(ui, c);
                     let props = toolbar_icon(
                         ui,
                         Icon::Properties,
@@ -263,7 +264,9 @@ impl Editor {
 
     fn bounded_navigator(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
         let document = &c.data.document.as_ref().unwrap().chart;
-        let target = if let Some(id) = document.decorations().selected.as_ref() {
+        let target = if self.figure_properties {
+            Some("figure".into())
+        } else if let Some(id) = document.decorations().selected.as_ref() {
             Some(id.element_id())
         } else {
             let selected = document.selected_json();
@@ -280,6 +283,8 @@ impl Editor {
             target.as_deref(),
             &mut self.controls,
         ) {
+            self.figure_properties = node.kind == "figure";
+            self.inspector_owner = Some(node.key.clone());
             let mut chart = c.data.document.as_ref().unwrap().chart.clone();
             chart.clear_selection();
             chart.set_active_layer(node.layer);
@@ -512,6 +517,27 @@ impl Editor {
     }
 
     fn radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        self.basic_radial_properties(ui, c);
+        let chart = &c.data.document.as_ref().unwrap().chart;
+        let target = if self.figure_properties {
+            "figure".into()
+        } else {
+            chart
+                .decorations()
+                .selected
+                .as_ref()
+                .map(|v| v.element_id())
+                .unwrap_or_else(|| {
+                    let selected = chart.selected_json();
+                    selected["series_id"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| "data_area".into())
+                })
+        };
+        self.catalog_properties(ui, c, &target, false);
+    }
+    fn basic_radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
         if self.bounded_context_properties(ui, c) {
             return;
         }

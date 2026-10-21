@@ -118,6 +118,8 @@ class FigureWidget(anywidget.AnyWidget):
             settings = self.figure.get_settings()
             from ._native import object_outline_json, bounded_view_json
             self.state = {"settings": settings, "revision": self.figure.revision, "code": self.figure.to_code(),
+                          "edit_history": self.figure.edit_history,
+                          "property_catalog": self.figure.editor_properties(),
                           "outline": json.loads(object_outline_json(json.dumps(settings))),
                           "bounded_view": json.loads(bounded_view_json(json.dumps(settings))),
                           "texts": _display_texts(settings),
@@ -148,6 +150,17 @@ class FigureWidget(anywidget.AnyWidget):
             if content.get("revision") == self.figure.revision:
                 self.figure.fit()
             self.refresh()
+        elif action in ('undo', 'redo', 'property'):
+            error = ''
+            try:
+                if action=='property':
+                    self.figure.edit_property(content['object_id'],content['property_id'],content['value'],expected_revision=content.get('revision'))
+                else:
+                    getattr(self.figure, action)(expected_revision=content.get('revision'))
+            except (ValueError, RuntimeError) as exc:
+                error = str(exc)
+            self.refresh()
+            self.send({'action':'history_result','operation':action,'client':content.get('client'),'state':self.state,'error':error})
         elif action == "edit":
             self._handling = True
             error = ""

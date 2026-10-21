@@ -398,6 +398,8 @@ impl SurfaceWindow {
                     .filter(|_| decoration.is_none() && !response.dragged())
                     .map(to_local);
                 if response.clicked() && decoration.is_none() {
+                    self.editor.figure_properties=false;
+                    self.editor.inspector_owner=None;
                     if let Some(p) = response.interact_pointer_pos() {
                         chart.select_at(&surface.frame, to_local(p), true);
                     }
@@ -448,6 +450,9 @@ impl SurfaceWindow {
                 );
             }
         });
+        if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
+            c.end_edit();
+        }
         if let Some(error) = error {
             return Err(error);
         }

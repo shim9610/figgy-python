@@ -201,6 +201,7 @@ struct FigureCore {
     elements: Vec<(String, HitId)>,
     columns: HashMap<String, (usize, f64, f64)>,
     revision: u64,
+    history: edit_history::History,
     uploads: u64,
     readbacks: u64,
     png_encodes: u64,
@@ -596,20 +597,10 @@ impl FigureAccess<'_> {
         self.active_element(target)
             .ok_or_else(|| invalid(format!("unknown decoration: {target}")))
     }
-    fn commit_config(&mut self, mut config: Config) -> PyResult<()> {
-        config.sync_subplot_links(Some(self.data.chart.config()));
-        validate_config(&config)?;
-        validate_draw_style(&config, &self.data.series)?;
-        self.renderer
-            .set_chart_config(
-                self.data.chart_id,
-                gpu::config(self.data.figure_id, &config),
-            )
-            .map_err(invalid)?;
-        self.data.chart = Chart::new(config);
-        self.refresh_addresses();
-        self.data.revision += 1;
-        Ok(())
+    fn commit_config(&mut self, config: Config) -> PyResult<()> {
+        let mut state = self.snapshot();
+        state.config = config;
+        self.apply_settings(&serde_json::to_string(&state).map_err(runtime)?)
     }
     fn snapshot(&self) -> Settings {
         Settings {
@@ -1014,6 +1005,7 @@ impl FigureCore {
                 elements,
                 columns: HashMap::new(),
                 revision: 0,
+                history: Default::default(),
                 uploads: 0,
                 readbacks: 0,
                 png_encodes: 0,
@@ -1114,6 +1106,7 @@ impl FigureAccess<'_> {
             .map_err(invalid)?;
         self.data.series = next;
         self.data.revision += 1;
+        self.data.history = Default::default();
         Ok(())
     }
     // Upload rollback belongs to Python; document registration, fitting and
@@ -1127,6 +1120,7 @@ impl FigureAccess<'_> {
     ) -> PyResult<()> {
         let old = self.snapshot();
         let revision = self.data.revision;
+        let history = self.data.history.clone();
         let result = (|| {
             if let Some(config) = config {
                 self.commit_config(parse(config)?)?;
@@ -1152,9 +1146,11 @@ impl FigureAccess<'_> {
             self.data.chart = Chart::new(old.config);
             self.data.series = old.series;
             self.data.revision = revision;
+            self.data.history = history;
             return Err(error);
         }
         self.data.revision = revision + 1;
+        self.data.history = Default::default();
         Ok(())
     }
     fn add_series_batch(&mut self, py: Python<'_>, json: &str, config: &str) -> PyResult<()> {
@@ -1163,6 +1159,7 @@ impl FigureAccess<'_> {
         }
         let previous = self.snapshot();
         let revision = self.data.revision;
+        let history = self.data.history.clone();
         let result = (|| {
             let mut series = self.data.series.clone();
             series.extend(parse::<Vec<SeriesConfig>>(json)?);
@@ -1192,12 +1189,16 @@ impl FigureAccess<'_> {
             self.data.chart = Chart::new(previous.config);
             self.data.series = previous.series;
             self.data.revision = revision;
+            self.data.history = history;
             return Err(error);
         }
         self.data.revision = revision + 1;
+        self.data.history = Default::default();
         Ok(())
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
+        let before = serde_json::to_value(self.snapshot()).map_err(runtime)?;
+        let base_revision = self.data.revision;
         let mut next: Settings = parse(json)?;
         next.config
             .sync_subplot_links(Some(self.data.chart.config()));
@@ -1277,6 +1278,14 @@ impl FigureAccess<'_> {
             self.data.document.as_mut().unwrap().chart = chart;
         }
         self.data.revision += 1;
+        let after = serde_json::to_value(self.snapshot()).map_err(runtime)?;
+        self.data.history.record(
+            before,
+            after,
+            base_revision,
+            self.data.revision,
+            "Edit chart",
+        );
         Ok(())
     }
     fn log_bounds(&mut self, axis: &str) -> PyResult<(f64, f64)> {
@@ -1683,12 +1692,14 @@ mod bounded;
 mod desktop;
 mod document_fit;
 mod drawing;
+mod edit_history;
 mod editor;
 mod gpu;
 mod identity;
 mod interaction;
 mod navigation;
 mod notebook;
+mod property_catalog;
 mod target_chooser;
 mod tick_policy;
 mod ui_fonts;
@@ -1752,6 +1763,42 @@ impl NativeFigure {
     }
     fn apply_settings(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.apply_settings(json))
+    }
+    fn edit_history_json(&self) -> PyResult<String> {
+        self.with(|core| Ok(core.data.history.status().to_string()))
+    }
+    fn column_extents_json(&self) -> PyResult<String> {
+        self.with(|core| {
+            Ok(json!(
+                core.data
+                    .columns
+                    .iter()
+                    .map(|(name, (_, min, max))| (name.clone(), json!([min, max])))
+                    .collect::<serde_json::Map<_, _>>()
+            )
+            .to_string())
+        })
+    }
+    fn edit_operations_json(&self) -> PyResult<String> {
+        self.with(|core| Ok(core.data.history.operations().to_string()))
+    }
+    fn undo(&self) -> PyResult<()> {
+        self.with(|core| core.replay_edit(false))
+    }
+    fn redo(&self) -> PyResult<()> {
+        self.with(|core| core.replay_edit(true))
+    }
+    fn begin_edit(&self, label: &str) -> PyResult<()> {
+        self.with(|core| {
+            core.begin_edit(label);
+            Ok(())
+        })
+    }
+    fn end_edit(&self) -> PyResult<()> {
+        self.with(|core| {
+            core.end_edit();
+            Ok(())
+        })
     }
     fn set_bounded(&self, family: &str, json: &str) -> PyResult<()> {
         self.with(|core| core.set_bounded(family, json))
@@ -1854,6 +1901,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_range_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::object_outline_json, m)?)?;
+    m.add_function(wrap_pyfunction!(property_catalog::editor_catalog_json, m)?)?;
+    m.add_function(wrap_pyfunction!(property_catalog::editor_property_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::bounded_view_json, m)?)?;
     m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

@@ -1310,6 +1310,78 @@ def choose_native_object(inputs, query, key):
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_editor_undo_redo_groups_a_real_title_drag(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.plot([0,1,2],[1,3,2],id='signal');ax.set_title('Move this title')"
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();count=fig.edit_history['undo_count'];uploads=fig.info['column_uploads']
+                r=inputs.info()['decorations']['chart_title']
+                drag_native(inputs,(r[0]+r[2]/2,r[1]+r[3]/2),(24,12))
+                after=fig.get_settings()
+                assert after['config']['chart_title']['offset_x']!=before['config']['chart_title']['offset_x']
+                assert fig.edit_history['undo_count']==count+1
+                inputs.click('undo');assert fig.get_settings()==before
+                inputs.click('redo');assert fig.get_settings()==after
+                assert fig.info['column_uploads']==uploads and not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    from inline_editor_harness import instrumented_source
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\n'+instrumented_source(tmp_path)
+    with notebook(tmp_path/'history-drag',source) as (page,execute):
+        before=page.evaluate(ROOT+'.testRendererState()')
+        count=json.loads(execute('print(json.dumps(fig.edit_history))'))['undo_count']
+        rect=page.evaluate(ROOT+'.decorations()')['chart_title']['rect'];canvas=page.locator('canvas').bounding_box()
+        backing=page.locator('canvas').evaluate('c=>[c.width,c.height]')
+        x=canvas['x']+(rect[0]+rect[2]/2)*canvas['width']/backing[0];y=canvas['y']+(rect[1]+rect[3]/2)*canvas['height']/backing[1]
+        page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+24,y+12,steps=4);page.mouse.up();page.evaluate(ROOT+'.flush()')
+        after=page.evaluate(ROOT+'.testRendererState()')
+        assert after['config']['chart_title']['offset_x']!=before['config']['chart_title']['offset_x']
+        assert json.loads(execute('print(json.dumps(fig.edit_history))'))['undo_count']==count+1
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.testRendererState()')==before
+        page.locator('[data-redo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.testRendererState()')==after
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_shared_property_controls_apply_and_undo_without_losing_the_object(tmp_path,backend):
+    setup="ax=fig.axes[0];ax.plot([0,1,2],[1,3,2],id='signal',label='Signal')"
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();uploads=fig.info['column_uploads']
+                inputs.click('properties');choose_native_object(inputs,'signal','series/signal')
+                inputs.click('line_width');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','8');inputs.key('Return')
+                assert fig.get_settings()['series'][0]['render_type']['Line']['line']['line_width']==8
+                assert inputs.info()['selected']=='signal'
+                inputs.click('undo');assert fig.get_settings()==before
+                assert fig.info['column_uploads']==uploads and not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    from inline_editor_harness import instrumented_source
+    source='import json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\n'+instrumented_source(tmp_path)
+    with notebook(tmp_path/'property-command',source) as (page,execute):
+        before=page.evaluate(ROOT+'.testRendererState()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('signal')
+        width=page.locator('[data-property=line_width]');width.fill('8');width.press('Tab');page.evaluate(ROOT+'.flush()')
+        after=page.evaluate(ROOT+'.testRendererState()')
+        assert after['series'][0]['render_type']['Line']['line']['line_width']==8
+        assert ObjectNavigator(page).selected()=='signal'
+        python_state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert python_state==after
+        page.locator('[data-undo]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.testRendererState()')==before
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
 def test_object_tree_routes_secondary_axes_and_reveals_canvas_selection(tmp_path):
     setup = "fig.set_layout([['left','right']]); ax=fig.subplots['left'].axes; ax.plot([0,1,2],[1,2,1],label='Signal',id='signal'); ax.set_title('Overview'); right=fig.subplots['right'].axes; right.plot([0,1,2],[3,1,2],id='other'); right.set_title('Measurements'); twin=right.twinx(id='pressure_axis'); twin.plot([0,1,2],[100,200,150],label='Pressure readings',id='pressure'); ax.activate()"
     with figgy.Figure(backend='native') as fig:

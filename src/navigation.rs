@@ -149,7 +149,7 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
         "Figure".into(),
         "figure",
         LayerRef::Base,
-        None,
+        Some("figure".into()),
     );
     if let Some(family) = ["radial", "categorical", "boxplot", "radar"]
         .into_iter()

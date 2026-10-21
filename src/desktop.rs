@@ -501,6 +501,16 @@ impl SurfaceWindow {
             && self.cursor.1 < (p.y + p.height) as f32
     }
     fn pointer(&mut self, event: &WindowEvent) -> PyResult<()> {
+        if matches!(
+            event,
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            }
+        ) {
+            self.editor.inspector_owner = None;
+        }
         if self.editor.inline_text.is_some() {
             return Ok(());
         }
@@ -1171,6 +1181,13 @@ impl SurfaceWindow {
                     });
             }
         });
+        if std::mem::take(&mut self.editor.history_replayed) {
+            self.selected = None;
+            self.editor.property_text.clear();
+        }
+        if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
+            c.end_edit();
+        }
         // Explicit export may temporarily select its RGBA target pipelines.
         c.renderer
             .ensure_target_format(self.config.format)
@@ -1562,6 +1579,27 @@ impl ApplicationHandler for App {
             return;
         }
         let response = w.input.on_window_event(&w.window, &event);
+        if matches!(
+            event,
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            }
+        ) {
+            if let Some(core) = w.core.upgrade() {
+                if let Ok(mut data) = core.lock() {
+                    let gpu = Arc::clone(&data.gpu);
+                    if let Ok(mut renderer) = gpu::lock(&gpu) {
+                        let mut c = FigureAccess::new(&gpu, &mut data, &mut renderer);
+                        c.end_edit();
+                        if w.cursor.1 > 58. * w.ctx.pixels_per_point() {
+                            c.begin_edit("Edit object");
+                        }
+                    }
+                }
+            }
+        }
         let result = match event {
             WindowEvent::Focused(false) => {
                 w.chooser = None;

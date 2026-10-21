@@ -338,6 +338,58 @@ class Figure:
             self._require_open()
             return json.loads(self._native.settings_json())
 
+    @property
+    def edit_history(self):
+        """Undo/redo availability for persistent edits; no source arrays are copied."""
+        with self._lock:
+            self._require_open()
+            return json.loads(self._native.edit_history_json())
+
+    def edit_operations(self):
+        """Accepted edits with revisions, stable object identities and SSOT changes."""
+        with self._lock:
+            self._require_open()
+            return json.loads(self._native.edit_operations_json())
+
+    def editor_properties(self):
+        """Contextual controls addressed by stable object and property IDs."""
+        from ._native import editor_catalog_json
+        with self._lock:
+            return json.loads(editor_catalog_json(json.dumps(self.get_settings(),allow_nan=False)))
+
+    def edit_property(self, object_id, property_id, value, *, expected_revision=None):
+        """Apply one shared editor command atomically through document validation."""
+        from ._native import editor_property_json
+        with self._lock:
+            if expected_revision is not None and expected_revision != self.revision:
+                raise ValueError('stale edit: the Figure changed; refresh and retry')
+            extents=json.loads(self._native.column_extents_json())
+            if property_id=='Color scale/axis/scale' and value=='Logarithmic':
+                owner=next((v for v in self.editor_properties() if v['id']==object_id),None)
+                if owner is not None:extents['_positive']=self._native.log_bounds_at('z',json.dumps(owner['layer']))
+            state=json.loads(editor_property_json(json.dumps(self.get_settings(),allow_nan=False),
+                object_id,property_id,json.dumps(value,allow_nan=False),json.dumps(extents,allow_nan=False)))
+            return self.apply_settings(state,expected_revision=expected_revision)
+
+    def undo(self, *, expected_revision=None):
+        return self._replay_edit(False, expected_revision)
+
+    def redo(self, *, expected_revision=None):
+        return self._replay_edit(True, expected_revision)
+
+    def _replay_edit(self, redo, expected_revision):
+        with self._lock:
+            self._require_open()
+            if expected_revision is not None and expected_revision != self.revision:
+                raise ValueError('stale edit: the Figure changed; refresh and retry')
+            getattr(self._native, 'redo' if redo else 'undo')()
+            self._selection = None
+            accepted = self.get_settings()
+            self.axes = [self._axes_for(p['id'], overlay) for p in accepted['identity']['panels']
+                         for overlay in [None, *p['overlays']]]
+        self._changed()
+        return self
+
     def apply_settings(self, settings, *, expected_revision=None, reset=False):
         """Replace accepted settings for existing series; source arrays are not copied.
 
