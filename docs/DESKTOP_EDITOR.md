@@ -6,8 +6,9 @@ Linux X11 windows using software Vulkan. Window decorations and fonts vary by
 platform; the new host has not yet been verified on Windows/macOS hardware.
 
 winit creates the OS window and handles input. egui draws the toolbar, property
-forms and popups inside that window. The upstream renderer draws the chart and
-owns its layout, picking and drag policies.
+forms and popups inside that window. Figgy owns panel focus and routes visible
+objects to their owners. The upstream renderer draws the chart and supplies
+layout, hit geometry, GPU picking and drag policies.
 
 | Component | Role |
 | --- | --- |
@@ -39,8 +40,8 @@ python examples/desktop_editor.py
 
 Source builds require Rust 1.99 or later and a system C/C++ toolchain: MSVC Build
 Tools on Windows, Xcode Command Line Tools on macOS, or a compiler/linker on
-Linux. These instructions target the upcoming 0.3.0 release; PyPI currently
-provides 0.2.1. Compatible prebuilt wheels
+Linux. PyPI provides 0.3.0; this checkout includes the subsequent renderer 0.18
+migration. Compatible prebuilt wheels
 do not require Rust. PR CI checks native/Jupyter interaction parity and packaged assets; see
 [validation records](HOST_VALIDATION.md) for tested builds.
 
@@ -67,11 +68,107 @@ Explicit `backend="native"` also selects native rendering in IPython/Jupyter.
 The window opens on the desktop of the machine running the kernel. To display
 inside a browser with a remote kernel, use `backend="webgpu"` and `display(fig)`.
 
+## Draw and edit annotations
+
+Open **Draw** to reveal a tool strip: Text, Arrow, horizontal/vertical lines,
+and horizontal/vertical bands. Click with **Text** and type directly on the chart;
+double-click existing text to edit it in place. **Enter** applies, **Shift+Enter**
+inserts a line break and **Esc** cancels. Clicking outside the input applies a
+nonempty draft. Empty or canceled drafts leave the document unchanged. Text
+editing does not automatically open Properties; use Properties for detailed
+formatting. Editing retains font and color; unchanged leading and trailing characters retain
+their character formatting.
+
+Drag to draw the other shapes. A preview follows the pointer without changing
+saved settings. Release creates one annotation and opens its Properties. Esc
+cancels an unfinished gesture. Switching windows retains the selected tool; an
+interrupted drag is canceled. Drawing a zero-length arrow/band creates nothing.
+Text drafts stay in the host until confirmation, so typing and cancellation do
+not create saved annotations or intermediate document revisions.
+
+![Text input at the annotation position, without opening Properties](images/desktop-editor-inline-text.png)
+
+**Follow data** stores text/arrow anchors in data coordinates so they follow
+zooming; otherwise anchors stay at a fraction of the plot area. Numeric lines
+and bands always follow their value axis. Unsupported directions are disabled:
+bar/box charts have one value axis; pie/donut, radar and polar accept ratio
+text/arrows. Upstream annotations currently belong to the first panel. In a
+multi-panel document, the drawing palette names the supported chart and disables
+drawing elsewhere. Drawing stays inside that panel rather than creating invisible
+annotations in another grid cell.
+
+Select an annotation on the canvas or in Objects to edit its content, coordinates,
+visibility, colors and size. Arrow forms include head dimensions and stroke;
+text supports character formatting and an optional background/border box.
+Reference lines and arrows can have labels. Drag existing annotations or their
+renderer-provided handles to move/resize them. **Delete annotation** removes the
+selected item; Delete/Backspace does the same when the chart has keyboard focus.
+These tools and forms are also available in Jupyter WebGPU. Completed edits are
+part of the same settings/replay/export document as Python-created annotations.
+
 ## Properties and layout
 
-The initial view contains the chart and toolbar, with properties closed. Click a
-chart title, axis, legend or series to open that object's form on the right.
-**Properties** also opens or closes the panel. Toolbar icons have name tooltips.
+The initial view contains the chart and toolbar, with properties closed. In a
+multi-panel figure, click a chart once to select it. A blue outline marks the
+whole selected panel, including its title and axes; the status strip names it.
+That first click does not move decorations, select data or pan. Subsequent
+clicks and drags edit inside that chart. Click another chart to switch; click a
+grid gutter or press Esc to leave it. Wheel zoom is inactive until a chart is
+selected. Single-panel figures retain immediate interaction.
+
+Click a visible title, axis, legend or series to open its form on the right.
+Secondary axes and data automatically select their owning axis, so editing a
+secondary series does not require finding its layer in a tree. Only the selected
+panel is probed, using renderer hit maps and GPU picks; source arrays stay in
+the GPU pool. **Properties** also opens or closes the sidebar. Toolbar icons
+have name tooltips.
+
+All visible coordinate layers in that panel participate in input. For example,
+while the primary axes are active, click a secondary Y axis to edit its range,
+or drag its title directly. Clicking a primary axis routes input back to its
+owner. This routing does not require selecting a layer first.
+
+When several nearby series coincide, **Choose what to edit** appears next to the
+click. Its rows show the label, color, stable ID and owning chart/axis, including
+series that coincide on the same axes. Hover or Up/Down previews a target; click
+or Enter selects it. Esc or an outside canvas click cancels without saving the
+preview. A plot-area drag still pans. Coincident decorations from different
+coordinate layers use the same chooser.
+
+Overlapping chart rectangles are a separate case: choose the chart first and it
+keeps ownership of following input. **Switch chart (N)** lets you select another
+intersecting chart. Neither operation changes data positions or draw order.
+See the [selection design and reference applications](EDITOR_SELECTION_DESIGN.md).
+
+These captures show a secondary-axis title selected by dragging it while the
+primary coordinate layer was active. Its Properties form identifies the owning
+secondary Y axis; the primary axis range remains unchanged.
+
+![Native direct interaction with an inactive overlay object](images/desktop-editor-overlay-objects.png)
+
+![Jupyter direct interaction with an inactive overlay object](images/jupyter-editor-overlay-objects.png)
+
+For coincident-series selection, see the
+[native candidate chooser](images/desktop-editor-overlap-chooser.png) and
+[Jupyter candidate chooser](images/jupyter-editor-overlap-chooser.png).
+
+The Properties sidebar starts with an **Objects** tree. Panels contain their
+axes, titles, legend, series, secondary Y axes and annotations. Search by a
+human label or object ID, expand/collapse branches, then select the object to
+edit. The path above the form shows its owner. Clicking an object in the chart
+reveals the corresponding tree item; clicking another panel routes subsequent
+edits to that panel. Object and layer selection do not use dropdowns.
+
+The same panel/axis interaction is available in Jupyter WebGPU. These actual
+host captures show a direct click on the red secondary-axis series in a 2×2 grid:
+
+![Native panel and direct series selection](images/desktop-editor-grid-direct-selection.png)
+
+![Jupyter panel and direct series selection](images/jupyter-editor-grid-direct-selection.png)
+
+Tree arrow keys move focus and expand/collapse branches; Enter selects an
+object. Chart arrow keys retain their sample-stepping/decoration-nudge meaning.
+Search and branch expansion are view state and do not modify saved settings.
 
 Opening properties expands a normal window horizontally while preserving the
 chart's displayed size and aspect ratio. Closing it restores the previous width.
@@ -89,12 +186,14 @@ ratio with surrounding space. PNG document dimensions stay unchanged.
 | Select | Select data or decorations; default mode |
 | Layout | Move and resize the plot area |
 | Properties / Close | Open or close properties |
-| Object list | Select named objects such as Chart title, X axis or a series |
+| Objects tree / search | Navigate panels, axes, series, secondary Y and annotations; select the target and see its ownership path |
 | Title, axis title, legend | Visibility, text, font family, size and color; individual legend labels |
 | Tick labels | Decimal, scientific or power notation; significant digits; font family, size and color |
 | Line series | Color and width |
 | Scatter series | Color and marker size |
 | Matrix series / colorbar | Shared color limits, linear/log scale, palette, number format and significant digits |
+| Box plot / radar value range | Automatic/manual minimum and maximum; wheel zoom over the plot; Fit restores automatic bounds |
+| Annotation | Visibility, text, anchors/endpoints, line and fill properties |
 | Axis | Limits, scale, tick spacing/direction/visibility, number format, significant digits, line width and color |
 | Copy Python | Export common setters and readable `fig.configure(...)` patches |
 | Save PNG | Enter a path, then Save image; export the chart at document resolution |
@@ -286,3 +385,40 @@ Switching scale selects a tick spacing of one decade for logarithmic scales,
 or one fifth of the range for linear scales. Direct SSOT range edits still
 require positive bounds for a logarithmic axis. Copy Python preserves the
 chosen scales. Both desktop and Jupyter expose these controls.
+
+## Shared legend typography and automatic tick spacing
+
+The legend form starts with **All legend entries**: font family, font size and
+color. Individual entry text and character formatting follow those common
+controls. A common font change preserves superscripts, subscripts and other
+character formatting. Native text fields use installed system fallback fonts
+for characters missing from the UI font, independently of the chart font.
+
+Wheel zoom recalculates tick spacing by default for the selected panel or
+secondary Y axis. Linear axes use the renderer's 1/2/5 spacing rule;
+logarithmic axes use whole decades. Panning preserves the current spacing.
+In the axis form, **Automatic tick spacing** restores automatic spacing at the
+current limits. Entering a numeric major spacing switches that axis to fixed
+spacing, which subsequent zooms preserve. Python `configure(...)` and
+`update(..., major_spacing=...)` also select fixed spacing; `set_xlim(...)` and
+`set_ylim(...)` fit the range and restore automatic spacing for that dimension.
+The conditional opposite-edge pairing rule above also applies to edits in the
+axis form; raw `configure(...)` patches remain one-sided.
+
+Saved schema-2 settings optionally include `identity.tick_modes`, addressed by
+persistent panel or overlay IDs. Panel entries use `bottom_x`, `top_x`, `left_y`
+and `right_y`; overlay entries use `y_axis`. Values are `Auto` or `Fixed`, and
+an absent entry means `Auto`. Numeric `major_spacing` remains in the renderer
+configuration in both modes. Full settings replay and Copy Python retain the
+mode along with the displayed spacing. Removing an owner removes its tick
+policy; unknown owner IDs and unknown modes are rejected.
+
+The current renderer does not label intermediate log values inside a decade.
+Automatic spacing therefore cannot yet add labels such as `2 × 10⁴` and
+`5 × 10⁴` when a log view is narrow. This renderer limitation is tracked in
+[figgy#42](https://github.com/shim9610/figgy/issues/42).
+
+Members of an explicitly shared X/Y group also share the primary axis's
+automatic/fixed tick policy. A numeric spacing edit from any member updates the
+shared spacing; enabling automatic spacing from any member restores it for the
+group. Opposite-edge styling and secondary Y axes remain locally owned.

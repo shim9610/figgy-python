@@ -2,8 +2,8 @@
 
 ## Current 0.3 validation setup
 
-The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.17.0`
-and `figgy-model 0.11.0`. The dated measurements and test totals below belong
+The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.18.0`
+and `figgy-model 0.12.0`. The dated measurements and test totals below belong
 to earlier checkpoints; they are not a test count or performance claim for the
 current release candidate.
 
@@ -13,10 +13,97 @@ integration. The [interaction parity guard](../scripts/check_interaction_parity.
 rejects changes to only one host without the corresponding host/test updates.
 [Shared interaction tests](../tests/test_interaction_parity.py) cover native and
 real Jupyter WebGPU controls. Pies/donuts, categorical bars and boxplots now use
-both hosts; the historical native-only radial limitation below no longer applies.
+both hosts; radar and multi-panel documents are also covered by the renderer
+0.18 integration. The historical native-only radial limitation below no longer applies.
 See [chart types](CHART_TYPES.md) and [desktop editing](DESKTOP_EDITOR.md) for
 current supported controls. A configured check or an earlier passing run does
 not establish the result of a later commit; inspect that commit's CI result.
+
+
+## Overlay ownership and ambiguous selection (2026-10-20)
+
+The installed release wheel passed **15 focused real-host cases, with no skips**
+across two runs on Linux x86_64, Python 3.12.14, native llvmpipe Vulkan and headed
+Chromium 154/SwiftShader under Xvfb/Openbox. The installed native binary and browser
+assets were compared byte-for-byte with the final wheel and browser source.
+
+Coverage includes direct editing/dragging of inactive secondary-axis objects,
+independent secondary ranges even when their numbers match the primary axes,
+inactive annotation drag/endpoint resizing, same-axis and cross-axis coincident
+series, duplicate labels, keyboard/hover preview and cancellation, retained chart
+ownership for fully overlapping panels and tree selection, isolated Y zoom,
+primary opposite-axis property pairing, numeric drafts and multiline text during
+resizing. A new object's form starts at the top. Preview checks preserve the
+native document/revision and browser settings; the browser ambiguity scenario
+sends exactly one edit to Python when a target is finally chosen. Source uploads,
+reference-fill settings and legend contents are preserved.
+
+The preceding Actions run at `3a8aa75` had **430 passed and 3 failed**. All three
+failed cases passed in this local run. Fixes complete sidebar click delivery
+before replacing controls, retain the selected property's input value across
+queued work, and constrain the inline text editor horizontally through CSS layout
+during resizing. Additional ownership checks exposed and fixed native overlay
+edits propagating into primary axes and browser rejection of the canonical
+omitted `Base` default.
+
+Workflow/assets preflight passed **112 tests**; Rust formatting/locked compilation,
+JavaScript syntax and release wheel packaging passed. The final PR's Actions
+result is independent of these local results. See the
+[selection design and official application references](EDITOR_SELECTION_DESIGN.md)
+and [actual host screenshots](DESKTOP_EDITOR.md).
+
+## Renderer 0.18 feature integration (2026-10-20)
+
+Local verification covers all **409 current suite cases** across a complete
+integration run and focused reruns of affected and newly added cases. The final
+installed release wheel passed **72 focused cases**, including all new feature
+model/replay tests, malformed-input and concurrency checks, native window
+regressions, mixed panel styles on real Jupyter WebGPU and the actual
+maturin-action contract. Cases skipped in the complete run because the action
+path was unset were subsequently executed with the real action file.
+
+Environment: Linux x86_64, CPython 3.12.14, Rust 1.99.0, native llvmpipe
+software Vulkan, Xvfb/Openbox and headed Chromium 154 with SwiftShader.
+The complete run exercised both real hosts: editing, zoom/pan, picking,
+annotations and endpoint resizing, active panels/layers, linked axes, radar,
+vector fields, mapped points, fills/steps, polar charts and whole-document PNGs.
+Mixed precise/stylized panels replay identically at export scales 1, 1.25 and 2.
+Ordinary display checks assert no PNG transport or whole-image native readback.
+
+Workflow/asset preflight passed **112 tests**. Locked Rust compilation,
+formatting and JavaScript syntax checks passed. Wheel and sdist builds include
+the new Python/Rust modules; separate-environment installation, packaged-asset
+verification and public API smoke checks passed. The matching upstream WASM
+assets and their provenance remain unchanged from the #15 migration baseline.
+
+These are local software-GPU results. The required Actions checks must pass on
+the final PR commit independently; physical GPU, Windows/macOS and ARM64 runtime
+coverage are not established by this record. Manual plotting remains separate
+from the future #18 review controller and binary recovery cache.
+
+## Reported issue verification (2026-10-20)
+
+The source fixes for issues #6–#13 were already present before the renderer
+0.18 migration. They were rechecked on the migration branch with Python
+3.12.14 on Linux x86_64 and llvmpipe software Vulkan. These are source-build
+results. PyPI 0.3.0 is already published with renderer 0.17.0/model 0.11.0;
+its sdist contains the earlier fixes. The renderer 0.18 migration is subsequent
+source work and does not replace published artifacts.
+
+| Issue | Resolution and regression evidence |
+| --- | --- |
+| [#6](https://github.com/shim9610/figgy-python/issues/6) | Automatic range setters retain their documented tick derivation. `set_xlim_without_tick_auto` / `set_ylim_without_tick_auto` preserve explicit tick and label settings; tests cover linear/log axes on native and browser models. |
+| [#7](https://github.com/shim9610/figgy-python/issues/7) | Histogram recoloring writes `fill_color` and exports the same setting in generated Python. |
+| [#8](https://github.com/shim9610/figgy-python/issues/8) | Sketch rejects unsupported existing histograms and new unsupported series, preserving the current settings and rendered image. |
+| [#9](https://github.com/shim9610/figgy-python/issues/9) | A grayscale colorbar has no brightness reversals inside its ramp; the pixel check excludes the antialiased frame and covers the former one-third/two-thirds discontinuities. |
+| [#10](https://github.com/shim9610/figgy-python/issues/10) | Unknown font families raise `ValueError`; supported and default names remain accepted. |
+| [#11](https://github.com/shim9610/figgy-python/issues/11) | Unicode super/subscripts normalize to rich text. A Greek alpha in the Latin-only handwritten face uses fallback and renders differently from an unassigned character's missing-glyph box. |
+| [#12](https://github.com/shim9610/figgy-python/issues/12) | Multiline title helpers grow the title band; direct settings retain explicitly chosen geometry. |
+| [#13](https://github.com/shim9610/figgy-python/issues/13) | The original unsupported multi-panel message used the running package version. The subsequent #16 integration now supports multi-panel construction and tests stable public panel addressing. |
+
+The behavioral checks are in `tests/test_issue_fixes.py`. Native/Jupyter
+interaction checks and renderer-migration coverage are recorded separately;
+these issue checks do not establish physical GPU or Windows/macOS results.
 
 ## Historical 0.2 checkpoints (2026-10-14)
 
@@ -510,3 +597,32 @@ browser style pixels were not rerun at that checkpoint. Interactive browser
 radial bindings were not yet exposed then; radial windows/PNG export required
 the native backend. The current 0.3 binding supports interactive radial charts
 and browser PNG export in Jupyter as well.
+
+## Renderer 0.18 panel focus and editing regressions
+
+Draft PR #19 adds host-owned focus for multi-panel figures. The first canvas
+click selects a stable panel ID without changing plot geometry or selecting data;
+subsequent clicks resolve visible base/secondary axes and series automatically.
+A gutter click or Esc leaves the panel, and an unfocused grid ignores wheel zoom.
+Native surface placement and input bounds now cover the whole document, and its
+focus outline uses the final stage after inspector docking. Browser queued input
+coordinates follow the current canvas size. Screenshots are in the editor guide.
+
+The preceding Actions run had 428 passes and three failures: two radial text
+editing waits and one numeric precision edit. Bounded annotation maps are prepared
+synchronously by the renderer, so their reads and text hits no longer wait for a
+material GPU frame. Background acknowledgements preserve focused form drafts,
+and sidebar pointer gestures defer rebuilding controls until after the click.
+Native UI input tests wait for a processed host frame rather than assuming a
+fixed 100 ms delay; they do not retry or replay actions.
+
+The installed release wheel was checked on Linux x86_64, Python 3.12.14, Rust
+1.99.0, native llvmpipe, Xvfb/Openbox and headed Chromium 154 with SwiftShader.
+Focused real-host coverage includes both grid hosts, direct secondary-axis/data
+selection, isolated Y zoom, escape/gutter release, numeric drafts across Python
+updates, radial text edit/cancel/delete and multiline/resize/format preservation,
+and Cartesian inline text plus tree ownership/reveal. Native checks retain zero
+RGBA readbacks/PNG display transport and unchanged source upload counts.
+Workflow/assets preflight has 112 passes; formatting, locked compilation,
+JavaScript syntax and installed browser asset comparisons also pass. Full Actions
+integration results are reported by the PR checks, independently of local results.

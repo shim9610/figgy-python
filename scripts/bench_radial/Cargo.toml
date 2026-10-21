@@ -1,0 +1,15 @@
+[package]
+name = "figgy-radial-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+renderer = { package = "figgy-renderer", version = "=0.18.0" }
+wgpu = "30"
+pollster = "1"
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

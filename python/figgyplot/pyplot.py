@@ -58,3 +58,16 @@ def close(fig=None):
     obj.close()
     if obj is _current:
         _current = None
+
+
+def quiver(*args, **kwargs): return gca().quiver(*args, **kwargs)
+def radar(*args, **kwargs): return gca().radar(*args, **kwargs)
+def step(*args, **kwargs): return gca().step(*args, **kwargs)
+def fill_between(*args, **kwargs): return gca().fill_between(*args, **kwargs)
+def text(*args, **kwargs): return gca().text(*args, **kwargs)
+def axhline(*args, **kwargs): return gca().axhline(*args, **kwargs)
+def axvline(*args, **kwargs): return gca().axvline(*args, **kwargs)
+def axhspan(*args, **kwargs): return gca().axhspan(*args, **kwargs)
+def axvspan(*args, **kwargs): return gca().axvspan(*args, **kwargs)
+def arrow(*args, **kwargs): return gca().arrow(*args, **kwargs)
+def twinx(*args, **kwargs): return gca().twinx(*args, **kwargs)

@@ -43,12 +43,15 @@ jobs:
     name: PR / Linux integration
     needs: preflight
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Baseline setup/build, priority checks and the full UI suite exceed 30m.
+    timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: '4'
       WGPU_BACKEND: vulkan
       FIGGY_TEST_JUPYTER: '1'
       FIGGY_TEST_HEADFUL: '1'
+      FIGGY_TEST_TIMING: '1'
+      FIGGY_LAYOUT_PROBE: '1'
       FIGGY_REQUIRE_INTERACTION_PARITY: '1'
       FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
       PYTHONUNBUFFERED: '1'
@@ -96,12 +99,21 @@ jobs:
             openbox > /tmp/figgyplot-openbox.log 2>&1 &
             wm_pid=$!
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
-            # Temporary priority gate: reproduce the failing checkout-local
-            # asset fixtures and radial preparation before the full suite.
+            # Reject the observed stale-font/box failures before the full suite.
+            # The queue-order cases must fail on the original a1e79a8 wheel.
+            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
+              --basetemp=ci-results/layout-probe --junitxml=ci-results/layout-probe.xml \
+              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]' \
+              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]' \
+              'tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]' \
+              'tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]' \
+              2>&1 | tee ci-results/layout-probe.log
+            # Measure the last failed radial screenshot before the full suite.
+            # Await current surface completion before the unchanged capture deadline.
             .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
               --basetemp=ci-results/priority --junitxml=ci-results/priority.xml \
               tests/test_packaged_assets.py \
-              'tests/test_interaction_parity.py::test_bounded_hosts_share_drag_resize_pick_hover_and_export[radial]' \
+              'tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[radial]' \
               2>&1 | tee ci-results/priority.log
             .venv/bin/python -m pytest -vv --capture=tee-sys --durations=30 \
               --basetemp=ci-results/full --junitxml=ci-results/junit.xml \

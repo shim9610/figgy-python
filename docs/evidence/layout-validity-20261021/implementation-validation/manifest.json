@@ -1,0 +1,103 @@
+{
+  "baseline_commit": "a1e79a800c25df9aa10fc20cffd661347f260a77",
+  "baseline_installed_assets": {
+    "webgpu.js": {
+      "sha256": "5c9b08d7e261eceb832bb7757c33805b824ce597b8123b8dfdac8f129e00fec9",
+      "baseline_matches": true
+    },
+    "editor.css": {
+      "sha256": "f4daec2459a995aecc00e08ec157f69bf0b08c66775f8d2f5b16cbbdf7541b0c",
+      "baseline_matches": true
+    }
+  },
+  "environment": "Python 3.12.14, Rust 1.99.0, Xvfb/Openbox, headed Chromium 154.0.8037.57, SwiftShader",
+  "test_source_sha256": "86c6ba126023e5b053bdcc14da6336c488af52ddad7d2fd01a377cdc4443d9be",
+  "validation_assets": {
+    "webgpu.js": {
+      "sha256": "f67ce734396232db24634ad1422b1ef8f93c3868a4b515ba5a6fe45ee8a7d4bd",
+      "installed_source_matches": true
+    },
+    "editor.css": {
+      "sha256": "ce64556909f54faf844d7a94356312fcac2466ab0146ebd54dc0f5e1e6ce0fee",
+      "installed_source_matches": true
+    }
+  },
+  "archives": {
+    "baseline-failure.xml.gz": {
+      "sha256": "312dae97dd7fa8f2e5ed20d31de6a366c4ecb9556301742f506ebe71b5e5c5be",
+      "uncompressed_sha256": "ac396039e29814403e2ba405bc3bfd1e5d67af2b15741fb04debaee962e21e95"
+    },
+    "baseline-failure.log.gz": {
+      "sha256": "29d19f8ef39acd104b6cccfef7ba6c524a6a81ea18ff29384cbcc6c449d9c29d",
+      "uncompressed_sha256": "3b1a184b270fa47361a5b0ebae016ce593744017303d9de8eae229ddc5bdeba4"
+    },
+    "baseline-queued-resize.json.gz": {
+      "sha256": "dcab9ded08707a3377376268f03a0ba7c2c02473c349b0d1cbd83f23b77aefda",
+      "uncompressed_sha256": "d751beb766f1805853a764b456d4b0df9742ad3556385a509153577e28cc2611"
+    },
+    "dpr-regressions.xml.gz": {
+      "sha256": "484428f599c38e4ba4a75dd12e800466def42c8ca6b0bb899dd2a53996f2a399",
+      "uncompressed_sha256": "1a3ad6772404a225e303cda794632f540654bfd41202319d3fa72c511a63ace9"
+    },
+    "test-inline-editor-harness.py.gz": {
+      "sha256": "bd40f2afeb05987c2c3d610b18be9e86b274be95ad7a4df5aa8fd33652db2394",
+      "uncompressed_sha256": "7d8579b01e4e1a8e1720035546c14dfef05f6d3a5677d56b1545fe971536416a"
+    },
+    "dpr-regression-observations.json.gz": {
+      "sha256": "47c97199f369ada60ecb125adde35cf4ad2691fe8d0dd2437b471976bb4c12d7",
+      "uncompressed_sha256": "30da3505f533a34d20d8354866b1d005eb2c9e706a351bcbeaddad2ac01fcb5d"
+    },
+    "existing-ui-regressions.xml.gz": {
+      "sha256": "23bc5e7e3e4cc8fc4a89380f15957e6c8f2f9f3eb9d96231ef2425c1821f2902",
+      "uncompressed_sha256": "5440b881c77a7d0dde4424841fc67c2a1d51e4793917f4cba93df0da0d4bba79"
+    },
+    "preflight.log.gz": {
+      "sha256": "42734573ad539ff6d67a1dadb11ceb2d6e7c4d2f3381206bfcefcf1b721e73f0",
+      "uncompressed_sha256": "e4f541d6fda17a6b3c47d51e07fcaeb4a50e52a9f749c6411b65650912cd1f67"
+    },
+    "no-display-suite.log.gz": {
+      "sha256": "8ff2f07e809f667b7c7098370a4fb88bdb65298deed4a0c6d50d891d62907148",
+      "uncompressed_sha256": "352c2078ac83c0ce01b42b3ae0873fbd0b1b71ff00894b456c74e9900a2d3841"
+    }
+  },
+  "results": {
+    "expected_baseline_failure": "assert 65.3617 == 16",
+    "corrected_wheel_ui": [
+      {
+        "name": "test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]",
+        "seconds": 16.271,
+        "passed": true
+      },
+      {
+        "name": "test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]",
+        "seconds": 14.467,
+        "passed": true
+      },
+      {
+        "name": "test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]",
+        "seconds": 19.03,
+        "passed": true
+      },
+      {
+        "name": "test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]",
+        "seconds": 53.955,
+        "passed": true
+      },
+      {
+        "name": "test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]",
+        "seconds": 12.395,
+        "passed": true
+      },
+      {
+        "name": "test_inactive_overlay_objects_can_be_edited_and_dragged_directly[webgpu]",
+        "seconds": 14.029,
+        "passed": true
+      }
+    ],
+    "preflight_passed": 117,
+    "no_display_suite": {
+      "passed": 386,
+      "skipped": 82
+    }
+  }
+}

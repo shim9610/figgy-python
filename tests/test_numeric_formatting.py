@@ -1,3 +1,4 @@
+from object_navigation import ObjectNavigator
 """Numeric label editing must affect rendered labels in both interactive hosts."""
 import json
 
@@ -35,22 +36,8 @@ def test_numeric_format_and_precision_editing_in_both_hosts(tmp_path):
         try:
             inputs = Inputs(handle)
             def click_control(key):
-                # Properties can exceed the available height; use real scrolling.
-                for _ in range(12):
-                    info=inputs.info();controls=info['controls']
-                    rect = controls.get(key)
-                    header=controls['object'];footer=controls['advanced']
-                    # Widget bounds include clipped rows. Keep the entire
-                    # control between the fixed inspector header and footer.
-                    top=header[1]+header[3]+30
-                    bottom=footer[1]-40
-                    if rect and top < rect[1] and rect[1]+rect[3] < bottom:
-                        inputs.click(key)
-                        return
-                    panel = info['chart_panel']
-                    inputs.xdo('mousemove','--window',inputs.wid,round(panel[0]+panel[2]+150),350)
-                    inputs.xdo('click',4 if rect and rect[1]<=top else 5);inputs.pump()
-                raise AssertionError(f'Control not visible: {target}/{key}: {rect}, viewport {top}..{bottom}')
+                # Inputs scrolls the actual property viewport, below the object tree.
+                inputs.click(key)
             for target,key in targets:
                 rect=inputs.info()['decorations'][target]
                 # The deliberately wide initial labels overlap the title at
@@ -81,10 +68,16 @@ def test_numeric_format_and_precision_editing_in_both_hosts(tmp_path):
     with notebook(tmp_path/'numeric', source) as (page,execute):
         page.locator('[data-properties]').click()
         for target,key in targets:
-            page.locator('[data-target]').select_option(target)
+            ObjectNavigator(page).choose(target)
             width_before=page.evaluate('async target=>(await '+ROOT+'.decorations())[target].rect[2]',target)
             digits=page.locator('[data-property=significant_digits]')
-            digits.fill('2');digits.press('Tab');page.evaluate(ROOT+'.flush()')
+            digits.fill('2')
+            # A Python update/comm acknowledgement must not replace a focused
+            # uncommitted form input before its normal blur/change event.
+            execute("fig.configure(config={'grid':{'show_minor_x':True}});print('updated')")
+            assert digits.input_value()=='2'
+            digits.press('Tab');page.evaluate(ROOT+'.flush()')
+            assert style(page.evaluate(ROOT+'.snapshot()'),key)['significant_digits']==2
             if target=='tick_labels_left':
                 width_after=page.evaluate('async target=>(await '+ROOT+'.decorations())[target].rect[2]',target)
                 assert width_after < width_before-10

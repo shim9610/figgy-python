@@ -11,6 +11,7 @@ import pytest
 from PIL import ImageGrab
 import figgyplot as figgy
 from figgyplot.desktop import poll_events
+from object_navigation import ensure_native_control_visible
 
 
 @pytest.mark.skipif(not os.environ.get('DISPLAY') or not shutil.which('xdotool') or not shutil.which('xclip'), reason='requires X11, xdotool and xclip')
@@ -31,7 +32,9 @@ def test_editor_preserves_canvas_and_edits_in_separate_settings_window(tmp_path)
     def click_rect(rect, wid=None):
         xdo('mousemove','--window',wid or chart_id,round(rect[0]+rect[2]/2),round(rect[1]+rect[3]/2));pump()
         xdo('mousedown',1);pump();xdo('mouseup',1);pump()
-    def click(name): click_rect(info()['controls'][name])
+    def click(name):
+        ensure_native_control_visible(info,xdo,pump,chart_id,name)
+        click_rect(info()['controls'][name])
     def key(name): xdo('key',name);pump()
     def type_text(rect, value, wid=None):
         click_rect(rect,wid);key('ctrl+a');xdo('type','--clearmodifiers','--',value);pump()
@@ -71,8 +74,8 @@ def test_editor_preserves_canvas_and_edits_in_separate_settings_window(tmp_path)
         # Visibility can be restored through the object list after the hitbox is hidden.
         click_rect(info()['decorations']['chart_title']);click('visible')
         assert not figure.get_settings()['config']['chart_title']['visible']
-        click('object')
-        click('object_chart_title');assert info()['selected']=='chart_title'
+        click('object_search');key('ctrl+a');xdo('type','--clearmodifiers','chart_title');pump()
+        click('tree:panel/main/chart_title');assert info()['selected']=='chart_title'
         click('visible')
         assert figure.get_settings()['config']['chart_title']['visible']
         # A hidden title can be restored without selecting any chart object or inspector.
@@ -101,6 +104,7 @@ def test_editor_preserves_canvas_and_edits_in_separate_settings_window(tmp_path)
         # Legend entries are independent fields, with no tab/rule placeholders.
         click_rect(info()['decorations']['legend'])
         assert 'text' not in info()['controls'] and 'legend_label_signal' in info()['controls']
+        ensure_native_control_visible(info,xdo,pump,chart_id,'legend_label_signal')
         type_text(info()['controls']['legend_label_signal'],'Reviewed signal')
         state=figure.get_settings()
         assert ''.join(s['text'] for s in state['series'][0]['label']['segments'])=='Reviewed signal'

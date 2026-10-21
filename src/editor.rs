@@ -6,13 +6,21 @@ pub const INSPECTOR_WIDTH: f32 = 320.;
 
 pub(crate) struct Editor {
     pub inspector_open: bool,
+    pub selection_hint: String,
+    pub panel_focused: bool,
+    pub(super) drawing: crate::drawing::Drawing,
+    pub(super) delete_annotation: bool,
+    pub(super) inline_text: Option<crate::drawing::InlineText>,
     pub edit_area: bool,
     pub error: String,
     pub advanced_requested: bool,
     pub picked: Option<Value>,
+    pub(super) navigator: navigation::Navigator,
     save_path: String,
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
+    inspector_context: String,
+    pub layout_probe: std::collections::VecDeque<Value>,
     notice: String,
     pub stage: egui::Rect,
     pub controls: HashMap<String, egui::Rect>,
@@ -22,13 +30,21 @@ impl Default for Editor {
     fn default() -> Self {
         Self {
             inspector_open: false,
+            selection_hint: String::new(),
+            panel_focused: true,
+            drawing: Default::default(),
+            delete_annotation: false,
+            inline_text: None,
             edit_area: false,
             error: String::new(),
             advanced_requested: false,
             picked: None,
+            navigator: navigation::Navigator::default(),
             save_path: "figure.png".into(),
             raw: String::new(),
             text_ranges: HashMap::new(),
+            inspector_context: String::new(),
+            layout_probe: Default::default(),
             notice: String::new(),
             stage: egui::Rect::NOTHING,
             controls: HashMap::new(),
@@ -37,6 +53,7 @@ impl Default for Editor {
 }
 
 pub fn theme(ctx: &egui::Context) {
+    crate::ui_fonts::install(ctx);
     ctx.set_theme(egui::ThemePreference::Light);
     let mut visuals = egui::Visuals::light();
     visuals.override_text_color = Some(Color32::from_rgb(32, 43, 59));
@@ -73,6 +90,22 @@ pub fn theme(ctx: &egui::Context) {
 }
 
 pub fn object_name(id: &str, data: &FigureCore) -> String {
+    if let Some((prefix, element)) = id.split_once(':') {
+        if let Some(index) = prefix
+            .strip_prefix("subplot_")
+            .and_then(|v| v.parse::<usize>().ok())
+        {
+            let panel = data
+                .identity
+                .as_ref()
+                .and_then(|v| v["panels"][index + 1]["id"].as_str())
+                .unwrap_or("Panel");
+            return format!("{} · {}", panel, object_name(element, data));
+        }
+        if prefix.starts_with("overlay_") {
+            return object_name(element, data);
+        }
+    }
     let name = match id {
         "chart_title" => "Chart title",
         "data_area" => "Plot area",
@@ -192,26 +225,29 @@ impl Editor {
                     let select = toolbar_icon(
                         ui,
                         Icon::Select,
-                        !*edit_area,
+                        !*edit_area && self.drawing.tool == crate::drawing::Tool::Select,
                         "Select",
                         "Select a chart element to edit",
                     );
                     self.controls.insert("select_mode".into(), select.rect);
                     if select.clicked() {
                         *edit_area = false;
+                        self.drawing.cancel();
                     }
                     let layout = toolbar_icon(
                         ui,
                         Icon::Layout,
-                        *edit_area,
+                        *edit_area && self.drawing.tool == crate::drawing::Tool::Select,
                         "Layout",
                         "Move or resize the plot area",
                     );
                     self.controls.insert("layout_mode".into(), layout.rect);
                     if layout.clicked() {
                         *edit_area = true;
+                        self.drawing.cancel();
                     }
                     ui.separator();
+                    self.drawing_button(ui);
                     let visibility = ui.button("Show / hide");
                     self.controls
                         .insert("visibility_menu".into(), visibility.rect);
@@ -388,6 +424,9 @@ impl Editor {
                     });
                 });
             });
+        self.edit_area = *edit_area;
+        self.drawing_ui(root, c);
+        *edit_area = self.edit_area;
         egui::Panel::top("navigation_help")
             .exact_size(24.)
             .frame(egui::Frame::NONE.fill(Color32::from_rgb(248, 249, 251))
@@ -410,6 +449,8 @@ impl Editor {
                     self.error.as_str()
                 } else if !self.notice.is_empty() {
                     self.notice.as_str()
+                } else if !self.selection_hint.is_empty() {
+                    self.selection_hint.as_str()
                 } else {
                     "Click an element to edit  ·  Esc: Clear selection  ·  Arrows: Move selection  ·  F11: Full screen"
                 };
@@ -425,7 +466,7 @@ impl Editor {
             });
         if self.inspector_open {
             let mut area = root.max_rect();
-            area.min.y += 82.;
+            area.min.y = root.available_rect_before_wrap().top();
             area.max.y -= 30.;
             egui::Area::new(egui::Id::new("inspector"))
                 .order(egui::Order::Foreground)
@@ -465,68 +506,73 @@ impl Editor {
                 }
             });
         });
-        ui.add_space(8.);
-        ui.label(RichText::new("OBJECT").size(11.).weak());
-        let response = egui::ComboBox::from_id_salt("object")
-            .width(ui.available_width())
-            .selected_text(
-                selected
-                    .as_ref()
-                    .map(|id| object_name(id, c.data))
-                    .unwrap_or_else(|| "Choose an element".into()),
-            )
-            .show_ui(ui, |ui| {
-                let mut elements = c.data.elements.iter().collect::<Vec<_>>();
-                let common = [
-                    "chart_title",
-                    "legend",
-                    "axis_title_bottom",
-                    "axis_title_left",
-                    "data_area",
-                ];
-                elements.sort_by_key(|(id, _)| {
-                    common
-                        .iter()
-                        .position(|name| *name == id)
-                        .unwrap_or(common.len())
-                });
-                for (id, _) in elements {
-                    let response =
-                        ui.selectable_value(selected, Some(id.clone()), object_name(id, c.data));
-                    if response.rect.intersects(ui.clip_rect()) {
-                        self.controls.insert(
-                            format!("object_{id}"),
-                            response.rect.intersect(ui.clip_rect()),
-                        );
-                    }
-                    if response.clicked() {
-                        ui.close();
-                    }
-                }
-                for series in &c.data.series {
-                    ui.selectable_value(
-                        selected,
-                        Some(series.series_id.clone()),
-                        object_name(&series.series_id, c.data),
-                    );
-                }
-            });
-        self.controls
-            .insert("object".into(), response.response.rect);
-        ui.add_space(10.);
-        ui.separator();
+        let nodes = navigation::nodes(&c.snapshot());
+        if let Some(node) = self.navigator.show(
+            ui,
+            &nodes,
+            c.data.chart.config().active_layer(),
+            selected.as_deref(),
+            &mut self.controls,
+        ) {
+            let mut config = c.data.chart.config().clone();
+            config.active_layer = node.layer;
+            config.picked_data = None;
+            config.picked_points = None;
+            if let Err(error) = c.commit_config(config) {
+                self.error = error.to_string();
+            }
+            *selected = node.target;
+            self.picked = None;
+        }
         ui.add_space(6.);
+        let context = format!("{:?}/{:?}", c.data.chart.config().active_layer(), selected);
+        let context_changed = context != self.inspector_context;
+        if context_changed {
+            self.text_ranges.clear();
+            self.inspector_context = context;
+        }
         if let Some(target) = selected.as_ref() {
-            egui::ScrollArea::vertical()
-                .max_height(
-                    (ui.available_height() - if self.picked.is_some() { 250. } else { 100. })
-                        .max(100.),
-                )
-                .show(ui, |ui| self.properties(ui, c, target));
+            let form_height =
+                (ui.available_height() - if self.picked.is_some() { 250. } else { 74. }).max(100.);
+            let mut form = egui::ScrollArea::vertical()
+                .id_salt("object_properties")
+                .max_height(form_height)
+                // A default wheel step can skip over an entire short form.
+                // Keep adjacent rows reachable using ordinary wheel input.
+                .wheel_scroll_multiplier(egui::vec2(1., (form_height / 240.).clamp(0.25, 1.)));
+            if context_changed {
+                form = form.vertical_scroll_offset(0.);
+            }
+            let form = form.show(ui, |ui| self.properties(ui, c, target));
+            self.controls
+                .insert("properties_viewport".into(), form.inner_rect);
+            // Observation only: do not request repaint, focus, scroll or model edits.
+            if std::env::var_os("FIGGY_LAYOUT_PROBE").is_some() {
+                let rect = |r: egui::Rect| [r.min.x, r.min.y, r.width(), r.height()];
+                self.layout_probe.push_back(json!({
+                    "frame":ui.ctx().cumulative_frame_nr(),
+                    "time":ui.input(|i|i.time),
+                    "context":self.inspector_context,"context_changed":context_changed,
+                    "reset_requested":context_changed,"target":target,
+                    "scroll_id":format!("{:?}",form.id),
+                    "scroll_offset":[form.state.offset.x,form.state.offset.y],
+                    "content_size":[form.content_size.x,form.content_size.y],
+                    "viewport":rect(form.inner_rect),"clip":rect(ui.clip_rect()),
+                    "pixels_per_point":ui.ctx().pixels_per_point(),
+                    "controls":self.controls.iter().map(|(k,v)|(k.clone(),json!(rect(*v)))).collect::<serde_json::Map<_,_>>()
+                }));
+                if self.layout_probe.len() > 64 {
+                    self.layout_probe.pop_front();
+                }
+            }
         } else {
             ui.label(
                 RichText::new("Select a title, axis, legend or data series in the chart.").weak(),
             );
+        }
+        if self.delete_annotation {
+            *selected = None;
+            self.delete_annotation = false;
         }
         if let Some(picked) = &self.picked {
             ui.separator();
@@ -535,6 +581,10 @@ impl Editor {
                 "index",
                 "x_index",
                 "y_index",
+                "color_value",
+                "size_value",
+                "u",
+                "v",
                 "bin_start",
                 "bin_end",
                 "x",
@@ -608,7 +658,10 @@ impl Editor {
 
     fn rich_text_editor(&mut self, ui: &mut egui::Ui, node: &mut Value, key: &str) -> bool {
         let mut text = display_text(&node["segments"]);
-        ui.label("Text (select characters to format)");
+        if !key.starts_with("legend_label_") {
+            ui.label("Text");
+            ui.small("Select characters to format them.");
+        }
         let output = egui::TextEdit::singleline(&mut text)
             .id_salt(key)
             .desired_width(f32::INFINITY)
@@ -637,6 +690,8 @@ impl Editor {
             .unwrap_or(0..count);
         let range = range.start.min(count)..range.end.min(count);
         ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.;
+            ui.spacing_mut().button_padding = egui::vec2(6., 4.);
             for (flag, label) in [
                 ("bold", "B"),
                 ("italic", "I"),
@@ -649,7 +704,36 @@ impl Editor {
                     !range.is_empty() && segments[range.clone()].iter().all(|s| s[flag] == true);
                 let response = ui.selectable_label(active, label).on_hover_text(flag);
                 self.controls.insert(format!("{key}_{flag}"), response.rect);
-                if response.clicked() {
+                // A queued Space typed in the text field must not activate a
+                // newly Tab-focused formatting button later in the same frame.
+                let activate = response.clicked()
+                    && (response.clicked_by(egui::PointerButton::Primary)
+                        || !response.gained_focus()
+                        || ui.input(|input| {
+                            let tab = input.events.iter().rposition(|event| {
+                                matches!(
+                                    event,
+                                    egui::Event::Key {
+                                        key: egui::Key::Tab,
+                                        pressed: true,
+                                        ..
+                                    }
+                                )
+                            });
+                            tab.is_none_or(|at| {
+                                input.events[at + 1..].iter().any(|event| {
+                                    matches!(
+                                        event,
+                                        egui::Event::Key {
+                                            key: egui::Key::Space | egui::Key::Enter,
+                                            pressed: true,
+                                            ..
+                                        }
+                                    )
+                                })
+                            })
+                        }));
+                if activate {
                     for segment in &mut segments[range.clone()] {
                         segment[flag] = json!(!active);
                         if !active && flag == "superscript" {
@@ -666,11 +750,289 @@ impl Editor {
         changed
     }
 
+    pub(super) fn font_controls(
+        &mut self,
+        ui: &mut egui::Ui,
+        node: &mut Value,
+        family: &str,
+    ) -> bool {
+        let mut changed = text_field(
+            ui,
+            node,
+            family,
+            "Font family",
+            "Default font",
+            &mut self.controls,
+        );
+        changed |= number(
+            ui,
+            node,
+            "font_size",
+            "Font size",
+            " px",
+            &mut self.controls,
+        );
+        changed
+    }
+
+    fn text_appearance(&mut self, ui: &mut egui::Ui, node: &mut Value) -> bool {
+        let mut changed = self.font_controls(ui, node, "font");
+        changed |= color(ui, node, "color", "Text color", &mut self.controls);
+        changed
+    }
+
+    pub(super) fn annotation_properties(&mut self, ui: &mut egui::Ui, item: &mut Value) -> bool {
+        self.delete_annotation = false;
+        let remove =
+            ui.button(RichText::new("Delete annotation").color(Color32::from_rgb(165, 42, 37)));
+        self.controls
+            .insert("delete_annotation".into(), remove.rect);
+        self.delete_annotation = remove.clicked();
+        let mut changed = false;
+        let annotation_id = item["id"].as_str().unwrap_or("").to_owned();
+        let mut visible = item["visible"].as_bool().unwrap_or(true);
+        let response = ui.checkbox(&mut visible, "Visible");
+        self.controls
+            .insert("annotation_visible".into(), response.rect);
+        if response.changed() {
+            item["visible"] = json!(visible);
+            changed = true;
+        }
+        let kind = item["kind"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .next()
+            .unwrap()
+            .clone();
+        ui.weak(&kind);
+        let geometry = &mut item["kind"][&kind];
+        for field in match kind.as_str() {
+            "ReferenceLine" => vec!["value"],
+            "Span" => vec!["from", "to"],
+            _ => vec![],
+        } {
+            changed |= number(ui, geometry, field, field, "", &mut self.controls);
+        }
+        for field in ["anchor", "from", "to"] {
+            if let Some(unit) = geometry[field]
+                .as_object()
+                .and_then(|v| v.keys().next())
+                .cloned()
+            {
+                if geometry[field][&unit].is_object() {
+                    ui.label(format!("{} · {} coordinates", field, unit.to_lowercase()));
+                    for dimension in ["x", "y"] {
+                        changed |= number(
+                            ui,
+                            &mut geometry[field][&unit],
+                            dimension,
+                            dimension,
+                            "",
+                            &mut self.controls,
+                        );
+                        if let Some(rect) = self.controls.get(dimension).copied() {
+                            self.controls.insert(format!("{field}_{dimension}"), rect);
+                        }
+                    }
+                }
+            }
+        }
+        let text_key = if kind == "ReferenceLine" {
+            "label"
+        } else {
+            "text"
+        };
+        if kind == "Arrow" || kind == "ReferenceLine" {
+            let mut label = geometry[text_key].is_object();
+            let response = ui.checkbox(&mut label, "Show label");
+            self.controls
+                .insert("annotation_label".into(), response.rect);
+            if response.changed() {
+                geometry[text_key] = if label {
+                    serde_json::to_value(renderer::text::RichText::plain(
+                        "Label",
+                        Color::from_rgb8(35, 45, 60),
+                        16.,
+                        "",
+                    ))
+                    .unwrap()
+                } else {
+                    Value::Null
+                };
+                changed = true;
+            }
+        }
+        if geometry[text_key].is_object() {
+            changed |= self.text_appearance(ui, &mut geometry[text_key]);
+            let key = format!("annotation_text_{annotation_id}");
+            changed |= self.rich_text_editor(ui, &mut geometry[text_key], &key);
+            if let Some(rect) = self.controls.get(&key).copied() {
+                self.controls.insert("annotation_text".into(), rect);
+            }
+        }
+        if kind == "Arrow" {
+            for key in ["head_length", "head_width"] {
+                changed |= number(
+                    ui,
+                    &mut geometry["style"],
+                    key,
+                    key,
+                    " px",
+                    &mut self.controls,
+                );
+            }
+        }
+        if kind == "Text" {
+            let mut boxed = geometry["box_style"].is_object();
+            let r = ui.checkbox(&mut boxed, "Text box");
+            self.controls.insert("annotation_box".into(), r.rect);
+            if r.changed() {
+                geometry["box_style"] = if boxed {
+                    serde_json::to_value(renderer::annotation::BoxStyle::default()).unwrap()
+                } else {
+                    Value::Null
+                };
+                changed = true;
+            }
+            if boxed {
+                let style = &mut geometry["box_style"];
+                changed |= color(ui, style, "fill", "Box fill", &mut self.controls);
+                changed |= color(
+                    ui,
+                    style,
+                    "border_color",
+                    "Border color",
+                    &mut self.controls,
+                );
+                for key in ["border_width", "padding"] {
+                    changed |= number(ui, style, key, key, " px", &mut self.controls);
+                }
+            }
+        }
+        if geometry["fill"].is_object() {
+            changed |= color(ui, geometry, "fill", "Fill", &mut self.controls);
+            changed |= number(
+                ui,
+                &mut geometry["fill"],
+                "a",
+                "Opacity",
+                "",
+                &mut self.controls,
+            );
+        }
+        if kind == "Arrow" || kind == "ReferenceLine" {
+            let style = if kind == "Arrow" {
+                &mut geometry["style"]["line"]
+            } else {
+                &mut geometry["style"]
+            };
+            if style.is_object() {
+                changed |= color(ui, style, "color", "Line color", &mut self.controls);
+                changed |= number(ui, style, "width", "Line width", " px", &mut self.controls);
+                let mut value = style["style"].as_str().unwrap_or("Solid").to_owned();
+                let before = value.clone();
+                let r = egui::ComboBox::from_label("Stroke")
+                    .selected_text(&value)
+                    .show_ui(ui, |ui| {
+                        for name in [
+                            "Solid",
+                            "Dash",
+                            "Dot",
+                            "DashDot",
+                            "DashDotDot",
+                            "ShortDash",
+                            "ShortDot",
+                            "ShortDashDot",
+                            "LongDash",
+                            "LongDashDot",
+                            "LongDashDotDot",
+                        ] {
+                            ui.selectable_value(&mut value, name.into(), name);
+                        }
+                    });
+                self.controls
+                    .insert("annotation_line_style".into(), r.response.rect);
+                if value != before {
+                    style["style"] = json!(value);
+                    changed = true;
+                }
+            }
+        }
+        changed
+    }
+
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
         let mut state = serde_json::to_value(c.snapshot()).unwrap();
+        if let Some(id) = target.strip_prefix("annotation:") {
+            if let Some(item) = state["config"]["annotations"]["items"]
+                .as_array_mut()
+                .and_then(|items| items.iter_mut().find(|v| v["id"] == id))
+            {
+                let changed = self.annotation_properties(ui, item);
+                if self.delete_annotation {
+                    state["config"]["annotations"]["items"]
+                        .as_array_mut()
+                        .unwrap()
+                        .retain(|v| v["id"] != id);
+                }
+                if changed || self.delete_annotation {
+                    match c.apply_settings(&state.to_string()) {
+                        Ok(_) => self.error.clear(),
+                        Err(error) => self.error = error.to_string(),
+                    }
+                }
+            }
+            return;
+        }
+        let scoped_path = match c.data.chart.config().active_layer() {
+            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                format!("/config/subplots/{i}/config")
+            }
+            _ => "/config".to_string(),
+        };
+        let overlay_target = target.contains("overlay_");
+        let overlay_index = if overlay_target {
+            match c.data.chart.config().active_layer() {
+                renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) => {
+                    Some(i)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let target = target.rsplit(':').next().unwrap_or(target);
         let mut changed = false;
-        let config = state["config"].clone();
+        let legend_owners: std::collections::HashSet<String> = state["series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|series| {
+                let id = &series["series_id"];
+                match c.data.chart.config().active_layer() {
+                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                        state["config"]["subplots"][i]["series"]
+                            .as_array()
+                            .is_some_and(|ids| ids.contains(id))
+                    }
+                    _ => !state["config"]["subplots"]
+                        .as_array()
+                        .is_some_and(|panels| {
+                            panels
+                                .iter()
+                                .any(|p| p["series"].as_array().is_some_and(|ids| ids.contains(id)))
+                        }),
+                }
+            })
+            .filter_map(|s| s["series_id"].as_str().map(str::to_owned))
+            .collect();
+        let config = state.pointer(&scoped_path).unwrap().clone();
         let mut config = config;
+        let original_right = config["right_y"].clone();
+        if let Some(i) = overlay_index {
+            config["right_y"] = config["overlays"][i]["y_axis"].clone();
+        }
         let visibility = match target {
             "chart_title" => Some((&mut config["chart_title"], "visible")),
             "legend" => Some((&mut config["legend"], "visible")),
@@ -737,25 +1099,52 @@ impl Editor {
         };
         if let Some(node) = rich {
             if target == "legend" {
+                ui.strong("All legend entries");
+            }
+            changed |= self.text_appearance(ui, node);
+            ui.separator();
+            if target == "legend" {
                 let mut labels_changed = false;
                 ui.label("Legend entries");
-                for series in state["series"].as_array_mut().unwrap() {
-                    if !series["label"].is_object() {
-                        continue;
-                    }
+                ui.small("Select characters in an entry to format them.");
+                for (index, series) in state["series"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .filter(|s| {
+                        s["label"].is_object()
+                            && s["series_id"]
+                                .as_str()
+                                .is_some_and(|id| legend_owners.contains(id))
+                    })
+                    .enumerate()
+                {
                     let key = format!("legend_label_{}", series["series_id"].as_str().unwrap());
+                    ui.label(format!("Entry {}", index + 1));
                     labels_changed |= self.rich_text_editor(ui, &mut series["label"], &key);
                 }
                 if labels_changed {
                     let mut content: renderer::text::RichText =
                         serde_json::from_value(node.clone()).unwrap();
                     content.segments.clear();
-                    for series in state["series"].as_array().unwrap() {
+                    for series in state["series"].as_array().unwrap().iter().filter(|s| {
+                        s["series_id"]
+                            .as_str()
+                            .is_some_and(|id| legend_owners.contains(id))
+                    }) {
                         let series: SeriesConfig = serde_json::from_value(series.clone()).unwrap();
                         if let Some(label) = &series.label {
                             renderer::legend::append_legend_entry_rich(
                                 &mut content,
-                                renderer::legend::series_symbol_segments(&series),
+                                renderer::legend::series_symbol_segments(
+                                    &series,
+                                    c.data
+                                        .chart
+                                        .config()
+                                        .colorbar
+                                        .as_ref()
+                                        .map(|bar| &bar.colormap),
+                                ),
                                 label.segments.clone(),
                             );
                         }
@@ -766,23 +1155,6 @@ impl Editor {
             } else {
                 changed |= self.rich_text_editor(ui, node, "text");
             }
-            changed |= text_field(
-                ui,
-                node,
-                "font",
-                "Font family",
-                "Default font",
-                &mut self.controls,
-            );
-            changed |= number(
-                ui,
-                node,
-                "font_size",
-                "Font size",
-                " px",
-                &mut self.controls,
-            );
-            changed |= color(ui, node, "color", "Text color", &mut self.controls);
             let previous = node["align"].as_str().unwrap_or("Left").to_owned();
             let mut align = previous.clone();
             ui.horizontal(|ui| {
@@ -798,24 +1170,9 @@ impl Editor {
         } else if target.starts_with("tick_labels_") {
             let key = axis_key(target.trim_start_matches("tick_labels_"));
             let node = &mut config[key]["label_style"];
-            changed |= label_format_controls(ui, node, &mut self.controls);
-            changed |= text_field(
-                ui,
-                node,
-                "label_font",
-                "Font family",
-                "Default font",
-                &mut self.controls,
-            );
-            changed |= number(
-                ui,
-                node,
-                "font_size",
-                "Font size",
-                " px",
-                &mut self.controls,
-            );
+            changed |= self.font_controls(ui, node, "label_font");
             changed |= color(ui, node, "color", "Text color", &mut self.controls);
+            changed |= label_format_controls(ui, node, &mut self.controls);
         } else if let Some(series) = state["series"]
             .as_array_mut()
             .unwrap()
@@ -871,6 +1228,20 @@ impl Editor {
             changed |= color_scale_properties(ui, &mut config["colorbar"], &mut self.controls);
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
+            let mut automatic = crate::tick_policy::automatic(
+                c.data.identity.as_ref(),
+                c.data.chart.config().active_layer(),
+                key,
+            );
+            let response = ui.checkbox(&mut automatic, "Automatic tick spacing");
+            self.controls.insert("auto_ticks".into(), response.rect);
+            if response.changed() {
+                crate::tick_policy::set_mode(&mut state, key, automatic);
+                if automatic {
+                    crate::tick_policy::retick_value(&mut config[key]);
+                }
+                changed = true;
+            }
             let node = &mut config[key];
             changed |= scale_control(ui, node, "axis_scale", &mut self.controls);
             let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
@@ -919,7 +1290,10 @@ impl Editor {
                 | number(ui, node, "max", "Maximum", "", &mut self.controls);
             changed |= range_changed;
             let node = &mut config[key];
-            changed |= number(
+            if range_changed && automatic {
+                crate::tick_policy::retick_value(node);
+            }
+            let spacing_changed = number(
                 ui,
                 node,
                 "major_spacing",
@@ -927,6 +1301,10 @@ impl Editor {
                 "",
                 &mut self.controls,
             );
+            if spacing_changed {
+                crate::tick_policy::set_mode(&mut state, key, false);
+                changed = true;
+            }
             changed |= number(
                 ui,
                 node,
@@ -961,9 +1339,9 @@ impl Editor {
                     continue;
                 }
                 let old = if key == "colorbar" {
-                    &state["config"][key]["axis"]
+                    &state.pointer(&scoped_path).unwrap()[key]["axis"]
                 } else {
-                    &state["config"][key]
+                    &state.pointer(&scoped_path).unwrap()[key]
                 };
                 let axis = if key == "colorbar" {
                     &mut config[key]["axis"]
@@ -987,10 +1365,30 @@ impl Editor {
                 }
             }
         }
-        if changed {
-            crate::axis_edit::sync_linked_axis_edit(&state["config"], &mut config, target);
+        // Secondary Y axes have independent ownership even when their numeric
+        // domains happen to match the panel's primary axes.
+        if changed && overlay_index.is_none() {
+            crate::axis_edit::sync_linked_axis_edit(
+                state.pointer(&scoped_path).unwrap(),
+                &mut config,
+                target,
+            );
         }
-        state["config"] = config;
+        if let Some(i) = overlay_index {
+            config["overlays"][i]["y_axis"] = config["right_y"].clone();
+            config["right_y"] = original_right;
+        }
+        *state.pointer_mut(&scoped_path).unwrap() = config;
+        if changed
+            && matches!(
+                target,
+                "axis_bottom" | "axis_top" | "axis_left" | "axis_right"
+            )
+        {
+            for side in ["bottom_x", "left_y"] {
+                crate::tick_policy::synchronize_spacing(&mut state, side);
+            }
+        }
         if changed {
             match c.apply_settings(&state.to_string()) {
                 Ok(_) => {
@@ -1006,7 +1404,7 @@ impl Editor {
 /// What a text field shows for a rich node: the text whose renderer segments
 /// these are (keeping "10⁻³" as typed), or the plain characters when the
 /// segments carry styling no plain text maps to.
-fn display_text(segments: &Value) -> String {
+pub(super) fn display_text(segments: &Value) -> String {
     serde_json::from_value::<Vec<renderer::text::RichSegment>>(segments.clone())
         .ok()
         .and_then(|segments| crate::plain_text_of(&segments))
@@ -1379,7 +1777,7 @@ fn toolbar_icon(
 mod radial_editor;
 
 // Preserve unchanged rich characters when editing the plain text input.
-fn preserve_segment_styles(old: &Value, mut fresh: Value) -> Value {
+pub(super) fn preserve_segment_styles(old: &Value, mut fresh: Value) -> Value {
     let (Some(old), Some(next)) = (old.as_array(), fresh.as_array_mut()) else {
         return fresh;
     };

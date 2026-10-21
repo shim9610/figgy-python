@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from figgyplot import subplots, release_gpu
 from figgyplot.desktop import poll_events
+from object_navigation import ensure_native_control_visible
 
 
 def test_surface_drag_resize_reopen_and_no_png(tmp_path):
@@ -53,6 +54,7 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
         pump()
 
     def click(name):
+        ensure_native_control_visible(info, xdo, pump, wid, name)
         click_rect(info()["controls"][name])
 
     def type_field(name, value):
@@ -89,6 +91,7 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
         )
         type_field("text", "Rust edited")
         type_field("font", "DejaVu Serif")
+        ensure_native_control_visible(info, xdo, pump, wid, "font_size")
         click_rect(info()["controls"]["font_size"], double=True)
         xdo("key", "ctrl+a")
         xdo("type", "36")
@@ -100,34 +103,13 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
             == "DejaVu Serif"
         )
         assert fig.get_settings()["config"]["chart_title"]["text"]["font_size"] == 36
-        # Popup must visibly appear without a forced refresh/additional motion.
-        from PIL import ImageGrab
-
-        geometry = dict(
-            line.split("=", 1)
-            for line in xdo("getwindowgeometry", "--shell", wid).splitlines()
-        )
-        gx, gy = int(geometry["X"]), int(geometry["Y"])
-        r = info()["controls"]["object"]
-
-        def popup_pixels():
-            return np.asarray(
-                ImageGrab.grab(
-                    bbox=(
-                        gx + int(r[0]),
-                        gy + int(r[1] + r[3] + 10),
-                        gx + int(r[0] + r[2]),
-                        gy + int(r[1] + r[3] + 120),
-                    ),
-                    xdisplay=os.environ["DISPLAY"],
-                )
-            )
-
-        closed = popup_pixels()
-        click("object")
-        assert np.count_nonzero(np.any(popup_pixels() != closed, axis=2)) > 100
-        xdo("key", "Escape")
-        pump()
+        # The object hierarchy is visible and collapses without a popup.
+        toggles = [key for key in info()["controls"] if key.startswith("tree_toggle:figure/")]
+        assert len(toggles) == 1 and "tree:panel/main" in info()["controls"]
+        click(toggles[0])
+        assert "tree:panel/main" not in info()["controls"]
+        click(toggles[0])
+        assert "tree:panel/main" in info()["controls"]
         xdo("windowsize", wid, 1350, 760)
         pump()
         assert info()["surface_size"] == [1350, 760]
@@ -249,6 +231,7 @@ def test_surface_heatmap_edits_sync_without_image_transport():
         click_rect(info()["decorations"]["data_area"])
         assert info()["selected"] == "Temperature" and info()["properties_open"]
         for name, value in [("min", "-2"), ("max", "4")]:
+            ensure_native_control_visible(info, xdo, pump, wid, name)
             click_rect(info()["controls"][name], double=True)
             xdo("key", "ctrl+a")
             xdo("type", "--", value)
@@ -260,6 +243,7 @@ def test_surface_heatmap_edits_sync_without_image_transport():
         xdo("mousemove", "--window", wid, round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2))
         xdo("click", "--repeat", 3, "--delay", 70, 5)
         pump()
+        ensure_native_control_visible(info, xdo, pump, wid, "colormap")
         click_rect(info()["controls"]["colormap"])
         click_rect(info()["controls"]["colormap_Magma"])
         bar = fig.get_settings()["config"]["colorbar"]

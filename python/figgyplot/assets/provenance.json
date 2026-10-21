@@ -1,21 +1,21 @@
 {
   "upstream_repository": "https://github.com/shim9610/figgy",
-  "upstream_revision": "783353a5e3343f27a48da3b0aa1c67969c9d63ff",
-  "renderer_version": "0.17.0",
-  "web_package_version": "0.14.0",
+  "upstream_revision": "3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04",
+  "renderer_version": "0.18.0",
+  "web_package_version": "0.15.0",
   "native_packages": {
     "figgy-renderer": {
-      "version": "0.17.0",
+      "version": "0.18.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "b4425da64c26b5e11f9ddc09dc539cf43a41d42ea2faf898624a0aab3cb199f8",
-      "upstream_revision": "783353a5e3343f27a48da3b0aa1c67969c9d63ff",
+      "checksum": "a1366ff8934883eda159462aa792e4404b46a3cd92f24b5aee0f36b8522d4eb5",
+      "upstream_revision": "3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04",
       "path_in_vcs": "crates/renderer"
     },
     "figgy-model": {
-      "version": "0.11.0",
+      "version": "0.12.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "bfe6ecfc08bc01d34090859b494aa9c071aeeb73442b5ac84a1947cf5a2cf0b0",
-      "upstream_revision": "783353a5e3343f27a48da3b0aa1c67969c9d63ff",
+      "checksum": "854378aecdefaa81fbafce80d70d8143ad1f39fefd20723de9a186c5506f7977",
+      "upstream_revision": "3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04",
       "path_in_vcs": "crates/model"
     }
   },
@@ -29,13 +29,13 @@
   },
   "wasm_bindgen_version": "0.2.129",
   "assets": {
-    "figgy_bg.wasm": {
-      "sha256": "bd794e856cd309de758518dd3afa2c857b29d7840f6f4230631b9551152c4878",
-      "bytes": 8965423
-    },
     "figgy.js": {
-      "sha256": "1c22229a01186c8e8b3ef09384b4dfbeb61c3b9febedd4abb3e7d1ebfb6bb657",
-      "bytes": 163258
+      "sha256": "09c34167726e3e2fcc058a51fc432dc7326e299b847d3ca55f876187fc9101e4",
+      "bytes": 185599
+    },
+    "figgy_bg.wasm": {
+      "sha256": "b623c0f06f21a4dfe4d0b64052a92e5551262d731bc1afe129ec39d24f70f20e",
+      "bytes": 10114854
     }
   }
 }

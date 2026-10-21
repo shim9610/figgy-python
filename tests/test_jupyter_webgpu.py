@@ -1,3 +1,4 @@
+from object_navigation import ObjectNavigator
 """Real JupyterLab/comm/WASM/WebGPU integration. Opt in with FIGGY_TEST_JUPYTER=1."""
 import json,os,shutil,socket,subprocess,sys,time,urllib.request,uuid,io
 from pathlib import Path
@@ -96,7 +97,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             execute("fig.configure(config={'bottom_x': {'major_spacing': 1.25, 'minor_count': 1}})")
             page.wait_for_function(root+".snapshot().config.bottom_x.major_spacing === 1.25")
             before_range=page.evaluate(root+'.snapshot().config')
-            page.locator('[data-target]').select_option('axis_bottom')
+            ObjectNavigator(page).choose('axis_bottom')
             page.locator('[data-fields] input[data-property=min]').fill('2')
             page.locator('[data-fields] input[data-property=min]').press('Tab')
             page.wait_for_function(root+".snapshot().config.bottom_x.min === 2")
@@ -114,7 +115,7 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             page.mouse.move(rect['x']+rect['width']/2+20,rect['y']+18,steps=4);page.mouse.up()
             page.wait_for_function(root+'.snapshot().config.chart_title.offset_x > 0')
             execute("await fig.sync(); assert fig.get_settings()['config']['chart_title']['offset_x'] > 0")
-            page.locator('[data-target]').select_option('signal');page.locator('[data-fields] input[type=color]').fill('#ff0000');page.locator('[data-fields] input[type=color]').dispatch_event('change')
+            ObjectNavigator(page).choose('signal');page.locator('[data-fields] input[type=color]').fill('#ff0000');page.locator('[data-fields] input[type=color]').dispatch_event('change')
             execute("await fig.sync(); assert fig.get_settings()['series'][0]['render_type']['Line']['line']['line_color']['r'] == 1")
             # Inspect the actual composited canvas, not only export output.
             page.evaluate('()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')

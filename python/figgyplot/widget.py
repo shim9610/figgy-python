@@ -116,7 +116,10 @@ class FigureWidget(anywidget.AnyWidget):
     def refresh(self):
         if not self._handling:
             settings = self.figure.get_settings()
+            from ._native import object_outline_json, bounded_view_json
             self.state = {"settings": settings, "revision": self.figure.revision, "code": self.figure.to_code(),
+                          "outline": json.loads(object_outline_json(json.dumps(settings))),
+                          "bounded_view": json.loads(bounded_view_json(json.dumps(settings))),
                           "texts": _display_texts(settings),
                           "log_bounds": {axis: self.figure._native.log_bounds(axis) for axis in ("x", "y", "z")}}
 
@@ -141,6 +144,10 @@ class FigureWidget(anywidget.AnyWidget):
             self._ready_event.set()
         elif action == "unmounted":
             self._clients.pop(content.get("client"), None)
+        elif action == "fit":
+            if content.get("revision") == self.figure.revision:
+                self.figure.fit()
+            self.refresh()
         elif action == "edit":
             self._handling = True
             error = ""

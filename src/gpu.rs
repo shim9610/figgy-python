@@ -186,17 +186,56 @@ pub fn config(figure: u64, input: &Config) -> Config {
             *id = column_id(figure, id);
         }
     }
+    for overlay in &mut result.overlays {
+        for id in &mut overlay.series {
+            *id = column_id(figure, id);
+        }
+    }
+    for subplot in &mut result.subplots {
+        for id in &mut subplot.series {
+            *id = column_id(figure, id);
+        }
+        subplot.config = config(figure, &subplot.config);
+    }
+    // Renderer 0.18's registry validates mapped series against the document
+    // root before expansion. Subplots still draw with their own colorbars.
+    // Supply an invisible validation context only at the GPU boundary; it
+    // never becomes an additional authority in the persisted chart model.
+    if result.colorbar.is_none() {
+        if let Some(bar) = result
+            .subplots
+            .iter()
+            .find_map(|p| p.config.colorbar.as_ref())
+        {
+            let mut bar = bar.clone();
+            bar.visible = false;
+            result.colorbar = Some(bar);
+        }
+    }
     result
 }
 
-/// Only names change at the host boundary. Public SSOT retains local ids;
+/// Names and the derived registry validation context change at this boundary.
+/// Public SSOT retains local ids and its own colorbars;
 /// typed renderer models still own all validation, fitting and rendering.
 pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
     use renderer::data_config::{
-        DataErrorBarStyleConfig, DataRenderType as T, DataScatterStyleConfig, ErrorRef,
+        DataErrorBarStyleConfig, DataRenderType as T, DataScatterStyleConfig, ErrorRef, LineFill,
+        MatrixRef, VectorColorMap, VectorComponents,
     };
     fn scatter(figure: u64, style: &mut DataScatterStyleConfig) {
         if let Some(id) = &mut style.point_style_index_column {
+            *id = column_id(figure, id);
+        }
+        if let Some(map) = &mut style.point_color_map {
+            map.column = column_id(figure, &map.column);
+        }
+        if let Some(map) = &mut style.point_size_map {
+            map.column = column_id(figure, &map.column);
+        }
+    }
+    fn matrix(figure: u64, reference: &mut MatrixRef) {
+        for id in &mut reference.columns {
             *id = column_id(figure, id);
         }
     }
@@ -220,6 +259,16 @@ pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
         s.series_id = column_id(figure, &s.series_id);
         s.x_column = column_id(figure, &s.x_column);
         s.y_column = column_id(figure, &s.y_column);
+        if let T::Line { line }
+        | T::ScatterLine { line, .. }
+        | T::LineScatterErrorbarX { line, .. }
+        | T::LineScatterErrorbarY { line, .. }
+        | T::LineScatterErrorbarXY { line, .. } = &mut s.render_type
+        {
+            if let Some(LineFill::ToSeries(id)) = &mut line.fill {
+                *id = column_id(figure, id);
+            }
+        }
         match &mut s.render_type {
             T::Line { .. } | T::Histogram { .. } => {}
             T::Scatter { scatter: style } | T::ScatterLine { scatter: style, .. } => {
@@ -269,11 +318,24 @@ pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
                 error(figure, err_y);
                 error_style(figure, err_style);
             }
-            T::Heatmap { matrix, .. }
-            | T::Contour { matrix, .. }
-            | T::HeatmapContour { matrix, .. } => {
-                for id in &mut matrix.columns {
-                    *id = column_id(figure, id);
+            T::Heatmap { matrix: grid, .. }
+            | T::Contour { matrix: grid, .. }
+            | T::HeatmapContour { matrix: grid, .. } => matrix(figure, grid),
+            T::Vector { components, style } => {
+                match components {
+                    VectorComponents::Points { u, v } => {
+                        *u = column_id(figure, u);
+                        *v = column_id(figure, v);
+                    }
+                    VectorComponents::Grid { u, v } => {
+                        matrix(figure, u);
+                        matrix(figure, v);
+                    }
+                }
+                match &mut style.color_map {
+                    Some(VectorColorMap::Column(id)) => *id = column_id(figure, id),
+                    Some(VectorColorMap::Grid(grid)) => matrix(figure, grid),
+                    None => {}
                 }
             }
         }

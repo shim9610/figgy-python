@@ -40,20 +40,37 @@ class Inputs:
     def info(self):
         return json.loads(self.window.info_json())
 
+    def input_frame(self, *args):
+        """Wait for the host to present an input instead of assuming a fixed delay.
+
+        Software Vulkan can take longer than the usual 100 ms under CI load;
+        sending the next gesture before a toolbar click is consumed loses input.
+        """
+        before = self.info()['surface_frames']
+        pointer = self.xdo('getmouselocation', '--shell') if args[0]=='mousemove' else None
+        self.xdo(*args)
+        if pointer is not None and pointer == self.xdo('getmouselocation', '--shell'):
+            self.pump()
+            return
+        deadline = time.monotonic()+5
+        while True:
+            self.pump()
+            if self.info()['surface_frames'] > before:
+                return
+            assert time.monotonic() < deadline, self.info()
+
     def click_rect(self, rect):
         x, y = round(rect[0]+rect[2]/2), round(rect[1]+rect[3]/2)
         # X11 may suppress same-position motion left over from an earlier window.
         # Deliver a real motion event before pressing on the new chart surface.
-        self.xdo("mousemove", "--window", self.wid, x+8, y+8)
-        self.pump()
-        self.xdo("mousemove", "--window", self.wid, x, y)
-        self.pump()
-        self.xdo("mousedown", 1)
-        self.pump()
-        self.xdo("mouseup", 1)
-        self.pump()
+        self.input_frame("mousemove", "--window", self.wid, x+8, y+8)
+        self.input_frame("mousemove", "--window", self.wid, x, y)
+        self.input_frame("mousedown", 1)
+        self.input_frame("mouseup", 1)
 
     def click(self, name):
+        from object_navigation import ensure_native_control_visible
+        ensure_native_control_visible(self.info, self.xdo, self.pump, self.wid, name)
         self.click_rect(self.info()["controls"][name])
 
     def key(self, key):
@@ -93,8 +110,16 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         inputs.click("radial_material_Wood")
         assert fig.get_settings()["radial"]["style"]["material"] == "Wood"
         inputs.click("copy")
-        copied = subprocess.check_output(["xclip", "-selection", "clipboard", "-o"], text=True)
-        assert copied == fig.to_code() and "configure_radial" in copied
+        # X11 clipboard ownership is asynchronous, especially when previous
+        # windows in the same process have just closed. Wait for this copy.
+        expected=fig.to_code();deadline=time.monotonic()+3
+        while True:
+            result=subprocess.run(["xclip","-selection","clipboard","-o","-t","UTF8_STRING"],capture_output=True,text=True,timeout=3)
+            copied=result.stdout
+            if result.returncode==0 and copied==expected:break
+            assert time.monotonic()<deadline,(result.returncode,result.stderr,copied)
+            inputs.pump()
+        assert copied == expected and "configure_radial" in copied
         assert "'value':" not in copied
         subprocess.run(["wmctrl", "-ir", inputs.wid, "-b", "add,maximized_vert,maximized_horz"], check=True)
         inputs.pump()

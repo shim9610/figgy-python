@@ -1,3 +1,4 @@
+from object_navigation import ObjectNavigator
 """Same input scenarios must work on native surfaces and real notebook WebGPU."""
 import json
 import os
@@ -8,14 +9,101 @@ import pytest
 import figgyplot as figgy
 from test_radial_desktop import Inputs
 from jupyter_harness import notebook, button_point_without_frames
+from browser_timing import screenshot_editor
 
 ROOT = "document.querySelector('.figgy-editor').figgy"
 CASES = {
     'radial': "ax.donut([40, 30, 30], labels=['A','B','C'], material='ceramic')",
     'categorical': "ax.bar(['A','B','C'], [4, 3, 5])",
     'boxplot': "ax.boxplot([[1,2,3],[2,4,6],[3,5,8]])",
+    'radar': "ax.radar(['A','B','C'], [[4,3,5],[2,5,3]])",
 }
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_legacy_settings_and_heatmap_legend_preserve_shared_host_model(backend):
+    """The migration keeps saved edits, current stamps and colormap symbols aligned."""
+    with figgy.Figure(backend=backend) as figure:
+        ax = figure.axes[0]
+        ax.imshow([[0, 1], [1, 0]], id='field')
+        figure.update('field', label='Temperature')
+        ax.legend()
+        before = figure.get_settings()
+        saved = json.loads(json.dumps(before))
+        saved['renderer_version'] = '0.17.0'
+        saved['config']['colorbar']['colormap'] = 'Magma'
+        figure.apply_settings(saved)
+        current = figure.get_settings()
+        assert current['renderer_version'] == '0.18.0'
+        assert current['config']['legend']['content'] != before['config']['legend']['content']
+        assert 'Temperature' in ''.join(s['text'] for s in current['config']['legend']['content']['segments'])
+        revision = figure.revision
+        figure.apply_settings(current)
+        assert figure.revision == revision
+
 NEEDS_UI = not os.environ.get('DISPLAY') or not all(shutil.which(p) for p in ['xdotool','xclip','wmctrl']) or os.environ.get('FIGGY_TEST_JUPYTER') != '1'
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('panel',['main','child'])
+def test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series(backend,panel):
+    from figgyplot._native import rebuild_legend_json
+    with figgy.Figure(backend=backend) as fig:
+        if panel=='child':fig.set_layout([['main','child']])
+        ax=fig.subplots[panel].axes
+        ax.plot([0,1],[1,2],marker='^',id='not_in_legend')
+        ax.scatter([0,1],[2,1],marker='o',label='Same label',id='circle')
+        ax.scatter([0,1],[3,2],marker='D',label='Same label',id='diamond')
+        ax.legend()
+        before=fig.get_settings();cfg=ax._config(before)
+        expected=json.loads(rebuild_legend_json(json.dumps(ax._owned_series(before)),json.dumps(cfg['legend']['content']),None))
+        assert cfg['legend']['content']==expected
+        fig.configure(series={'diamond':{'render_type':{'Scatter':{'scatter':{'point_size':5.6}}}}})
+        after=fig.get_settings()
+        assert ax._config(after)['legend']['content']==expected
+        assert after['series'][1]['render_type']['Scatter']['scatter']['point_shape']=='CircleFilled'
+        assert after['series'][2]['render_type']['Scatter']['scatter']['point_shape']=='DiamondFilled'
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('change',['unlabelled_size','labelled_width','all_labelled'])
+def test_offscreen_legend_keys_keep_their_symbols_after_configure(backend,change,tmp_path):
+    """Style edits preserve the labelled subset, including offscreen legend keys."""
+    from figgyplot._native import rebuild_legend_json
+    with figgy.Figure(figsize=(6,4),dpi=120,backend=backend) as fig:
+        ax=fig.axes[0];x=np.linspace(0,10,11)
+        ax.plot(x,x,color='#c44536',linestyle='--',marker='o',markersize=4,
+                label='red data' if change=='all_labelled' else None,id='data_red')
+        ax.plot(x,x+3,color='#0b6e99',linestyle=':',marker='s',markersize=4,
+                label='blue data' if change=='all_labelled' else None,id='data_blue')
+        ax.plot([-1e9,-.9e9],[1,1],color='#2a9d8f',linewidth=3,label='key green line',id='key_line')
+        ax.scatter([-1e9],[1],color='#57606a',marker='^',s=16,label='key grey triangle',id='key_tri')
+        ax.set_xlim(0,10);ax.set_ylim(0,15);ax.legend(True)
+        before=fig.get_settings();legend=before['config']['legend']['content']
+        expected=json.loads(rebuild_legend_json(json.dumps(before['series']),json.dumps(legend),None))
+        assert legend==expected
+        if backend=='native':fig.savefig(tmp_path/'before.png')
+        if change=='labelled_width':
+            patch={'key_line':{'render_type':{'Line':{'line':{'line_width':5.6}}}}}
+        else:
+            patch={'data_red':{'render_type':{'ScatterLine':{'scatter':{'point_size':5.6}}}}}
+        fig.configure(series=patch)
+        after=fig.get_settings()
+        expected=json.loads(rebuild_legend_json(json.dumps(after['series']),json.dumps(legend),None))
+        assert after['config']['legend']['content']==expected
+        if change!='labelled_width':assert expected==legend
+        if backend=='native':
+            fig.savefig(tmp_path/'after.png')
+            pixels=fig.render_rgba()[...,:3].astype(int)
+            # These keys are outside the axes: their colors can appear only in
+            # the legend, so this also checks the actual rendered symbols.
+            for color in ([42,157,143],[87,96,106]):
+                ink=255-np.array(color)
+                coverage=((255-pixels)@ink)/(ink@ink)
+                error=np.max(np.abs(pixels-(255-coverage[...,None]*ink)),axis=2)
+                assert np.count_nonzero((coverage>.35)&(coverage<=1.01)&(error<=2))>3
+        assert [s['label'] for s in after['series']]==[s['label'] for s in before['series']]
+        assert [s['render_type'].keys() for s in after['series']]==[s['render_type'].keys() for s in before['series']]
+
 
 if os.environ.get('FIGGY_REQUIRE_INTERACTION_PARITY') == '1' and NEEDS_UI:
     raise RuntimeError('Required interaction parity cannot be skipped: install X11 tools, set DISPLAY and FIGGY_TEST_JUPYTER=1')
@@ -28,8 +116,7 @@ def offset(chart, target):
 def drag_native(inputs, start, delta):
     for args in [('mousemove','--window',inputs.wid,*map(round,start)),('mousedown',1),
                  ('mousemove','--window',inputs.wid,*map(round,(start[0]+delta[0],start[1]+delta[1]))),('mouseup',1)]:
-        inputs.xdo(*args)
-        inputs.pump()
+        inputs.input_frame(*args)
 
 
 def native_point(info, logical):
@@ -128,10 +215,12 @@ def check_bounded_menus_during_preparation(page, execute, kind):
     report=json.loads(execute('print(json.dumps(await preparation))'))
     assert report['ready'] and report['backend']=='webgpu'
     page.evaluate(ROOT+'.flush()')
-    check_display_frame_ready(page)
+    # Queued toolbar actions open the docked inspector after preparation. Its
+    # new canvas size is a subsequent layout change, not the prepared surface.
+    check_display_frame_ready(page, after_layout_change=True)
     assert page.locator('.figgy-properties').is_visible()
     if kind=='radial':
-        assert page.locator('[data-target]').input_value()=='chart_title'
+        assert ObjectNavigator(page).selected()=='chart_title'
     else:
         grid=page.locator('input[data-visibility="grid"]')
         assert grid.is_visible()
@@ -146,7 +235,13 @@ def check_bounded_menus_during_preparation(page, execute, kind):
     assert page.locator('.figgy-error').inner_text()==''
 
 
-def check_display_frame_ready(page):
+def check_display_frame_ready(page, after_layout_change=False):
+    if after_layout_change:
+        page.wait_for_function("""()=>{
+            const root=document.querySelector('.figgy-editor'),canvas=root.querySelector('canvas'),r=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
+            const expected=[Math.round(r.width*dpr),Math.round(r.height*dpr)],work=window.figgyGPUWork,host=root.figgy.diagnostics();
+            return canvas.width===expected[0]&&canvas.height===expected[1]&&JSON.stringify(work.completedCanvas)===JSON.stringify(expected)&&work.submitted===work.completed&&!host.dirty&&!host.frame_pending&&!host.busy&&!host.queued;
+        }""", polling=100, timeout=180000)
     initial = page.evaluate("""()=>{
         const canvas=document.querySelector('.figgy-editor canvas'),r=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
         const work=window.figgyGPUWork;
@@ -314,21 +409,21 @@ def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
             page.mouse.up()
             # Changing the inspector target is pure DOM work. Its controls must
             # match the dropdown immediately, even while renderer work is held.
-            target=page.locator('[data-target]')
+            target=ObjectNavigator(page)
             series_id=page.evaluate(ROOT+'.snapshot().categorical.series[0].id')
-            target.select_option(series_id)
+            target.choose(series_id)
             assert page.locator('[data-property=label]').count() == 1
-            target.select_option('chart_title')
+            target.choose('chart_title')
             assert page.locator('[data-property=label]').count() == 0
             # An earlier queued Arrow still belongs to the title, even when
             # the inspector has already presented the later series choice.
             page.locator('canvas').press('ArrowRight')
-            target.select_option(series_id)
+            target.choose(series_id)
             # Likewise an older queued canvas pick must not replace a newer
             # inspector choice when the GPU fence releases and work drains.
             page.mouse.click(*start)
-            target.select_option('chart_title')
-            target.select_option(series_id)
+            target.choose('chart_title')
+            target.choose(series_id)
             assert page.locator('[data-property=label]').count() == 1
             page.evaluate("window.figgyHeldFrames=0;requestAnimationFrame(()=>{window.figgyHeldFrames++;requestAnimationFrame(()=>window.figgyHeldFrames++);})")
             page.wait_for_function('window.figgyHeldFrames===2', polling=100)
@@ -338,14 +433,14 @@ def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path):
             execute('await fig.sync(timeout=5)')
             accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
             assert offset(accepted['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2)
-            assert target.input_value() == series_id
+            assert target.selected() == series_id
         finally:
             page.evaluate('window.figgyFrameGate.release()')
         page.wait_for_function('before=>window.figgyGPUWork.submitted>before',arg=submitted,polling=100)
         execute('await fig.sync()')
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
-        assert offset(state['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2), target.input_value()
-        assert target.input_value() == series_id
+        assert offset(state['categorical'],'ChartTitle') == pytest.approx([13,6],abs=.2), target.selected()
+        assert target.selected() == series_id
         path=tmp_path/'coalesced-export.png'
         execute(f'await fig.savefig_async({str(path)!r})')
         from PIL import Image
@@ -359,7 +454,7 @@ def test_cartesian_sync_accepts_edits_while_display_gpu_is_pending(tmp_path):
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\nax.plot([0,1],[1,2])\nax.set_title('Before')\ndisplay(fig.widget())"
     with notebook(tmp_path/'cartesian-frame-barrier',source) as (page,execute):
         page.locator('[data-properties]').click()
-        page.locator('[data-target]').select_option('chart_title')
+        ObjectNavigator(page).choose('chart_title')
         page.evaluate(ROOT+'.flush()')
         page.evaluate("""()=>{
             const prototype=GPUQueue.prototype,original=prototype.onSubmittedWorkDone;
@@ -534,7 +629,7 @@ def test_cartesian_hosts_share_ticks_and_selected_character_formatting(tmp_path)
             for tick in ['None','Inside','Both','Outside']:
                 inputs.click('tick_direction');inputs.click('tick_'+tick)
                 assert_axis(fig.get_settings(),tick)
-            inputs.click('object');inputs.click('object_chart_title')
+            choose_native_object(inputs,'chart_title','panel/main/chart_title')
             # Select just the digit, then apply exclusive super/subscript flags.
             inputs.click('text');inputs.key('Home');inputs.key('Right');inputs.key('shift+Right')
             inputs.click('text_superscript');inputs.click('text_subscript')
@@ -547,12 +642,12 @@ def test_cartesian_hosts_share_ticks_and_selected_character_formatting(tmp_path)
         finally:handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\nax.plot([0,1,2],[0,1,0],id='signal')\nax.set_title('a2b')\ndisplay(fig.widget())"
     with notebook(tmp_path/'text',source) as (page,execute):
-        page.locator('[data-properties]').click();page.locator('[data-target]').select_option('axis_bottom')
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose('axis_bottom')
         page.locator('[data-property=visible]').uncheck();page.locator('[data-property=tick_labels_visible]').uncheck();page.locator('[data-property=ticks_visible]').uncheck()
         for tick in ['None','Inside','Both','Outside']:
             page.locator('[data-property=tick_direction]').select_option(tick)
             execute('await fig.sync()');assert_axis(page.evaluate(ROOT+'.snapshot()'),tick)
-        page.locator('[data-target]').select_option('chart_title')
+        ObjectNavigator(page).choose('chart_title')
         def select_range(start,end):
             field=page.locator('[data-property=text]');field.focus()
             field.evaluate('(el,r)=>{el.setSelectionRange(...r);el.dispatchEvent(new Event("select"));}',[start,end])
@@ -657,10 +752,21 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
     source="import json\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.set_xlim(-1,3)\ndisplay(fig.widget())"
     with notebook(tmp_path/'scales',source) as (page,execute):
         page.locator('[data-properties]').click()
-        target=page.locator('[data-target]')
+        # Saved 0.17 settings must also pass the browser's local installer,
+        # before any kernel round trip can normalize the renderer stamp.
+        legacy = page.evaluate(ROOT+'.snapshot()')
+        legacy['renderer_version'] = '0.17.0'
+        legacy['config']['chart_title']['offset_x'] = 7
+        page.locator('[data-advanced]').evaluate('element=>element.open=true')
+        page.locator('[data-settings]').fill(json.dumps(legacy))
+        page.locator('[data-apply]').click()
+        page.wait_for_function(ROOT+'.snapshot().config.chart_title.offset_x===7')
+        assert page.evaluate(ROOT+'.snapshot().renderer_version') == '0.18.0'
+        page.locator('[data-advanced]').evaluate('element=>element.open=false')
+        target=ObjectNavigator(page)
         def choose(control, value):
             page.locator(f'[data-property={control}]').select_option(value);page.evaluate(ROOT+'.flush()')
-        target.select_option('axis_bottom');before=page.evaluate(ROOT+'.snapshot()')
+        target.choose('axis_bottom');before=page.evaluate(ROOT+'.snapshot()')
         choose('axis_scale','Logarithmic')
         assert_scale(page.evaluate(ROOT+'.snapshot()'),'bottom_x','Logarithmic')
         current=page.evaluate(ROOT+'.snapshot()')
@@ -668,12 +774,12 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         assert page.locator('[data-property=axis_scale]').input_value()=='Logarithmic'
         assert not page.locator('.figgy-error').inner_text()
         for name,key in [('axis_bottom','bottom_x'),('axis_left','left_y')]:
-            target.select_option(name)
+            target.choose(name)
             for scale in ['Logarithmic','Linear']:
                 choose('axis_scale',scale);assert_scale(page.evaluate(ROOT+'.snapshot()'),key,scale)
         # Both the field series and the colorbar itself expose the same controls.
-        target.select_option('field');assert page.locator('[data-property=color_scale]').count()==1
-        target.select_option('colorbar')
+        target.choose('field');assert page.locator('[data-property=color_scale]').count()==1
+        target.choose('colorbar')
         execute("s=fig.get_settings(); s['config']['colorbar']['axis']['min']=0; fig.apply_settings(s); await fig.sync()")
         choose('color_scale','Logarithmic')
         assert_scale(page.evaluate(ROOT+'.snapshot()'),'colorbar','Logarithmic')
@@ -739,7 +845,7 @@ def test_log_color_ui_masks_nonpositive_samples_in_both_hosts(tmp_path, positive
         original_series=page.evaluate(ROOT+'.snapshot().series')
         uploads=page.evaluate(ROOT+'.stats.column_uploads')
         page.locator('[data-properties]').click()
-        page.locator('[data-target]').select_option('colorbar')
+        ObjectNavigator(page).choose('colorbar')
         page.locator('[data-property=color_scale]').select_option('Logarithmic')
         page.evaluate(ROOT+'.flush()');execute('await fig.sync()')
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
@@ -807,7 +913,7 @@ def test_log_axis_ui_breaks_lines_at_nonpositive_samples_in_both_hosts(tmp_path)
     with notebook(tmp_path/'line-log-gap',source) as (page,execute):
         before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
         page.locator('[data-properties]').click()
-        page.locator('[data-target]').select_option('axis_left')
+        ObjectNavigator(page).choose('axis_left')
         page.locator('[data-property=axis_scale]').select_option('Logarithmic')
         page.evaluate(ROOT+'.flush()');execute('await fig.sync()')
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
@@ -935,7 +1041,7 @@ def test_empty_titles_can_be_enabled_edited_and_restored_in_both_hosts(tmp_path)
             page.locator('button[data-visibility]').click()
             check_enabled(page.evaluate(ROOT+'.snapshot()'),axis,label)
             assert page.locator('.figgy-properties').is_visible()
-            assert page.locator('[data-target]').input_value()==target
+            assert ObjectNavigator(page).selected()==target
             field=page.locator('[data-property=text]')
             assert field.input_value()==label
             field.focus();field.evaluate('(el)=>{el.select();el.dispatchEvent(new Event("select"));}')
@@ -1007,16 +1113,8 @@ for key in ['top_x','right_y']:
         try:
             inputs=Inputs(handle)
             def click_control(key):
-                for _ in range(16):
-                    info=inputs.info();controls=info['controls'];rect=controls.get(key)
-                    header=controls['object'];footer=controls['advanced']
-                    top=header[1]+header[3]+30;bottom=footer[1]-40
-                    if rect and top<rect[1] and rect[1]+rect[3]<bottom:
-                        inputs.click(key);return
-                    panel=info['chart_panel']
-                    inputs.xdo('mousemove','--window',inputs.wid,round(panel[0]+panel[2]+150),350)
-                    inputs.xdo('click',4 if rect and rect[1]<=top else 5);inputs.pump()
-                raise AssertionError(f'Control not visible: {key}')
+                # Inputs scrolls the actual property viewport, below the object tree.
+                inputs.click(key)
             def edit(target,field,value):
                 inputs.click_rect(inputs.info()['decorations'][target])
                 assert inputs.info()['selected']==target
@@ -1042,7 +1140,7 @@ for key in ['top_x','right_y']:
     with notebook(tmp_path/('paired_'+dimension),source) as (page,execute):
         page.locator('[data-properties]').click()
         def edit(target,field,value):
-            page.locator('[data-target]').select_option(target)
+            ObjectNavigator(page).choose(target)
             control=page.locator(f'[data-property={field}]')
             if field in ['label_format','tick_direction','axis_scale']: control.select_option(value)
             elif field=='tick_labels_visible': control.set_checked(value)
@@ -1060,3 +1158,1080 @@ for key in ['top_x','right_y']:
         code=page.locator('textarea[data-code]').input_value()
         assert code
         execute(f"code={code!r}; assert code==fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.plot([1,10,100],[1,10,100],id='signal'); exec(code,{{'fig':other}}); assert other.get_settings()['config']==fig.get_settings()['config']; other.close()")
+
+
+FEATURE_018 = {
+    'maps': "ax.scatter([0,1,2],[2,1,3],c=[1,2,4],s=[2,5,9],id='signal')",
+    'child_maps': "fig.set_layout([['empty','mapped']]); ax=fig.subplots['mapped'].axes; ax.scatter([0,1,2],[2,1,3],c=[1,2,4],s=[2,5,9],id='signal')",
+    'mixed_styles': "fig.set_layout([['line','field']]); ax=fig.subplots['line'].axes; ax.plot([0,1,2],[1,2,1],id='signal'); ax.set_draw_style('sketch'); fig.subplots['field'].imshow([[0,1],[1,0]],id='field')",
+    'vector_points': "ax.quiver([0,1,2],[0,2,1],[1,0,-1],[0,1,1],values=[1,2,3],scale=20,id='signal')",
+    'vector_grid': "ax.quiver([0,1],[0,1],[[1,0],[0,-1]],[[0,1],[1,0]],values=[[1,2],[3,4]],scale=20,id='signal')",
+    'fill_steps': "ax.fill_between([0,1,2],[2,4,3],[1,1,2],id='band'); ax.step([0,1,2],[1,2,1],where='post',id='signal')",
+    'polar': "ax.set_polar(); ax.plot([0,90,180,270,360],[1,2,3,2,1],id='signal'); ax.text(.5,.5,'Note',coords='ratio',id='note')",
+    'annotations': "ax.plot([0,1,2],[1,2,0],id='signal'); ax.axvspan(.5,1.,id='span'); ax.arrow(.2,.2,.4,.3,coords='ratio',id='arrow')",
+    'panels': "fig.set_layout([['left','right']]); ax=fig.subplots['left'].axes; ax.plot([0,1,2],[1,2,1],color='red',id='signal'); fig.subplots['right'].plot([0,1,2],[3,1,2],color='blue',id='other'); ax.activate()",
+    'secondary_y': "ax.plot([0,1,2],[1,2,1],id='signal'); twin=ax.twinx(id='pressure'); twin.plot([0,1,2],[100,200,150],color='red',id='other'); ax.activate()",
+}
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('feature', FEATURE_018)
+def test_renderer_018_features_display_edit_and_export_in_both_hosts(tmp_path, feature):
+    from PIL import Image
+    setup = FEATURE_018[feature]
+    with figgy.Figure(backend='native') as fig:
+        ax = fig.axes[0]
+        exec(setup, {'fig': fig, 'ax': ax})
+        handle = fig.show(block=False)
+        try:
+            inputs = Inputs(handle)
+            info = inputs.info()
+            assert info['surface_frames'] > 0 and not info['error']
+            assert fig.info['rgba_readbacks'] == fig.info['png_encodes'] == 0
+            # Settings acceptance redraws the actual surface with all panels.
+            state = fig.get_settings()
+            state['config']['grid']['show_major_x'] = False
+            fig.apply_settings(state)
+            inputs.pump()
+            assert not inputs.info()['error']
+            native = fig.render_rgba(scale=2)
+            assert native.shape == (1200, 1920, 4)
+            assert np.any(native[..., :3] < 150)
+            if feature == 'panels':
+                for half in (native[:, :960, :3], native[:, 960:, :3]):
+                    assert np.count_nonzero(half.max(axis=2)-half.min(axis=2) > 80) > 100
+        finally:
+            handle.close()
+            Inputs.pump()
+    source = "import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n" + setup + "\ndisplay(fig.widget())"
+    with notebook(tmp_path/feature, source) as (page, execute):
+        page.locator('[data-properties]').click()
+        page.locator('[data-advanced]').evaluate('(el)=>el.open=true')
+        state = page.evaluate(ROOT+'.snapshot()')
+        state['config']['grid']['show_major_x'] = False
+        page.locator('[data-settings]').fill(json.dumps(state))
+        page.locator('[data-apply]').click()
+        page.evaluate(ROOT+'.flush()')
+        execute('await fig.sync()')
+        assert not page.locator('.figgy-error').inner_text()
+        accepted = json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert accepted['schema_version'] == 2
+        assert not accepted['config']['grid']['show_major_x']
+        if feature == 'child_maps':
+            assert 'colorbar' not in accepted['config']
+            assert 'colorbar' not in page.evaluate(ROOT+'.snapshot().config')
+        if feature == 'panels':
+            ObjectNavigator(page).panel('right')
+            page.evaluate(ROOT+'.flush()')
+            assert page.evaluate(ROOT+'.snapshot().config.active_layer') == {'Subplot': 0}
+            ObjectNavigator(page).choose('subplot_0:chart_title')
+            title = page.locator('[data-property=text]')
+            title.fill('Right panel');title.dispatch_event('change')
+            page.evaluate(ROOT+'.flush()')
+            execute('await fig.sync()')
+            accepted = json.loads(execute('print(json.dumps(fig.get_settings()))'))
+            rich = accepted['config']['subplots'][0]['config']['chart_title']['text']
+            assert ''.join(s['text'] for s in rich['segments']) == 'Right panel'
+            assert not accepted['config']['chart_title']['text']['segments']
+        path = tmp_path/'export.png'
+        execute(f'await fig.savefig_async({str(path)!r},scale=2)')
+        pixels = np.asarray(Image.open(path).convert('RGB'))
+        assert pixels.shape == (1200, 1920, 3)
+        assert np.any(pixels < 150)
+        if feature == 'panels':
+            for half in (pixels[:, :960], pixels[:, 960:]):
+                assert np.count_nonzero(half.max(axis=2)-half.min(axis=2) > 80) > 100
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires X11 input tools and FIGGY_TEST_JUPYTER=1')
+@pytest.mark.parametrize('kind', ['cartesian', 'radar'])
+def test_annotation_layer_drag_and_endpoint_resize_match_hosts(tmp_path, kind):
+    import copy
+    setup = "ax.plot([0,1,2],[1,2,0],id='signal')" if kind == 'cartesian' else "ax.radar(['A','B','C'],[2,4,3])"
+    setup += "; ax.arrow(.25,.3,.25,.15,coords='ratio',id='arrow').select()"
+    if kind == 'cartesian': setup += "; ax.activate()"  # The annotation layer starts inactive.
+    def geometry(state):
+        owner = state['config'] if kind == 'cartesian' else state['radar']
+        return owner['annotations']['items'][0]['kind']['Arrow']
+    with figgy.Figure(backend='native') as fig:
+        exec(setup, {'fig': fig, 'ax': fig.axes[0]})
+        handle = fig.show(block=False)
+        try:
+            inputs = Inputs(handle)
+            target = 'annotation:arrow' if kind == 'cartesian' else 'annotation_0'
+            box = json.loads(fig._native.bounds_json(target))['rect']
+            original = copy.deepcopy(geometry(fig.get_settings()))
+            scale = inputs.info()['chart_panel'][2]/960
+            point = native_point(inputs.info(), (box[0]+box[2]/2, box[1]+box[3]/2))
+            drag_native(inputs, point, (12*scale, 6*scale))
+            moved = copy.deepcopy(geometry(fig.get_settings()))
+            assert moved['from'] != original['from'] and moved['to'] != original['to']
+            bounds = json.loads(fig._native.bounds_json(target))
+            endpoint = max(bounds['handles'], key=lambda r:r[0]+r[1])
+            point = native_point(inputs.info(), (endpoint[0]+endpoint[2]/2, endpoint[1]+endpoint[3]/2))
+            drag_native(inputs, point, (10*scale, 0))
+            resized = geometry(fig.get_settings())
+            assert resized['from'] == moved['from'] and resized['to'] != moved['to']
+            assert not inputs.info()['error']
+        finally:
+            handle.close();Inputs.pump()
+    source = "import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/kind, source) as (page, execute):
+        def screen(point):
+            if kind == 'radar':
+                return browser_point(page, point)
+            return page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""", point)
+        original = geometry(page.evaluate(ROOT+'.snapshot()'))
+        annotation = page.evaluate(ROOT+'.annotations()')[0]
+        box = annotation['rect']
+        start = screen([box[0]+box[2]/2, box[1]+box[3]/2])
+        page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+12,start[1]+6,steps=5);page.mouse.up()
+        page.evaluate(ROOT+'.flush()')
+        moved = geometry(page.evaluate(ROOT+'.snapshot()'))
+        assert moved['from'] != original['from'] and moved['to'] != original['to']
+        if page.locator('.figgy-properties').is_visible():
+            page.locator('[data-close-properties]').click()
+        annotation = page.evaluate(ROOT+'.annotations()')[0]
+        endpoint = max(annotation['handles'], key=lambda r:r[0]+r[1])
+        start = screen([endpoint[0]+endpoint[2]/2, endpoint[1]+endpoint[3]/2])
+        page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+10,start[1],steps=5);page.mouse.up()
+        page.evaluate(ROOT+'.flush()')
+        resized = geometry(page.evaluate(ROOT+'.snapshot()'))
+        assert resized['from'] == moved['from'] and resized['to'] != moved['to']
+        assert not page.locator('.figgy-error').inner_text()
+
+
+def choose_native_object(inputs, query, key):
+    inputs.click('object_search')
+    inputs.key('ctrl+a')
+    inputs.xdo('type', '--clearmodifiers', query)
+    inputs.pump()
+    inputs.click('tree:'+key)
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+def test_object_tree_routes_secondary_axes_and_reveals_canvas_selection(tmp_path):
+    setup = "fig.set_layout([['left','right']]); ax=fig.subplots['left'].axes; ax.plot([0,1,2],[1,2,1],label='Signal',id='signal'); ax.set_title('Overview'); right=fig.subplots['right'].axes; right.plot([0,1,2],[3,1,2],id='other'); right.set_title('Measurements'); twin=right.twinx(id='pressure_axis'); twin.plot([0,1,2],[100,200,150],label='Pressure readings',id='pressure'); ax.activate()"
+    with figgy.Figure(backend='native') as fig:
+        exec(setup, {'fig': fig})
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('properties')
+            root_title_rect=inputs.info()['decorations']['chart_title']
+            choose_native_object(inputs, 'pressure', 'series/pressure')
+            assert fig.get_settings()['config']['active_layer']=={'SubplotOverlay':[0,0]}
+            assert inputs.info()['selected']=='pressure'
+            assert 'object' not in inputs.info()['controls'] and 'active_layer' not in inputs.info()['controls']
+            choose_native_object(inputs, 'chart_title', 'panel/right/chart_title')
+            inputs.click('text');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','Edited measurements');inputs.pump()
+            state=fig.get_settings()
+            assert ''.join(s['text'] for s in state['config']['subplots'][0]['config']['chart_title']['text']['segments'])=='Edited measurements'
+            assert ''.join(s['text'] for s in state['config']['chart_title']['text']['segments'])=='Overview'
+            # Directly choosing a different panel on the canvas also reveals it.
+            # The first click enters the panel; the second edits its title.
+            inputs.click_rect(root_title_rect)
+            assert inputs.info()['focused_panel']=='left'
+            assert inputs.info()['selected'] is None
+            inputs.click_rect(root_title_rect)
+            assert fig.get_settings()['config'].get('active_layer','Base')=='Base'
+            assert inputs.info()['selected']=='chart_title'
+            assert 'tree:panel/left/chart_title' in inputs.info()['controls']
+            from PIL import ImageGrab
+            frame=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+            x,y,w,h=[int(frame[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+            ImageGrab.grab(bbox=(x,y,x+w,y+h),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-object-navigator.png')
+            assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+        finally:
+            handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'objects',source) as (page,execute):
+        initial=page.locator('canvas').bounding_box()
+        assert initial['width']<=960.5 and initial['height']/initial['width']==pytest.approx(600/960,abs=.002)
+        page.locator('[data-properties]').click()
+        assert page.locator('select[data-target], select[data-layer]').count()==0
+        nav=ObjectNavigator(page);nav.choose('pressure')
+        page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'SubplotOverlay':[0,0]}
+        assert page.locator('[data-object="pressure"]').get_attribute('aria-selected')=='true'
+        nav.choose('subplot_0:chart_title')
+        title=page.locator('[data-property=text]');title.fill('Edited measurements');title.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        execute('await fig.sync()')
+        state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert ''.join(s['text'] for s in state['config']['subplots'][0]['config']['chart_title']['text']['segments'])=='Edited measurements'
+        assert ''.join(s['text'] for s in state['config']['chart_title']['text']['segments'])=='Overview'
+        # Keyboard tree navigation is independent of chart arrow-key dragging.
+        search=page.locator('[data-object-search]');search.fill('Pressure readings');search.press('ArrowDown')
+        page.keyboard.press('Enter');page.evaluate(ROOT+'.flush()')
+        assert nav.selected()=='pressure'
+        # Inspector is docked outside the canvas, including on smaller outputs.
+        canvas=page.locator('canvas').bounding_box();inspector=page.locator('.figgy-properties').bounding_box()
+        assert inspector['x']>=canvas['x']+canvas['width']
+        assert page.evaluate(ROOT+'.stats.png_exports')==0
+        page.locator('.figgy-editor').screenshot(path=str(tmp_path/'object-navigator.png'))
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('family', ['boxplot','boxplot_horizontal','radar'])
+def test_bounded_value_range_wheel_and_fit_work_in_both_hosts(tmp_path, family):
+    kind='boxplot' if family.startswith('boxplot') else 'radar'
+    setup="ax.boxplot([[1,2,4],[2,5,9]],orientation=%r)"%('horizontal' if family.endswith('horizontal') else 'vertical') if kind=='boxplot' else "ax.radar(['A','B','C'],[2,4,3])"
+    with figgy.Figure(backend='native') as fig:
+        exec(setup, {'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle)
+            before=fig.get_settings()[kind]
+            rect=inputs.info()['decorations']['data_area'];point=native_point(inputs.info(),(rect[0]+rect[2]/2,rect[1]+rect[3]/2))
+            inputs.xdo('mousemove','--window',inputs.wid,*map(round,point));inputs.pump();inputs.xdo('click',4);inputs.pump()
+            after=fig.get_settings()[kind]
+            assert after['value_range'] is not None
+            assert after['series']==before['series']
+            panel_before=inputs.info()['chart_panel']
+            inputs.click('properties');assert 'range_min' in inputs.info()['controls']
+            assert inputs.info()['chart_panel']==panel_before
+            inputs.click('fit');assert fig.get_settings()[kind]['value_range'] is None
+            assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/family,source) as (page,execute):
+        original=page.evaluate(ROOT+'.snapshot()')[kind]
+        area=page.evaluate('async()=> (await '+ROOT+'.decorations()).find(v=>v.id==="data_area").rect')
+        page.mouse.move(*browser_point(page,(area[0]+area[2]/2,area[1]+area[3]/2)));page.mouse.wheel(0,-40)
+        page.wait_for_function(ROOT+f'.snapshot().{kind}.value_range !== null')
+        page.evaluate(ROOT+'.flush()')
+        state=page.evaluate(ROOT+'.snapshot()')[kind]
+        assert state['series']==original['series']
+        page.locator('[data-properties]').click();minimum=page.locator('[data-property=range_min]');assert minimum.is_visible()
+        page.locator('[data-fit]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+f'.snapshot().{kind}.value_range') is None
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('family', ['cartesian', 'log_inverted', 'boxplot', 'boxplot_horizontal', 'categorical', 'radial', 'radar', 'polar'])
+def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
+    """Real gestures create one SSOT edit, never a document per preview frame."""
+    setup = {
+        'cartesian': "ax.plot([0,1,2],[1,3,2]);ax.set_xlim(0,2);ax.set_ylim(0,4)",
+        'log_inverted': "ax.plot([1,10,100],[1,10,100]);ax.set_xlim(1,100);ax.set_ylim(1,100);ax.set_xscale('log');fig.configure(config={k:{'inverted':True} for k in ['bottom_x','top_x']})",
+        'boxplot': "ax.boxplot([[1,2,4],[2,5,9]])",
+        'boxplot_horizontal': "ax.boxplot([[1,2,4],[2,5,9]],orientation='horizontal')",
+        'categorical': "ax.bar(['A','B','C'],[2,4,3])",
+        'radial': "ax.donut([2,3,4])",
+        'radar': "ax.radar(['A','B','C'],[2,4,3])",
+        'polar': "ax.set_polar();ax.plot([0,1,2],[1,2,1])",
+    }[family]
+    kind = 'boxplot' if family.startswith('boxplot') else family if family in {'categorical','radial','radar'} else None
+    horizontal = family == 'boxplot_horizontal'
+    axes = [horizontal, not horizontal] if kind in {'boxplot','categorical'} else [False,False] if family in {'radial','radar','polar'} else [True,True]
+    tools = ['arrow'] + (['vline','vspan'] if axes[0] else []) + (['hline','hspan'] if axes[1] else [])
+    def owner(state): return state[kind] if kind else state['config']
+    def items(state): return owner(state).get('annotations',{}).get('items',[])
+    with figgy.Figure(backend='native') as fig:
+        exec(setup, {'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('draw');revision=fig.revision
+            inputs.click('layout_mode');inputs.click('draw_arrow')
+            assert not inputs.info()['layout_mode'] and inputs.info()['drawing_tool']=='arrow'
+            if family=='radial':
+                # Switching between plot windows must retain the armed tool.
+                with figgy.Figure(backend='native') as other:
+                    other.axes[0].plot([0,1],[0,1]);other_handle=other.show(block=False)
+                    try:
+                        Inputs(other_handle)
+                        assert inputs.info()['drawing_tool']=='arrow'
+                    finally:other_handle.close();Inputs.pump()
+                inputs.xdo('windowraise',inputs.wid);inputs.xdo('windowfocus',inputs.wid);inputs.pump()
+            start=native_point(inputs.info(),(330,240));end=native_point(inputs.info(),(490,340))
+            inputs.xdo('mousemove','--window',inputs.wid,*map(round,start));inputs.pump();inputs.xdo('mousedown',1);inputs.pump()
+            inputs.xdo('mousemove','--window',inputs.wid,*map(round,end));inputs.pump()
+            assert fig.revision==revision and not items(fig.get_settings())
+            inputs.key('Escape');inputs.xdo('mouseup',1);inputs.pump()
+            assert not items(fig.get_settings())
+            # The existing bounded hover route may resume after cancellation.
+            if kind is None:assert fig.revision==revision
+            inputs.click('draw_text');revision=fig.revision;point=native_point(inputs.info(),(330,240))
+            inputs.click_rect([point[0]-1,point[1]-1,2,2])
+            assert 'inline_text' in inputs.info()['controls'] and not items(fig.get_settings())
+            inputs.xdo('type','--clearmodifiers','Discard this');inputs.pump();inputs.key('Escape')
+            assert not items(fig.get_settings())
+            if kind is None: assert fig.revision==revision
+            inputs.click('draw_text');inputs.click_rect([point[0]-1,point[1]-1,2,2])
+            draft_revision=fig.revision
+            inputs.xdo('type','--clearmodifiers','Review this region');inputs.pump()
+            assert not items(fig.get_settings()) and fig.revision==draft_revision
+            assert not inputs.info()['properties_open']
+            inputs.key('Return');assert len(items(fig.get_settings()))==1
+            assert ''.join(v['text'] for v in items(fig.get_settings())[0]['kind']['Text']['text']['segments'])=='Review this region'
+            # Editing is a second transaction; Escape retains both content and revision.
+            revision=fig.revision
+            def edit_native_text():
+                inputs.xdo('mousemove','--window',inputs.wid,round(point[0]+20),round(point[1]+8));inputs.pump()
+                inputs.xdo('click','--repeat',2,'--delay',100,1);inputs.pump()
+                assert 'inline_text' in inputs.info()['controls'], inputs.info()
+            edit_native_text();inputs.xdo('type','--clearmodifiers','Cancelled replacement');inputs.pump();inputs.key('Escape')
+            if kind is None: assert fig.revision==revision
+            assert ''.join(v['text'] for v in items(fig.get_settings())[0]['kind']['Text']['text']['segments'])=='Review this region'
+            edit_native_text();inputs.key('End');inputs.xdo('type','--clearmodifiers',' again');inputs.pump();inputs.key('Return')
+            assert ''.join(v['text'] for v in items(fig.get_settings())[0]['kind']['Text']['text']['segments'])=='Review this region again'
+            assert not inputs.info()['properties_open']
+            if any(axes):
+                revision=fig.revision;inputs.click('draw_data_anchor');assert fig.revision==revision
+            for tool in tools:
+                inputs.click('draw_'+tool)
+                assert inputs.info()['drawing_tool']==tool, inputs.info()
+                start=native_point(inputs.info(),(340,260));end=native_point(inputs.info(),(510,360))
+                count=len(items(fig.get_settings()));drag_native(inputs,start,(end[0]-start[0],end[1]-start[1]))
+                assert len(items(fig.get_settings()))==count+1, inputs.info()
+                if tool=='arrow':
+                    assert ('Data' if any(axes) else 'Ratio') in items(fig.get_settings())[-1]['kind']['Arrow']['from']
+                    assert 'head_length' in inputs.info()['controls']
+            saved=fig.get_settings();ids=[i['id'] for i in items(saved)];assert len(ids)==len(set(ids))
+            assert owner(saved)['active_layer']=='Annotations'
+            inputs.click('delete_annotation');assert len(items(fig.get_settings()))==len(ids)-1
+            assert not inputs.info()['error']
+            assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/family,source) as (page,execute):
+        page.locator('[data-draw]').click()
+        for name,allowed in [('vline',axes[0]),('vspan',axes[0]),('hline',axes[1]),('hspan',axes[1])]:
+            assert page.locator(f'[data-tool={name}]').is_enabled()==allowed
+        page.locator('[data-layout]').click();page.locator('[data-tool=arrow]').click()
+        assert page.locator('[data-layout]').get_attribute('aria-pressed')=='false'
+        assert page.locator('[data-select]').get_attribute('aria-pressed')=='false'
+        if family=='radial':
+            other=page.context.new_page()
+            try:other.bring_to_front()
+            finally:other.close();page.bring_to_front()
+            assert page.locator('[data-tool=arrow]').get_attribute('aria-pressed')=='true'
+        r=page.locator('canvas').bounding_box()
+        page.mouse.move(r['x']+r['width']*.35,r['y']+r['height']*.4);page.mouse.down();page.mouse.move(r['x']+r['width']*.55,r['y']+r['height']*.6)
+        page.wait_for_function("document.querySelector('.figgy-drawing-preview').childElementCount>0")
+        assert not items(page.evaluate(ROOT+'.snapshot()'))
+        page.keyboard.press('Escape');page.mouse.up();assert not items(page.evaluate(ROOT+'.snapshot()'))
+        def place_browser_text():
+            page.locator('[data-tool=text]').click();r=page.locator('canvas').bounding_box()
+            page.mouse.click(r['x']+r['width']*.35,r['y']+r['height']*.4)
+            page.locator('[data-inline-text]').wait_for(state='visible')
+            page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
+        place_browser_text();entry=page.locator('[data-inline-text]');entry.fill('Discard this');entry.press('Escape')
+        assert not items(page.evaluate(ROOT+'.snapshot()'))
+        place_browser_text();entry.fill('Review this region')
+        assert not items(page.evaluate(ROOT+'.snapshot()'))
+        assert not page.locator('.figgy-properties').is_visible()
+        screenshot_editor(page,tmp_path/f'{family}-inline-text.png')
+        entry.press('Enter');page.evaluate(ROOT+'.flush()')
+        assert not page.locator('.figgy-error').inner_text()
+        assert ''.join(v['text'] for v in items(page.evaluate(ROOT+'.snapshot()'))[0]['kind']['Text']['text']['segments'])=='Review this region'
+        def edit_browser_text():
+            page.wait_for_function('async()=> (await '+ROOT+'.annotations()).length===1')
+            rect=page.evaluate(ROOT+'.annotations()')[0]['rect'];page.mouse.dblclick(*browser_point(page,(rect[0]+20,rect[1]+8)))
+            entry.wait_for(state='visible');page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
+        edit_browser_text();entry.fill('Cancelled replacement');entry.press('Escape');page.evaluate(ROOT+'.flush()')
+        assert ''.join(v['text'] for v in items(page.evaluate(ROOT+'.snapshot()'))[0]['kind']['Text']['text']['segments'])=='Review this region'
+        edit_browser_text();entry.press('End');entry.press('ArrowRight');entry.type(' again');entry.press('Enter');page.evaluate(ROOT+'.flush()')
+        assert ''.join(v['text'] for v in items(page.evaluate(ROOT+'.snapshot()'))[0]['kind']['Text']['text']['segments'])=='Review this region again'
+        assert not page.locator('.figgy-properties').is_visible()
+        if any(axes):page.locator('[data-anchor-data]').check()
+        for tool in tools:
+            page.locator(f'[data-tool={tool}]').click();r=page.locator('canvas').bounding_box();count=len(items(page.evaluate(ROOT+'.snapshot()')))
+            page.mouse.move(r['x']+r['width']*.36,r['y']+r['height']*.44);page.mouse.down();page.mouse.move(r['x']+r['width']*.55,r['y']+r['height']*.6,steps=4);page.mouse.up()
+            page.wait_for_function(ROOT+f'.snapshot().{kind or "config"}.annotations.items.length==={count+1}')
+            page.evaluate(ROOT+'.flush()')
+            assert not page.locator('.figgy-error').inner_text()
+            if tool=='arrow':
+                assert ('Data' if any(axes) else 'Ratio') in items(page.evaluate(ROOT+'.snapshot()'))[-1]['kind']['Arrow']['from']
+                field=page.locator('[data-property=head_length]');field.fill('14');field.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+                page.locator('[data-property=line_style]').select_option('Dash');page.evaluate(ROOT+'.flush()')
+                assert items(page.evaluate(ROOT+'.snapshot()'))[-1]['kind']['Arrow']['style']['head_length']==14
+        execute('await fig.sync()');state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert items(state)==items(page.evaluate(ROOT+'.snapshot()'))
+        count=len(items(state));page.locator('[data-delete-annotation]').click();page.evaluate(ROOT+'.flush()')
+        assert len(items(page.evaluate(ROOT+'.snapshot()')))==count-1
+        assert page.evaluate(ROOT+'.stats.png_exports')==0
+        screenshot_editor(page,tmp_path/f'{family}-drawing.png')
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('family', ['cartesian', 'radial'])
+def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path, family):
+    """Drafts survive resizing; editing an ordinary Python-owned layer needs no tree."""
+    setup = "ax.plot([0,1,2],[1,3,2])" if family == 'cartesian' else "ax.donut([2,3,4])"
+    kind = 'radial' if family == 'radial' else 'config'
+    def annotation(state): return state[kind]['annotations']['items'][0]
+    def content(state): return ''.join(v['text'] for v in annotation(state)['kind']['Text']['text']['segments'])
+    with figgy.Figure(backend='native') as fig:
+        exec(setup, {'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('draw');inputs.click('draw_text')
+            point=native_point(inputs.info(),(850,510));inputs.click_rect([point[0]-1,point[1]-1,2,2])
+            inputs.xdo('type','--clearmodifiers','First');inputs.pump();inputs.key('shift+Return')
+            inputs.xdo('type','--clearmodifiers','Second');inputs.pump()
+            inputs.xdo('windowsize',inputs.wid,780,590);inputs.pump()
+            assert 'inline_text' in inputs.info()['controls']
+            rect=inputs.info()['controls']['inline_text'];width,height=inputs.info()['surface_size']
+            assert rect[0]>=0 and rect[1]>=0 and rect[0]+rect[2]<=width+1 and rect[1]+rect[3]<=height+1
+            inputs.key('Return');assert content(fig.get_settings())=='First\nSecond'
+            state=fig.get_settings();state[kind]['active_layer']='Base'
+            annotation(state)['kind']['Text']['text']['segments'][0]['bold']=True
+            fig.apply_settings(state);inputs.pump()
+            # Direct hit routing must reveal text even when its annotation layer is inactive.
+            point=native_point(inputs.info(),(850,510))
+            inputs.xdo('mousemove','--window',inputs.wid,round(point[0]+8),round(point[1]+6));inputs.pump()
+            inputs.xdo('click','--repeat',2,'--delay',100,1);inputs.pump()
+            assert 'inline_text' in inputs.info()['controls'],inputs.info()
+            inputs.key('ctrl+End');inputs.xdo('type','--clearmodifiers','!');inputs.pump()
+            # Clicking outside applies the pending text once, without starting a canvas drag.
+            inputs.click('draw')
+            assert content(fig.get_settings())=='First\nSecond!'
+            assert annotation(fig.get_settings())['kind']['Text']['text']['segments'][0]['bold']
+            assert not inputs.info()['error']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/family,source) as (page,execute):
+        page.locator('[data-draw]').click();page.locator('[data-tool=text]').click()
+        page.mouse.click(*browser_point(page,(850,510)));entry=page.locator('[data-inline-text]');entry.wait_for(state='visible')
+        entry.fill('First');entry.press('Shift+Enter');entry.type('Second')
+        from layout_probe import arm_browser
+        from inline_editor_harness import OBSERVE, wait_surface, assert_contained
+        arm_browser(page)
+        page.set_viewport_size({'width':980,'height':820})
+        wait_surface(page,(980,820))
+        state=page.evaluate(OBSERVE)
+        (tmp_path/'inline-editor-resize.json').write_text(json.dumps(state,indent=2))
+        assert state['focused'] and state['value']=='First\nSecond'
+        assert_contained(state)
+        # Enter used by an IME must not confirm or discard its current composition.
+        entry.dispatch_event('keydown',{'key':'Enter','code':'Enter','isComposing':True})
+        assert entry.is_visible()
+        entry.press('Enter');page.evaluate(ROOT+'.flush()')
+        assert not page.locator('.figgy-error').inner_text()
+        assert content(page.evaluate(ROOT+'.snapshot()'))=='First\nSecond'
+        execute("state=fig.get_settings();state['"+kind+"']['active_layer']='Base';state['"+kind+"']['annotations']['items'][0]['kind']['Text']['text']['segments'][0]['bold']=True;fig.apply_settings(state);print('updated')")
+        page.wait_for_function(f'({ROOT}.snapshot().{kind}.active_layer??"Base")==="Base" && {ROOT}.snapshot().{kind}.annotations.items[0].kind.Text.text.segments[0].bold===true')
+        page.wait_for_function('async()=> (await '+ROOT+'.annotations()).length===1')
+        rect=page.evaluate(ROOT+'.annotations()')[0]['rect'];canvas=page.locator('canvas').bounding_box()
+        # Cartesian geometry is in current physical canvas pixels; bounded maps use document units.
+        size=[960,600] if family=='radial' else page.locator('canvas').evaluate('c=>[c.width,c.height]')
+        page.mouse.dblclick(canvas['x']+(rect[0]+8)*canvas['width']/size[0],canvas['y']+(rect[1]+6)*canvas['height']/size[1])
+        entry.wait_for(state='visible');page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
+        entry.press('Control+End');entry.type('!');page.locator('[data-draw]').click();page.evaluate(ROOT+'.flush()')
+        assert content(page.evaluate(ROOT+'.snapshot()'))=='First\nSecond!'
+        assert annotation(page.evaluate(ROOT+'.snapshot()'))['kind']['Text']['text']['segments'][0]['bold']
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real Jupyter WebGPU widget')
+@pytest.mark.parametrize('dpr',[1,2])
+def test_inline_editor_resize_uses_current_units_and_applies_real_edits(tmp_path,dpr):
+    """Exercise queued resizes, actual draft edits, application and cancellation.
+
+    Automatic chart layout may retain history. This checks the inline editor's
+    document-unit font at document width, not whole-chart round-trip equality.
+    """
+    from inline_editor_harness import ROOT as host, instrumented_source, OBSERVE, wait_surface, observe, assert_contained, open_existing
+    source="""import json
+import figgyplot as fg
+fig,ax=fg.subplots(backend='webgpu')
+ax.plot([0,1,2],[1,3,2],id='signal')
+ax.text(.95,.95,'Probe',coords='ratio',fontsize=16*72/fig.dpi,id='probe')
+"""+instrumented_source(tmp_path)
+    with notebook(tmp_path/'inline-resize-contract',source) as (page,execute):
+        entry=open_existing(page)
+        entry.fill('First\nSecond')
+        before=observe(page,tmp_path,'before-resize')
+        original=before['renderer']['config']['annotations']['items'][0]
+        page.set_viewport_size({'width':640,'height':600})
+        wait_surface(page,(640,600))
+        # Hold the existing host queue so CSS layout necessarily changes before
+        # the GPU backing resize. This is a legal scheduling order, not a repair.
+        page.evaluate(host+'.testHoldQueue()')
+        previous_width=page.locator('canvas').evaluate('c=>c.width')
+        try:
+            page.set_viewport_size({'width':1500,'height':1000})
+            page.wait_for_function("document.querySelector('.figgy-editor canvas').getBoundingClientRect().width===960",polling=20)
+            page.wait_for_function(host+'.diagnostics().queued>0',polling=20)
+            page.wait_for_function("previous=>window.__figgyInlinePass?.cssWidth===960&&window.__figgyInlinePass?.backingWidth===previous",arg=previous_width,polling=20)
+            pending=page.evaluate(OBSERVE)
+            (tmp_path/'queued-resize.json').write_text(json.dumps(pending,indent=2))
+            assert pending['font']==16,pending
+        finally:
+            page.evaluate(host+'.testReleaseQueue()')
+        wait_surface(page,(1500,1000))
+        after=observe(page,tmp_path,'after-resize')
+        assert after['renderer']['config']['annotations']['items'][0]==original
+        assert after['font']==16 and after['focused'] and after['value']=='First\nSecond'
+        assert_contained(after)
+        # Changing DPR alone must update backing pixels without changing the
+        # authored font or the CSS-space font at the requested document width.
+        session=page.context.new_cdp_session(page)
+        session.send('Emulation.setDeviceMetricsOverride',dict(width=1500,height=1000,deviceScaleFactor=dpr,mobile=False))
+        wait_surface(page,(1500,1000),dpr)
+        for text in ('First\nSecond','\n'.join('Line '+str(n) for n in range(8)),'Pressure 10⁻⁶ Torr / μm °C '*8):
+            entry.fill(text)
+            for width,height in ((980,820),(640,600),(1500,1000)):
+                session.send('Emulation.setDeviceMetricsOverride',dict(width=width,height=height,deviceScaleFactor=dpr,mobile=False))
+                wait_surface(page,(width,height),dpr)
+                state=observe(page,tmp_path,f'layout-{len(text)}-{width}')
+                assert state['renderer']['config']['annotations']['items'][0]==original
+                assert state['value']==text and state['focused']
+                assert_contained(state)
+                if width==1500:assert state['font']==16,state
+        # Actual pointer/keyboard actions must produce the intended accepted
+        # document, independently of whether a screenshot can be captured.
+        entry.fill('First\nSecond');entry.click();entry.press('Control+End');entry.type('!');entry.press('Enter')
+        page.evaluate(host+'.flush()')
+        applied=observe(page,tmp_path,'after-apply')
+        item=applied['renderer']['config']['annotations']['items'][0]
+        assert ''.join(s['text'] for s in item['kind']['Text']['text']['segments'])=='First\nSecond!'
+        assert item['kind']['Text']['text']['font_size']==16
+        python_state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert python_state==applied['renderer']
+        entry=open_existing(page);entry.press('Control+End');entry.type(' discard');entry.press('Escape')
+        page.evaluate(host+'.flush()')
+        cancelled=observe(page,tmp_path,'after-cancel')
+        assert cancelled['renderer']['config']['annotations']['items'][0]==item
+        assert not entry.is_visible()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_grid_focus_routes_visible_axes_and_data_without_tree(tmp_path, backend):
+    """A chart click enters it without editing; visible data choose their owner."""
+    setup = """
+fig.set_layout([['overview','measurements'],['residuals','spectrum']], gap=16)
+ax=fig.subplots['overview'].axes
+ax.plot([0,1,2],[1,3,2],id='overview_line')
+ax.set_title('Overview')
+right=fig.subplots['measurements'].axes
+right.plot([2,5,8],[2,8,4],id='signal',label='Signal')
+right.set_title('Measurements')
+twin=right.twinx(id='pressure_axis')
+twin.plot([2,5,8],[850,600,250],id='pressure',label='Pressure',color='red')
+fig.subplots['residuals'].axes.plot([0,1,2],[-.1,.2,-.1],id='residual')
+fig.subplots['residuals'].axes.set_title('Residuals')
+fig.subplots['spectrum'].axes.plot([0,1,2],[1,4,2],id='spectrum')
+fig.subplots['spectrum'].axes.set_title('Spectrum')
+right.set_xlim(0,10);right.set_ylim(0,10);twin.set_ylim(0,1000)
+ax.activate()
+"""
+    def data_point(rect, x, y):
+        # Renderer selection bounds include a two-pixel selection padding.
+        a,b,w,h=rect
+        return a+2+(w-4)*x,b+2+(h-4)*(1-y)
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup, {'fig':fig})
+            before=fig.get_settings();handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);uploads=fig.info['column_uploads']
+                assert inputs.info()['focused_panel'] is None
+                r=before['config']['subplots'][0]['config']['chart_area']
+                center=native_point(inputs.info(),(r['x']+r['width']/2,r['y']+r['height']/2))
+                drag_native(inputs,center,(12,8))
+                assert inputs.info()['focused_panel']=='measurements'
+                assert inputs.info()['selected'] is None and not inputs.info()['properties_open']
+                state=fig.get_settings()
+                assert state['config']['subplots']==before['config']['subplots']
+                area=inputs.info()['decorations']['subplot_0:data_area']
+                pressure=data_point(area,.5,.6)
+                inputs.click_rect([*pressure,0,0])
+                assert inputs.info()['selected']=='pressure'
+                from PIL import ImageGrab
+                window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+                sx,sy,sw,sh=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+                ImageGrab.grab(bbox=(sx,sy-20,sx+sw,sy+sh-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-grid-direct-selection.png')
+                assert fig.get_settings()['config']['active_layer']=={'SubplotOverlay':[0,0]}
+                # A click on the primary line switches back automatically.
+                inputs.click_rect([*data_point(area,.5,.8),0,0])
+                assert inputs.info()['selected']=='signal'
+                assert fig.get_settings()['config']['active_layer']=={'Subplot':0}
+                # The right-hand axis belongs to the visible secondary scale.
+                inputs.click_rect([area[0]+area[2]-2,area[1]+area[3]*.37,0,0])
+                if inputs.info()['choice_candidates']:
+                    inputs.click('choose:element/subplot_0:overlay_0:axis_right')
+                assert inputs.info()['selected']=='subplot_0:overlay_0:axis_right'
+                assert fig.get_settings()['config']['active_layer']=={'SubplotOverlay':[0,0]}
+                old=fig.get_settings()
+                inputs.xdo('mousemove','--window',inputs.wid,*map(round,data_point(area,.4,.5)));inputs.pump()
+                inputs.xdo('keydown','Shift_L');inputs.xdo('click',4);inputs.xdo('keyup','Shift_L');inputs.pump()
+                changed=fig.get_settings()
+                assert changed['config']['subplots'][0]['config']['overlays'][0]['y_axis']['max']!=old['config']['subplots'][0]['config']['overlays'][0]['y_axis']['max']
+                assert changed['config']['subplots'][0]['config']['left_y']==old['config']['subplots'][0]['config']['left_y']
+                assert changed['config']['left_y']==old['config']['left_y']
+                inputs.key('Escape')
+                assert inputs.info()['focused_panel'] is None and inputs.info()['selected'] is None
+                # Wheel is inert until the user enters a chart again.
+                old=fig.get_settings();inputs.xdo('click',4);inputs.pump()
+                assert fig.get_settings()['config']==old['config']
+                inputs.click_rect([*native_point(inputs.info(),(100,100)),0,0])
+                assert inputs.info()['focused_panel']=='overview'
+                # The grid gutter clears focus instead of editing a neighbor.
+                inputs.click_rect([*native_point(inputs.info(),(480,150)),0,0])
+                assert inputs.info()['focused_panel'] is None
+                assert fig.info['column_uploads']==uploads
+                assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source="import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'grid-focus',source) as (page,execute):
+        def click(point):
+            # Cartesian decoration geometry uses current physical canvas pixels.
+            screen=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",point)
+            page.mouse.click(*screen);page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel') is None
+        before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        page.mouse.click(*browser_point(page,(720,150)));page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='measurements'
+        assert page.locator('.figgy-properties').is_hidden()
+        assert page.evaluate(ROOT+'.snapshot().config.subplots')==before['config']['subplots']
+        area=page.evaluate(ROOT+'.decorations()')['subplot_0:data_area']['rect']
+        click(data_point(area,.5,.6))
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'SubplotOverlay':[0,0]}
+        assert ObjectNavigator(page).selected()=='pressure'
+        page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-grid-direct-selection.png'))
+        area=page.evaluate(ROOT+'.decorations()')['subplot_0:data_area']['rect']
+        click(data_point(area,.5,.8))
+        assert ObjectNavigator(page).selected()=='signal', (area,page.evaluate(ROOT+'.stats'),page.evaluate(ROOT+'.snapshot().config.active_layer'))
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'Subplot':0}
+        click([area[0]+area[2]-2,area[1]+area[3]*.37])
+        if page.locator('.figgy-target-chooser').is_visible():
+            page.locator('[data-choice="element/subplot_0:overlay_0:axis_right"]').click();page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='subplot_0:overlay_0:axis_right'
+        old=page.evaluate(ROOT+'.snapshot()')
+        point=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",data_point(area,.4,.5))
+        page.mouse.move(*point);page.keyboard.down('Shift');page.mouse.wheel(0,-40);page.keyboard.up('Shift');page.evaluate(ROOT+'.flush()')
+        changed=page.evaluate(ROOT+'.snapshot()')
+        assert changed['config']['subplots'][0]['config']['overlays'][0]['y_axis']['max']!=old['config']['subplots'][0]['config']['overlays'][0]['y_axis']['max']
+        assert changed['config']['subplots'][0]['config']['left_y']==old['config']['subplots'][0]['config']['left_y']
+        assert changed['config']['left_y']==old['config']['left_y']
+        page.locator('canvas').press('Escape');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel') is None
+        old=page.evaluate(ROOT+'.snapshot().config');page.mouse.wheel(0,-40);page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot().config')==old
+        canvas=page.locator('canvas');size=canvas.bounding_box()
+        canvas.click(position={'x':100*size['width']/960,'y':100*size['height']/600});page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='overview'
+        size=canvas.bounding_box();canvas.click(position={'x':480*size['width']/960,'y':150*size['height']/600});page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel') is None
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+        assert not page.locator('.figgy-error').inner_text()
+        execute('await fig.sync()')
+        assert json.loads(execute('print(json.dumps(fig.get_settings()))'))['config'].get('active_layer','Base')=='Base'
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_coincident_series_chooser_is_view_only_until_commit(tmp_path, backend):
+    """All same-axis and secondary-axis hits remain reachable without reordering."""
+    setup = """
+ax=fig.axes[0]
+ax.plot([1,5,9],[5,5,5],id='red',label='Signal',color='red')
+blue=json.loads(json.dumps(fig.get_settings()['series'][0]))
+blue['series_id']='blue'
+blue['render_type']['Line']['line']['line_color']={'r':0.,'g':0.,'b':1.,'a':1.}
+fig._native.add_series_fitted(json.dumps(blue),None,[0.,10.,0.,10.])
+twin=ax.twinx(id='pressure_axis')
+twin.plot([1,5,9],[50,50,50],id='pressure',label='Pressure',color='green')
+ax.set_xlim(0,10);ax.set_ylim(0,10);twin.set_ylim(0,100)
+ax.set_title('Overlapping signals');ax.legend();ax.activate()
+s=fig.get_settings()
+s['series'][0]['render_type']['Line']['line']['fill']={'ToSeries':'blue'}
+fig.apply_settings(s)
+"""
+    def point(rect):
+        x,y,w,h=rect
+        return x+w/2,y+h/2
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig,'json':json});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();revision=fig.revision;uploads=fig.info['column_uploads']
+                inputs.click_rect([*point(inputs.info()['decorations']['data_area']),0,0])
+                choices=inputs.info()['choice_candidates']
+                assert {c['key'] for c in choices}=={'series/red','series/blue','series/pressure'},inputs.info()
+                assert fig.get_settings()==before and fig.revision==revision
+                inputs.input_frame('mousemove','--window',inputs.wid,*map(round,point(inputs.info()['controls']['choose:series/blue'])))
+                assert inputs.info()['choice_preview']=='series/blue'
+                assert fig.get_settings()==before and fig.revision==revision
+                from PIL import ImageGrab
+                window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+                x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+                ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-overlap-chooser.png')
+                inputs.key('Escape');assert inputs.info()['choice_candidates'] is None
+                assert fig.get_settings()==before and fig.revision==revision
+                inputs.click_rect([*point(inputs.info()['decorations']['data_area']),0,0])
+                inputs.click('choose:series/red')
+                assert inputs.info()['selected']=='red' and inputs.info()['properties_open']
+                state=fig.get_settings();assert state['config']['picked_data']['refs'][0]['series_id']=='red'
+                assert state['series']==before['series']
+                assert state['config']['legend']==before['config']['legend']
+                # Selection stays available through the tree, including duplicate labels.
+                assert fig.info['column_uploads']==uploads
+                assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source="import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'coincident',source) as (page,execute):
+        def click_center():
+            area=page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+            p=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",point(area))
+            page.mouse.click(*p);page.evaluate(ROOT+'.flush()')
+        before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        click_center()
+        assert {c['key'] for c in page.evaluate(ROOT+'.stats.choice_candidates')}=={'series/red','series/blue','series/pressure'},page.evaluate(ROOT+'.stats')
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.locator('[data-choice="series/blue"]').hover();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.choice_preview')=='series/blue'
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-overlap-chooser.png'))
+        page.keyboard.press('ArrowDown');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.choice_preview')!='series/blue'
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.keyboard.press('Escape');page.evaluate(ROOT+'.flush()')
+        assert page.locator('.figgy-target-chooser').is_hidden()
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        click_center();page.locator('[data-choice="series/red"]').click();page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='red'
+        state=page.evaluate(ROOT+'.snapshot()')
+        assert state['config']['picked_data']['refs'][0]['series_id']=='red'
+        assert state['series']==before['series'] and state['config']['legend']==before['config']['legend']
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_fully_overlapping_panels_keep_the_chosen_chart(tmp_path, backend):
+    """Choose a rear chart once; subsequent canvas clicks keep its ownership."""
+    setup="""
+fig.set_layout([['rear','front']])
+for id,name in [('rear','Rear chart'),('front','Front chart')]:
+    ax=fig.subplots[id].axes
+    ax.plot([1,5,9],[5,5,5],id=id+'_line',label=name)
+    ax.set_title(name);ax.set_xlim(0,10);ax.set_ylim(0,10)
+fig.subplots['rear'].set_rect(0,0,960,600)
+fig.subplots['front'].set_rect(0,0,960,600)
+fig.subplots['rear'].axes.activate()
+"""
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig,'json':json});handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();revision=fig.revision
+                inputs.click_rect([*native_point(inputs.info(),(300,200)),0,0])
+                assert {c['key'] for c in inputs.info()['choice_candidates']}=={'panel/rear','panel/front'}
+                assert fig.get_settings()==before and fig.revision==revision
+                inputs.click('choose:panel/rear')
+                assert inputs.info()['focused_panel']=='rear'
+                rect=inputs.info()['decorations']['data_area']
+                inputs.click_rect([rect[0]+rect[2]/2,rect[1]+rect[3]/2,0,0])
+                assert inputs.info()['selected']=='rear_line'
+                assert inputs.info()['focused_panel']=='rear'
+                inputs.click('switch_chart');inputs.click('choose:panel/front')
+                assert inputs.info()['focused_panel']=='front'
+                assert fig.get_settings()['config']['active_layer']=={'Subplot':0}
+                # A tree choice of the covered chart also owns following canvas input.
+                inputs.click('object_search');inputs.xdo('type','--clearmodifiers','rear_line');inputs.pump()
+                inputs.click('tree:series/rear_line')
+                assert inputs.info()['focused_panel']=='rear'
+                rect=inputs.info()['decorations']['data_area']
+                inputs.click_rect([rect[0]+rect[2]/2,rect[1]+rect[3]/2,0,0])
+                assert inputs.info()['focused_panel']=='rear'
+                assert not inputs.info()['error']
+            finally:handle.close();Inputs.pump()
+        return
+    source="import figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'overlap-panels',source) as (page,execute):
+        before=page.evaluate(ROOT+'.snapshot()')
+        page.mouse.click(*browser_point(page,(300,200)));page.evaluate(ROOT+'.flush()')
+        assert {c['key'] for c in page.evaluate(ROOT+'.stats.choice_candidates')}=={'panel/rear','panel/front'}
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        page.locator('[data-choice="panel/rear"]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        r=page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+        p=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",[r[0]+r[2]/2,r[1]+r[3]/2])
+        page.mouse.click(*p);page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='rear_line'
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        page.locator('.figgy-switch-chart').click();page.evaluate(ROOT+'.flush()')
+        page.locator('[data-choice="panel/front"]').click();page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='front'
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'Subplot':0}
+        if page.locator('.figgy-properties').is_hidden():page.locator('[data-properties]').click()
+        ObjectNavigator(page).choose('rear_line');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        r=page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+        p=page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""",[r[0]+r[2]/2,r[1]+r[3]/2])
+        page.mouse.click(*p);page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.stats.focused_panel')=='rear'
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_inactive_overlay_objects_can_be_edited_and_dragged_directly(tmp_path, backend):
+    """Overlay objects receive input without first activating their layer in a tree."""
+    setup="""
+ax=fig.axes[0]
+ax.plot([1,5,9],[2,8,4],id='signal',label='Signal')
+twin=ax.twinx(id='pressure_axis')
+twin.plot([1,5,9],[85,60,25],id='pressure',label='Pressure',color='red')
+twin.set_ylabel('Pressure')
+ax.set_xlim(0,10);ax.set_ylim(0,10);twin.set_ylim(0,100)
+state=fig.get_settings()
+state['config']['right_y']['out_margin']=160
+state['config']['overlays'][0]['y_axis']['line_offset']=45
+state['config']['overlays'][0]['y_axis']['title_option']['visible']=True
+fig.apply_settings(state)
+ax.activate()
+"""
+    if backend=='native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup,{'fig':fig});handle=fig.show(block=False)
+            from layout_probe import native_sample, save_native
+            samples=[];inputs=None
+            try:
+                inputs=Inputs(handle);before=fig.get_settings();uploads=fig.info['column_uploads']
+                native_sample(inputs,samples,'initial')
+                assert before['config'].get('active_layer','Base')=='Base'
+                primary_left=inputs.info()['decorations']['axis_left']
+                area=inputs.info()['decorations']['data_area'];scale=inputs.info()['chart_panel'][2]/960
+                inputs.click_rect([area[0]+area[2]-2+45*scale,area[1]+area[3]*.4,0,0])
+                assert inputs.info()['selected']=='overlay_0:axis_right',inputs.info()
+                assert fig.get_settings()['config']['active_layer']=={'Overlay':0}
+                inputs.click('min');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','10');inputs.key('Return')
+                changed=fig.get_settings()
+                assert changed['config']['overlays'][0]['y_axis']['min']==10
+                assert changed['config']['left_y']==before['config']['left_y']
+                # Matching numbers do not make independent coordinate layers linked.
+                equal=fig.get_settings();equal['config']['overlays'][0]['y_axis'].update(min=0,max=10,major_spacing=2)
+                fig.apply_settings(equal);inputs.pump()
+                inputs.click('min');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','1');inputs.key('Return')
+                assert fig.get_settings()['config']['overlays'][0]['y_axis']['min']==1
+                assert fig.get_settings()['config']['left_y']==before['config']['left_y']
+                fig.apply_settings(changed);inputs.pump()
+                # The shared left axis belongs to Base even while the overlay is active.
+                rect=inputs.info()['decorations']['overlay_0:axis_title_right']
+                inputs.click_rect(primary_left)
+                assert fig.get_settings()['config'].get('active_layer','Base')=='Base'
+                before=fig.get_settings()
+                start=(rect[0]+rect[2]/2,rect[1]+rect[3]/2)
+                native_sample(inputs,samples,'before_title_drag')
+                drag_native(inputs,start,(16,12))
+                native_sample(inputs,samples,'after_title_drag')
+                assert inputs.info()['selected']=='overlay_0:axis_title_right'
+                assert fig.get_settings()['config']['overlays'][0]['y_axis']['title_option']!=before['config']['overlays'][0]['y_axis']['title_option']
+                assert fig.get_settings()['config']['left_y']==before['config']['left_y']
+                # Common typography precedes the text row in a scrollable form.
+                # Exercise ordinary scrolling and real editing at default and
+                # minimum supported sizes, rather than requiring every row to
+                # be visible immediately after a different object is selected.
+                for width,height in ((1312,744),(900,520)):
+                    inputs.xdo('windowsize',inputs.wid,width,height);inputs.pump()
+                    untouched=fig.get_settings();revision=fig.revision
+                    inputs.click('text')
+                    info=inputs.info();r=info['controls']['text'];v=info['controls']['properties_viewport']
+                    assert r[1]>=v[1]-1 and r[1]+r[3]<=v[1]+v[3]+1,info
+                    assert fig.get_settings()==untouched and fig.revision==revision
+                    value=f'Pressure {height}'
+                    inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers',value);inputs.key('Return')
+                    edited=fig.get_settings()
+                    rich=edited['config']['overlays'][0]['y_axis']['title_option']['text']
+                    assert ''.join(s['text'] for s in rich['segments'])==value
+                    assert rich['font_size']==untouched['config']['overlays'][0]['y_axis']['title_option']['text']['font_size']
+                    assert edited['config']['left_y']==before['config']['left_y']
+                assert fig.info['column_uploads']==uploads and not inputs.info()['error']
+                from PIL import ImageGrab
+                window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+                x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+                ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-overlay-object-edit.png')
+            finally:
+                if inputs is not None:save_native(inputs,samples,tmp_path)
+                handle.close();Inputs.pump()
+        return
+    source="import figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'overlay-objects',source) as (page,execute):
+        def bounds(target):return page.evaluate(ROOT+'.decorations()')[target]['rect']
+        def screen(rect):
+            return page.evaluate("""r=>{const c=document.querySelector('.figgy-editor canvas'),b=c.getBoundingClientRect();return [b.x+(r[0]+r[2]/2)*b.width/c.width,b.y+(r[1]+r[3]/2)*b.height/c.height];}""",rect)
+        before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        # Decorations exposes the active owner; the shared plot edge plus the
+        # configured offset locates the inactive overlay without activating it.
+        area=bounds('data_area');page.mouse.click(*screen([area[0]+area[2]-2+45*page.locator('canvas').evaluate('c=>c.width/960'),area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='overlay_0:axis_right'
+        assert page.evaluate(ROOT+'.snapshot().config.active_layer')=={'Overlay':0}
+        page.locator('[data-property=min]').fill('10');page.locator('[data-property=min]').press('Tab');page.evaluate(ROOT+'.flush()')
+        changed=page.evaluate(ROOT+'.snapshot()')
+        assert changed['config']['overlays'][0]['y_axis']['min']==10
+        assert changed['config']['left_y']==before['config']['left_y']
+        execute("state=fig.get_settings();state['config']['overlays'][0]['y_axis'].update(min=0,max=10,major_spacing=2);fig.apply_settings(state);print('matched')")
+        page.wait_for_function(ROOT+'.snapshot().config.overlays[0].y_axis.max===10')
+        page.locator('[data-property=min]').fill('1');page.locator('[data-property=min]').press('Tab');page.evaluate(ROOT+'.flush()')
+        assert page.evaluate(ROOT+'.snapshot().config.overlays[0].y_axis.min')==1
+        assert page.evaluate(ROOT+'.snapshot().config.left_y')==before['config']['left_y']
+        execute(f"fig.apply_settings({changed!r});print('restored')")
+        page.wait_for_function(ROOT+'.snapshot().config.overlays[0].y_axis.max===100')
+        area=bounds('data_area');page.mouse.click(*screen([area[0]+2,area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        assert page.evaluate('('+ROOT+'.snapshot().config.active_layer??"Base")')=='Base'
+        # Title geometry is offset to the right of the overlay axis; find its
+        # public bounds using the same active-owner decoration API after direct
+        # selection of the secondary axis, then return to Base before dragging.
+        area=bounds('data_area');scale=page.locator('canvas').evaluate('c=>c.width/960')
+        page.mouse.click(*screen([area[0]+area[2]-2+45*scale,area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        title=bounds('overlay_0:axis_title_right')
+        area=bounds('data_area');page.mouse.click(*screen([area[0]+2,area[1]+area[3]*.4,0,0]));page.evaluate(ROOT+'.flush()')
+        before=page.evaluate(ROOT+'.snapshot()');start=screen(title)
+        page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+16,start[1]+12,steps=5);page.mouse.up();page.evaluate(ROOT+'.flush()')
+        assert ObjectNavigator(page).selected()=='overlay_0:axis_title_right'
+        assert page.locator('.figgy-inspector-scroll').evaluate('e=>e.scrollTop')==0
+        changed=page.evaluate(ROOT+'.snapshot()')
+        assert changed['config']['overlays'][0]['y_axis']['title_option']!=before['config']['overlays'][0]['y_axis']['title_option']
+        assert changed['config']['left_y']==before['config']['left_y']
+        title_text=page.locator('[data-property=text]')
+        title_text.fill('Pressure edited');title_text.press('Tab');page.evaluate(ROOT+'.flush()')
+        edited=page.evaluate(ROOT+'.snapshot()')
+        assert ''.join(s['text'] for s in edited['config']['overlays'][0]['y_axis']['title_option']['text']['segments'])=='Pressure edited'
+        assert edited['config']['left_y']==before['config']['left_y']
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads and not page.locator('.figgy-error').inner_text()
+        page.locator('.figgy-editor').screenshot(path=str(tmp_path/'browser-overlay-object-edit.png'))
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('panel',['main','child'])
+def test_legend_shared_typography_precedes_entries_in_both_hosts(tmp_path,panel):
+    setup="ax.plot([0,1,2],[4,3,4],id='unlabelled')\nfor i in range(3): ax.plot([0,1,2],[i,i+1,i],marker=['o','s','^'][i],label=f'10⁻{chr(0x2076+i)} Torr',id=f'p{i}')\nax.legend()"
+    if panel=='child':setup="ax.plot([0,1],[8,9],label='Other panel',id='other_panel');ax.legend()\nfig.set_layout([['main','child']]);ax=fig.subplots['child'].axes\n"+setup
+    target='subplot_0:legend' if panel=='child' else 'legend'
+    tree_panel='child' if panel=='child' else 'main'
+    def config(state):return state['config']['subplots'][0]['config'] if panel=='child' else state['config']
+    def assert_scope(state):
+        if panel=='child':assert 'Other panel' in ''.join(s['text'] for s in state['config']['legend']['content']['segments'])
+    def assert_style(state):
+        assert_scope(state)
+        assert config(state)['legend']['content']['font']=='Liberation Sans'
+        assert config(state)['legend']['content']['font_size']==21
+        for series in state['series']:
+            if series['series_id'].startswith('p') and series['label'] is not None:assert any(s['text']=='-' and s['superscript'] for s in series['label']['segments'])
+            if series['label'] is not None:assert not any(s['bold'] for s in series['label']['segments'])
+    with figgy.Figure(backend='native') as fig:
+        ax=fig.axes[0];exec(setup,{'fig':fig,'ax':ax});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('properties')
+            choose_native_object(inputs,'legend',f'panel/{tree_panel}/legend')
+            controls=inputs.info()['controls']
+            if panel=='child':assert 'legend_label_other_panel' not in controls
+            assert controls['font'][1]<controls['font_size'][1]<controls['legend_label_p0'][1]
+            inputs.click('font');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','Liberation Sans');inputs.key('Tab')
+            inputs.click('font_size');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','21');inputs.key('Return')
+            assert_style(fig.get_settings())
+            legend=config(fig.get_settings())['legend']['content']
+            fig.configure(series={'p1':{'render_type':{'ScatterLine':{'scatter':{'point_size':5.6}}}}});inputs.pump()
+            assert config(fig.get_settings())['legend']['content']==legend
+            inputs.click('legend_label_p2');inputs.key('End');inputs.xdo('type','--clearmodifiers',' updated');inputs.key('Tab')
+            assert_style(fig.get_settings())
+            assert ''.join(s['text'] for s in next(s for s in fig.get_settings()['series'] if s['series_id']=='p2')['label']['segments']).endswith(' updated')
+            (tmp_path/'native-legend-settings.json').write_text(json.dumps(fig.get_settings()))
+            # Return to the top so the capture shows common controls first.
+            choose_native_object(inputs,'chart_title',f'panel/{tree_panel}/chart_title')
+            choose_native_object(inputs,'legend',f'panel/{tree_panel}/legend')
+            from PIL import ImageGrab
+            window=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines())
+            x,y,w,h=[int(window[k]) for k in ('X','Y','WIDTH','HEIGHT')]
+            ImageGrab.grab(bbox=(x,y-20,x+w,y+h-20),xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-legend-typography.png')
+            assert not inputs.info()['error']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/'legend',source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose(target)
+        if panel=='child':assert page.locator('[data-property=legend_label_other_panel]').count()==0
+        order=page.locator('[data-property]').evaluate_all("els=>els.map(el=>el.dataset.property)")
+        assert order.index('font')<order.index('font_size')<order.index('legend_label_p0')
+        assert page.locator('[data-property=text]').count()==0
+        font=page.locator('[data-property=font]');font.fill('Liberation Sans');font.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        size=page.locator('[data-property=font_size]');size.fill('21');size.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        assert_style(page.evaluate(ROOT+'.snapshot()'))
+        legend=config(page.evaluate(ROOT+'.snapshot()'))['legend']['content']
+        execute("fig.configure(series={'p1':{'render_type':{'ScatterLine':{'scatter':{'point_size':5.6}}}}})");page.evaluate(ROOT+'.flush()')
+        assert config(page.evaluate(ROOT+'.snapshot()'))['legend']['content']==legend
+        label=page.locator('[data-property=legend_label_p2]');label.fill(label.input_value()+' updated');label.dispatch_event('change');page.evaluate(ROOT+'.flush()')
+        execute('await fig.sync()');state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert_style(state)
+        assert ''.join(s['text'] for s in next(s for s in state['series'] if s['series_id']=='p2')['label']['segments']).endswith(' updated')
+        assert not page.locator('.figgy-error').inner_text()
+        screenshot_editor(page,tmp_path/'browser-legend-typography.png')
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('owner',['primary','subplot','overlay','shared'])
+def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tmp_path,owner):
+    setup="ax=fig.axes[0];ax.plot([0,1000],[1,1000],id='base');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
+    if owner in ('subplot','shared'):setup+="fig.set_layout([['main','right']]);ax=fig.subplots['right'].axes;ax.plot([0,1000],[1,1000],id='other');ax.set_xlim(0,1000);ax.set_ylim(1,1000)\n"
+    if owner=='overlay':setup+="ax=ax.twinx(id='pressure');ax.plot([0,1000],[1,1e9],id='pressure_data');ax.set_yscale('log');ax.set_ylim(1,1e9)\n"
+    if owner=='shared':setup+="fig.share_axes('x')\n"
+    setup+='ax.activate()'
+    key='right_y' if owner=='overlay' else 'bottom_x'
+    target='overlay_0:axis_right' if owner=='overlay' else 'subplot_0:axis_bottom' if owner in ('subplot','shared') else 'axis_bottom'
+    node='panel/main/overlay/pressure/axis_right' if owner=='overlay' else 'panel/right/axis_bottom' if owner in ('subplot','shared') else 'panel/main/axis_bottom'
+    def config(state):return state['config']['subplots'][0]['config'] if owner in ('subplot','shared') else state['config']
+    def axis(state):return config(state)['overlays'][0]['y_axis'] if owner=='overlay' else config(state)[key]
+    manual="ax.configure(y_axis={'major_spacing':3.0})" if owner=='overlay' else "ax.configure(bottom_x={'major_spacing':7.0},top_x={'major_spacing':7.0})"
+    def center(state):
+        r=config(state)['chart_area'];return r['x']+r['width']/2,r['y']+r['height']/2
+    native_spacing=None
+    with figgy.Figure(backend='native') as fig:
+        exec(setup,{'fig':fig});handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);before=fig.get_settings();spacing=axis(before)['major_spacing'];uploads=fig.info['column_uploads']
+            x,y=native_point(inputs.info(),center(before));modifier='shift' if owner=='overlay' else 'ctrl'
+            if owner in ('subplot','shared'):inputs.click_rect([x,y,0,0])
+            def zoom():
+                inputs.xdo('mousemove','--window',inputs.wid,round(x),round(y));inputs.pump();inputs.xdo('keydown',modifier);inputs.xdo('click','--repeat',8,'--delay',15,4);inputs.xdo('keyup',modifier);inputs.pump()
+            zoom();current=fig.get_settings();native_spacing=axis(current)['major_spacing']
+            assert native_spacing<spacing
+            if owner=='overlay':assert current['config']['left_y']==before['config']['left_y']
+            if owner=='subplot':assert current['config']['bottom_x']==before['config']['bottom_x']
+            # Explicit numeric configuration selects fixed ticks and survives zoom.
+            ax=fig._axes_for('right' if owner in ('subplot','shared') else 'main','pressure' if owner=='overlay' else None)
+            exec(manual,{'ax':ax});inputs.pump();fixed=axis(fig.get_settings())['major_spacing'];zoom()
+            assert axis(fig.get_settings())['major_spacing']==fixed
+            inputs.click('properties');choose_native_object(inputs,'axis_right' if owner=='overlay' else 'axis_bottom',node)
+            inputs.click('auto_ticks');inputs.pump()
+            assert axis(fig.get_settings())['major_spacing']!=fixed
+            if owner=='shared':
+                state=fig.get_settings()
+                assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']
+                assert state['identity']['tick_modes']['main']['bottom_x']=='Auto'
+                inputs.click('major_spacing');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','13');inputs.key('Return')
+                state=fig.get_settings()
+                assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']==13
+                assert state['identity']['tick_modes']['main']['bottom_x']=='Fixed'
+            assert fig.info['column_uploads']==uploads
+            assert not inputs.info()['error']
+        finally:handle.close();Inputs.pump()
+    source="import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
+    with notebook(tmp_path/owner,source) as (page,execute):
+        page.locator('[data-properties]').click();ObjectNavigator(page).choose(target,node=node)
+        state=page.evaluate(ROOT+'.snapshot()');x,y=browser_point(page,center(state));modifier='Shift' if owner=='overlay' else 'Control'
+        def zoom():
+            page.mouse.move(x,y);page.keyboard.down(modifier);page.mouse.wheel(0,-320);page.keyboard.up(modifier);page.evaluate(ROOT+'.flush()')
+        before=axis(state)['major_spacing'];zoom();state=page.evaluate(ROOT+'.snapshot()')
+        assert axis(state)['major_spacing']<before
+        assert axis(state)['major_spacing']==native_spacing
+        execute(manual);page.evaluate(ROOT+'.flush()');fixed=axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing'];zoom()
+        assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']==fixed
+        ObjectNavigator(page).choose(target,node=node);page.locator('[data-property=auto_ticks]').check();page.evaluate(ROOT+'.flush()')
+        assert axis(page.evaluate(ROOT+'.snapshot()'))['major_spacing']!=fixed
+        if owner=='shared':
+            state=page.evaluate(ROOT+'.snapshot()')
+            assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']
+            assert state['identity']['tick_modes']['main']['bottom_x']=='Auto'
+            spacing=page.locator('[data-property=major_spacing]');spacing.fill('13');spacing.press('Tab');page.evaluate(ROOT+'.flush()')
+            state=page.evaluate(ROOT+'.snapshot()')
+            assert state['config']['bottom_x']['major_spacing']==axis(state)['major_spacing']==13
+            assert state['identity']['tick_modes']['main']['bottom_x']=='Fixed'
+        execute('await fig.sync()');accepted=json.loads(execute('print(json.dumps(fig.get_settings()))'))
+        assert accepted['identity']['tick_modes']==page.evaluate(ROOT+'.snapshot().identity.tick_modes')
+        assert not page.locator('.figgy-error').inner_text()

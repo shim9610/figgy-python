@@ -9,6 +9,7 @@ pub(super) struct BoundedSurface {
     id: egui::TextureId,
     size: (u32, u32),
     frame: DocumentFrame,
+    annotations: Arc<renderer::annotation::BoundedAnnotationFrame>,
 }
 
 impl SurfaceWindow {
@@ -19,6 +20,19 @@ impl SurfaceWindow {
         let mut error = None;
         let output = ctx.run_ui(input, |root| {
             self.editor.show_bounded(root, c, overlay);
+            // Side-panel frame margins must not enlarge the chart when the
+            // window grows to accommodate the docked inspector.
+            if !overlay {
+                let available = self.pending_chart_width.unwrap_or_else(|| {
+                    self.config.width.saturating_sub(if self.inspector_docked {
+                        self.sidebar_pixels()
+                    } else {
+                        0
+                    })
+                });
+                self.editor.stage.max.x = self.editor.stage.min.x
+                    + (available as f32 / ctx.pixels_per_point() - 32.).max(1.);
+            }
             let (_, panel, scale) = self.display(c);
             self.panel = panel;
             self.scale = scale;
@@ -27,6 +41,7 @@ impl SurfaceWindow {
                 egui::pos2(panel.x as f32 / dpr, panel.y as f32 / dpr),
                 egui::vec2(panel.width as f32 / dpr, panel.height as f32 / dpr),
             );
+            let mut inline_space = None;
             let prepared = (|| -> PyResult<()> {
                 let document_size = c.data.chart.config().chart_area.0;
                 let logical_size = (document_size.width, document_size.height);
@@ -77,12 +92,18 @@ impl SurfaceWindow {
                         &texture.create_view(&Default::default()),
                         wgpu::FilterMode::Linear,
                     );
+                    let annotations = renderer.prepare_annotations(
+                        &c.data.document.as_ref().unwrap().chart,
+                        logical_size,
+                        scale,
+                    )?;
                     self.bounded_surface = Some(BoundedSurface {
                         renderer,
                         texture,
                         id,
                         size,
                         frame,
+                        annotations,
                     });
                 }
                 let surface = self.bounded_surface.as_mut().unwrap();
@@ -94,17 +115,91 @@ impl SurfaceWindow {
                         scale,
                     )
                     .map_err(runtime)?;
+                surface.annotations = surface.renderer.prepare_annotations(
+                    &c.data.document.as_ref().unwrap().chart,
+                    logical_size,
+                    scale,
+                )?;
                 root.painter().image(
                     surface.id,
                     image_rect,
                     egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
                     egui::Color32::WHITE,
                 );
+                inline_space = Some((surface.frame.annotation_space(), logical_size));
+                if self.editor.inline_text.is_some() {
+                    return Ok(());
+                }
                 let response = root.interact(
                     image_rect,
                     egui::Id::new("radial_image"),
                     egui::Sense::click_and_drag(),
                 );
+                // Bounded value axes have their own range model; do not
+                // silently drop wheel input as if they were immutable images.
+                if response.hovered()
+                    && let Some(view) = navigation::bounded_view(&c.snapshot())
+                {
+                    let delta = root.input(|i| {
+                        i.raw
+                            .events
+                            .iter()
+                            .filter_map(|e| {
+                                if let egui::Event::MouseWheel { delta, .. } = e {
+                                    Some(delta.y)
+                                } else {
+                                    None
+                                }
+                            })
+                            .sum::<f32>()
+                    });
+                    let modifiers = root.input(|i| i.modifiers);
+                    let horizontal = view["axis"] == "x";
+                    let allowed = if horizontal {
+                        !modifiers.shift || modifiers.ctrl
+                    } else {
+                        !modifiers.ctrl || modifiers.shift
+                    };
+                    if delta != 0. && allowed {
+                        let [low, high]: [f64; 2] =
+                            serde_json::from_value(view["range"].clone()).unwrap();
+                        let area = surface
+                            .frame
+                            .decorations()
+                            .entries()
+                            .find(|(_, v)| v.id == renderer::DecorationId::DataArea)
+                            .and_then(|(id, _)| surface.frame.decorations().bounds(id));
+                        if let (Some(p), Some(area)) = (response.hover_pos(), area) {
+                            let x = (p.x - image_rect.min.x) * logical_size.0 as f32
+                                / image_rect.width();
+                            let y = (p.y - image_rect.min.y) * logical_size.1 as f32
+                                / image_rect.height();
+                            let anchor = if view["axis"] == "radius" {
+                                0.
+                            } else if horizontal {
+                                ((x - area.x) / area.width).clamp(0., 1.) as f64
+                            } else {
+                                (1. - (y - area.y) / area.height).clamp(0., 1.) as f64
+                            };
+                            let factor = (-delta as f64 / 40. * 0.1).clamp(-1.2, 1.2).exp();
+                            let pivot = low + (high - low) * anchor;
+                            let range = Some([
+                                pivot + (low - pivot) * factor,
+                                pivot + (high - pivot) * factor,
+                            ]);
+                            let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                            match &mut chart {
+                                crate::bounded::DocumentChart::BoxPlot(c) => c.value_range = range,
+                                crate::bounded::DocumentChart::Radar(c) => c.value_range = range,
+                                _ => {}
+                            }
+                            if let Err(error) = c.set_document(chart) {
+                                self.editor.error = error.to_string();
+                            }
+                            root.ctx().request_repaint();
+                        }
+                    }
+                }
                 let map = surface.frame.decorations();
                 let to_local = |p: egui::Pos2| {
                     [
@@ -112,12 +207,78 @@ impl SurfaceWindow {
                         (p.y - image_rect.min.y) * logical_size.1 as f32 / image_rect.height(),
                     ]
                 };
+                if self.editor.drawing.tool != crate::drawing::Tool::Select {
+                    if let Some(origin) = ctx.input(|i| i.pointer.press_origin()) {
+                        if image_rect.contains(origin)
+                            && self.editor.drawing.gesture.is_none()
+                            && (response.drag_started()
+                                || response.clicked()
+                                || response.is_pointer_button_down_on())
+                        {
+                            self.editor
+                                .drawing
+                                .begin(surface.frame.annotation_space(), to_local(origin));
+                        }
+                    }
+                    if let Some(p) = ctx.input(|i| i.pointer.interact_pos()) {
+                        self.editor.drawing.update(to_local(p));
+                    }
+                    self.editor.drawing.preview(root.painter(), |p| {
+                        egui::pos2(
+                            image_rect.min.x + p[0] * image_rect.width() / logical_size.0 as f32,
+                            image_rect.min.y + p[1] * image_rect.height() / logical_size.1 as f32,
+                        )
+                    });
+                    if ctx.input(|i| i.pointer.any_released()) {
+                        if let Some(item) = self.editor.drawing.finish() {
+                            if matches!(
+                                &item.kind,
+                                renderer::annotation::AnnotationKind::Text { .. }
+                            ) {
+                                self.editor.begin_inline_text(item, false);
+                                ctx.request_repaint();
+                                return Ok(());
+                            }
+                            let mut chart = c.data.document.as_ref().unwrap().chart.clone();
+                            let index = chart.annotations().items.len();
+                            chart.annotations_mut().visible = true;
+                            chart.annotations_mut().items.push(item);
+                            chart.set_active_layer(renderer::LayerRef::Annotations);
+                            chart.clear_selection();
+                            chart.decorations_mut().selected =
+                                Some(renderer::DecorationId::Annotation(index));
+                            if let Err(e) = c.set_document(chart) {
+                                self.editor.error = e.to_string();
+                            } else {
+                                self.editor.inspector_open = true;
+                            }
+                        }
+                    }
+                    if response.dragged() || response.clicked() {
+                        ctx.request_repaint();
+                    }
+                    return Ok(());
+                }
                 let mut chart = c.data.document.as_ref().unwrap().chart.clone();
                 let before = chart.clone();
                 let decoration = response.interact_pointer_pos().and_then(|p| {
                     let point = to_local(p);
-                    let hit = map.hit_test(point)?;
-                    let key = map.element(hit)?.id.clone();
+                    let text = chart.annotations().visible.then(|| {
+                        let map = surface.annotations.annotations();
+                        let index = map.element(map.hit_test(point)?)?.index;
+                        matches!(chart.annotations().items[index].kind, renderer::annotation::AnnotationKind::Text { .. })
+                            .then_some(renderer::DecorationId::Annotation(index))
+                    }).flatten();
+                    let key = if let Some(text) = text { text } else { match surface.annotations.hit_test_active_layer(
+                        chart.active_layer(),
+                        map,
+                        point,
+                    )? {
+                        renderer::annotation::LayerHit::Annotation { index, .. } => {
+                            renderer::DecorationId::Annotation(index)
+                        }
+                        renderer::annotation::LayerHit::Element(id) => map.element(id)?.id.clone(),
+                    }};
                     if key == renderer::DecorationId::DataArea
                         && !self.editor.edit_area
                         && chart.decorations().selected != Some(key.clone())
@@ -127,9 +288,27 @@ impl SurfaceWindow {
                     }
                     Some(key)
                 });
+                if response.double_clicked() && chart.annotations().visible
+                    && let Some(p) = response.interact_pointer_pos()
+                    && let Some(id) = surface.annotations.annotations().hit_test(to_local(p))
+                    && let Some(item) = surface.annotations.annotations().element(id)
+                    && matches!(chart.annotations().items[item.index].kind, renderer::annotation::AnnotationKind::Text { .. })
+                {
+                    self.editor.begin_inline_text(chart.annotations().items[item.index].clone(), true);
+                    ctx.request_repaint();
+                    return Ok(());
+                }
                 if response.drag_started() {
                     self.handle = ctx.input(|i| i.pointer.press_origin()).and_then(|p| {
                         let selected = chart.decorations().selected.as_ref()?;
+                        if let renderer::DecorationId::Annotation(index) = selected {
+                            let id = surface.annotations.annotations().find(*index)?;
+                            return surface
+                                .annotations
+                                .annotations()
+                                .hit_resize_handle(id, to_local(p))
+                                .map(|h| format!("{h:?}"));
+                        }
                         let (id, _) = map.entries().find(|(_, e)| &e.id == selected)?;
                         map.hit_resize_handle(id, to_local(p))
                             .map(|h| format!("{h:?}"))
@@ -137,6 +316,10 @@ impl SurfaceWindow {
                 }
                 if (response.clicked() || response.drag_started()) && self.handle.is_none() {
                     chart.decorations_mut().selected = decoration.clone();
+                    if matches!(decoration, Some(renderer::DecorationId::Annotation(_))) {
+                        chart.set_active_layer(renderer::LayerRef::Annotations);
+                    }
+
                     if decoration.is_some() {
                         match &mut chart {
                             crate::bounded::DocumentChart::Radial(c) => {
@@ -144,6 +327,7 @@ impl SurfaceWindow {
                             }
                             crate::bounded::DocumentChart::Categorical(c) => c.selected = None,
                             crate::bounded::DocumentChart::BoxPlot(c) => c.selected = None,
+                            crate::bounded::DocumentChart::Radar(c) => c.selected = None,
                         }
                     }
                 }
@@ -177,6 +361,35 @@ impl SurfaceWindow {
                         }
                     }
                 }
+                if response.dragged() {
+                    if let Some(renderer::DecorationId::Annotation(index)) =
+                        chart.decorations().selected
+                    {
+                        if let Some(id) = surface.annotations.annotations().find(index) {
+                            let delta = ctx.input(|i| i.pointer.delta());
+                            let dx = delta.x * logical_size.0 as f32 / image_rect.width();
+                            let dy = delta.y * logical_size.1 as f32 / image_rect.height();
+                            if let Some(handle) = self.handle.as_ref().and_then(|name| {
+                                ALL_HANDLES.into_iter().find(|h| format!("{h:?}") == *name)
+                            }) {
+                                surface.annotations.annotations().resize_by(
+                                    chart.annotations_mut(),
+                                    id,
+                                    handle,
+                                    dx,
+                                    dy,
+                                );
+                            } else {
+                                surface.annotations.annotations().drag_by(
+                                    chart.annotations_mut(),
+                                    id,
+                                    dx,
+                                    dy,
+                                );
+                            }
+                        }
+                    }
+                }
                 if response.drag_stopped() {
                     self.handle = None;
                 }
@@ -196,6 +409,11 @@ impl SurfaceWindow {
                     match surface.renderer.prepare(&chart, logical_size, scale) {
                         Ok(frame) => {
                             surface.frame = frame;
+                            surface.annotations = surface.renderer.prepare_annotations(
+                                &chart,
+                                logical_size,
+                                scale,
+                            )?;
                             c.set_document(chart)?;
                             self.editor.error.clear();
                         }
@@ -203,8 +421,10 @@ impl SurfaceWindow {
                     }
                     if response.clicked() {
                         let chart = &c.data.document.as_ref().unwrap().chart;
-                        self.editor.inspector_open |= !chart.selected_json().is_null()
-                            || chart.decorations().selected.is_some();
+                        let text = matches!(chart.decorations().selected,
+                            Some(renderer::DecorationId::Annotation(index)) if matches!(chart.annotations().items[index].kind, renderer::annotation::AnnotationKind::Text { .. }));
+                        self.editor.inspector_open |= !text && (!chart.selected_json().is_null()
+                            || chart.decorations().selected.is_some());
                     }
                     ctx.request_repaint();
                 }
@@ -212,6 +432,20 @@ impl SurfaceWindow {
             })();
             if let Err(e) = prepared {
                 error = Some(e);
+            }
+            if let Some((space, logical_size)) = inline_space {
+                self.editor.inline_text_ui(
+                    root,
+                    c,
+                    space,
+                    |p| {
+                        egui::pos2(
+                            image_rect.min.x + p[0] * image_rect.width() / logical_size.0 as f32,
+                            image_rect.min.y + p[1] * image_rect.height() / logical_size.1 as f32,
+                        )
+                    },
+                    image_rect.width() / logical_size.0 as f32,
+                );
             }
         });
         if let Some(error) = error {
@@ -247,13 +481,17 @@ impl SurfaceWindow {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        load: wgpu::LoadOp::Clear(background_wgpu(Some(
+                            c.data.document.as_ref().unwrap().chart.background(),
+                        ))),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 ..Default::default()
             });
+            radial.annotations.draw_underlay(&mut pass);
             radial.frame.draw(&mut pass);
+            radial.annotations.draw_overlay(&mut pass);
         }
         for (id, deltas) in &output.textures_delta.set {
             for delta in deltas {
@@ -328,7 +566,7 @@ impl SurfaceWindow {
             .collect::<serde_json::Map<_, _>>();
         *self.control.stats.lock().unwrap() = json!({
             "host":"winit-wgpu", "window_role":"chart", "chart_family":c.data.document.as_ref().unwrap().chart.family(),
-            "controls":controls, "error":self.editor.error, "properties_open":self.editor.inspector_open,
+            "controls":controls, "layout_mode":self.editor.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"error":self.editor.error, "properties_open":self.editor.inspector_open,
             "inspector_overlay":self.inspector_overlay(), "selected":c.data.document.as_ref().unwrap().chart.selected_json(),
             "chart_panel":[self.panel.x,self.panel.y,self.panel.width,self.panel.height],
             "surface_size":[self.config.width,self.config.height], "scale_factor":self.window.scale_factor(),

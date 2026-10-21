@@ -76,9 +76,9 @@ separately. These measurements include RGBA readback and do not measure UI FPS.
 
 ## Install
 
-This description covers **figgyplot 0.3.0**. Until that version is published,
-PyPI provides 0.2.1; use the [source-checkout instructions](https://github.com/shim9610/figgy-python#install)
-for the upcoming features.
+This description covers the published **figgyplot 0.3.0** release. The
+[source checkout](https://github.com/shim9610/figgy-python#install) may contain
+subsequent changes; its renderer migration does not update installed wheels.
 
 Install from PyPI:
 

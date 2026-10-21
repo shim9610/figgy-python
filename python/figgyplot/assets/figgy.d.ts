@@ -65,6 +65,28 @@ export class FiggyBoundedChart {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
+    /**
+     * The layer that receives pointer interaction, as JSON.
+     */
+    active_layer(): string;
+    /**
+     * Append an `Annotation` JSON value and return its index.
+     */
+    add_annotation(json: string): number;
+    /**
+     * The compass name of the annotation's live handle under a point.
+     */
+    annotation_handle(index: number, x: number, y: number): string | undefined;
+    /**
+     * Annotations the current frame skipped, as `[{index, reason}]`.
+     */
+    annotation_warnings(): string;
+    /**
+     * The drawn annotations as JSON: `index`, `id`, `kind`, the selection
+     * box `rect` and `handles`, and `selected`. Skipped items are listed by
+     * `annotation_warnings` instead.
+     */
+    annotations(): string;
     clear_selection(): void;
     /**
      * One GPU surface; no kernel PNG transport is used for interactive frames.
@@ -75,6 +97,11 @@ export class FiggyBoundedChart {
      */
     decorations(): string;
     drag(target: string, dx: number, dy: number, handle?: string | null): boolean;
+    /**
+     * Move an annotation, or one of its handles, by a pointer delta.
+     * Returns `false` for a rejected move; the document is unchanged then.
+     */
+    drag_annotation(index: number, dx: number, dy: number, handle?: string | null): boolean;
     export_png(scale: number): Promise<Uint8Array>;
     /**
      * Submit one frame and wait for actual GPU completion. Hosts must await
@@ -91,12 +118,61 @@ export class FiggyBoundedChart {
      * display submissions until it settles. Device loss rejects the Promise.
      */
     gpu_ready(): Promise<any>;
+    /**
+     * The topmost drawn annotation under a point, as its index.
+     */
+    hit_annotation(x: number, y: number): number | undefined;
+    /**
+     * The topmost decoration under a point, as its stable id. While the
+     * annotation layer is active (and shown) its drawn items sit on top of
+     * every decoration and answer as `"annotation_<n>"`; on the base layer
+     * they are not registered and clicks pass through them.
+     */
     hit_decoration(x: number, y: number, edit_area: boolean): string | undefined;
     hover(x: number | null | undefined, y: number | null | undefined, dt: number): boolean;
     pick(x: number, y: number, toggle: boolean): string;
+    /**
+     * The `Anchor` JSON at a point for `"Data"` or `"Ratio"`; `null` when
+     * the point has no such position (a radial chart has no data anchors).
+     */
+    pointer_to_anchor(x: number, y: number, kind: string): string;
+    /**
+     * Remove the annotation at `index`; later indices move down one and the
+     * selection follows or clears.
+     */
+    remove_annotation(index: number): void;
     resize(width: number, height: number): void;
     resize_handle(target: string, x: number, y: number): string | undefined;
+    /**
+     * Select one annotation (`decorations.selected = Annotation(index)`) or
+     * none. Clears the data and decoration selections like
+     * `select_decoration`.
+     */
+    select_annotation(index?: number | null): void;
+    /**
+     * Select a decoration by the id `hit_decoration` reported, or none.
+     * An `"annotation_<n>"` id selects that drawn annotation
+     * (`decorations.selected = Annotation(n)`).
+     */
     select_decoration(target?: string | null): void;
+    selected_annotation(): number | undefined;
+    /**
+     * Set the layer that receives pointer interaction: `"Base"` or
+     * `"Annotations"` as JSON (bounded charts have no overlays, so an
+     * `{ "Overlay": n }` is stored as `"Base"`). A change clears the
+     * decoration selection (`decorations.selected`, an annotation
+     * included); the data selection is kept. Returns the stored layer as
+     * JSON. Drawn pixels never depend on it.
+     */
+    set_active_layer(json: string): string;
+    /**
+     * Replace the annotation at `index`.
+     */
+    set_annotation(index: number, json: string): void;
+    /**
+     * Show or hide the whole annotation layer without re-rasterizing it.
+     */
+    set_annotations_visible(visible: boolean): void;
     /**
      * Validate and prepare before replacing the SSOT, retaining the old chart on failure.
      */
@@ -109,6 +185,17 @@ export class FiggyChart {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * The layer that receives pointer interaction, as JSON, with the
+     * out-of-range fallback applied.
+     * JS: `JSON.parse(chart.active_layer())`
+     */
+    active_layer(): string;
+    /**
+     * Append an `Annotation` (JSON, the same shape as in `get_config`)
+     * and return its index.
+     */
+    add_annotation(json: string): number;
+    /**
      * Register or update a line series over two registered columns.
      *
      * Upsert by `series_id`: a new id takes the next color of the active
@@ -116,6 +203,26 @@ export class FiggyChart {
      * Non-empty `label` adds/updates the legend row.
      */
     add_line_series(series_id: string, x_column: string, y_column: string, line_width: number, label: string): void;
+    /**
+     * The compass name (`"W"`, `"E"`, ...) of the annotation's handle
+     * under a point, or none. Only the handles `annotations` lists are
+     * live: a span's two edges, a line's two value handles, an arrow's
+     * two endpoints.
+     */
+    annotation_handle(index: number, x: number, y: number): string | undefined;
+    /**
+     * Annotations the current raster skipped, as `[{index, reason}]`
+     * with `reason` one of `NonFinite`, `NoValueAxis`, `OutOfRange`,
+     * `EmptyText`.
+     */
+    annotation_warnings(): string;
+    /**
+     * The drawn annotations of the current frame as JSON: `index`, `id`,
+     * `kind`, the selection box `rect` and its `handles` in physical
+     * canvas pixels, and `selected`. Items the raster skipped are
+     * absent here and listed by `annotation_warnings`.
+     */
+    annotations(): string;
     /**
      * Apply an axis frame preset to all four axes (decoration-only).
      */
@@ -126,12 +233,26 @@ export class FiggyChart {
      */
     apply_color_cycle(cycle: ColorCycle): void;
     /**
-     * Fit BOTH axes to the union of every registered series, leaving a
-     * uniform `padding` fraction of the data span as margin on each
-     * side (`0.0` = no padding, `0.05` = 5% top/bottom/left/right).
-     * This is the whole fit policy — no rounding of the range ends;
-     * ticks land on nice values inside the range by themselves. Hosts
-     * should call this instead of re-deriving ranges.
+     * Fit the axes of the active layer to the union of that layer's
+     * series, leaving a uniform `padding` fraction of the data span as
+     * margin on each side (`0.0` = no padding, `0.05` = 5%
+     * top/bottom/left/right). This is the whole fit policy — no rounding
+     * of the range ends; ticks land on nice values inside the range by
+     * themselves. Hosts should call this instead of re-deriving ranges.
+     *
+     * The active layer (`set_active_layer`) decides which axes move:
+     * `Base` and `Annotations` fit the parent's `bottom_x` and `left_y`,
+     * `Subplot(i)` fits subplot `i`'s, and `Overlay(n)` /
+     * `SubplotOverlay(i, n)` fit that overlay's Y axis only. An axis fits
+     * every series drawn against it (`Config::layer_of_series`). A linked
+     * axis (`link_x`, `link_y`) is one axis shared by its link group: it
+     * fits the series of every chart in the group and the range moves
+     * the whole group, whichever member is active. X and Y links are
+     * followed separately. An overlay shares its chart's X axis and has
+     * its own Y axis, so its series count towards that X axis and not
+     * towards `left_y`. An axis that is not linked fits its own chart's
+     * series only; to fit every layer, set each layer active in turn and
+     * call this again.
      *
      * Each series contributes its exact original GPU primitive domain:
      * valid adjacent segments for line-only mode, paired finite points
@@ -145,10 +266,26 @@ export class FiggyChart {
      */
     auto_fit_all(padding: number): Promise<void>;
     /**
-     * Fit the shared z axis to every matrix value column in the chart.
-     * A chart without a colourbar is left unchanged.
+     * Fit the shared z axis to every column the colourbar maps: matrix
+     * value columns, scatter `point_color_map` columns and vector colour
+     * maps. A chart without a colourbar is left unchanged.
      */
     auto_fit_colorbar(padding: number): void;
+    /**
+     * Fit overlay layer `layer`'s Y axis to a column's cached statistics
+     * with proportional padding, the overlay counterpart of `auto_fit_y`.
+     * A layer index past the overlay list is an error.
+     * JS: `chart.auto_fit_overlay_y(0, "pressure", 0.05)`
+     */
+    auto_fit_overlay_y(layer: number, column: string, padding: number): void;
+    /**
+     * Fit subplot `index`'s X (`axis = "x"`) or Y (`axis = "y"`) axis to
+     * the union of the given columns' cached statistics with
+     * proportional padding. A linked axis moves its whole link group.
+     * An index past the subplot list or another axis name is an error.
+     * JS: `chart.auto_fit_subplot(0, "y", ["flow"], 0.05)`
+     */
+    auto_fit_subplot(index: number, axis: string, columns: string[], padding: number): void;
     /**
      * Fit the x axis to a column's range with proportional padding.
      */
@@ -189,12 +326,12 @@ export class FiggyChart {
      */
     begin_streaming(max_primitives_per_chunk: number): void;
     cancel_stream_operation_and_wait(handle: StreamingOperationHandle): Promise<void>;
+    cancel_streaming(): void;
     /**
      * Cancel this chart and resolve only after its submitted work and
      * retired renderer-owned surfaces have crossed the completion fence.
      */
     cancel_streaming_and_wait(): Promise<void>;
-    cancel_streaming(): void;
     /**
      * Configure the total GPU budget and chart-local packed-view limit.
      * Automatic streaming keeps original sources nonresident, then caches
@@ -222,6 +359,8 @@ export class FiggyChart {
     static create_with_progress(canvas: HTMLCanvasElement, on_event: Function): Promise<FiggyChart>;
     /**
      * Renderer-measured decoration bounds in physical canvas pixels.
+     * An `"annotation_<n>"` id that `hit_test` reports resolves to the
+     * drawn item's selection box.
      */
     decoration_bounds(target: string): string;
     /**
@@ -233,13 +372,24 @@ export class FiggyChart {
     demote_auto_resident_columns(ids: string[], revisions: Float64Array, sources: Array<any>): void;
     discard_stream_selection_request(request: AutoStreamingRangeRequestResult): void;
     /**
+     * Move an annotation, or one of its handles, by a pointer delta in
+     * physical canvas pixels. The delta is converted back into the
+     * item's anchors through the frame's anchor space and written to
+     * the config; a move that would leave the plot or panel is rejected
+     * and returns `false`.
+     */
+    drag_annotation(index: number, dx: number, dy: number, handle?: string | null): boolean;
+    /**
      * Compile the drawable-series fit-bound engine without drawing. On wasm
      * this uses `createComputePipelineAsync`. Series registration does
      * not do this; `auto_fit_all` does.
      */
     ensure_extent_engine(): Promise<void>;
     /**
-     * Export the panel as PNG bytes at `scale ×` resolution.
+     * Export the document as PNG bytes at `scale ×` resolution: the base
+     * layer and every overlay layer composited into one image, exactly
+     * as the canvas shows them. A document without overlays exports the
+     * same bytes as the per-panel renderer export.
      * JS: `const png = await chart.export_png(2.0);`
      * Holds a mutable borrow of this WASM object until the Promise settles.
      * wasm-bindgen checks borrows; it does not queue concurrent calls.
@@ -300,7 +450,15 @@ export class FiggyChart {
      * display submissions until it settles. Device loss rejects the Promise.
      */
     gpu_ready(): Promise<any>;
+    /**
+     * `true` while a chart element or an annotation is selected.
+     */
     has_selection(): boolean;
+    /**
+     * The topmost drawn annotation under a point in physical canvas
+     * pixels, as its index.
+     */
+    hit_annotation(x: number, y: number): number | undefined;
     /**
      * Hit-test the chart chrome at canvas pixel `(x, y)` — returns the
      * topmost element's stable id (`"data_area"`, `"axis_bottom"`,
@@ -308,7 +466,14 @@ export class FiggyChart {
      * `"colorbar_axis"`, `"colorbar_tick_labels"`,
      * `"colorbar_title"`, …) or `null`. Pure geometry, no selection state
      * change: the renderer's own layout answers, so hosts don't have to
-     * re-derive box positions for hover cursors / context UI.
+     * re-derive box positions for hover cursors / context UI. The set of
+     * registered elements follows the active layer: while an overlay is
+     * active its elements answer as `"overlay_<n>:axis_right"`,
+     * `"overlay_<n>:tick_labels_right"`, `"overlay_<n>:axis_title_right"`
+     * and `"overlay_<n>:legend"`, and the base Y axes do not answer.
+     * While the annotation layer is active (and shown) its drawn items
+     * sit on top and answer as `"annotation_<n>"`; on every other layer
+     * they are not registered and clicks pass through them.
      */
     hit_test(x: number, y: number): string | undefined;
     /**
@@ -333,11 +498,21 @@ export class FiggyChart {
     next_view_point_index(source_id: string | null | undefined, series_id: string, current: number, forward: boolean): any;
     /**
      * Pointer move with frame delta — drags or resizes the selection.
+     * After a press on an annotation the delta moves that item (or the
+     * pressed handle) through the frame's anchor space.
      */
     on_move(dx: number, dy: number): void;
     /**
      * Pointer press. Returns `true` while something is selected.
      * The host can mirror that state in its own UI.
+     *
+     * The press follows the active layer's route: while the annotation
+     * layer is active (and shown), the selected annotation's handles win
+     * first, then a drawn item under the point is selected (clearing
+     * the element selection) and dragged by `on_move`; a press that
+     * misses every item falls through to the shared elements below and
+     * clears the annotation selection. On every other layer the items
+     * are not part of the route.
      */
     on_press(x: number, y: number): boolean;
     on_release(): void;
@@ -362,6 +537,13 @@ export class FiggyChart {
      * `undefined` to `null`.
      */
     pick_point(x: number, y: number, max_distance_px: number): Promise<any>;
+    /**
+     * The anchor (`Anchor` JSON) at a point in physical canvas pixels,
+     * as `"Data"` or `"Ratio"`, for placing a new text box or arrow
+     * where the user clicked. `null` when the point has no data
+     * position (outside a log axis, or the chart has no value axes).
+     */
+    pointer_to_anchor(x: number, y: number, kind: string): string;
     /**
      * Prepare the same resident Cartesian groups as prewarm_all_with_progress,
      * without a progress callback. The host must prevent other calls on this
@@ -452,6 +634,11 @@ export class FiggyChart {
      */
     release_unused_gpu_memory(): Promise<string>;
     /**
+     * Remove the annotation at `index`. Later items move down one
+     * index; the selection follows or clears.
+     */
+    remove_annotation(index: number): void;
+    /**
      * Unregister a column. Series referencing it are removed too so the
      * chart can never point at freed data. Auto-managed legends remove
      * the corresponding rows; freely edited legends preserve their text
@@ -504,6 +691,13 @@ export class FiggyChart {
      */
     resize(width: number, height: number): void;
     /**
+     * Select one annotation (its box and handles are drawn on the
+     * overlay) or none. Selecting an annotation clears the decoration
+     * selection; selecting a decoration with `on_press` clears this.
+     */
+    select_annotation(index?: number | null): void;
+    selected_annotation(): number | undefined;
+    /**
      * Inspect the first resident typed selection as JSON, or `"null"` when
      * none is selected. Only selected GPU samples are read back. Histograms
      * expose `bin_start`, `bin_end`, `value`, and `orientation`; the value
@@ -515,6 +709,26 @@ export class FiggyChart {
      * Report the effective primitive/grid extent currently drawn.
      */
     series_draw_info(series_id: string): string;
+    /**
+     * Set the layer that receives pointer interaction: `"Base"`,
+     * `{ "Overlay": index }`, `"Annotations"`, `{ "Subplot": index }` or
+     * `{ "SubplotOverlay": [subplot, overlay] }` as JSON. The hit map is
+     * rebuilt for that layer (`HitMap::for_active_layer`) and the
+     * element selection is cleared when the layer changes. An overlay
+     * index past the overlay list is stored as `"Base"`; the stored
+     * layer is returned as JSON. Drawn pixels never depend on it.
+     * JS: `chart.set_active_layer(JSON.stringify({ Overlay: 0 }))`
+     */
+    set_active_layer(json: string): string;
+    /**
+     * Replace the annotation at `index` with an `Annotation` JSON value.
+     */
+    set_annotation(index: number, json: string): void;
+    /**
+     * Show or hide the whole annotation layer. Hiding skips the two
+     * composite draws and re-rasterizes nothing.
+     */
+    set_annotations_visible(visible: boolean): void;
     /**
      * Set the WebGPU surface clear color used behind the chart panel.
      * Components are linear 0..1 RGBA floats. This is host/app state:
@@ -743,28 +957,49 @@ export interface InitOutput {
     readonly color_cycle_css: (a: number) => [number, number];
     readonly draw_style_modes: () => [number, number, number, number];
     readonly draw_style_param_specs: (a: number, b: number) => [number, number, number, number];
+    readonly figgyboundedchart_active_layer: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_add_annotation: (a: number, b: number, c: number) => [number, number, number];
+    readonly figgyboundedchart_annotation_handle: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly figgyboundedchart_annotation_warnings: (a: number) => [number, number, number, number];
+    readonly figgyboundedchart_annotations: (a: number) => [number, number, number, number];
     readonly figgyboundedchart_clear_selection: (a: number) => void;
     readonly figgyboundedchart_create: (a: any, b: number, c: number, d: number, e: number, f: number, g: number) => any;
     readonly figgyboundedchart_decorations: (a: number) => [number, number, number, number];
     readonly figgyboundedchart_drag: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly figgyboundedchart_drag_annotation: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly figgyboundedchart_export_png: (a: number, b: number) => any;
     readonly figgyboundedchart_first_frame_ready: (a: number) => any;
     readonly figgyboundedchart_frame: (a: number) => [number, number];
     readonly figgyboundedchart_get_document: (a: number) => [number, number, number, number];
     readonly figgyboundedchart_gpu_ready: (a: number) => any;
+    readonly figgyboundedchart_hit_annotation: (a: number, b: number, c: number) => number;
     readonly figgyboundedchart_hit_decoration: (a: number, b: number, c: number, d: number) => [number, number];
     readonly figgyboundedchart_hover: (a: number, b: number, c: number, d: number) => number;
     readonly figgyboundedchart_pick: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly figgyboundedchart_pointer_to_anchor: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly figgyboundedchart_remove_annotation: (a: number, b: number) => [number, number];
     readonly figgyboundedchart_resize: (a: number, b: number, c: number) => void;
     readonly figgyboundedchart_resize_handle: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly figgyboundedchart_select_annotation: (a: number, b: number) => [number, number];
     readonly figgyboundedchart_select_decoration: (a: number, b: number, c: number) => [number, number];
+    readonly figgyboundedchart_selected_annotation: (a: number) => number;
+    readonly figgyboundedchart_set_active_layer: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly figgyboundedchart_set_annotation: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly figgyboundedchart_set_annotations_visible: (a: number, b: number) => [number, number];
     readonly figgyboundedchart_set_document: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgyboundedchart_step_selection: (a: number, b: number) => void;
+    readonly figgychart_active_layer: (a: number) => [number, number, number, number];
+    readonly figgychart_add_annotation: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_add_line_series: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number];
+    readonly figgychart_annotation_handle: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly figgychart_annotation_warnings: (a: number) => [number, number, number, number];
+    readonly figgychart_annotations: (a: number) => [number, number, number, number];
     readonly figgychart_apply_axis_preset: (a: number, b: number) => [number, number];
     readonly figgychart_apply_color_cycle: (a: number, b: number) => [number, number];
     readonly figgychart_auto_fit_all: (a: number, b: number) => any;
     readonly figgychart_auto_fit_colorbar: (a: number, b: number) => [number, number];
+    readonly figgychart_auto_fit_overlay_y: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly figgychart_auto_fit_subplot: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
     readonly figgychart_auto_fit_x: (a: number, b: number, c: number, d: number) => [number, number];
     readonly figgychart_auto_fit_y: (a: number, b: number, c: number, d: number) => [number, number];
     readonly figgychart_auto_stream_chart_request_ranges: (a: number) => [number, number, number];
@@ -784,6 +1019,7 @@ export interface InitOutput {
     readonly figgychart_decoration_bounds: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_demote_auto_resident_columns: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number];
     readonly figgychart_discard_stream_selection_request: (a: number, b: number) => [number, number];
+    readonly figgychart_drag_annotation: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly figgychart_ensure_extent_engine: (a: number) => any;
     readonly figgychart_export_png: (a: number, b: number) => any;
     readonly figgychart_finish_stream_export: (a: number, b: number) => any;
@@ -796,6 +1032,7 @@ export interface InitOutput {
     readonly figgychart_gpu_memory_status: (a: number) => [number, number];
     readonly figgychart_gpu_ready: (a: number) => any;
     readonly figgychart_has_selection: (a: number) => number;
+    readonly figgychart_hit_annotation: (a: number, b: number, c: number) => number;
     readonly figgychart_hit_test: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_inspect_column_admission: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_interrupt_render: (a: number) => [number, number, number, number];
@@ -806,6 +1043,7 @@ export interface InitOutput {
     readonly figgychart_on_release: (a: number) => void;
     readonly figgychart_pick_data: (a: number, b: number, c: number, d: number) => any;
     readonly figgychart_pick_point: (a: number, b: number, c: number, d: number) => any;
+    readonly figgychart_pointer_to_anchor: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly figgychart_prewarm_all: (a: number) => any;
     readonly figgychart_prewarm_all_with_progress: (a: number, b: any) => any;
     readonly figgychart_prewarm_gpu_picking: (a: number) => any;
@@ -817,6 +1055,7 @@ export interface InitOutput {
     readonly figgychart_register_streaming_column_sources: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
     readonly figgychart_register_streaming_columns: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number];
     readonly figgychart_release_unused_gpu_memory: (a: number) => any;
+    readonly figgychart_remove_annotation: (a: number, b: number) => [number, number];
     readonly figgychart_remove_column: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_remove_series: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_replace_streaming_column_sources: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
@@ -826,8 +1065,13 @@ export interface InitOutput {
     readonly figgychart_request_stream_auto_fit: (a: number, b: number) => [number, number, number];
     readonly figgychart_reset_legend_from_series_labels: (a: number) => [number, number];
     readonly figgychart_resize: (a: number, b: number, c: number) => [number, number];
+    readonly figgychart_select_annotation: (a: number, b: number) => [number, number];
+    readonly figgychart_selected_annotation: (a: number) => number;
     readonly figgychart_selection_details: (a: number) => any;
     readonly figgychart_series_draw_info: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly figgychart_set_active_layer: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly figgychart_set_annotation: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly figgychart_set_annotations_visible: (a: number, b: number) => [number, number];
     readonly figgychart_set_clear_color: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly figgychart_set_colorbar_axis: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_colorbar_title: (a: number, b: number, c: number) => [number, number];
@@ -869,8 +1113,8 @@ export interface InitOutput {
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined___js_sys_9d9a0597b9bb8a15___Function_fn_wasm_bindgen_828f888c0d3e13b9___JsValue_____wasm_bindgen_828f888c0d3e13b9___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__149: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__150: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__179: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_828f888c0d3e13b9___convert__closures_____invoke___wasm_bindgen_828f888c0d3e13b9___sys__JsNullable_wgpu_634d2c566364ae16___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_828f888c0d3e13b9___JsError___true__180: (a: number, b: number, c: any) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

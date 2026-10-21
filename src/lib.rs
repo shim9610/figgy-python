@@ -38,21 +38,37 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
     // Internally tagged serde enums buffer their fields before deserialization;
     // serde_ignored cannot observe unknown draw-style parameters inside them.
     if json.contains("\"draw_style\"") {
-        let raw: Value = serde_json::from_str(json).map_err(invalid)?;
-        let style = raw
-            .get("draw_style")
-            .or_else(|| raw.get("config").and_then(|c| c.get("draw_style")));
-        if let Some(style) = style {
-            let parsed: renderer::config::DrawStyle =
-                serde_json::from_value(style.clone()).map_err(invalid)?;
-            if let Some(fields) = style.as_object() {
-                for key in fields.keys() {
-                    if key != "mode" && !draw_style_specs(&parsed).iter().any(|p| p.key == key) {
-                        return Err(invalid(format!("unknown draw-style parameter: {key}")));
+        fn styles(value: &Value) -> PyResult<()> {
+            if let Some(fields) = value.as_object() {
+                if let Some(style) = fields.get("draw_style") {
+                    let parsed: renderer::config::DrawStyle =
+                        serde_json::from_value(style.clone()).map_err(invalid)?;
+                    if let Some(fields) = style.as_object() {
+                        for key in fields.keys() {
+                            if key != "mode"
+                                && !draw_style_specs(&parsed).iter().any(|p| p.key == key)
+                            {
+                                return Err(invalid(format!(
+                                    "unknown draw-style parameter: {key}"
+                                )));
+                            }
+                        }
+                    }
+                }
+                if let Some(config) = fields.get("config") {
+                    styles(config)?;
+                }
+                if let Some(items) = fields.get("subplots").and_then(Value::as_array) {
+                    for subplot in items {
+                        if let Some(config) = subplot.get("config") {
+                            styles(config)?;
+                        }
                     }
                 }
             }
+            Ok(())
         }
+        styles(&serde_json::from_str::<Value>(json).map_err(invalid)?)?;
     }
     let mut de = serde_json::Deserializer::from_str(json);
     let mut unknown = Vec::new();
@@ -68,9 +84,14 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
     Ok(value)
 }
 
-/// Renderer version stamped into, and required from, Settings documents.
+/// Renderer version stamped into Settings documents. Previous compatible
+/// documents are accepted explicitly by supported_settings_version.
 /// It names the `figgy-renderer` pin in Cargo.toml; update both together.
-const RENDERER_VERSION: &str = "0.17.0";
+const RENDERER_VERSION: &str = "0.18.0";
+
+fn supported_settings_version(schema: u32, renderer: &str) -> bool {
+    matches!(schema, 1 | 2) && matches!(renderer, "0.17.0" | RENDERER_VERSION)
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -87,12 +108,18 @@ struct Settings {
     categorical: Option<renderer::categorical::CategoricalChart>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     boxplot: Option<renderer::boxplot::BoxPlotChart>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    radar: Option<renderer::radar::RadarChart>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    identity: Option<Value>,
 }
 
 impl Settings {
     fn document(&self) -> PyResult<Option<bounded::DocumentChart>> {
+        validate_identity(self.identity.as_ref(), &self.config, self.schema_version)?;
         let docs = [
             self.radial.clone().map(bounded::DocumentChart::Radial),
+            self.radar.clone().map(bounded::DocumentChart::Radar),
             self.categorical
                 .clone()
                 .map(bounded::DocumentChart::Categorical),
@@ -161,6 +188,7 @@ impl<T: Number> HiLoColumnSource for BorrowedColumn<'_, T> {
 }
 
 struct FigureCore {
+    identity: Option<Value>,
     background: Option<Color>,
     code_dpi: f64,
     default_config: Config,
@@ -288,8 +316,18 @@ impl FigureAccess<'_> {
         let styled = !matches!(
             self.data.chart.config().draw_style,
             renderer::config::DrawStyle::Precise
-        );
-        if scale != 1.0 && !styled {
+        ) || self
+            .data
+            .chart
+            .config()
+            .subplots
+            .iter()
+            .any(|p| !matches!(p.config.draw_style, renderer::config::DrawStyle::Precise));
+        if !styled
+            && (!self.data.chart.config().subplots.is_empty()
+                || !self.data.chart.config().overlays.is_empty()
+                || scale != 1.0)
+        {
             // Exports at another scale rasterize without a ChartView, so derive
             // this revision's tick warnings from a view of the document itself.
             if self.data.warnings_revision != Some(self.data.revision) {
@@ -300,7 +338,7 @@ impl FigureAccess<'_> {
                     .map_err(runtime)?;
                 self.note_render_warnings(view.render_warnings());
             }
-            return pollster::block_on(self.renderer.export_panel_rgba_with_clear_async(
+            return pollster::block_on(self.renderer.export_document_rgba_with_clear_async(
                 &Chart::new(gpu::config(self.data.figure_id, self.data.chart.config())),
                 &gpu::series(self.data.figure_id, &self.data.series),
                 scale,
@@ -315,8 +353,15 @@ impl FigureAccess<'_> {
             config.chart_area.0.width = (original.width as f32 * scale).round().max(1.) as u32;
             config.chart_area.0.height = (original.height as f32 * scale).round().max(1.) as u32;
         }
+        let original = self.data.chart.config().document_area();
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: (original.width as f32 * scale).round().max(1.) as u32,
+            height: (original.height as f32 * scale).round().max(1.) as u32,
+        };
+        config = renderer::place_document(&config, 1., rect);
         let chart = Chart::new(config);
-        let rect = chart.config().chart_area.0;
         if rect.width > self.renderer.device().limits().max_texture_dimension_2d
             || rect.height > self.renderer.device().limits().max_texture_dimension_2d
         {
@@ -353,7 +398,7 @@ impl FigureAccess<'_> {
             });
             let view = self
                 .renderer
-                .create_chart_view(&chart, rect)
+                .create_chart_view(&chart, chart.config().chart_area.0)
                 .map_err(runtime)?;
             self.data.target = Some(RenderTarget {
                 width: rect.width,
@@ -386,7 +431,7 @@ impl FigureAccess<'_> {
         }
         if target.revision != self.data.revision {
             self.renderer
-                .refresh_axis(&mut target.view, &chart, rect)
+                .refresh_axis(&mut target.view, &chart, chart.config().chart_area.0)
                 .map_err(runtime)?;
             target.revision = self.data.revision;
         }
@@ -548,14 +593,11 @@ impl FigureAccess<'_> {
         Ok(())
     }
     fn element(&self, target: &str) -> PyResult<HitId> {
-        self.data
-            .elements
-            .iter()
-            .find(|(name, _)| name == target)
-            .map(|(_, id)| *id)
+        self.active_element(target)
             .ok_or_else(|| invalid(format!("unknown decoration: {target}")))
     }
-    fn commit_config(&mut self, config: Config) -> PyResult<()> {
+    fn commit_config(&mut self, mut config: Config) -> PyResult<()> {
+        config.sync_subplot_links(Some(self.data.chart.config()));
         validate_config(&config)?;
         validate_draw_style(&config, &self.data.series)?;
         self.renderer
@@ -565,12 +607,21 @@ impl FigureAccess<'_> {
             )
             .map_err(invalid)?;
         self.data.chart = Chart::new(config);
+        self.refresh_addresses();
         self.data.revision += 1;
         Ok(())
     }
     fn snapshot(&self) -> Settings {
         Settings {
-            schema_version: 1,
+            schema_version: if self.data.identity.is_some() { 2 } else { 1 },
+            identity: self.data.identity.clone(),
+            radar: self.data.document.as_ref().and_then(|r| {
+                if let bounded::DocumentChart::Radar(c) = &r.chart {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            }),
             renderer_version: RENDERER_VERSION.into(),
             config: self.data.chart.config().clone(),
             series: self.data.series.clone(),
@@ -613,14 +664,22 @@ fn positive_data_bounds(
             "x" => extent.union(&column(&s.x_column)?),
             "y" => extent.union(&column(&s.y_column)?),
             "z" => {
-                let matrix = match &s.render_type {
-                    renderer::DataRenderType::Heatmap { matrix, .. }
-                    | renderer::DataRenderType::Contour { matrix, .. }
-                    | renderer::DataRenderType::HeatmapContour { matrix, .. } => matrix,
-                    _ => continue,
-                };
-                for id in &matrix.columns {
-                    extent.union(&column(id)?);
+                let value = serde_json::to_value(&s.render_type).map_err(invalid)?;
+                let style = value.as_object().unwrap().values().next().unwrap();
+                for matrix in [&style["matrix"], &style["style"]["color_map"]["Grid"]] {
+                    if let Some(columns) = matrix["columns"].as_array() {
+                        for id in columns {
+                            extent.union(&column(id.as_str().unwrap())?);
+                        }
+                    }
+                }
+                for id in [
+                    &style["scatter"]["point_color_map"]["column"],
+                    &style["style"]["color_map"]["Column"],
+                ] {
+                    if let Some(id) = id.as_str() {
+                        extent.union(&column(id)?);
+                    }
                 }
             }
             _ => return Err(invalid("log bounds axis must be x, y or z")),
@@ -658,8 +717,7 @@ fn positive_data_bounds(
 fn validate_config(config: &Config) -> PyResult<()> {
     validate_model_numbers(config, "config")?;
     let rect = config.chart_area.0;
-    if rect.x != 0
-        || rect.y != 0
+    if (config.subplots.is_empty() && (rect.x != 0 || rect.y != 0))
         || rect.width == 0
         || rect.height == 0
         || rect.width > 8192
@@ -667,6 +725,12 @@ fn validate_config(config: &Config) -> PyResult<()> {
     {
         return Err(invalid(
             "chart canvas must begin at (0, 0) and be 1..8192 pixels",
+        ));
+    }
+    let document = config.document_area();
+    if document.width > 8192 || document.height > 8192 {
+        return Err(invalid(
+            "complete document exceeds the 8192 pixel canvas limit",
         ));
     }
     for axis in [
@@ -752,6 +816,25 @@ fn draw_style_specs(
 }
 
 fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()> {
+    if !config.subplots.is_empty() {
+        let mut base = config.clone();
+        base.subplots.clear();
+        let owned: Vec<_> = series
+            .iter()
+            .filter(|s| !config.subplots.iter().any(|p| p.owns_series(&s.series_id)))
+            .cloned()
+            .collect();
+        validate_draw_style(&base, &owned)?;
+        for panel in &config.subplots {
+            let owned: Vec<_> = series
+                .iter()
+                .filter(|s| panel.owns_series(&s.series_id))
+                .cloned()
+                .collect();
+            validate_draw_style(&panel.config, &owned)?;
+        }
+        return Ok(());
+    }
     use renderer::{DataRenderType, config::DrawStyle};
     // A stylized style silently skips series it has no entry point for; the
     // renderer's own predicate says which, so none reaches it unrejected.
@@ -918,6 +1001,7 @@ impl FigureCore {
             add!(ColorBarLabelElement);
             add!(ColorBarTitleElement);
             Ok(Self {
+                identity: None,
                 background: None,
                 code_dpi: 120.0,
                 default_config,
@@ -1059,15 +1143,10 @@ impl FigureAccess<'_> {
         })();
         if let Err(error) = result {
             self.renderer
-                .set_chart_series(
-                    self.data.chart_id,
-                    gpu::series(self.data.figure_id, &old.series),
-                )
-                .map_err(runtime)?;
-            self.renderer
-                .set_chart_config(
+                .set_chart_state(
                     self.data.chart_id,
                     gpu::config(self.data.figure_id, &old.config),
+                    gpu::series(self.data.figure_id, &old.series),
                 )
                 .map_err(runtime)?;
             self.data.chart = Chart::new(old.config);
@@ -1078,9 +1157,51 @@ impl FigureAccess<'_> {
         self.data.revision = revision + 1;
         Ok(())
     }
+    fn add_series_batch(&mut self, py: Python<'_>, json: &str, config: &str) -> PyResult<()> {
+        if self.data.document.is_some() {
+            return Err(invalid("bounded charts cannot contain coordinate series"));
+        }
+        let previous = self.snapshot();
+        let revision = self.data.revision;
+        let result = (|| {
+            let mut series = self.data.series.clone();
+            series.extend(parse::<Vec<SeriesConfig>>(json)?);
+            let config: Config = parse(config)?;
+            validate_config(&config)?;
+            validate_draw_style(&config, &series)?;
+            self.renderer
+                .set_chart_state(
+                    self.data.chart_id,
+                    gpu::config(self.data.figure_id, &config),
+                    gpu::series(self.data.figure_id, &series),
+                )
+                .map_err(invalid)?;
+            self.data.chart = Chart::new(config);
+            self.refresh_addresses();
+            self.data.series = series;
+            self.fit(py, 0.05)
+        })();
+        if let Err(error) = result {
+            self.renderer
+                .set_chart_state(
+                    self.data.chart_id,
+                    gpu::config(self.data.figure_id, &previous.config),
+                    gpu::series(self.data.figure_id, &previous.series),
+                )
+                .map_err(runtime)?;
+            self.data.chart = Chart::new(previous.config);
+            self.data.series = previous.series;
+            self.data.revision = revision;
+            return Err(error);
+        }
+        self.data.revision = revision + 1;
+        Ok(())
+    }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let mut next: Settings = parse(json)?;
-        if next.schema_version != 1 || next.renderer_version != RENDERER_VERSION {
+        next.config
+            .sync_subplot_links(Some(self.data.chart.config()));
+        if !supported_settings_version(next.schema_version, &next.renderer_version) {
             return Err(invalid("unsupported settings/renderer version"));
         }
         validate_config(&next.config)?;
@@ -1115,42 +1236,43 @@ impl FigureAccess<'_> {
         }
         let old = self.data.series.clone();
         let series_changed = next.series != old;
-        if series_changed {
-            renderer::legend::update_legend_symbols_preserving_text(
-                &mut next.config.legend.content,
-                &next.series,
-            );
+        if series_changed
+            || next.config != *self.data.chart.config()
+            || next.config.colorbar.as_ref().map(|bar| &bar.colormap)
+                != self
+                    .data
+                    .chart
+                    .config()
+                    .colorbar
+                    .as_ref()
+                    .map(|bar| &bar.colormap)
+        {
+            identity::refresh_legends(&mut next.config, &next.series);
         }
         let radial_changed = document.as_ref() != self.data.document.as_ref().map(|r| &r.chart);
         if next.config == *self.data.chart.config()
             && !series_changed
             && !radial_changed
             && next.background == self.data.background
+            && next.identity == self.data.identity
         {
             return Ok(());
         }
-        if series_changed {
-            self.renderer
-                .set_chart_series(
-                    self.data.chart_id,
-                    gpu::series(self.data.figure_id, &next.series),
-                )
-                .map_err(invalid)?;
-        }
-        if let Err(e) = self.renderer.set_chart_config(
-            self.data.chart_id,
-            gpu::config(self.data.figure_id, &next.config),
-        ) {
-            if series_changed {
-                self.renderer
-                    .set_chart_series(self.data.chart_id, gpu::series(self.data.figure_id, &old))
-                    .map_err(runtime)?;
-            }
-            return Err(invalid(e));
-        }
+        // Config and series can introduce or remove dependencies together
+        // (for example, a point color map and its colorbar). Let the renderer
+        // validate and commit the complete state without an invalid interim.
+        self.renderer
+            .set_chart_state(
+                self.data.chart_id,
+                gpu::config(self.data.figure_id, &next.config),
+                gpu::series(self.data.figure_id, &next.series),
+            )
+            .map_err(invalid)?;
         self.data.chart = Chart::new(next.config);
+        self.refresh_addresses();
         self.data.series = next.series;
         self.data.background = next.background;
+        self.data.identity = next.identity;
         if let Some(chart) = document {
             self.data.document.as_mut().unwrap().chart = chart;
         }
@@ -1158,9 +1280,19 @@ impl FigureAccess<'_> {
         Ok(())
     }
     fn log_bounds(&mut self, axis: &str) -> PyResult<(f64, f64)> {
+        self.log_bounds_for(axis, self.data.chart.config().active_layer())
+    }
+    fn log_bounds_for(&mut self, axis: &str, layer: renderer::LayerRef) -> PyResult<(f64, f64)> {
+        let selected: Vec<_> = self
+            .data
+            .series
+            .iter()
+            .filter(|s| identity::fit_member(self.data.chart.config(), &s.series_id, axis, layer))
+            .cloned()
+            .collect();
         let mut extra = renderer::chart::FitExtent::EMPTY;
         if matches!(axis, "x" | "y") {
-            let errorbars: Vec<_> = gpu::series(self.data.figure_id, &self.data.series)
+            let errorbars: Vec<_> = gpu::series(self.data.figure_id, &selected)
                 .into_iter()
                 .filter(|s| {
                     matches!(
@@ -1195,7 +1327,7 @@ impl FigureAccess<'_> {
                 }
             }
         }
-        positive_data_bounds(axis, &self.data.series, extra, |id| {
+        positive_data_bounds(axis, &selected, extra, |id| {
             Chart::slot_extent(
                 self.renderer.pool(),
                 &gpu::column_id(self.data.figure_id, id),
@@ -1204,100 +1336,81 @@ impl FigureAccess<'_> {
         })
     }
     fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
+        self.fit_domain(py, padding, false)
+    }
+    fn fit_domain(&mut self, py: Python<'_>, padding: f64, active_only: bool) -> PyResult<()> {
         if !padding.is_finite() || padding < 0.0 {
             return Err(invalid("padding must be finite and non-negative"));
         }
-        py.detach(|| {
+        let extents = py.detach(|| -> PyResult<Vec<[renderer::chart::FitExtent; 2]>> {
             pollster::block_on(self.renderer.ensure_errorbar_extent_engine()).map_err(runtime)?;
-            let token = self
-                .renderer
-                .begin_fit_commit(self.data.chart_id)
-                .map_err(runtime)?;
-            let mut x = renderer::chart::FitExtent::EMPTY;
-            let mut y = renderer::chart::FitExtent::EMPTY;
+            let specs = gpu::series(self.data.figure_id, &self.data.series);
             let mut jobs = Vec::new();
-            for series in &gpu::series(self.data.figure_id, &self.data.series) {
-                if let Some(job) = self
-                    .renderer
-                    .begin_series_fit_extent(series)
-                    .map_err(runtime)?
-                {
-                    jobs.push(job);
-                }
-                if let renderer::DataRenderType::Histogram { bar } = &series.render_type {
-                    let mut a = Chart::slot_extent(self.renderer.pool(), &series.x_column)
-                        .map_err(runtime)?;
-                    let mut b = Chart::slot_extent(self.renderer.pool(), &series.y_column)
-                        .map_err(runtime)?;
-                    let base = renderer::chart::FitExtent {
-                        min: bar.baseline,
-                        max: bar.baseline,
-                        min_positive: (bar.baseline > 0.0).then_some(bar.baseline),
-                    };
-                    if matches!(
-                        bar.orientation,
-                        renderer::data_config::BarOrientation::Vertical
-                    ) {
-                        b.union(&base);
-                    } else {
-                        a.union(&base);
-                    }
-                    x.union(&a);
-                    y.union(&b);
-                }
+            let mut extents = Vec::new();
+            for series in &specs {
+                let a =
+                    Chart::slot_extent(self.renderer.pool(), &series.x_column).map_err(runtime)?;
+                let b =
+                    Chart::slot_extent(self.renderer.pool(), &series.y_column).map_err(runtime)?;
+                extents.push([a, b]);
+                jobs.push(
+                    self.renderer
+                        .begin_series_fit_extent(series)
+                        .map_err(runtime)?,
+                );
             }
             self.renderer.wait_idle();
-            for job in jobs {
-                if let Some(ext) = pollster::block_on(job.resolve()).map_err(runtime)? {
-                    x.union(&renderer::chart::FitExtent {
-                        min: ext.x.min,
-                        max: ext.x.max,
-                        min_positive: ext.x.min_positive,
-                    });
-                    y.union(&renderer::chart::FitExtent {
-                        min: ext.y.min,
-                        max: ext.y.max,
-                        min_positive: ext.y.min_positive,
+            for (i, job) in jobs.into_iter().enumerate() {
+                if let Some(job) = job {
+                    extents[i] =
+                        if let Some(e) = pollster::block_on(job.resolve()).map_err(runtime)? {
+                            [
+                                renderer::chart::FitExtent {
+                                    min: e.x.min,
+                                    max: e.x.max,
+                                    min_positive: e.x.min_positive,
+                                },
+                                renderer::chart::FitExtent {
+                                    min: e.y.min,
+                                    max: e.y.max,
+                                    min_positive: e.y.min_positive,
+                                },
+                            ]
+                        } else {
+                            [renderer::chart::FitExtent::EMPTY; 2]
+                        };
+                }
+                if let renderer::DataRenderType::Histogram { bar } = &specs[i].render_type {
+                    let dimension = usize::from(matches!(
+                        bar.orientation,
+                        renderer::data_config::BarOrientation::Vertical
+                    ));
+                    extents[i][dimension].union(&renderer::chart::FitExtent {
+                        min: bar.baseline,
+                        max: bar.baseline,
+                        min_positive: (bar.baseline > 0.).then_some(bar.baseline),
                     });
                 }
             }
-            self.renderer
-                .commit_auto_fit_all_if_current(&token, &x, &y, padding)
-                .map_err(runtime)
+            Ok(extents)
         })?;
-        let mut next = self
-            .renderer
-            .chart_config(self.data.chart_id)
-            .map_err(runtime)?
-            .clone();
-        if let Err(error) = validate_config(&next) {
-            self.renderer
-                .set_chart_config(
-                    self.data.chart_id,
-                    gpu::config(self.data.figure_id, self.data.chart.config()),
-                )
-                .map_err(runtime)?;
-            return Err(error);
-        }
-        // Fitting changes axes only; keep the local document's selection ids.
-        next.picked_data = self.data.chart.config().picked_data.clone();
-        next.picked_points = self.data.chart.config().picked_points.clone();
-        self.data.chart = Chart::new(next);
-        self.data.revision += 1;
-        Ok(())
+        let config = document_fit::fit(
+            self.data.chart.config(),
+            &self.data.series,
+            &extents,
+            padding,
+            active_only,
+        );
+        self.commit_config(config)
     }
     fn set_range(&mut self, axis: &str, min: f64, max: f64) -> PyResult<()> {
         if !min.is_finite() || !max.is_finite() || min >= max {
             return Err(invalid("range must be finite and increasing"));
         }
-        let mut next = Chart::new(self.data.chart.config().clone());
-        match axis {
-            "x" => next.set_x_range(min, max),
-            "y" => next.set_y_range(min, max),
-            _ => return Err(invalid("axis must be x or y")),
-        }
-        self.commit_config(next.config().clone())
+        let next = document_fit::set_range(self.data.chart.config(), axis, min, max)?;
+        self.commit_config(next)
     }
+
     fn render_rgba<'py>(
         &mut self,
         py: Python<'py>,
@@ -1324,10 +1437,37 @@ impl FigureAccess<'_> {
         if self.data.document.is_some() {
             let frame = self.document_frame()?;
             let map = frame.decorations();
-            return Ok(map
-                .hit_test([x, y])
-                .and_then(|id| map.element(id))
-                .map(|e| e.id.element_id()));
+            let annotations = self.document_annotations()?;
+            return Ok(
+                match annotations.hit_test_active_layer(
+                    self.data.document.as_ref().unwrap().chart.active_layer(),
+                    map,
+                    [x, y],
+                ) {
+                    Some(renderer::annotation::LayerHit::Annotation { index, .. }) => {
+                        Some(format!("annotation_{index}"))
+                    }
+                    Some(renderer::annotation::LayerHit::Element(id)) => {
+                        map.element(id).map(|e| e.id.element_id())
+                    }
+                    None => None,
+                },
+            );
+        }
+        if self.data.chart.config().active_layer() == renderer::LayerRef::Annotations {
+            let view = self.annotation_view()?;
+            if let Some(id) = view.annotation_map().hit_test([x, y]) {
+                let index = view
+                    .annotation_map()
+                    .entries()
+                    .find(|(hit, _)| *hit == id)
+                    .map(|(_, item)| item.index)
+                    .unwrap();
+                return Ok(Some(format!(
+                    "annotation:{}",
+                    self.data.chart.config().annotations.items[index].id
+                )));
+            }
         }
         Ok(self
             .data
@@ -1342,6 +1482,23 @@ impl FigureAccess<'_> {
             .map(|el| el.element_id()))
     }
     fn bounds_json(&mut self, target: &str) -> PyResult<String> {
+        if self.data.document.is_some()
+            && let Some(index) = target
+                .strip_prefix("annotation_")
+                .and_then(|v| v.parse::<usize>().ok())
+        {
+            let frame = self.document_annotations()?;
+            let value = frame.annotations().find(index).and_then(|id|frame.annotations().selection_box(id)).map(|b|json!({"rect":[b.rect.x,b.rect.y,b.rect.width,b.rect.height],"handles":b.handles.iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>()}));
+            return serde_json::to_string(&value).map_err(runtime);
+        }
+
+        if target.starts_with("annotation:") {
+            let view = self.annotation_view()?;
+            let map = view.annotation_map();
+            let value = map.find(self.annotation_index(target)?).and_then(|id| map.selection_box(id)).map(|b| json!({"rect":[b.rect.x,b.rect.y,b.rect.width,b.rect.height],"handles":b.handles.iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>() }));
+            return serde_json::to_string(&value).map_err(runtime);
+        }
+
         if self.data.document.is_some() {
             let frame = self.document_frame()?;
             let map = frame.decorations();
@@ -1360,7 +1517,15 @@ impl FigureAccess<'_> {
         }));
         serde_json::to_string(&value).map_err(runtime)
     }
-    fn resize_handle(&self, target: &str, x: f32, y: f32) -> PyResult<Option<String>> {
+    fn resize_handle(&mut self, target: &str, x: f32, y: f32) -> PyResult<Option<String>> {
+        if target.starts_with("annotation:") {
+            let view = self.annotation_view()?;
+            return Ok(view
+                .annotation_map()
+                .find(self.annotation_index(target)?)
+                .and_then(|id| view.annotation_map().hit_resize_handle(id, [x, y]))
+                .map(|h| format!("{h:?}")));
+        }
         let id = self.element(target)?;
         Ok(self
             .data
@@ -1384,6 +1549,29 @@ impl FigureAccess<'_> {
         if self.data.document.is_some() {
             return self.document_drag(target, dx, dy, handle);
         }
+        if target.starts_with("annotation:") {
+            let view = self.annotation_view()?;
+            let map = view.annotation_map();
+            let id = map
+                .find(self.annotation_index(target)?)
+                .ok_or_else(|| invalid("annotation is not visible"))?;
+            let mut config = self.data.chart.config().clone();
+            let moved = if let Some(handle) = handle {
+                let handle = ALL_HANDLES
+                    .into_iter()
+                    .find(|h| format!("{h:?}") == handle)
+                    .ok_or_else(|| invalid("unknown resize handle"))?;
+                map.resize_by(&mut config.annotations, id, handle, dx, dy)
+            } else {
+                map.drag_by(&mut config.annotations, id, dx, dy)
+            };
+            if moved == Some(renderer::layout::NudgeResult::Moved) {
+                self.commit_config(config)?;
+                return Ok(true);
+            }
+            return Ok(false);
+        }
+
         let id = self.element(target)?;
         let el = self.data.hitmap.get(id).unwrap();
         let mut cfg = self.data.chart.config().clone();
@@ -1493,9 +1681,18 @@ impl FigureAccess<'_> {
 mod axis_edit;
 mod bounded;
 mod desktop;
+mod document_fit;
+mod drawing;
 mod editor;
 mod gpu;
+mod identity;
+mod interaction;
+mod navigation;
 mod notebook;
+mod target_chooser;
+mod tick_policy;
+mod ui_fonts;
+use identity::{validate_columns, validate_identity};
 mod selection;
 
 #[pyclass(module = "figgyplot._native")]
@@ -1550,6 +1747,9 @@ impl NativeFigure {
     ) -> PyResult<()> {
         self.with(|core| core.add_series_fitted(py, json, config, bounds))
     }
+    fn add_series_batch(&self, py: Python<'_>, json: &str, config: &str) -> PyResult<()> {
+        self.with(|core| core.add_series_batch(py, json, config))
+    }
     fn apply_settings(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.apply_settings(json))
     }
@@ -1559,8 +1759,15 @@ impl NativeFigure {
     fn set_radial(&self, json: &str) -> PyResult<()> {
         self.with(|core| core.set_radial(json))
     }
+    fn fit_active(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
+        self.with(|core| core.fit_domain(py, padding, true))
+    }
     fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.with(|core| core.fit(py, padding))
+    }
+    fn log_bounds_at(&self, axis: &str, layer: &str) -> PyResult<(f64, f64)> {
+        let layer = parse(layer)?;
+        self.with(|core| core.log_bounds_for(axis, layer))
     }
     fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
         self.with(|core| core.log_bounds(axis))
@@ -1645,6 +1852,9 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(text_segments_json, m)?)?;
     m.add_function(wrap_pyfunction!(segments_plain_text, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
+    m.add_function(wrap_pyfunction!(fitted_range_json, m)?)?;
+    m.add_function(wrap_pyfunction!(navigation::object_outline_json, m)?)?;
+    m.add_function(wrap_pyfunction!(navigation::bounded_view_json, m)?)?;
     m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
@@ -1714,20 +1924,33 @@ fn fitted_chart_title_margin(config: &str) -> PyResult<f32> {
 }
 
 #[pyfunction]
+fn fitted_range_json(config: &str, axis: &str, min: f64, max: f64) -> PyResult<String> {
+    if !min.is_finite() || !max.is_finite() || min >= max {
+        return Err(invalid("range must be finite and increasing"));
+    }
+    let config: Config = parse(config)?;
+    let fitted = document_fit::set_range(&config, axis, min, max)?;
+    validate_config(&fitted)?;
+    serde_json::to_string(&fitted).map_err(invalid)
+}
+
+#[pyfunction]
 fn default_colorbar_json() -> PyResult<String> {
     serde_json::to_string(&default::default_colorbar_options()).map_err(runtime)
 }
 
 #[pyfunction]
-fn rebuild_legend_json(series: &str, rich: &str) -> PyResult<String> {
+#[pyo3(signature = (series, rich, colormap=None))]
+fn rebuild_legend_json(series: &str, rich: &str, colormap: Option<&str>) -> PyResult<String> {
     let series: Vec<SeriesConfig> = parse(series)?;
     let mut rich: renderer::text::RichText = parse(rich)?;
+    let colormap: Option<renderer::colormap::ColorMap> = colormap.map(parse).transpose()?;
     rich.segments.clear();
     for spec in series {
         if let Some(label) = &spec.label {
             renderer::legend::append_legend_entry_rich(
                 &mut rich,
-                renderer::legend::series_symbol_segments(&spec),
+                renderer::legend::series_symbol_segments(&spec, colormap.as_ref()),
                 label.segments.clone(),
             );
         }

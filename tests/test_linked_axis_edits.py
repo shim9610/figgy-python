@@ -27,6 +27,8 @@ def test_axis_edits_work_in_both_directions_and_preserve_unedited_differences(fi
     expected=copy.deepcopy(figure.get_settings())
     for name in (key, peer):
         expected['config'][name].update(major_spacing=4., tick='Inside', line_width=2.)
+    # Numeric spacing records fixed intent for both implicitly paired edges.
+    expected['identity'].setdefault('tick_modes',{}).setdefault('main',{}).update({key:'Fixed',peer:'Fixed'})
     figure.update('axis_'+side, major_spacing=4., tick='Inside', line_width=2.)
     assert figure.get_settings()==expected
     # A secondary-side edit uses the same rule in reverse; no explicit link flag.
@@ -60,6 +62,7 @@ def test_distinct_coordinate_axes_remain_independent_without_rounding(figure, di
     expected=copy.deepcopy(figure.get_settings())
     expected['config']['bottom_x']['major_spacing']=4.
     expected['config']['bottom_x']['label_style']['significant_digits']=4
+    expected['identity'].setdefault('tick_modes',{}).setdefault('main',{})['bottom_x']='Fixed'
     figure.update('axis_bottom', major_spacing=4., significant_digits=4)
     assert figure.get_settings()==expected
 
