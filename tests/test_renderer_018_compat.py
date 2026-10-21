@@ -8,8 +8,9 @@ import figgyplot as figgy
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('previous', ['0.17.0', '0.18.0'])
 @pytest.mark.parametrize('kind', ['line', 'radial', 'categorical', 'boxplot'])
-def test_previous_settings_preserve_edits_and_reject_unknown_versions(backend, kind):
+def test_previous_settings_preserve_edits_and_reject_unknown_versions(backend, kind, previous):
     with figgy.Figure(backend=backend) as figure:
         ax = figure.axes[0]
         if kind == 'line':
@@ -22,11 +23,11 @@ def test_previous_settings_preserve_edits_and_reject_unknown_versions(backend, k
             ax.boxplot([[1, 2, 3], [2, 3, 4]])
         ax.set_title('Saved presentation')
         saved = figure.get_settings()
-        saved['renderer_version'] = '0.17.0'
+        saved['renderer_version'] = previous
         ax.set_title('Temporary edit')
         figure.apply_settings(saved)
         current = figure.get_settings()
-        expected = dict(saved, renderer_version='0.18.0')
+        expected = dict(saved, renderer_version='0.18.1')
         assert current == expected
         revision = figure.revision
         for key, value in [('renderer_version', '0.19.0'), ('schema_version', 3)]:
@@ -132,3 +133,21 @@ def test_new_references_isolate_figures_and_survive_other_figure_close(kind):
         assert np.array_equal(second.render_rgba(), image)
         assert second.info['column_uploads'] == uploads
         assert second.get_settings() == settings
+
+@pytest.mark.parametrize('target,axis', [('tick_labels_bottom','bottom_x'),('tick_labels_left','left_y')])
+def test_tick_label_bounds_follow_both_offset_components(target,axis):
+    """The box and hit region follow the labels, including along the axis."""
+    with figgy.Figure(backend='native') as fig:
+        fig.axes[0].plot([0,1],[0,1],id='signal')
+        fig.axes[0].set_xlim(0,1);fig.axes[0].set_ylim(0,1)
+        fig.render_rgba()
+        before=json.loads(fig._native.bounds_json(target))['rect']
+        state=fig.get_settings();state['config'][axis]['label_style']['label_offset_x']+=45;state['config'][axis]['label_style']['label_offset_y']+=30
+        fig.apply_settings(state)
+        pixels=fig.render_rgba()
+        after=json.loads(fig._native.bounds_json(target))['rect']
+        assert np.subtract(after,before)==pytest.approx([45,30,0,0],abs=.01)
+        x,y,w,h=after
+        assert fig._native.hit_test(x+w/2,y+h/2)==target
+        crop=pixels[max(0,round(y)):round(y+h),max(0,round(x)):round(x+w),:3]
+        assert np.any(np.all(crop<100,axis=2)), 'prepared label box contains no drawn text'

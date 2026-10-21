@@ -13,8 +13,8 @@ async function loadKernel(model) {
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
 const clone = value => JSON.parse(JSON.stringify(value));
-const rendererVersion = '0.18.0';
-const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0',rendererVersion].includes(settings.renderer_version);
+const rendererVersion = '0.18.1';
+const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0',rendererVersion].includes(settings.renderer_version);
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};

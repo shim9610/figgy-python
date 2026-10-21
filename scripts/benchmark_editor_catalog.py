@@ -40,7 +40,7 @@ def measure(counts=(10, 50, 200, 500), repeats=5):
             rows.append(dict(series=count, mode=mode, settings_bytes=len(source.encode()),
                              catalog_bytes=len(result.encode()), median_ms=round(statistics.median(timings), 3),
                              samples_ms=[round(v, 3) for v in timings]))
-    return {"renderer": "0.18.0", "python":platform.python_version(), "machine":platform.machine(), "repeats":repeats,
+    return {"renderer": "0.18.1", "python":platform.python_version(), "machine":platform.machine(), "repeats":repeats,
             "scope": "typed metadata only; no GPU rendering or data uploads", "results": rows}
 
 

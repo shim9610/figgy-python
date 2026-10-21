@@ -429,8 +429,8 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-The native extension uses the published **figgy-renderer 0.18.0** and
-**figgy-model 0.12.0** crates from crates.io, pinned in `Cargo.lock`.
+The native extension uses the published **figgy-renderer 0.18.1** and
+**figgy-model 0.12.1** crates from crates.io, pinned in `Cargo.lock`.
 The packaged browser kernel is built from their upstream release commit
 `3a0a6a3` with a recorded web-binding patch for non-borrowing GPU completion.
 Asset provenance checks pair the registry versions and checksums with that

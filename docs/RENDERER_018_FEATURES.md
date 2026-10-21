@@ -52,7 +52,7 @@ requested scale, independently of which layer currently receives interaction.
 | Polar | `figgy.subplots(subplot_kw={'projection': 'polar'})`; `ax.set_polar(**options)` | Lines, scatter and scatter-lines; fields, histograms, errors, vectors and secondary Y axes rejected |
 | Radar | `ax.radar(categories, values, labels=..., colors=..., **properties)` | Separate bounded document; values are series-by-category; upstream bounded limits apply |
 | Point vectors | `ax.quiver(x, y, u, v, scale=20, units='pixels', pivot='middle')` | Equal-length vectors; anchor picking reports components |
-| Grid vectors | `ax.quiver(x, y, u, v)` with 2-D components | Shape `(len(y), len(x))`; Cartesian; upstream does not provide grid-vector picking |
+| Grid vectors | `ax.quiver(x, y, u, v)` with 2-D components | Shape `(len(y), len(x))`; Cartesian; 0.18.1 picks drawn arrows; selection outlines the whole cell |
 | Vector colors | `quiver(..., values=..., cmap=..., vmin=..., vmax=...)` | Values match component shape; colorbar owns the scale |
 | Point color map | `ax.scatter(x, y, c=values, cmap=..., vmin=..., vmax=...)` | Explicit aligned numeric values; per-point values use the panel colorbar |
 | Point size map | `scatter(..., s=values, size_domain=(lo, hi), size_range=(2, 12), size_scale='area')` | Size range is marker diameter in Python points; `radius` also supported |

@@ -87,10 +87,10 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
 /// Renderer version stamped into Settings documents. Previous compatible
 /// documents are accepted explicitly by supported_settings_version.
 /// It names the `figgy-renderer` pin in Cargo.toml; update both together.
-const RENDERER_VERSION: &str = "0.18.0";
+const RENDERER_VERSION: &str = "0.18.1";
 
 fn supported_settings_version(schema: u32, renderer: &str) -> bool {
-    matches!(schema, 1 | 2) && matches!(renderer, "0.17.0" | RENDERER_VERSION)
+    matches!(schema, 1 | 2) && matches!(renderer, "0.17.0" | "0.18.0" | RENDERER_VERSION)
 }
 
 #[derive(Serialize, Deserialize)]

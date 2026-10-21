@@ -230,7 +230,7 @@ def test_surface_heatmap_edits_sync_without_image_transport():
         pump()
         click_rect(info()["decorations"]["data_area"])
         assert info()["selected"] == "Temperature" and info()["properties_open"]
-        for name, value in [("min", "-2"), ("max", "4")]:
+        for name, value in [("vmin", "-2"), ("vmax", "4")]:
             ensure_native_control_visible(info, xdo, pump, wid, name)
             click_rect(info()["controls"][name], double=True)
             xdo("key", "ctrl+a")
@@ -239,7 +239,7 @@ def test_surface_heatmap_edits_sync_without_image_transport():
             pump()
         # A picked heatmap also shows its sample details below the scrollable
         # properties. Scroll there before clicking controls below the viewport.
-        rect = info()["controls"]["max"]
+        rect = info()["controls"]["vmax"]
         xdo("mousemove", "--window", wid, round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2))
         xdo("click", "--repeat", 3, "--delay", 70, 5)
         pump()

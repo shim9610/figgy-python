@@ -100,8 +100,8 @@ they already expose, so the supplemental catalog does not duplicate them.
 
 Grid vectors can use their resident horizontal/vertical component grids or
 retain their explicit color grid. Their scalar domains come from recorded
-column extents. Grid-vector picking remains unavailable upstream; the object
-tree exposes their controls. Numeric label formats include degrees/radians and
+column extents. Renderer 0.18.1 adds grid-vector arrow picking; its selection outline covers
+the whole cell. The object tree also exposes these controls. Numeric label formats include degrees/radians and
 timestamp units, offsets, patterns, fractional digits and tick policy.
 
 Shared-axis commands adopt the chosen target's range, scale and tick intent.

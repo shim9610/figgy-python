@@ -56,10 +56,10 @@ The migration tree still carries that package version; select a new unused
 version before building publication artifacts. Do not upload the changed source
 as 0.3.0. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
-has its own version; the WASM wrapper's 0.15.0 is not the renderer version.
+has its own version; the WASM wrapper's 0.15.1 is not the renderer version.
 The native extension consumes crates.io packages with versions and checksums
 pinned in `Cargo.lock`. The bundled WASM uses their upstream release revision
-`3a0a6a33be14f2ff4dab1475d4fcec9eafa1ee04`, recorded in
+`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d`, recorded in
 `scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
 
 When updating the renderer, update the registry dependency and lockfile, then
