@@ -173,6 +173,10 @@ def test_timed_screenshot_keeps_original_result_deadline_and_exception(tmp_path,
     original=TimeoutError('original screenshot timeout')
     calls=[]
     class Page:
+        def wait_for_function(self,script,**kwargs):
+            from browser_timing import DISPLAY_SETTLED
+            assert script==DISPLAY_SETTLED
+            assert kwargs=={'polling':100,'timeout':180000}
         def evaluate(self,*args):
             raise RuntimeError('diagnostics unavailable')
         def locator(self,selector):
@@ -186,3 +190,22 @@ def test_timed_screenshot_keeps_original_result_deadline_and_exception(tmp_path,
         assert caught.value is original
     else:assert screenshot_editor(Page(),tmp_path/'plot.png')==b'png'
     assert calls==[{'path':str(tmp_path/'plot.png')}]
+
+
+def test_capture_requires_current_surface_completion_and_propagates_display_errors():
+    from browser_timing import DISPLAY_SETTLED
+    run_node(r"""
+import assert from 'node:assert/strict';
+globalThis.devicePixelRatio=2;
+let state={busy:0,queued:0,dirty:false,frame_pending:false,edit_inflight:null,edit_pending:false};
+const canvas={width:960,height:600,getBoundingClientRect:()=>({width:480,height:300})};
+globalThis.document={querySelector:()=>({figgy:{diagnostics:()=>state},querySelector:()=>canvas})};
+const settled=("""+DISPLAY_SETTLED+r""");
+assert.equal(settled(),true);
+for(const flag of ['busy','queued','dirty','frame_pending','edit_inflight','edit_pending']){
+ state[flag]=1;assert.equal(settled(),false,flag);state[flag]=0;
+}
+canvas.width=699;assert.equal(settled(),false);canvas.width=960;
+state.frame_error='device lost';assert.throws(settled,/device lost/);state.frame_error=null;
+state.disposed=true;assert.throws(settled,/disposed/);
+""")

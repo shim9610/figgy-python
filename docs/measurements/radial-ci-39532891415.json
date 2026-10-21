@@ -1,0 +1,1237 @@
+{
+  "run_url": "https://github.com/shim9610/figgy-python/actions/runs/39532891415",
+  "job_url": "https://github.com/shim9610/figgy-python/actions/runs/39532891415/job/119002780365",
+  "commit": "ce0ae908359ba8169cceefad85cefc226c7920cb",
+  "result": "Priority gate: 48 passed, 1 failed; full suite not run.",
+  "measurements": {
+    "outcome": "failed",
+    "browser": {
+      "version": "156.0.8078.4",
+      "executable": "/home/runner/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+      "vulkan_driver": "vk_swiftshader_icd.json",
+      "headless": false,
+      "args": [
+        "--no-sandbox",
+        "--enable-unsafe-webgpu",
+        "--use-angle=vulkan",
+        "--enable-features=Vulkan",
+        "--disable-vulkan-surface",
+        "--enable-logging",
+        "--log-file=/home/runner/work/figgy-python/figgy-python/ci-results/priority/test_annotation_drawing_editin0/radial/chromium.log",
+        "--gpu-watchdog-timeout-seconds=180"
+      ],
+      "host": {
+        "cpus": 4,
+        "affinity": 4,
+        "cpu_quota": null
+      }
+    },
+    "timing": {
+      "now": 189085.7,
+      "raf": {
+        "requested": 166,
+        "called": 162,
+        "cancelled": 14,
+        "frames": 91,
+        "lastAt": 188165.10000000003,
+        "maxGapMs": 32749.800000000047,
+        "pending": 2
+      },
+      "timer": {
+        "samples": 1881,
+        "maxGapMs": 515.2999999999884,
+        "geometryChanges": 7
+      },
+      "stableGeometryMs": 30518.199999999953,
+      "submissions": [
+        {
+          "queue": 1,
+          "submission": 1,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 32709.400000000023,
+          "submitToCompleteMs": 32709.800000000047
+        },
+        {
+          "queue": 1,
+          "submission": 2,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 29335.100000000093,
+          "submitToCompleteMs": 29335.400000000023
+        },
+        {
+          "queue": 1,
+          "submission": 3,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 29439.79999999993,
+          "submitToCompleteMs": 29439.899999999907
+        },
+        {
+          "queue": 1,
+          "submission": 4,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 29522.900000000023,
+          "submitToCompleteMs": 29523.5
+        },
+        {
+          "queue": 1,
+          "submission": 5,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 29481.900000000023,
+          "submitToCompleteMs": 29482
+        },
+        {
+          "queue": 1,
+          "submission": 6,
+          "canvas": [
+            960,
+            600
+          ],
+          "status": "completed",
+          "waitMs": 29314.599999999977,
+          "submitToCompleteMs": 29314.699999999953
+        },
+        {
+          "queue": 1,
+          "submission": 7,
+          "canvas": [
+            699,
+            437
+          ],
+          "status": "pending",
+          "waitMs": 1065.0999999999767
+        }
+      ],
+      "submitCpuMaxMs": 0.19999999995343387,
+      "pipelines": [
+        {
+          "name": "createShaderModule",
+          "t": 5351.799999999988,
+          "label": "figgy render prewarm",
+          "shaderBytes": 13903,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 0.1000000000349246
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5352.400000000023,
+          "label": "radial surfaces",
+          "shaderBytes": null,
+          "entry": "fs",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 683.7999999999884
+        },
+        {
+          "name": "createShaderModule",
+          "t": 6039.200000000012,
+          "label": "radial surfaces",
+          "shaderBytes": 13903,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 6039.799999999988,
+          "label": "radial surfaces",
+          "shaderBytes": null,
+          "entry": "fs",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createShaderModule",
+          "t": 99289.10000000003,
+          "label": "figgy fullscreen textured shader",
+          "shaderBytes": 1745,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 99289.20000000001,
+          "label": "figgy fullscreen textured pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        }
+      ],
+      "longTasks": [
+        {
+          "type": "long-animation-frame",
+          "t": 69240.70000000001,
+          "durationMs": 29334.699999999953,
+          "blockingDuration": 0,
+          "renderStart": 98573.60000000003,
+          "styleAndLayoutStart": 98575.39999999997
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 98673.39999999997,
+          "durationMs": 115.90000000002328,
+          "blockingDuration": 0,
+          "renderStart": 98789.20000000001,
+          "styleAndLayoutStart": 98789.29999999999
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 98807.10000000003,
+          "durationMs": 193.09999999997672,
+          "blockingDuration": 0,
+          "renderStart": 99000.10000000003,
+          "styleAndLayoutStart": 99000.20000000001
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 99080.10000000003,
+          "durationMs": 113.5,
+          "blockingDuration": 0,
+          "renderStart": 99193.29999999999,
+          "styleAndLayoutStart": 99193.60000000003
+        },
+        {
+          "type": "longtask",
+          "t": 153954.7,
+          "durationMs": 70,
+          "blockingDuration": null,
+          "renderStart": null,
+          "styleAndLayoutStart": null
+        },
+        {
+          "type": "longtask",
+          "t": 154024.89999999997,
+          "durationMs": 127,
+          "blockingDuration": null,
+          "renderStart": null,
+          "styleAndLayoutStart": null
+        },
+        {
+          "type": "longtask",
+          "t": 154285.10000000003,
+          "durationMs": 52,
+          "blockingDuration": null,
+          "renderStart": null,
+          "styleAndLayoutStart": null
+        },
+        {
+          "type": "longtask",
+          "t": 154427.00000000006,
+          "durationMs": 122,
+          "blockingDuration": null,
+          "renderStart": null,
+          "styleAndLayoutStart": null
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 99301.89999999997,
+          "durationMs": 29573,
+          "blockingDuration": 0,
+          "renderStart": 128872.79999999999,
+          "styleAndLayoutStart": 128874.79999999999
+        },
+        {
+          "type": "long-animation-frame",
+          "t": 128886.89999999997,
+          "durationMs": 29608.300000000047,
+          "blockingDuration": 175.1,
+          "renderStart": 158491.60000000003,
+          "styleAndLayoutStart": 158494.39999999997
+        }
+      ],
+      "marks": [
+        {
+          "t": 69327.60000000003,
+          "kind": "mark",
+          "stage": "screenshot.start",
+          "name": "radial-inline-text.png"
+        },
+        {
+          "t": 99039.20000000001,
+          "kind": "mark",
+          "stage": "screenshot.end",
+          "name": "radial-inline-text.png",
+          "outcome": "passed",
+          "elapsedMs": 29711.99655500004
+        },
+        {
+          "t": 158656.89999999997,
+          "kind": "mark",
+          "stage": "screenshot.start",
+          "name": "radial-drawing.png"
+        },
+        {
+          "t": 188668.10000000003,
+          "kind": "mark",
+          "stage": "screenshot.end",
+          "name": "radial-drawing.png",
+          "outcome": "failed",
+          "elapsedMs": 30011.44152300003
+        }
+      ]
+    }
+  },
+  "failure": {
+    "browser": {
+      "version": "156.0.8078.4",
+      "executable": "/home/runner/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+      "vulkan_driver": "vk_swiftshader_icd.json",
+      "headless": false,
+      "args": [
+        "--no-sandbox",
+        "--enable-unsafe-webgpu",
+        "--use-angle=vulkan",
+        "--enable-features=Vulkan",
+        "--disable-vulkan-surface",
+        "--enable-logging",
+        "--log-file=/home/runner/work/figgy-python/figgy-python/ci-results/priority/test_annotation_drawing_editin0/radial/chromium.log",
+        "--gpu-watchdog-timeout-seconds=180"
+      ],
+      "host": {
+        "cpus": 4,
+        "affinity": 4,
+        "cpu_quota": null
+      }
+    },
+    "status": "Ready",
+    "host": {
+      "kind": "radial",
+      "busy": 0,
+      "queued": 0,
+      "dirty": false,
+      "frame_pending": true,
+      "frame_error": null,
+      "edit_inflight": null,
+      "edit_pending": false,
+      "canvas": [
+        699,
+        437
+      ],
+      "disposed": false
+    },
+    "gpu_work": {
+      "submitted": 7,
+      "completed": 6,
+      "completedCanvas": [
+        960,
+        600
+      ]
+    },
+    "preparation_gate": null,
+    "state_error": null,
+    "collection_error": null,
+    "queues": [
+      {
+        "id": 1,
+        "submitted": 7,
+        "completed": 6,
+        "pendingFences": 2,
+        "canvas": [
+          699,
+          437
+        ],
+        "globalSubmitted": 7
+      }
+    ],
+    "adapters": [
+      {
+        "id": 1,
+        "vendor": "google",
+        "architecture": "swiftshader",
+        "device": "",
+        "description": "",
+        "isFallbackAdapter": true
+      }
+    ],
+    "last_host_stages": [
+      {
+        "t": 6066.400000000023,
+        "stage": "ready_frame.started",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false
+      },
+      {
+        "t": 38777.79999999999,
+        "stage": "ready_frame.completed",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false
+      },
+      {
+        "t": 154795.89999999997,
+        "stage": "request.received",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false,
+        "requestId": "440e663d5663451f8ed62f4228568668",
+        "action": "barrier"
+      },
+      {
+        "t": 154796.00000000006,
+        "stage": "request.initialized",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false,
+        "requestId": "440e663d5663451f8ed62f4228568668",
+        "action": "barrier"
+      },
+      {
+        "t": 154796.10000000003,
+        "stage": "request.queue_drained",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false,
+        "requestId": "440e663d5663451f8ed62f4228568668",
+        "action": "barrier"
+      },
+      {
+        "t": 154796.10000000003,
+        "stage": "request.edits_acknowledged",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false,
+        "requestId": "440e663d5663451f8ed62f4228568668",
+        "action": "barrier"
+      },
+      {
+        "t": 154796.10000000003,
+        "stage": "response.send_started",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false,
+        "requestId": "440e663d5663451f8ed62f4228568668",
+        "action": "barrier"
+      },
+      {
+        "t": 154796.3,
+        "stage": "response.sent",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          960,
+          600
+        ],
+        "disposed": false,
+        "requestId": "440e663d5663451f8ed62f4228568668",
+        "action": "barrier",
+        "elapsed_ms": 0.2999999999301508
+      },
+      {
+        "t": 158494.89999999997,
+        "stage": "surface.resized",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "kind": "radial",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false,
+        "previous": [
+          960,
+          600
+        ]
+      }
+    ],
+    "last_events": [
+      {
+        "t": 158616.39999999997,
+        "kind": "radial",
+        "stage": "queue.started",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": 11,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false,
+        "operationId": 52
+      },
+      {
+        "t": 158623.10000000003,
+        "kind": "radial",
+        "stage": "queue.finished",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false,
+        "operationId": 52
+      },
+      {
+        "t": 187807.89999999997,
+        "kind": "fence-end",
+        "id": 9,
+        "queue": 1,
+        "submission": 6
+      },
+      {
+        "t": 187807.89999999997,
+        "kind": "fence-end",
+        "id": 10,
+        "queue": 1,
+        "submission": 6
+      },
+      {
+        "t": 187808.00000000006,
+        "kind": "radial",
+        "stage": "display.settled",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 0,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false
+      },
+      {
+        "t": 188017.00000000006,
+        "kind": "radial",
+        "stage": "queue.enqueued",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 0,
+        "queued": 1,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false,
+        "operationId": 53
+      },
+      {
+        "t": 188017.10000000003,
+        "kind": "radial",
+        "stage": "queue.started",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false,
+        "operationId": 53
+      },
+      {
+        "t": 188018.3,
+        "kind": "getMappedRange",
+        "id": null,
+        "size": 112
+      },
+      {
+        "t": 188018.3,
+        "kind": "unmap",
+        "id": null,
+        "size": 112
+      },
+      {
+        "t": 188018.39999999997,
+        "kind": "getMappedRange",
+        "id": null,
+        "size": 480
+      },
+      {
+        "t": 188018.39999999997,
+        "kind": "unmap",
+        "id": null,
+        "size": 480
+      },
+      {
+        "t": 188020.50000000006,
+        "kind": "submit",
+        "queue": 1,
+        "submission": 7,
+        "globalSubmission": 7,
+        "canvas": [
+          699,
+          437
+        ],
+        "cpuMs": 0.10000000009313226
+      },
+      {
+        "t": 188020.60000000003,
+        "kind": "fence-start",
+        "id": 11,
+        "queue": 1,
+        "submission": 7
+      },
+      {
+        "t": 188020.60000000003,
+        "kind": "radial",
+        "stage": "display.submitted",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 1,
+        "queued": 0,
+        "dirty": true,
+        "frame_pending": false,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false
+      },
+      {
+        "t": 188020.89999999997,
+        "kind": "fence-start",
+        "id": 12,
+        "queue": 1,
+        "submission": 7
+      },
+      {
+        "t": 188020.89999999997,
+        "kind": "radial",
+        "stage": "queue.finished",
+        "client": "3ebf580c-1fda-430c-8158-2b848dc96a5c",
+        "busy": 0,
+        "queued": 0,
+        "dirty": false,
+        "frame_pending": true,
+        "frame_error": null,
+        "edit_inflight": null,
+        "edit_pending": false,
+        "canvas": [
+          699,
+          437
+        ],
+        "disposed": false,
+        "operationId": 53
+      }
+    ],
+    "kernel_executions": [
+      {
+        "started_unix": 1792550075.2183943,
+        "characters": 16,
+        "outcome": "passed",
+        "message_id": "e9727301-a4faf11e7dde7bce97f0c510_7596_0",
+        "duration_ms": 55.714130999945155
+      },
+      {
+        "started_unix": 1792550075.2741132,
+        "characters": 37,
+        "outcome": "passed",
+        "message_id": "e9727301-a4faf11e7dde7bce97f0c510_7596_1",
+        "duration_ms": 10.92329300001893
+      }
+    ],
+    "timing": {
+      "raf": {
+        "requested": 166,
+        "called": 162,
+        "cancelled": 14,
+        "frames": 91,
+        "lastAt": 188165.10000000003,
+        "maxGapMs": 32749.800000000047,
+        "pending": 2
+      },
+      "timer": {
+        "samples": 1881,
+        "maxGapMs": 515.2999999999884,
+        "geometryChanges": 7
+      },
+      "geometry": {
+        "root": [
+          378,
+          112.9375,
+          1053,
+          652
+        ],
+        "canvas": [
+          699,
+          437,
+          389,
+          262.9375,
+          699,
+          436.875
+        ],
+        "visibility": "visible",
+        "focused": true,
+        "status": "Ready"
+      },
+      "pipelines": [
+        {
+          "name": "createShaderModule",
+          "t": 5351.799999999988,
+          "label": "figgy render prewarm",
+          "shaderBytes": 13903,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.1000000000349246,
+          "elapsedMs": 0.1000000000349246
+        },
+        {
+          "name": "createRenderPipelineAsync",
+          "t": 5352.400000000023,
+          "label": "radial surfaces",
+          "shaderBytes": null,
+          "entry": "fs",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 683.7999999999884
+        },
+        {
+          "name": "createShaderModule",
+          "t": 6039.200000000012,
+          "label": "radial surfaces",
+          "shaderBytes": 13903,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0.09999999997671694,
+          "elapsedMs": 0.09999999997671694
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 6039.799999999988,
+          "label": "radial surfaces",
+          "shaderBytes": null,
+          "entry": "fs",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createShaderModule",
+          "t": 99289.10000000003,
+          "label": "figgy fullscreen textured shader",
+          "shaderBytes": 1745,
+          "entry": null,
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        },
+        {
+          "name": "createRenderPipeline",
+          "t": 99289.20000000001,
+          "label": "figgy fullscreen textured pipeline",
+          "shaderBytes": null,
+          "entry": "fs_main",
+          "samples": 1,
+          "status": "completed",
+          "cpuMs": 0,
+          "elapsedMs": 0
+        }
+      ],
+      "fences": [
+        {
+          "id": 1,
+          "queue": 1,
+          "submission": 1,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 6068.200000000012,
+          "status": "completed",
+          "end": 38777.600000000035,
+          "waitMs": 32709.400000000023,
+          "submitToCompleteMs": 32709.800000000047
+        },
+        {
+          "id": 2,
+          "queue": 1,
+          "submission": 2,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 39747.399999999965,
+          "status": "completed",
+          "end": 69082.50000000006,
+          "waitMs": 29335.100000000093,
+          "submitToCompleteMs": 29335.300000000047
+        },
+        {
+          "id": 3,
+          "queue": 1,
+          "submission": 2,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 39748.20000000001,
+          "status": "completed",
+          "end": 69082.60000000003,
+          "waitMs": 29334.400000000023,
+          "submitToCompleteMs": 29335.400000000023
+        },
+        {
+          "id": 4,
+          "queue": 1,
+          "submission": 3,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 69117.10000000003,
+          "status": "completed",
+          "end": 98556.89999999997,
+          "waitMs": 29439.79999999993,
+          "submitToCompleteMs": 29439.899999999907
+        },
+        {
+          "id": 5,
+          "queue": 1,
+          "submission": 3,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 69117.39999999997,
+          "status": "completed",
+          "end": 98556.89999999997,
+          "waitMs": 29439.5,
+          "submitToCompleteMs": 29439.899999999907
+        },
+        {
+          "id": 6,
+          "queue": 1,
+          "submission": 4,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 99297.10000000003,
+          "status": "completed",
+          "end": 128820.00000000006,
+          "waitMs": 29522.900000000023,
+          "submitToCompleteMs": 29523.5
+        },
+        {
+          "id": 7,
+          "queue": 1,
+          "submission": 5,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 128873.89999999997,
+          "status": "completed",
+          "end": 158355.8,
+          "waitMs": 29481.900000000023,
+          "submitToCompleteMs": 29482
+        },
+        {
+          "id": 8,
+          "queue": 1,
+          "submission": 5,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 128874.29999999999,
+          "status": "completed",
+          "end": 158355.8,
+          "waitMs": 29481.5,
+          "submitToCompleteMs": 29482
+        },
+        {
+          "id": 9,
+          "queue": 1,
+          "submission": 6,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 158493.3,
+          "status": "completed",
+          "end": 187807.89999999997,
+          "waitMs": 29314.599999999977,
+          "submitToCompleteMs": 29314.699999999953
+        },
+        {
+          "id": 10,
+          "queue": 1,
+          "submission": 6,
+          "canvas": [
+            960,
+            600
+          ],
+          "t": 158493.7,
+          "status": "completed",
+          "end": 187807.89999999997,
+          "waitMs": 29314.199999999953,
+          "submitToCompleteMs": 29314.699999999953
+        },
+        {
+          "id": 11,
+          "queue": 1,
+          "submission": 7,
+          "canvas": [
+            699,
+            437
+          ],
+          "t": 188020.60000000003,
+          "status": "pending"
+        },
+        {
+          "id": 12,
+          "queue": 1,
+          "submission": 7,
+          "canvas": [
+            699,
+            437
+          ],
+          "t": 188020.89999999997,
+          "status": "pending"
+        }
+      ],
+      "last_samples": [
+        {
+          "t": 188367.50000000006,
+          "gapMs": 100,
+          "rafAgeMs": 202.40000000002328,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 188467.39999999997,
+          "gapMs": 99.89999999990687,
+          "rafAgeMs": 302.29999999993015,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 188567.39999999997,
+          "gapMs": 100,
+          "rafAgeMs": 402.29999999993015,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 188667.50000000006,
+          "gapMs": 100.10000000009313,
+          "rafAgeMs": 502.4000000000233,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 188767.39999999997,
+          "gapMs": 99.89999999990687,
+          "rafAgeMs": 602.2999999999302,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 188867.50000000006,
+          "gapMs": 100.10000000009313,
+          "rafAgeMs": 702.4000000000233,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 188967.50000000006,
+          "gapMs": 100,
+          "rafAgeMs": 802.4000000000233,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        },
+        {
+          "t": 189067.50000000006,
+          "gapMs": 100,
+          "rafAgeMs": 902.4000000000233,
+          "geometry": {
+            "root": [
+              378,
+              112.9375,
+              1053,
+              652
+            ],
+            "canvas": [
+              699,
+              437,
+              389,
+              262.9375,
+              699,
+              436.875
+            ],
+            "visibility": "visible",
+            "focused": true,
+            "status": "Ready"
+          }
+        }
+      ]
+    }
+  },
+  "screenshot_error": "Locator.screenshot: Timeout 29983ms exceeded; fonts loaded; attempting scroll into view; waiting for element to be stable.",
+  "measurement_definition": "submitToCompleteMs: wall time from existing GPUQueue.submit to existing onSubmittedWorkDone resolution; includes queue, driver work and JS completion delivery, not a hardware timestamp query."
+}

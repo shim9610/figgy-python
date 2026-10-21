@@ -88,8 +88,37 @@ TIMING_INIT = r"""(() => {
 })()"""
 
 
+DISPLAY_SETTLED = r"""() => {
+    const root=document.querySelector('.figgy-editor'),f=root?.figgy,canvas=root?.querySelector('canvas');
+    if(!f||!canvas)return false;
+    const d=f.diagnostics();
+    if(d.frame_error)throw Error('Display failed: '+d.frame_error);
+    if(d.disposed)throw Error('Display disposed before capture');
+    const r=canvas.getBoundingClientRect(),scale=devicePixelRatio||1;
+    return !d.busy&&!d.queued&&!d.dirty&&!d.frame_pending&&!d.edit_inflight&&!d.edit_pending
+        &&canvas.width===Math.max(1,Math.round(r.width*scale))
+        &&canvas.height===Math.max(1,Math.round(r.height*scale));
+}"""
+
+
 def screenshot_editor(page, path):
-    """Measure the existing screenshot call without changing its timeout or waits."""
+    """Await the final displayed revision, then use the original capture deadline."""
+    # Edit acknowledgements do not imply that the current surface has completed.
+    # Poll DOM diagnostics: rAF polling itself can stall behind software rendering.
+    timing_enabled = os.environ.get('FIGGY_TEST_TIMING') == '1'
+    wait_started = time.monotonic()
+    if timing_enabled:
+        try:
+            page.evaluate("()=>window.figgyTiming?.mark('capture.display_wait.start')")
+        except Exception:
+            pass
+    page.wait_for_function(DISPLAY_SETTLED, polling=100, timeout=180000)
+    if timing_enabled:
+        try:
+            page.evaluate("elapsedMs=>window.figgyTiming?.mark('capture.display_wait.end',{elapsedMs})",
+                          (time.monotonic()-wait_started)*1000)
+        except Exception:
+            pass
     if os.environ.get('FIGGY_TEST_TIMING') != '1':
         return page.locator('.figgy-editor').screenshot(path=str(path))
     path = Path(path)
