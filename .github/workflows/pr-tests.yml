@@ -96,14 +96,18 @@ jobs:
           retention-days: 5
           if-no-files-found: error
 
-  integration:
-    name: PR / Linux integration
+  integration_shards:
+    name: PR / Linux integration shard ${{ matrix.shard }}
     needs: build
-    # Keep the required check red when preflight/build fails or is skipped.
-    if: always()
+    # Fail closed on upstream failure, but let superseded runs be cancelled.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    # Measured test workload is ~39m; build time has its own job budget.
+    # Disjoint execution preserves every assertion and the per-job time budget.
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
       WGPU_BACKEND: vulkan
       FIGGY_TEST_JUPYTER: '1'
@@ -113,6 +117,7 @@ jobs:
       FIGGY_REQUIRE_INTERACTION_PARITY: '1'
       FIGGYPLOT_MATURIN_ACTION: .ci/maturin-action/action.yml
       PYTHONUNBUFFERED: '1'
+      CI_SHARD: ${{ matrix.shard }}
     steps:
       - name: Require the verified wheel
         env:
@@ -151,7 +156,7 @@ jobs:
         run: |
           .venv/bin/python -m playwright install --with-deps chromium
           .venv/bin/python scripts/ci_gpu_env.py
-      - name: Test previous failures first, then native and Jupyter integration
+      - name: Execute disjoint native and Jupyter test shard
         run: |
           mkdir -p ci-results
           xvfb-run -a -s '-screen 0 1600x1000x24' bash <<'SCRIPT'
@@ -159,23 +164,10 @@ jobs:
             openbox > /tmp/figgyplot-openbox.log 2>&1 &
             wm_pid=$!
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
-            # Reject the observed stale-font/box failures before the full suite.
-            # The queue-order cases must fail on the original a1e79a8 wheel.
-            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
-              --basetemp=ci-results/layout-probe --junitxml=ci-results/layout-probe.xml \
-              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]' \
-              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]' \
-              'tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[cartesian]' \
-              'tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]' \
-              2>&1 | tee ci-results/layout-probe.log
-            # Measure the last failed radial screenshot before the full suite.
-            # Await current surface completion before the unchanged capture deadline.
-            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=20 \
-              --basetemp=ci-results/priority --junitxml=ci-results/priority.xml \
-              tests/test_packaged_assets.py \
-              'tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[radial]' \
-              2>&1 | tee ci-results/priority.log
-            .venv/bin/python -m pytest -vv --capture=tee-sys --durations=30 \
+            # Collect the entire suite; execute each node ID on one runner.
+            # The required integration job audits exact JUnit execution IDs.
+            .venv/bin/python scripts/run_ci_tests.py -x -vv --capture=tee-sys --durations=30 \
+              --ci-shard-count=4 --ci-shard-index="$CI_SHARD" \
               --basetemp=ci-results/full --junitxml=ci-results/junit.xml \
               2>&1 | tee ci-results/full.log
           SCRIPT
@@ -183,8 +175,40 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pr-linux-integration-results
+          name: pr-linux-integration-shard-${{ matrix.shard }}
           path: ci-results
           retention-days: 5
           if-no-files-found: ignore
 
+
+  integration:
+    name: PR / Linux integration
+    needs: integration_shards
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every shard to succeed
+        env:
+          SHARD_RESULT: ${{ needs.integration_shards.result }}
+        run: test "$SHARD_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: pr-linux-integration-shard-*
+          path: ci-results
+      - name: Verify complete passing execution without duplicates or skips
+        run: |
+          for shard in 0 1 2 3; do
+            mv "ci-results/pr-linux-integration-shard-$shard" "ci-results/shard-$shard"
+          done
+          python3 scripts/check_ci_execution.py ci-results --shards=4
+      - name: Save execution audit
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-linux-integration-audit
+          path: ci-results/execution-audit.json
+          retention-days: 5
+          if-no-files-found: error

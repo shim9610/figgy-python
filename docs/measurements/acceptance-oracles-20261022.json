@@ -1,0 +1,95 @@
+{
+  "baseline": "c2f3703a85682fd485e8d5c0579601bf75bbe775",
+  "runtime_changed": false,
+  "before": {
+    "single_pixel_feature_tests_accepted": 9,
+    "zero_restore_payload_tests_accepted": 10,
+    "zero_resident_data_tests_accepted": 10,
+    "writer_mutation_tests_accepted_before_source_snapshot_fix": 2
+  },
+  "after": {
+    "native_feature_scenes": 9,
+    "browser_feature_scenes": 9,
+    "wrong_image_checks_rejected": 45,
+    "actual_roundtrip_single_pixel_checks_rejected": 9,
+    "wrong_restore_payload_checks_rejected": 42,
+    "wrong_device_or_transfer_checks_rejected": 14,
+    "normal_restore_cases": 22,
+    "float_precision_cases": 4,
+    "focused_cases_passed": 209,
+    "focused_seconds": 11.14,
+    "headful_browser_cases_passed": 9,
+    "headful_browser_seconds": 127.57,
+    "preflight_cases_passed": 131,
+    "preflight_seconds": 2.9,
+    "wrong_cache_writer_input_mutation_checks_rejected": 2,
+    "execution_contract_cases_passed": 14,
+    "execution_contract_seconds": 0.64
+  },
+  "collection": {
+    "previous": 642,
+    "current": 785,
+    "added": 143,
+    "omitted": 0,
+    "duplicates": 0,
+    "shards": 4,
+    "per_shard": [
+      197,
+      196,
+      196,
+      196
+    ]
+  },
+  "visual_contract": {
+    "document": [
+      960,
+      600
+    ],
+    "plot": [
+      100,
+      100,
+      400,
+      400
+    ],
+    "cartesian_domain": [
+      0,
+      4
+    ],
+    "rgb_quantization_tolerance": 3,
+    "pixel_neighborhood": 1,
+    "marker_solid_area_radius_band": 2,
+    "oracle": "Authored scene geometry and colors; no rendered image or renderer bounds are used to generate expected probes.",
+    "semantic_faults": [
+      "wrong colormap",
+      "swapped vector components",
+      "linear interpolation replacing steps",
+      "wrong fill baseline/reference",
+      "reversed polar direction",
+      "wrong radar value range",
+      "missing text annotation"
+    ]
+  },
+  "recovery_contract": {
+    "lossless_boundaries": [
+      "original renderer input",
+      "baseline and approved NPY files",
+      "restored upload arguments",
+      "browser transfer snapshots"
+    ],
+    "comparisons": [
+      "complete column identities",
+      "dtype",
+      "shape",
+      "all values",
+      "payload bits"
+    ],
+    "gpu": "Read every native column via GPU selection readback, using temporary test-only probe series without any sample upload.",
+    "native_finite_rtol": 2e-14,
+    "native_finite_atol": 0,
+    "nonfinite": "Native selection JSON represents nonfinite values as null. NaN payloads, infinities and signed-zero bits are checked exactly at lossless boundaries, not promised as bit-identical GPU representation.",
+    "original_capture": "Copy the original array before delegating to the cache writer or renderer; restoration capture remains before the renderer upload."
+  },
+  "browser_capture": "The complete widget is translated by the fractional part of its DOM origin to align canvas pixels with the device grid. CSS and backing remain exactly 960x600 at DPR 1. No cropping, resampling or relaxed image shape is used.",
+  "scope": "These close the demonstrated oracle gaps for the listed scenes and recovery families. They do not establish every feature combination, font rasterization or usability.",
+  "required_ci": "Pending validation of the final commit. CI #58 passed 470 of 771 tests before its deadline. CI #59 caught a repository-local subprocess root isolation error, reproduced locally and fixed with an explicit sample-test root. The required integration check audits exact passing JUnit IDs across all four disjoint shards."
+}

@@ -44,13 +44,19 @@ OBSERVE = """()=>{
 }"""
 
 
-def wait_surface(page, viewport, dpr=1):
-    # Size readiness is independent of font, containment and assertion success.
-    page.wait_for_function("""([width,height,dpr])=>{
+SURFACE_READY = """([width,height,dpr])=>{
         const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();
         return innerWidth===width&&innerHeight===height&&devicePixelRatio===dpr&&
+            r.width>0&&r.height>0&&r.left>=0&&r.right<=width+1&&
             c.width===Math.round(r.width*dpr)&&c.height===Math.round(r.height*dpr);
-    }""", arg=[*viewport, dpr], polling=20)
+    }"""
+
+
+def wait_surface(page, viewport, dpr=1):
+    # Jupyter may still have its preceding allocation after innerWidth changes.
+    # Matching old CSS/backing sizes do not make that overflow ready for input.
+    # Do not depend on the inline editor's font, bounds or asserted content here.
+    page.wait_for_function(SURFACE_READY, arg=[*viewport, dpr], polling=20)
 
 
 def observe(page, folder, label):
@@ -70,13 +76,33 @@ def assert_contained(state):
         assert r['y']+r['height'] <= c['y']+c['height']+1, (name, state)
 
 
+def annotation_point(page, index=0, offset=(8,6)):
+    """Prepare geometry and map it through the live DOM in one browser operation.
+
+    A protocol bounding box read separately can describe the preceding layout.
+    The point must be visible and hit the canvas before sending real mouse input.
+    """
+    return page.evaluate("""async ({index,offset})=>{
+        const root=document.querySelector('.figgy-editor'),c=root.querySelector('canvas');
+        const entries=await root.figgy.annotations(),annotation=entries.find(v=>v.index===index)??entries[index];
+        if(!annotation)throw Error('Missing annotation '+index);
+        const r=c.getBoundingClientRect(),state=root.figgy.snapshot();
+        const units=root.figgy.diagnostics().kind==='cartesian'?[c.width,c.height]:
+            [state.config.chart_area.width,state.config.chart_area.height];
+        const point=[r.x+(annotation.rect[0]+offset[0])*r.width/units[0],
+            r.y+(annotation.rect[1]+offset[1])*r.height/units[1]];
+        const result={annotation:annotation.rect,canvas:{x:r.x,y:r.y,width:r.width,height:r.height},
+            units,point,viewport:[innerWidth,innerHeight],backing:[c.width,c.height]};
+        if(point[0]<0||point[0]>=innerWidth||point[1]<0||point[1]>=innerHeight||
+            document.elementFromPoint(...point)!==c)
+            throw Error('Annotation input target is outside the visible canvas: '+JSON.stringify(result));
+        return result;
+    }""", {'index':index,'offset':list(offset)})
+
+
 def open_existing(page):
-    entries = page.evaluate(ROOT + '.annotations()')
-    rect = entries[0]['rect']
-    point = page.locator('canvas').evaluate("""(c,p)=>{
-        const r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];
-    }""", [rect[0]+8, rect[1]+6])
-    page.mouse.dblclick(*point)
+    target = annotation_point(page)
+    page.mouse.dblclick(*target['point'])
     entry = page.locator('[data-inline-text]')
     entry.wait_for(state='visible')
     return entry

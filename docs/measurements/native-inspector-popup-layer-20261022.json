@@ -1,0 +1,1450 @@
+{
+  "scenario": "Reopen the native axis scale menu after editing divergent opposite-axis ranges",
+  "before": {
+    "menu_probe": {
+      "button_clicked": false,
+      "frame": 999,
+      "id": "axis_scale",
+      "items": [
+        {
+          "clicked": false,
+          "clip": [
+            0.0,
+            533.0,
+            1312.0,
+            70.0
+          ],
+          "contains_pointer": false,
+          "enabled": true,
+          "hovered": false,
+          "id": "id_0BCE",
+          "interact_rect": [
+            1005.0,
+            533.0,
+            162.0,
+            30.0
+          ],
+          "layer": "LayerId { Foreground id_40E5 }",
+          "layer_at_pointer": "LayerId { Foreground id_2B95 }",
+          "name": "Linear",
+          "pointer": [
+            1086.0,
+            548.0
+          ],
+          "rect": [
+            1005.0,
+            533.0,
+            162.0,
+            30.0
+          ],
+          "transform": null
+        },
+        {
+          "clicked": false,
+          "clip": [
+            0.0,
+            533.0,
+            1312.0,
+            70.0
+          ],
+          "contains_pointer": false,
+          "enabled": true,
+          "hovered": false,
+          "id": "id_08C5",
+          "interact_rect": [
+            1005.0,
+            573.0,
+            162.0,
+            30.0
+          ],
+          "layer": "LayerId { Foreground id_40E5 }",
+          "layer_at_pointer": "LayerId { Foreground id_2B95 }",
+          "name": "Logarithmic",
+          "pointer": [
+            1086.0,
+            548.0
+          ],
+          "rect": [
+            1005.0,
+            573.0,
+            162.0,
+            30.0
+          ],
+          "transform": null
+        }
+      ],
+      "kind": "scale_control",
+      "pass": 0,
+      "popup_open": false,
+      "previous": "Logarithmic",
+      "value": "Logarithmic"
+    },
+    "requested_scale": "Linear",
+    "accepted_before_config": {
+      "chart_area": {
+        "x": 0,
+        "y": 0,
+        "width": 960,
+        "height": 600
+      },
+      "top_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 201.0,
+        "major_spacing": 1.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "bottom_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 101.0,
+        "major_spacing": 3.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 80.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "left_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 110.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "right_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": false,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 6
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "chart_title": {
+        "text": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 28.0,
+          "font": ""
+        },
+        "visible": true,
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "top_margin": 32.0
+      },
+      "grid": {
+        "show_major_x": true,
+        "major_x_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_x_width": 1.0,
+        "major_x_style": "Solid",
+        "show_major_y": true,
+        "major_y_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_y_width": 1.0,
+        "major_y_style": "Solid",
+        "show_minor_x": false,
+        "minor_x_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_x_width": 0.5,
+        "minor_x_style": "Dot",
+        "show_minor_y": false,
+        "minor_y_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_y_width": 0.5,
+        "minor_y_style": "Dot"
+      },
+      "legend": {
+        "visible": false,
+        "content": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 14.0,
+          "font": ""
+        },
+        "corner": "TopRight",
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "padding": 8.0,
+        "bg_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 0.85
+        },
+        "border_color": {
+          "r": 0.6,
+          "g": 0.6,
+          "b": 0.6,
+          "a": 1.0
+        }
+      }
+    },
+    "accepted_after_config": {
+      "chart_area": {
+        "x": 0,
+        "y": 0,
+        "width": 960,
+        "height": 600
+      },
+      "top_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 201.0,
+        "major_spacing": 1.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "bottom_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 101.0,
+        "major_spacing": 3.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 80.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "left_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 110.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "right_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": false,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 6
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "chart_title": {
+        "text": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 28.0,
+          "font": ""
+        },
+        "visible": true,
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "top_margin": 32.0
+      },
+      "grid": {
+        "show_major_x": true,
+        "major_x_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_x_width": 1.0,
+        "major_x_style": "Solid",
+        "show_major_y": true,
+        "major_y_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_y_width": 1.0,
+        "major_y_style": "Solid",
+        "show_minor_x": false,
+        "minor_x_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_x_width": 0.5,
+        "minor_x_style": "Dot",
+        "show_minor_y": false,
+        "minor_y_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_y_width": 0.5,
+        "minor_y_style": "Dot"
+      },
+      "legend": {
+        "visible": false,
+        "content": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 14.0,
+          "font": ""
+        },
+        "corner": "TopRight",
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "padding": 8.0,
+        "bg_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 0.85
+        },
+        "border_color": {
+          "r": 0.6,
+          "g": 0.6,
+          "b": 0.6,
+          "a": 1.0
+        }
+      }
+    }
+  },
+  "after": {
+    "menu_probe": {
+      "button_clicked": false,
+      "frame": 1001,
+      "id": "axis_scale",
+      "items": [
+        {
+          "clicked": true,
+          "clip": [
+            0.0,
+            533.0,
+            1312.0,
+            70.0
+          ],
+          "contains_pointer": true,
+          "enabled": true,
+          "hovered": true,
+          "id": "id_0BCE",
+          "interact_rect": [
+            1005.0,
+            533.0,
+            162.0,
+            30.0
+          ],
+          "layer": "LayerId { Foreground id_40E5 }",
+          "layer_at_pointer": "LayerId { Foreground id_40E5 }",
+          "name": "Linear",
+          "pointer": [
+            1086.0,
+            548.0
+          ],
+          "rect": [
+            1005.0,
+            533.0,
+            162.0,
+            30.0
+          ],
+          "transform": null
+        },
+        {
+          "clicked": false,
+          "clip": [
+            0.0,
+            533.0,
+            1312.0,
+            70.0
+          ],
+          "contains_pointer": false,
+          "enabled": true,
+          "hovered": false,
+          "id": "id_08C5",
+          "interact_rect": [
+            1005.0,
+            573.0,
+            162.0,
+            30.0
+          ],
+          "layer": "LayerId { Foreground id_40E5 }",
+          "layer_at_pointer": "LayerId { Foreground id_40E5 }",
+          "name": "Logarithmic",
+          "pointer": [
+            1086.0,
+            548.0
+          ],
+          "rect": [
+            1005.0,
+            573.0,
+            162.0,
+            30.0
+          ],
+          "transform": null
+        }
+      ],
+      "kind": "scale_control",
+      "parent_layer": "LayerId { Middle id_2B95 }",
+      "pass": 0,
+      "popup_open": false,
+      "previous": "Logarithmic",
+      "value": "Linear"
+    },
+    "requested_scale": "Linear",
+    "accepted_before_config": {
+      "chart_area": {
+        "x": 0,
+        "y": 0,
+        "width": 960,
+        "height": 600
+      },
+      "top_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 201.0,
+        "major_spacing": 1.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "bottom_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 101.0,
+        "major_spacing": 3.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 80.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "left_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 110.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "right_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": false,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 6
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "chart_title": {
+        "text": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 28.0,
+          "font": ""
+        },
+        "visible": true,
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "top_margin": 32.0
+      },
+      "grid": {
+        "show_major_x": true,
+        "major_x_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_x_width": 1.0,
+        "major_x_style": "Solid",
+        "show_major_y": true,
+        "major_y_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_y_width": 1.0,
+        "major_y_style": "Solid",
+        "show_minor_x": false,
+        "minor_x_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_x_width": 0.5,
+        "minor_x_style": "Dot",
+        "show_minor_y": false,
+        "minor_y_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_y_width": 0.5,
+        "minor_y_style": "Dot"
+      },
+      "legend": {
+        "visible": false,
+        "content": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 14.0,
+          "font": ""
+        },
+        "corner": "TopRight",
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "padding": 8.0,
+        "bg_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 0.85
+        },
+        "border_color": {
+          "r": 0.6,
+          "g": 0.6,
+          "b": 0.6,
+          "a": 1.0
+        }
+      }
+    },
+    "accepted_after_config": {
+      "chart_area": {
+        "x": 0,
+        "y": 0,
+        "width": 960,
+        "height": 600
+      },
+      "top_x": {
+        "scale": "Logarithmic",
+        "min": 1.0,
+        "max": 201.0,
+        "major_spacing": 1.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "bottom_x": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 101.0,
+        "major_spacing": 20.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Scientific",
+          "significant_digits": 2
+        },
+        "tick": "Both",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 80.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "left_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": true,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 18.0,
+          "label_visible": true,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 3
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0.0,
+          "offset_y": 0.0
+        },
+        "out_margin": 110.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "right_y": {
+        "scale": "Linear",
+        "min": 1.0,
+        "max": 100.0,
+        "major_spacing": 10.0,
+        "minor_count": 4,
+        "inverted": false,
+        "label_style": {
+          "visible": false,
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 11.0,
+          "label_visible": false,
+          "label_font": "",
+          "label_offset_x": 0.0,
+          "label_offset_y": 0.0,
+          "format": "Decimal",
+          "significant_digits": 6
+        },
+        "tick": "Inside",
+        "title_option": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "font_size": 22.0,
+            "font": ""
+          },
+          "visible": false,
+          "offset_x": 3.0,
+          "offset_y": 4.0
+        },
+        "out_margin": 25.0,
+        "line_offset": 0.0,
+        "line_visible": true,
+        "line_color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "line_width": 1.0,
+        "line_style": "Solid",
+        "major_tick_length": 5.0,
+        "minor_tick_length": 3.0
+      },
+      "chart_title": {
+        "text": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 28.0,
+          "font": ""
+        },
+        "visible": true,
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "top_margin": 32.0
+      },
+      "grid": {
+        "show_major_x": true,
+        "major_x_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_x_width": 1.0,
+        "major_x_style": "Solid",
+        "show_major_y": true,
+        "major_y_color": {
+          "r": 0.78431374,
+          "g": 0.78431374,
+          "b": 0.78431374,
+          "a": 1.0
+        },
+        "major_y_width": 1.0,
+        "major_y_style": "Solid",
+        "show_minor_x": false,
+        "minor_x_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_x_width": 0.5,
+        "minor_x_style": "Dot",
+        "show_minor_y": false,
+        "minor_y_color": {
+          "r": 0.9019608,
+          "g": 0.9019608,
+          "b": 0.9019608,
+          "a": 1.0
+        },
+        "minor_y_width": 0.5,
+        "minor_y_style": "Dot"
+      },
+      "legend": {
+        "visible": false,
+        "content": {
+          "segments": [],
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "font_size": 14.0,
+          "font": ""
+        },
+        "corner": "TopRight",
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+        "padding": 8.0,
+        "bg_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 0.85
+        },
+        "border_color": {
+          "r": 0.6,
+          "g": 0.6,
+          "b": 0.6,
+          "a": 1.0
+        }
+      }
+    }
+  },
+  "fix": {
+    "inspector_order_before": "Foreground",
+    "inspector_order_after": "Middle",
+    "popup_order": "Foreground",
+    "reason": "The inspector must not intercept input for its popup menus"
+  },
+  "review_layout": {
+    "before": {
+      "properties": [
+        998.0,
+        448.0,
+        296.0,
+        174.0
+      ],
+      "review": [
+        12.0,
+        605.0,
+        1288.0,
+        36.25
+      ]
+    },
+    "after_cartesian": {
+      "properties": [
+        998.0,
+        397.1875,
+        296.0,
+        100.0
+      ],
+      "review": [
+        12.0,
+        605.0,
+        1288.0,
+        36.25
+      ]
+    },
+    "fix": "Reserve the review panel before sizing the inspector from remaining space"
+  },
+  "focused_validation": {
+    "passed": 5,
+    "seconds": 124.92,
+    "cases": [
+      "paired axes x (native/browser)",
+      "paired axes y (native/browser)",
+      "long comments with Cartesian properties",
+      "long comments with radial properties",
+      "short click under injected slow frames"
+    ]
+  }
+}

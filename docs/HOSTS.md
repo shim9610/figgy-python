@@ -2,7 +2,8 @@
 
 The figgyplot 0.3.0 source uses the published `figgy-renderer 0.18.1` and
 `figgy-model 0.12.1` crates from crates.io. `Cargo.lock` pins their versions
-and checksums; packaged WASM uses their release commit `3a0a6a3`.
+and checksums; packaged WASM uses their release commit
+`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d`.
 Provenance checks preserve this source pairing; see [publishing](PUBLISHING.md).
 Chart layout, styles, data
 rendering, hit maps and drag policies remain renderer APIs. No renderer source is
@@ -95,6 +96,13 @@ input-to-submission time. That time ends at CPU queue submission, not monitor
 presentation or completed GPU execution. `benchmarks/ui_surface.py` measures
 surface submission rate; the existing `compare.py` measures completed RGBA
 readback. Do not compare the two as the same FPS metric.
+
+Both native chart families also report `pointer_sequence` and `pointer_input`
+for the last cursor-motion or mouse-button event included in a submitted surface frame. The event
+records its kind, physical client coordinates, button/state and egui's consumed
+flag. These diagnose delivered input independently of chart SSOT or selection;
+a surface-frame increment alone does not identify which input was processed.
+The UI harness retains bounded before/after input records and timestamps.
 
 ## Jupyter
 

@@ -184,11 +184,17 @@ def click_button(page, selector):
 
 
 @contextmanager
-def notebook(tmp_path, source):
+def notebook(tmp_path, source, *, allow_closed=False, initial_views=1):
     import nbformat
     from playwright.sync_api import sync_playwright
     from jupyter_client import BlockingKernelClient
     tmp_path.mkdir(parents=True, exist_ok=True)
+    started=time.monotonic();timeline=[]
+    def phase(stage):
+        timeline.append({'stage':stage,'elapsed_seconds':time.monotonic()-started})
+        try:(tmp_path/'harness-timing.json').write_text(json.dumps(timeline))
+        except OSError:pass  # A diagnostic must never replace a test failure.
+    phase('start')
     runtime = tmp_path / 'runtime'
     runtime.mkdir()
     # Configure first-run announcements before Jupyter starts. Clicking the
@@ -208,6 +214,7 @@ def notebook(tmp_path, source):
     server = subprocess.Popen([sys.executable, '-m', 'jupyterlab', '--no-browser', '--expose-app-in-browser',
         '--ip=127.0.0.1', f'--port={port}', f'--ServerApp.root_dir={tmp_path}', '--IdentityProvider.token='],
         env=env, stdout=log, stderr=subprocess.STDOUT)
+    phase('server-started')
     base = f'http://127.0.0.1:{port}'
     client = None
     try:
@@ -220,6 +227,7 @@ def notebook(tmp_path, source):
                 if time.monotonic() > deadline:
                     raise RuntimeError((tmp_path/'server.log').read_text())
                 time.sleep(.1)
+        phase('server-ready')
         with sync_playwright() as p:
             browser_env = dict(os.environ)
             browser_args = ['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface',
@@ -231,8 +239,10 @@ def notebook(tmp_path, source):
                 # watchdog enabled, aligned with the existing startup deadline.
                 browser_args.append('--gpu-watchdog-timeout-seconds=180')
             executable = os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium')
+            phase('browser-launch')
             browser = p.chromium.launch(headless=os.environ.get('FIGGY_TEST_HEADFUL') != '1', env=browser_env,
                 executable_path=executable, args=browser_args)
+            phase('browser-launched')
             driver = os.environ.get('FIGGY_BROWSER_VK_DRIVER')
             browser_info = {
                 'version': browser.version,
@@ -270,8 +280,9 @@ def notebook(tmp_path, source):
                 # Ready includes async pipeline compilation and GPU completion.
                 # Cold software-GPU startup has its own budget; gesture checks
                 # keep Playwright's normal timeout and strict result assertions.
-                page.wait_for_function("['Ready','WebGPU failed'].includes(document.querySelector('.figgy-editor [data-status]')?.textContent)", timeout=180000)
-                assert page.locator('.figgy-editor [data-status]').inner_text() == 'Ready', page.locator('.figgy-error').inner_text()
+                page.wait_for_function("(count)=>{const states=Array.from(document.querySelectorAll('.figgy-editor [data-status]'));return states.length===count && states.every(s=>['Ready','WebGPU failed'].includes(s.textContent));}", arg=initial_views, timeout=180000)
+                assert page.locator('.figgy-editor [data-status]').all_text_contents() == ['Ready']*initial_views, page.locator('.figgy-error').all_text_contents()
+                phase('views-ready')
                 with urllib.request.urlopen(base+'/api/sessions') as response:
                     session = next(s for s in json.load(response) if s['path'] == 'check.ipynb')
                 client = BlockingKernelClient(connection_file=str(runtime/f"kernel-{session['kernel']['id']}.json"))
@@ -303,9 +314,14 @@ def notebook(tmp_path, source):
                         raise
                     finally:
                         entry['duration_ms'] = (time.monotonic()-started)*1000
+                phase('test-start')
                 yield page, execute
+                phase('test-end')
                 assert not errors
-                assert page.locator('.figgy-error').inner_text() == ''
+                if allow_closed:
+                    assert all(value=='' for value in page.locator('.figgy-error').all_text_contents())
+                else:
+                    assert page.locator('.figgy-error').inner_text() == ''
                 outcome = 'passed'
             except Exception:
                 import traceback
@@ -323,18 +339,26 @@ def notebook(tmp_path, source):
                     pass
                 raise
             finally:
+                phase('diagnostics-start')
                 if not diagnostics_saved:
                     save_browser_diagnostics(page, tmp_path, browser_info, outcome, errors, console_errors, kernel_executions)
+                phase('diagnostics-end')
                 context.close()
+                phase('context-closed')
                 browser.close()
+                phase('browser-closed')
     finally:
         if client:
             client.stop_channels()
+        phase('server-stop')
         server.terminate()
         try:
             server.wait(timeout=15)
         except subprocess.TimeoutExpired:
             server.kill()
             server.wait()
+        phase('server-stopped')
+        if os.environ.get('FIGGY_TEST_TIMING')=='1':
+            print('FIGGY HARNESS TIMING '+json.dumps(timeline),flush=True)
         log.close()
         shutil.rmtree(runtime, ignore_errors=True)

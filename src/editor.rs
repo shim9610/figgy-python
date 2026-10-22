@@ -5,6 +5,7 @@ use egui::{Color32, RichText, Stroke};
 pub const INSPECTOR_WIDTH: f32 = 320.;
 
 pub(crate) struct Editor {
+    pub(crate) review: Option<Arc<Mutex<Value>>>,
     pub inspector_open: bool,
     pub selection_hint: String,
     pub panel_focused: bool,
@@ -33,6 +34,7 @@ pub(crate) struct Editor {
 impl Default for Editor {
     fn default() -> Self {
         Self {
+            review: None,
             inspector_open: false,
             selection_hint: String::new(),
             panel_focused: true,
@@ -56,6 +58,86 @@ impl Default for Editor {
             notice: String::new(),
             stage: egui::Rect::NOTHING,
             controls: HashMap::new(),
+        }
+    }
+}
+
+impl Editor {
+    pub(crate) fn review_ui(&mut self, root: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        let Some(shared) = self.review.clone() else {
+            return;
+        };
+        let mut state = shared.lock().unwrap();
+        if state.is_null() {
+            return;
+        }
+        let pending = !state["request"].is_null();
+        let mut comments = state["comments"].as_str().unwrap_or("").to_owned();
+        egui::Panel::bottom("review_comments")
+            .exact_size(148.)
+            .frame(
+                egui::Frame::NONE
+                    .fill(Color32::from_rgb(245, 248, 252))
+                    .inner_margin(12),
+            )
+            .show(root, |ui| {
+                ui.label(RichText::new("Review comments").strong());
+                ui.add_enabled_ui(!pending, |ui| {
+                    let input = egui::ScrollArea::vertical()
+                        .id_salt("review_comment_scroll")
+                        .max_height(48.)
+                        .min_scrolled_height(48.)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut comments)
+                                    .desired_width(f32::INFINITY)
+                                    .desired_rows(2)
+                                    .hint_text("Describe changes for the next version…"),
+                            )
+                        });
+                    self.controls.insert(
+                        "review_comments".into(),
+                        input.inner.rect.intersect(input.inner_rect),
+                    );
+                    ui.horizontal(|ui| {
+                        for (key, label, disposition) in [
+                            ("review_changes", "Request changes", "request_changes"),
+                            ("review_accept", "Accept", "accept"),
+                        ] {
+                            let button = ui.button(label);
+                            self.controls.insert(key.into(), button.rect);
+                            if button.clicked() {
+                                c.end_edit();
+                                state["request"] = json!({"disposition":disposition,
+                                    "comments":comments,"revision":c.data.revision,"finalized":false});
+                                state["error"] = json!("");
+                            }
+                        }
+                        if pending {
+                            ui.label("Saving review…");
+                        } else if let Some(error) =
+                            state["error"].as_str().filter(|s| !s.is_empty())
+                        {
+                            ui.colored_label(Color32::from_rgb(170, 45, 45), error);
+                        } else {
+                            ui.weak("Submitted after every Figure is reviewed");
+                        }
+                    });
+                });
+            });
+        state["comments"] = json!(comments);
+    }
+
+    pub(crate) fn finalize_review(&self, revision: u64) {
+        if let Some(shared) = &self.review {
+            let mut state = shared.lock().unwrap();
+            if state["request"].is_object() && state["request"]["finalized"] == false {
+                // Inline text blur can commit later in the same frame than the
+                // review button. Seal the revision after those accepted edits.
+                state["request"]["revision"] = json!(revision);
+                state["request"]["finalized"] = json!(true);
+            }
         }
     }
 }
@@ -534,12 +616,13 @@ impl Editor {
                         }),
                 );
             });
+        self.review_ui(root, c);
         if self.inspector_open {
-            let mut area = root.max_rect();
-            area.min.y = root.available_rect_before_wrap().top();
-            area.max.y -= 30.;
+            let area = root.available_rect_before_wrap();
             egui::Area::new(egui::Id::new("inspector"))
-                .order(egui::Order::Foreground)
+                // Menus use Foreground. Keep the panel below them so reopening
+                // a menu cannot let its parent panel intercept the item click.
+                .order(egui::Order::Middle)
                 .fixed_pos(egui::pos2(area.right() - INSPECTOR_WIDTH, area.top()))
                 .movable(false)
                 .show(root.ctx(), |ui| {
@@ -1294,7 +1377,13 @@ impl Editor {
                 changed = true;
             }
             let node = &mut config[key];
-            changed |= scale_control(ui, node, "axis_scale", &mut self.controls);
+            changed |= scale_control(
+                ui,
+                node,
+                "axis_scale",
+                &mut self.controls,
+                &mut self.layout_probe,
+            );
             let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
             let response = ui.checkbox(&mut labels, "Tick labels");
             self.controls
@@ -1553,10 +1642,14 @@ fn scale_control(
     axis: &mut Value,
     id: &str,
     controls: &mut HashMap<String, egui::Rect>,
+    probe: &mut std::collections::VecDeque<Value>,
 ) -> bool {
     ui.label("Scale");
     let previous = axis["scale"].as_str().unwrap_or("Linear");
     let mut value = previous.to_owned();
+    let capture = std::env::var_os("FIGGY_LAYOUT_PROBE").is_some()
+        && ui.input(|i| i.pointer.any_pressed() || i.pointer.any_released());
+    let mut items = vec![];
     let response = egui::ComboBox::from_id_salt(id)
         .selected_text(if previous == "Logarithmic" {
             "Logarithmic (base 10)"
@@ -1569,10 +1662,32 @@ fn scale_control(
                 ("Logarithmic", "Logarithmic (base 10)"),
             ] {
                 let response = ui.selectable_value(&mut value, name.to_owned(), label);
+                if capture {
+                    let rect = |r:egui::Rect| [r.min.x,r.min.y,r.width(),r.height()];
+                    items.push(json!({"name":name,"clicked":response.clicked(),
+                        "hovered":response.hovered(),"contains_pointer":response.contains_pointer(),
+                        "enabled":response.enabled(),"id":format!("{:?}",response.id),
+                        "rect":rect(response.rect),"interact_rect":rect(response.interact_rect),
+                        "clip":rect(ui.clip_rect()),"layer":format!("{:?}",response.layer_id),
+                        "pointer":ui.ctx().pointer_hover_pos().map(|p|[p.x,p.y]),
+                        "layer_at_pointer":ui.ctx().pointer_hover_pos().and_then(|p|ui.ctx().layer_id_at(p)).map(|v|format!("{v:?}")),
+                        "transform":ui.ctx().layer_transform_to_global(response.layer_id).map(|t|json!({
+                            "scaling":t.scaling,"translation":[t.translation.x,t.translation.y],"global_rect":rect(t*response.rect)}))}));
+                }
                 controls.insert(format!("{id}_{name}"), response.rect);
             }
         });
     controls.insert(id.into(), response.response.rect);
+    if capture {
+        probe.push_back(json!({"kind":"scale_control","id":id,"previous":previous,
+            "value":value,"items":items,"button_clicked":response.response.clicked(),
+            "parent_layer":format!("{:?}",response.response.layer_id),
+            "popup_open":egui::ComboBox::is_open(ui.ctx(),response.response.id),
+            "pass":ui.ctx().current_pass_index(),"frame":ui.ctx().cumulative_frame_nr()}));
+        while probe.len() > 64 {
+            probe.pop_front();
+        }
+    }
     ui.label("Log view omits zero and negative values; source data is preserved.");
     if value == previous {
         return false;

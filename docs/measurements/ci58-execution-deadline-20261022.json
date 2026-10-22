@@ -1,0 +1,18 @@
+{
+  "run": 39734785159,
+  "head": "25e015710fe1802ee2dccde43c78d2a65ef3478a",
+  "completed_cases": 470,
+  "total": 771,
+  "assertion_failures": 0,
+  "termination": "Job cancelled exactly at its configured 45-minute limit; 470 tests passed, no assertion failure reported.",
+  "new_visual_browser_cases": 9,
+  "new_visual_browser_interval_seconds": 125.166,
+  "radial_comparison": {
+    "nodeid": "tests/test_interaction_parity.py::test_radial_detail_tree_selection_edits_only_the_chosen_child[webgpu]",
+    "baseline_run": 39723351628,
+    "previous_first_gpu_submit_ms": 11621.7,
+    "current_first_gpu_submit_ms": 42342.3,
+    "previous_pipeline_ms": 500.7,
+    "current_pipeline_ms": 659.8
+  }
+}

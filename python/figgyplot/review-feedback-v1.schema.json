@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Figgyplot review feedback protocol 1",
+  "type": "object",
+  "required": [
+    "protocol",
+    "session_id",
+    "round"
+  ],
+  "properties": {
+    "protocol": {
+      "const": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "round": {
+      "type": "object",
+      "required": [
+        "id",
+        "number",
+        "status",
+        "source",
+        "documents",
+        "work_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "const": "ready"
+        },
+        "work_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object"
+        },
+        "documents": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/document"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "required": [
+        "baseline",
+        "baseline_revision",
+        "baseline_hash",
+        "dpi",
+        "backend",
+        "columns",
+        "comments",
+        "approval"
+      ],
+      "properties": {
+        "baseline": {
+          "type": "object"
+        },
+        "baseline_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baseline_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "columns": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/binary"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "target"
+            ],
+            "properties": {
+              "channel": {
+                "enum": [
+                  "api",
+                  "ui"
+                ]
+              },
+              "text": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "target": {}
+            }
+          }
+        },
+        "approval": {
+          "type": "object",
+          "required": [
+            "id",
+            "disposition",
+            "revision",
+            "settings",
+            "persistent_hash",
+            "changes"
+          ],
+          "properties": {
+            "disposition": {
+              "enum": [
+                "accept",
+                "request_changes",
+                "skip"
+              ]
+            },
+            "changes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/change"
+              }
+            }
+          }
+        }
+      }
+    },
+    "binary": {
+      "type": "object",
+      "required": [
+        "file",
+        "sha256",
+        "bytes",
+        "dtype",
+        "shape"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^data/[0-9a-f]{64}\\.npy$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dtype": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "required": [
+        "id",
+        "op",
+        "path",
+        "object_id",
+        "selectors",
+        "before_exists",
+        "after_exists",
+        "before",
+        "after"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "add",
+            "remove",
+            "replace",
+            "move"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "object_id": {
+          "type": "string"
+        },
+        "selectors": {
+          "type": "object"
+        },
+        "before_exists": {
+          "type": "boolean"
+        },
+        "after_exists": {
+          "type": "boolean"
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "session_id",
+        "round_id",
+        "work_id",
+        "manifest",
+        "source"
+      ],
+      "properties": {
+        "protocol": {
+          "const": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "round_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "work_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

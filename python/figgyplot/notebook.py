@@ -21,7 +21,7 @@ class NotebookData:
         little = np.asarray(array, dtype=array.dtype.newbyteorder("<"))
         self.columns[id] = (str(array.dtype), little.tobytes(order="C"))
 
-    def add_series_fitted(self, spec_json, config=None, bounds=None):
+    def cache_series_extents(self, spec_json):
         # Only bounded extent metadata survives transfer release, never sample arrays.
         spec = json.loads(spec_json)
         style = next(iter(spec['render_type'].values()))
@@ -67,6 +67,9 @@ class NotebookData:
                 positive = values[values>0]
                 extents.append((float(values.min()), float(values.max()), float(positive.min()) if positive.size else None))
             self.model.cache_fit_extent(spec['series_id'], *extents)
+
+    def add_series_fitted(self, spec_json, config=None, bounds=None):
+        self.cache_series_extents(spec_json)
         return self.model.add_series_fitted(spec_json, config, bounds)
 
     def remove_column(self, id):

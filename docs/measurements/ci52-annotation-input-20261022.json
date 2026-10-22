@@ -1,0 +1,745 @@
+{
+  "run": 39711546907,
+  "job": 119605700627,
+  "commit": "9ceb223d81aa58eb6a6ffe5acfb70b47fa9360ea",
+  "case": "test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]",
+  "full_suite": {
+    "passed": 250,
+    "failed": 1,
+    "seconds": 1472.42
+  },
+  "request": {
+    "annotation": [
+      846,
+      506.0000305175781,
+      62.265625,
+      38.400001525878906
+    ],
+    "canvas": {
+      "x": 389,
+      "y": 361.9375,
+      "width": 960,
+      "height": 600
+    },
+    "units": [
+      960,
+      600
+    ],
+    "point": [
+      1243,
+      873.9375305175781
+    ]
+  },
+  "observed": {
+    "canvas": {
+      "x": 389,
+      "y": 438.9375,
+      "width": 511,
+      "height": 319.375
+    },
+    "backing": [
+      511,
+      319
+    ],
+    "viewport": [
+      980,
+      820,
+      1
+    ],
+    "box": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0
+    },
+    "input": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0
+    },
+    "hint": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0
+    },
+    "font": 16,
+    "value": "First\nSecond",
+    "focused": false,
+    "selection": [
+      12,
+      12
+    ],
+    "accepted": {
+      "schema_version": 2,
+      "renderer_version": "0.18.1",
+      "config": {
+        "chart_area": {
+          "x": 0,
+          "y": 0,
+          "width": 960,
+          "height": 600
+        },
+        "top_x": {
+          "scale": "Linear",
+          "min": 0,
+          "max": 1,
+          "major_spacing": 0.2,
+          "minor_count": 4,
+          "inverted": false,
+          "label_style": {
+            "visible": true,
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 18,
+            "label_visible": false,
+            "label_font": "",
+            "label_offset_x": 0,
+            "label_offset_y": 0,
+            "format": "Decimal",
+            "significant_digits": 3
+          },
+          "tick": "Inside",
+          "title_option": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "font_size": 22,
+              "font": ""
+            },
+            "visible": false,
+            "offset_x": 0,
+            "offset_y": 0
+          },
+          "out_margin": 25,
+          "line_offset": 0,
+          "line_visible": true,
+          "line_color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "line_width": 1,
+          "line_style": "Solid",
+          "major_tick_length": 5,
+          "minor_tick_length": 3
+        },
+        "bottom_x": {
+          "scale": "Linear",
+          "min": 0,
+          "max": 1,
+          "major_spacing": 0.2,
+          "minor_count": 4,
+          "inverted": false,
+          "label_style": {
+            "visible": true,
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 18,
+            "label_visible": true,
+            "label_font": "",
+            "label_offset_x": 0,
+            "label_offset_y": 0,
+            "format": "Decimal",
+            "significant_digits": 3
+          },
+          "tick": "Inside",
+          "title_option": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "font_size": 22,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0,
+            "offset_y": 0
+          },
+          "out_margin": 80,
+          "line_offset": 0,
+          "line_visible": true,
+          "line_color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "line_width": 1,
+          "line_style": "Solid",
+          "major_tick_length": 5,
+          "minor_tick_length": 3
+        },
+        "left_y": {
+          "scale": "Linear",
+          "min": 0,
+          "max": 1,
+          "major_spacing": 0.2,
+          "minor_count": 4,
+          "inverted": false,
+          "label_style": {
+            "visible": true,
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 18,
+            "label_visible": true,
+            "label_font": "",
+            "label_offset_x": 0,
+            "label_offset_y": 0,
+            "format": "Decimal",
+            "significant_digits": 3
+          },
+          "tick": "Inside",
+          "title_option": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "font_size": 22,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0,
+            "offset_y": 0
+          },
+          "out_margin": 110,
+          "line_offset": 0,
+          "line_visible": true,
+          "line_color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "line_width": 1,
+          "line_style": "Solid",
+          "major_tick_length": 5,
+          "minor_tick_length": 3
+        },
+        "right_y": {
+          "scale": "Linear",
+          "min": 0,
+          "max": 1,
+          "major_spacing": 0.2,
+          "minor_count": 4,
+          "inverted": false,
+          "label_style": {
+            "visible": true,
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 18,
+            "label_visible": false,
+            "label_font": "",
+            "label_offset_x": 0,
+            "label_offset_y": 0,
+            "format": "Decimal",
+            "significant_digits": 3
+          },
+          "tick": "Inside",
+          "title_option": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "font_size": 22,
+              "font": ""
+            },
+            "visible": false,
+            "offset_x": 0,
+            "offset_y": 0
+          },
+          "out_margin": 25,
+          "line_offset": 0,
+          "line_visible": true,
+          "line_color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "line_width": 1,
+          "line_style": "Solid",
+          "major_tick_length": 5,
+          "minor_tick_length": 3
+        },
+        "chart_title": {
+          "text": {
+            "segments": [],
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 28,
+            "font": ""
+          },
+          "visible": true,
+          "offset_x": 0,
+          "offset_y": 0,
+          "top_margin": 32
+        },
+        "grid": {
+          "show_major_x": true,
+          "major_x_color": {
+            "r": 0.78431374,
+            "g": 0.78431374,
+            "b": 0.78431374,
+            "a": 1
+          },
+          "major_x_width": 1,
+          "major_x_style": "Solid",
+          "show_major_y": true,
+          "major_y_color": {
+            "r": 0.78431374,
+            "g": 0.78431374,
+            "b": 0.78431374,
+            "a": 1
+          },
+          "major_y_width": 1,
+          "major_y_style": "Solid",
+          "show_minor_x": false,
+          "minor_x_color": {
+            "r": 0.9019608,
+            "g": 0.9019608,
+            "b": 0.9019608,
+            "a": 1
+          },
+          "minor_x_width": 0.5,
+          "minor_x_style": "Dot",
+          "show_minor_y": false,
+          "minor_y_color": {
+            "r": 0.9019608,
+            "g": 0.9019608,
+            "b": 0.9019608,
+            "a": 1
+          },
+          "minor_y_width": 0.5,
+          "minor_y_style": "Dot"
+        },
+        "legend": {
+          "visible": false,
+          "content": {
+            "segments": [],
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "font_size": 14,
+            "font": ""
+          },
+          "corner": "TopRight",
+          "offset_x": 0,
+          "offset_y": 0,
+          "padding": 8,
+          "bg_color": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 0.85
+          },
+          "border_color": {
+            "r": 0.6,
+            "g": 0.6,
+            "b": 0.6,
+            "a": 1
+          }
+        }
+      },
+      "series": [],
+      "radial": {
+        "decorations": {
+          "data_area": null,
+          "offsets": [],
+          "selected": {
+            "Annotation": 0
+          }
+        },
+        "title": "",
+        "annotations": {
+          "visible": true,
+          "items": [
+            {
+              "id": "annotation_b4a941a9-9f48-43a1-9cfe-47374db14348",
+              "kind": {
+                "Text": {
+                  "anchor": {
+                    "Ratio": {
+                      "x": 0.90570176,
+                      "y": 0.8804348
+                    }
+                  },
+                  "text": {
+                    "segments": [
+                      {
+                        "text": "F",
+                        "bold": true,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "i",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "r",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "s",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "t",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "\n",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "S",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "e",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "c",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "o",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "n",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      },
+                      {
+                        "text": "d",
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "superscript": false,
+                        "subscript": false,
+                        "greek": false
+                      }
+                    ],
+                    "color": {
+                      "r": 0.137,
+                      "g": 0.176,
+                      "b": 0.235,
+                      "a": 1
+                    },
+                    "font_size": 16,
+                    "font": ""
+                  },
+                  "box_style": null
+                }
+              }
+            }
+          ]
+        },
+        "slices": [
+          {
+            "label": "Slice 1",
+            "value": 2,
+            "color": {
+              "r": 0.12156863,
+              "g": 0.46666667,
+              "b": 0.7058824,
+              "a": 1
+            },
+            "explode": 0,
+            "style": null,
+            "labels": null,
+            "label_format": null,
+            "label_color": null
+          },
+          {
+            "label": "Slice 2",
+            "value": 3,
+            "color": {
+              "r": 1,
+              "g": 0.49803922,
+              "b": 0.05490196,
+              "a": 1
+            },
+            "explode": 0,
+            "style": null,
+            "labels": null,
+            "label_format": null,
+            "label_color": null
+          },
+          {
+            "label": "Slice 3",
+            "value": 4,
+            "color": {
+              "r": 0.17254902,
+              "g": 0.627451,
+              "b": 0.17254902,
+              "a": 1
+            },
+            "explode": 0,
+            "style": null,
+            "labels": null,
+            "label_format": null,
+            "label_color": null
+          }
+        ],
+        "kind": {
+          "Donut": {
+            "inner_radius": 0.5
+          }
+        },
+        "start_angle_degrees": -90,
+        "split": null,
+        "style": {
+          "material": "Flat",
+          "tilt_degrees": 0,
+          "depth": 0,
+          "bevel": 0.015,
+          "gap_degrees": 0,
+          "roughness": 0.35,
+          "texture_strength": 0.2,
+          "texture_scale": 1,
+          "light": [
+            -0.5,
+            -0.6,
+            1
+          ],
+          "shadow": false,
+          "inner_corner": 0,
+          "outer_corner": 0,
+          "outline": {
+            "rim": false,
+            "separators": false,
+            "emphasis": false,
+            "width": 1,
+            "color": {
+              "r": 0.08,
+              "g": 0.12,
+              "b": 0.2,
+              "a": 1
+            }
+          },
+          "hover_lift": 0.08,
+          "hover_brightness": 0.04,
+          "gloss": 0.55,
+          "texture_angle_degrees": 0
+        },
+        "labels": "Outside",
+        "label_format": "NamePercent",
+        "label_decimals": 1,
+        "value_suffix": "",
+        "interaction": {
+          "hovered": null,
+          "selected": null,
+          "hover_progress": 0
+        },
+        "font_family": "sans-serif",
+        "font_size": 18.333334,
+        "label_color": {
+          "r": 0.12,
+          "g": 0.16,
+          "b": 0.22,
+          "a": 1
+        },
+        "background": {
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "identity": {
+        "figure": "c592a4d1-1cd3-4725-bed2-ebdc552b9d07",
+        "groups": {},
+        "layout": null,
+        "panels": [
+          {
+            "id": "main",
+            "overlays": []
+          }
+        ],
+        "retired": []
+      }
+    },
+    "host": {
+      "kind": "radial",
+      "busy": 0,
+      "queued": 0,
+      "dirty": false,
+      "frame_pending": false,
+      "frame_error": null,
+      "edit_inflight": null,
+      "edit_pending": false,
+      "canvas": [
+        511,
+        319
+      ],
+      "disposed": false
+    }
+  },
+  "hit": null,
+  "annotation_geometry_after": [
+    {
+      "element": "annotation_0",
+      "handles": [],
+      "id": "annotation_b4a941a9-9f48-43a1-9cfe-47374db14348",
+      "index": 0,
+      "kind": "Text",
+      "rect": [
+        846,
+        506.0000305175781,
+        62.265625,
+        39.56614303588867
+      ],
+      "selected": true
+    }
+  ],
+  "interpretation": "The recorded input point is outside the 980x820 viewport. The failure does not establish a renderer hit-test or SSOT error. Request-time DOM coordinates must be read together with prepared annotation geometry; a separately captured protocol bounding box may describe an earlier layout.",
+  "controlled_regression": {
+    "stale_point": [
+      1243.0,
+      873.9375
+    ],
+    "current": {
+      "annotation": [
+        846,
+        506,
+        62,
+        38
+      ],
+      "canvas": {
+        "x": 389,
+        "y": 438.9375,
+        "width": 511,
+        "height": 319.375
+      },
+      "units": [
+        960,
+        600
+      ],
+      "point": [
+        843.5770833333333,
+        711.4708333333333
+      ],
+      "viewport": [
+        980,
+        820
+      ],
+      "backing": [
+        960,
+        600
+      ]
+    },
+    "delivered": [
+      {
+        "trusted": true,
+        "x": 843,
+        "y": 711
+      }
+    ]
+  },
+  "validation": {
+    "affected_passed": 5,
+    "seconds": 94.48,
+    "complete_collection": 641,
+    "runtime_changed": false,
+    "deadlines_or_post_input_assertions_changed": false,
+    "complete_updated_ci": "pending"
+  }
+}

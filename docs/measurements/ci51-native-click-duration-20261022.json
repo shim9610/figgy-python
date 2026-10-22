@@ -1,0 +1,170 @@
+{
+  "scenario": "Native radial detail series selection through real X11 input",
+  "ci": {
+    "run": 39656619970,
+    "job": 119421653668,
+    "full_collection": 639,
+    "observed_failed_case": "test_radial_detail_tree_selection_edits_only_the_chosen_child[native]",
+    "started_utc": "2026-10-21T18:58:40Z",
+    "cancelled_utc": "2026-10-21T19:43:57Z",
+    "job_budget_minutes": 45,
+    "note": "CI log records the failed case but no final traceback before cancellation. Detailed cause below is reproduced locally for the same case."
+  },
+  "local_reproduction": {
+    "failed": {
+      "press_to_release_command_seconds": 0.8215802909980994,
+      "target_rect": [
+        1069.0,
+        224.0,
+        243.0,
+        24.0
+      ],
+      "press": {
+        "button": "Left",
+        "consumed": true,
+        "kind": "button",
+        "position": [
+          1190.0,
+          236.0
+        ],
+        "state": "Pressed"
+      },
+      "release": {
+        "button": "Left",
+        "consumed": true,
+        "kind": "button",
+        "position": [
+          1190.0,
+          236.0
+        ],
+        "state": "Released"
+      },
+      "selected_after_release": null,
+      "surface_frames": [
+        45,
+        52
+      ]
+    },
+    "passed": {
+      "press_to_release_command_seconds": 0.793658811977366,
+      "target_rect": [
+        1069.0,
+        224.0,
+        243.0,
+        24.0
+      ],
+      "press": {
+        "button": "Left",
+        "consumed": true,
+        "kind": "button",
+        "position": [
+          1190.0,
+          236.0
+        ],
+        "state": "Pressed"
+      },
+      "release": {
+        "button": "Left",
+        "consumed": true,
+        "kind": "button",
+        "position": [
+          1190.0,
+          236.0
+        ],
+        "state": "Released"
+      },
+      "selected_after_release": {
+        "group": 1,
+        "index": 1
+      },
+      "surface_frames": [
+        50,
+        57
+      ]
+    },
+    "failure": "KeyError: section:Series style; the detail slice remained unselected"
+  },
+  "input_contract": {
+    "egui_version": "0.36.2",
+    "max_click_duration_seconds": 0.8,
+    "source": "https://docs.rs/egui/0.36.2/egui/struct.InputOptions.html#structfield.max_click_duration"
+  },
+  "regression": {
+    "test": "test_click_remains_a_short_press_when_frames_are_slow",
+    "injected_frame_delay_seconds": 0.9,
+    "before_fix": "failed: properties_open was false",
+    "fix": "Send X11 button press/release as one xdotool click before waiting for rendered frames.",
+    "after_fix": "passed with the same injected frame delay"
+  },
+  "validation": {
+    "focused_passed": 3,
+    "focused_seconds": 94.07,
+    "cases": [
+      "test_click_remains_a_short_press_when_frames_are_slow",
+      "test_radial_detail_tree_selection_edits_only_the_chosen_child[native]",
+      "test_radial_detail_tree_selection_edits_only_the_chosen_child[webgpu]"
+    ],
+    "full_suite": {
+      "tests": 640,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2444.032,
+      "wheel_sha256": "88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b"
+    },
+    "full_suite_attempts": [
+      {
+        "collected": 640,
+        "passed": 219,
+        "failed": 1,
+        "seconds": 772.35,
+        "failed_case": "test_matching_opposite_axes_share_only_ui_edited_fields[x]",
+        "cause": "The Cartesian inspector intercepted its reopened popup menu."
+      },
+      {
+        "collected": 640,
+        "passed": 243,
+        "failed": 1,
+        "seconds": 1201.72,
+        "failed_case": "test_annotation_drawing_editing_and_cancel_in_both_hosts[boxplot]",
+        "cause": "Native bounded drawing relied on press_origin, which egui clears after a press and release buffered in the same frame."
+      },
+      {
+        "collected": 640,
+        "passed": 640,
+        "failed": 0,
+        "seconds": 2444.04,
+        "wheel_sha256": "88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b"
+      }
+    ]
+  },
+  "ci_runtime_comparison": {
+    "run50": {
+      "run_id": 39630843161,
+      "full_suite_passed": 593,
+      "full_suite_seconds": 1781.99,
+      "seconds_from_full_start_to_native_detail_result": 1603
+    },
+    "run51": {
+      "run_id": 39656619970,
+      "full_collection": 639,
+      "seconds_from_full_start_to_native_detail_result": 2250,
+      "full_suite_complete": false
+    },
+    "common_browser_fixtures": 77,
+    "host": {
+      "logical_cpus": 4,
+      "affinity_cpus": 4,
+      "chromium_version": "156.0.8078.4"
+    },
+    "median_fixture_max_pipeline_ms": {
+      "run50": 432.9,
+      "run51": 542.3
+    },
+    "median_fixture_page_time_ms": {
+      "run50": 8975.8,
+      "run51": 11939.7
+    },
+    "interpretation": "Slower software-GPU/host timing is measured. This comparison does not identify all causes of the wall-time increase. New harness phase records separate startup, test, diagnostics and shutdown. No deadline is increased."
+  }
+}

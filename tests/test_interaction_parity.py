@@ -1077,10 +1077,13 @@ for key in ['top_x','right_y']:
     fig.configure(config={key:{'label_style':{'visible':False,'font_size':11.,'significant_digits':6},'title_option':{'offset_x':3.,'offset_y':4.}}})
 """
     axes=['bottom_x','top_x','left_y','right_y']
+    snapshots=[]
     def check_edit(get_state, edit, source, field, value, linked=True):
         before=get_state()['config']
         edit(targets[source],field,value)
         after=get_state()['config']
+        snapshots.append({'axis':source,'field':field,'value':value,'before':before,'after':after})
+        (tmp_path/'axis-state-transitions.json').write_text(json.dumps(snapshots))
         changed={'label_format':['label_style','format'],'significant_digits':['label_style','significant_digits'],
                  'tick_labels_visible':['label_style','visible'],'tick_direction':['tick'],'axis_scale':['scale']}.get(field,[field])
         destination=opposite if source==primary else primary
@@ -1125,6 +1128,9 @@ for key in ['top_x','right_y']:
                 click_control(field)
                 if field in ['label_format','tick_direction','axis_scale']:
                     prefix='tick' if field=='tick_direction' else field
+                    if field=='axis_scale' and value=='Linear':
+                        from PIL import ImageGrab
+                        ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-linear-menu.png')
                     inputs.click(prefix+'_'+value)
                 elif field!='tick_labels_visible':
                     inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers',str(value));inputs.key('Return')
@@ -1139,7 +1145,10 @@ for key in ['top_x','right_y']:
                 other.axes[0].plot([1,10,100],[1,10,100],id='signal')
                 exec(code,{'fig':other})
                 assert other.get_settings()['config']==fig.get_settings()['config']
-        finally: handle.close();Inputs.pump()
+        finally:
+            (tmp_path/'native-axis-input-events.json').write_text(json.dumps(inputs.events))
+            (tmp_path/'native-axis-settings.json').write_text(json.dumps(fig.get_settings()))
+            handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"display(fig.widget())"
     with notebook(tmp_path/('paired_'+dimension),source) as (page,execute):
         click_button(page, '[data-properties]')
@@ -1504,6 +1513,11 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
     def items(state): return owner(state).get('annotations',{}).get('items',[])
     with figgy.Figure(backend='native') as fig:
         exec(setup, {'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
+        inputs=None;samples=[]
+        def drawing_probe(stage):
+            samples.append({'stage':stage,'settings':fig.get_settings(),'host':inputs.info()})
+            (tmp_path/'native-drawing-states.json').write_text(json.dumps(samples))
+            (tmp_path/'native-drawing-inputs.json').write_text(json.dumps(inputs.events))
         try:
             inputs=Inputs(handle);inputs.click('draw');revision=fig.revision
             inputs.click('layout_mode');inputs.click('draw_arrow')
@@ -1526,7 +1540,9 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
             # The existing bounded hover route may resume after cancellation.
             if kind is None:assert fig.revision==revision
             inputs.click('draw_text');revision=fig.revision;point=native_point(inputs.info(),(330,240))
+            drawing_probe('text-armed')
             inputs.click_rect([point[0]-1,point[1]-1,2,2])
+            drawing_probe('text-placed')
             assert 'inline_text' in inputs.info()['controls'] and not items(fig.get_settings())
             inputs.xdo('type','--clearmodifiers','Discard this');inputs.pump();inputs.key('Escape')
             assert not items(fig.get_settings())
@@ -1566,7 +1582,9 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
             inputs.click('delete_annotation');assert len(items(fig.get_settings()))==len(ids)-1
             assert not inputs.info()['error']
             assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
-        finally:handle.close();Inputs.pump()
+        finally:
+            if inputs is not None:drawing_probe('closing')
+            handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
     with notebook(tmp_path/family,source) as (page,execute):
         click_button(page, '[data-draw]')
@@ -1628,6 +1646,59 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         screenshot_editor(page,tmp_path/f'{family}-drawing.png')
 
 
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real browser')
+def test_surface_readiness_rejects_matching_pre_resize_css_and_backing(tmp_path):
+    from playwright.sync_api import sync_playwright
+    from inline_editor_harness import SURFACE_READY,wait_surface
+    with sync_playwright() as p:
+        browser=p.chromium.launch(executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
+                                  headless=False,args=['--no-sandbox'])
+        try:
+            page=browser.new_page(viewport={'width':980,'height':820})
+            page.set_content('''<style>body{margin:0}canvas{position:absolute;left:389px;top:361.9375px;width:960px;height:600px}</style>
+                <div class="figgy-editor"><canvas width="960" height="600"></canvas></div>''')
+            old=page.evaluate("""()=>{const c=document.querySelector('canvas'),r=c.getBoundingClientRect();
+                return {viewport:[innerWidth,innerHeight],canvas:[r.x,r.y,r.width,r.height],backing:[c.width,c.height]};}""")
+            assert not page.evaluate(SURFACE_READY,[980,820,1]),old
+            page.evaluate("""()=>{window.layoutDelivered=false;setTimeout(()=>{
+                const c=document.querySelector('canvas');c.style.width='511px';c.style.height='319.375px';
+                c.width=511;c.height=319;window.layoutDelivered=true;
+            },200);}""")
+            wait_surface(page,(980,820))
+            assert page.evaluate('layoutDelivered')
+            (tmp_path/'surface-readiness.json').write_text(json.dumps({'before':old,'after':page.locator('canvas').evaluate('c=>[c.width,c.height,c.getBoundingClientRect().width]')}))
+        finally:browser.close()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real browser')
+def test_annotation_mouse_input_uses_live_layout_after_resize(tmp_path):
+    from playwright.sync_api import sync_playwright
+    from inline_editor_harness import annotation_point
+    with sync_playwright() as p:
+        browser=p.chromium.launch(executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
+                                  headless=False,args=['--no-sandbox'])
+        try:
+            page=browser.new_page(viewport={'width':980,'height':820})
+            page.set_content('''<style>body{margin:0}canvas{position:absolute;left:389px;top:361.9375px;width:960px;height:600px}</style>
+                <div class="figgy-editor"><canvas width="960" height="600"></canvas></div>''')
+            page.evaluate("""()=>{
+                const root=document.querySelector('.figgy-editor'),canvas=root.querySelector('canvas');
+                root.figgy={annotations:async()=>[{index:0,rect:[846,506,62,38]}],
+                    snapshot:()=>({config:{chart_area:{width:960,height:600}}}),diagnostics:()=>({kind:'radial'})};
+                window.clicks=[];canvas.addEventListener('dblclick',e=>clicks.push({trusted:e.isTrusted,x:e.clientX,y:e.clientY}));
+            }""")
+            old=page.locator('canvas').bounding_box()
+            stale=[old['x']+854*old['width']/960,old['y']+512*old['height']/600]
+            page.evaluate("""()=>{const c=document.querySelector('canvas');c.style.width='511px';
+                c.style.height='319.375px';c.style.top='438.9375px';}""")
+            page.mouse.dblclick(*stale)
+            assert page.evaluate('clicks')==[]  # The CI point lies outside the viewport.
+            current=annotation_point(page);page.mouse.dblclick(*current['point'])
+            clicks=page.evaluate('clicks');assert len(clicks)==1 and clicks[0]['trusted']
+            (tmp_path/'annotation-input-layout.json').write_text(json.dumps({'stale_point':stale,'current':current,'delivered':clicks}))
+        finally:browser.close()
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
 @pytest.mark.parametrize('family', ['cartesian', 'radial'])
 def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path, family):
@@ -1686,12 +1757,10 @@ def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path
         execute("state=fig.get_settings();state['"+kind+"']['active_layer']='Base';state['"+kind+"']['annotations']['items'][0]['kind']['Text']['text']['segments'][0]['bold']=True;fig.apply_settings(state);print('updated')")
         page.wait_for_function(f'({ROOT}.snapshot().{kind}.active_layer??"Base")==="Base" && {ROOT}.snapshot().{kind}.annotations.items[0].kind.Text.text.segments[0].bold===true')
         page.wait_for_function('async()=> (await '+ROOT+'.annotations()).length===1')
-        rect=page.evaluate(ROOT+'.annotations()')[0]['rect'];canvas=page.locator('canvas').bounding_box()
-        # Cartesian geometry is in current physical canvas pixels; bounded maps use document units.
-        size=[960,600] if family=='radial' else page.locator('canvas').evaluate('c=>[c.width,c.height]')
-        reopen={'annotation':rect,'canvas':canvas,'units':size}
+        from inline_editor_harness import annotation_point
+        reopen=annotation_point(page)
         (tmp_path/'inline-reopen-request.json').write_text(json.dumps(reopen,indent=2))
-        page.mouse.dblclick(canvas['x']+(rect[0]+8)*canvas['width']/size[0],canvas['y']+(rect[1]+6)*canvas['height']/size[1])
+        page.mouse.dblclick(*reopen['point'])
         try:
             entry.wait_for(state='visible');page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
         finally:
@@ -2576,13 +2645,29 @@ def test_radial_detail_tree_selection_edits_only_the_chosen_child(tmp_path,backe
         import copy
         with figgy.Figure(backend=backend) as fig:
             exec(setup,{'fig':fig,'copy':copy});handle=fig.show(block=False)
+            samples=[];started=time.monotonic();inputs=None
+            def probe(stage):
+                sample={'stage':stage,'elapsed_seconds':time.monotonic()-started,
+                        'settings':fig.get_settings(),'host':json.loads(handle.info_json())}
+                if inputs is not None:
+                    (tmp_path/'native-input-events.json').write_text(json.dumps(inputs.events))
+                samples.append(sample)
+                (tmp_path/'native-detail-states.json').write_text(json.dumps(samples))
             try:
-                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'Detail B','bounded/series/slice_1_1')
-                inputs.click('section:Series style');inputs.click('property:Series style/custom')
+                inputs=Inputs(handle);probe('opened')
+                inputs.click('properties');probe('properties')
+                choose_native_object(inputs,'Detail B','bounded/series/slice_1_1');probe('selected-child')
+                inputs.click('section:Series style');probe('style-section')
+                inputs.click('property:Series style/custom');probe('custom-style')
                 inputs.click('property:Series style/style/gap_degrees');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','5');inputs.key('Return')
+                probe('edited-gap')
                 chart=fig.get_settings()['radial'];assert chart['split']['children'][1]['style']['gap_degrees']==5
                 assert chart['split']['children'][0]['style'] is None and all(v['style'] is None for v in chart['slices'])
                 assert not inputs.info()['error']
+            except Exception:
+                probe('failure')
+                print('FIGGY NATIVE DETAIL FAILURE '+json.dumps(samples[-1]),flush=True)
+                raise
             finally:handle.close();Inputs.pump()
         return
     source='import copy,json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
@@ -2631,3 +2716,156 @@ def test_large_logarithmic_values_render_at_their_projected_height_in_both_hosts
         width,height=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
         check(Image.open(path).convert('RGB'),[rect[0]*960/width,rect[1]*600/height,rect[2]*960/width,rect[3]*600/height])
         assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and notebook review inputs')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+@pytest.mark.parametrize('family',['cartesian','radial'])
+def test_review_submission_keeps_comments_and_view_on_storage_failure(tmp_path,monkeypatch,backend,family):
+    from figgyplot.review import Session
+    setup="ax=fig.axes[0];ax.plot([0,1],[1,3],id='signal')" if family=='cartesian' else "ax=fig.axes[0];ax.pie([3,2,1])"
+    comments='Keep the title and adjust the legend next'
+    cache=tmp_path/'review-cache'
+    if backend=='native':
+        with Session(cache) as session:
+            fig=session.figure(id='review-chart');exec(setup,{'fig':fig})
+            session.present();handle=fig._windows[-1];inputs=Inputs(handle)
+            inputs.click('review_comments');inputs.xdo('type','--clearmodifiers',comments);inputs.pump()
+            fig.axes[0].set_title('Human chart title');inputs.pump()
+            inputs.click('draw');inputs.click('draw_text')
+            px,py=native_point(inputs.info(),(350,250));inputs.click_rect([px,py,0,0])
+            inputs.xdo('type','--clearmodifiers','Human annotation');inputs.pump()
+            inputs.click('review_changes')
+            assert json.loads(handle.review_request_json())['comments']==comments
+            assert not handle.closed
+            def fail(*args):raise OSError('simulated storage failure')
+            with monkeypatch.context() as patch:
+                patch.setattr(session._store,'write',fail);session.poll()
+            inputs.pump()
+            assert not handle.closed and not session.events()
+            assert inputs.info()['review']['comments']==comments
+            assert 'simulated storage failure' in inputs.info()['review']['error']
+            from PIL import ImageGrab
+            geometry=dict(line.split('=',1) for line in inputs.xdo('getwindowgeometry','--shell',inputs.wid).splitlines() if '=' in line)
+            x,y,w,h=(int(geometry[key]) for key in ('X','Y','WIDTH','HEIGHT'))
+            ImageGrab.grab(xdisplay=os.environ['DISPLAY']).crop((x,y,x+w,y+h)).save(tmp_path/'native-review.png')
+            inputs.click('review_changes');session.poll();assert handle.closed
+            feedback=session.feedback(session.events()[0]['work_id'])['round']['documents']['review-chart']
+            assert feedback['comments'][0]['text']==comments
+            assert comments not in json.dumps(feedback['approval']['settings'])
+            owner=feedback['approval']['settings']['radial' if family=='radial' else 'config']
+            assert ''.join(s['text'] for s in owner['annotations']['items'][-1]['kind']['Text']['text']['segments'])=='Human annotation'
+            assert feedback['approval']['changes']
+        return
+    source="import json\nfrom figgyplot.review import Session\nsession=Session("+repr(str(cache))+",backend='webgpu')\nfig=session.figure(id='review-chart')\n"+setup+"\ndisplay(session.widget(fig))"
+    with notebook(tmp_path/'notebook-review',source,allow_closed=True) as (page,execute):
+        field=page.locator('[data-review-comments]');field.fill(comments);field.press('Tab')
+        execute("fig.axes[0].set_title('Human chart title'); await fig.sync()")
+        execute("real_write=session._store.write\ndef fail_write(*args):\n    raise OSError('simulated storage failure')\nsession._store.write=fail_write")
+        click_button(page,'[data-draw]');click_button(page,'[data-tool=text]')
+        page.mouse.click(*browser_point(page,(350,250)))
+        page.locator('[data-inline-text]').fill('Human annotation')
+        click_button(page,'[data-review-changes]')
+        page.wait_for_function("document.querySelector('[data-review-status]').textContent.includes('simulated storage failure')")
+        assert field.input_value()==comments
+        assert json.loads(execute('print(json.dumps(session.events()))'))==[]
+        screenshot_editor(page,tmp_path/'browser-review.png')
+        execute('session._store.write=real_write')
+        click_button(page,'[data-review-changes]')
+        page.wait_for_function("!document.querySelector('.figgy-editor')")
+        feedback=json.loads(execute('print(json.dumps(session.feedback(session.events()[0]["work_id"])))'))['round']['documents']['review-chart']
+        assert feedback['comments'][0]['text']==comments
+        assert comments not in json.dumps(feedback['approval']['settings'])
+        owner=feedback['approval']['settings']['radial' if family=='radial' else 'config']
+        assert ''.join(s['text'] for s in owner['annotations']['items'][-1]['kind']['Text']['text']['segments'])=='Human annotation'
+        assert feedback['approval']['changes']
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native review input')
+@pytest.mark.parametrize('family',['cartesian','radial'])
+def test_native_review_long_comments_keep_approval_controls_reachable(tmp_path,family):
+    from figgyplot.review import Session
+    comments='\n'.join('Review note '+str(i) for i in range(40))
+    with Session(tmp_path/'cache') as session:
+        fig=session.figure(id='review-chart')
+        if family=='radial':fig.axes[0].pie([3,2,1])
+        else:fig.axes[0].plot([0,1],[1,3],id='signal')
+        session.present();handle=fig._windows[-1];inputs=Inputs(handle)
+        with pytest.raises(RuntimeError,match='already has'):fig.show(block=False)
+        inputs.click('properties')
+        if family=='cartesian':inputs.click_rect(inputs.info()['decorations']['axis_bottom'])
+        props=inputs.info()['controls']['properties_viewport']
+        review=inputs.info()['controls']['review_comments']
+        (tmp_path/'review-property-bounds.json').write_text(json.dumps({'properties':props,'review':review}))
+        assert (props[0]+props[2]<=review[0] or review[0]+review[2]<=props[0]
+                or props[1]+props[3]<=review[1] or review[1]+review[3]<=props[1])
+        session.comment(fig.id,'Preserve the original data',target={'series_id':'signal'})
+        inputs.click('review_comments')
+        import subprocess
+        subprocess.run(['xclip','-selection','clipboard'],input=comments,text=True,
+                       stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
+        inputs.key('ctrl+v');inputs.pump();session.poll()
+        info=inputs.info();width,height=info['surface_size']
+        for key in ['review_comments','review_changes','review_accept']:
+            x,y,w,h=info['controls'][key]
+            assert 0<=x<x+w<=width and 0<=y<y+h<=height,(key,info['controls'][key],info['surface_size'])
+        assert info['review']['comments']==comments
+        inputs.click('review_changes');session.poll();assert handle.closed
+        with pytest.raises(RuntimeError,match='approved|sealed'):fig.show(block=False)
+        feedback=session.feedback(session.events()[0]['work_id'])['round']['documents'][fig.id]
+        assert [c['text'] for c in feedback['comments']]==['Preserve the original data',comments]
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real notebook duplicate views')
+def test_review_duplicate_browser_views_require_explicit_resolution(tmp_path):
+    source="from figgyplot.review import Session\nimport json\nsession=Session("+repr(str(tmp_path/'cache'))+",backend='webgpu')\nfig=session.figure(id='review-chart',retain_notebook_data=True)\nfig.axes[0].plot([0,1],[1,3],id='signal')\nw=session.widget(fig)\ndisplay(w,w)"
+    with notebook(tmp_path/'duplicate-views',source,allow_closed=True,initial_views=2) as (page,execute):
+        fields=page.locator('[data-review-comments]')
+        fields.nth(0).fill('First view feedback');fields.nth(1).fill('Second view draft')
+        page.locator('[data-review-changes]').nth(0).click()
+        page.wait_for_function("Array.from(document.querySelectorAll('[data-review-status]')).some(s=>s.textContent.includes('duplicate review views'))")
+        assert page.locator('.figgy-editor').count()==2
+        assert fields.nth(1).input_value()=='Second view draft'
+        assert json.loads(execute('print(json.dumps(session.events()))'))==[]
+        assert json.loads(execute('print(json.dumps(session.snapshot()["rounds"][-1]["documents"]["review-chart"]["approval"]))')) is None
+        execute('session.cancel()')
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and notebook review rounds')
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_review_controller_displays_a_complete_regenerated_round(tmp_path,backend):
+    from figgyplot.review import Session
+    source=tmp_path/'builder.py';cache=tmp_path/'cache'
+    def builder(title, extra=False):
+        text="def build(session):\n    fig=session.figure(id='review-round')\n    fig.axes[0].plot([0,1],[1,3],id='signal')\n    fig.axes[0].set_title("+repr(title)+")\n"
+        if extra:text+="    other=session.figure(id='second-result')\n    other.axes[0].plot([0,1],[3,1],id='other')\n"
+        return text
+    source.write_text(builder('Initial title'))
+    if backend=='native':
+        with Session(cache,source={'entrypoint':str(source)}) as session:
+            namespace={};exec(source.read_text(),namespace);namespace['build'](session)
+            session.present();old=session._figures['review-round']._windows[-1]
+            inputs=Inputs(old);inputs.click('review_comments');inputs.xdo('type','--clearmodifiers','Add the second chart');inputs.pump()
+            inputs.click('review_changes');session.poll();assert old.closed
+            source.write_text(builder('Updated source title',True))
+            agent=Session.open(cache);work=agent.events()[0]['work_id'];assert agent.regenerate(work)==2
+            session.poll();Inputs.pump()
+            assert set(session._handles)=={'review-round','second-result'}
+            assert all(not h.closed for h in session._handles.values())
+            state=session._figures['review-round'].get_settings()
+            assert ''.join(s['text'] for s in state['config']['chart_title']['text']['segments'])=='Updated source title'
+            session.cancel()
+        return
+    initial="import asyncio,json,runpy\nfrom pathlib import Path\nfrom figgyplot.review import Session\nsession=Session("+repr(str(cache))+",source={'entrypoint':"+repr(str(source))+"},backend='webgpu')\nrunpy.run_path("+repr(str(source))+")['build'](session)\nfig=session._figures['review-round']\ndisplay(session.widget(fig))\nwatcher=asyncio.create_task(session.watch())"
+    with notebook(tmp_path/'round-publication',initial,allow_closed=True) as (page,execute):
+        page.locator('[data-review-comments]').fill('Add the second chart')
+        click_button(page,'[data-review-changes]')
+        page.wait_for_function("!document.querySelector('.figgy-editor')")
+        source.write_text(builder('Updated source title',True))
+        result=execute("agent=Session.open("+repr(str(cache))+"); work=agent.events()[0]['work_id']; print(await asyncio.to_thread(agent.regenerate,work))")
+        assert result.strip()=='2'
+        page.wait_for_function("document.querySelectorAll('.figgy-editor').length===2 && [...document.querySelectorAll('.figgy-editor [data-status]')].every(s=>s.textContent==='Ready')",timeout=180000)
+        assert json.loads(execute("print(json.dumps(sorted(session._figures)))"))==['review-round','second-result']
+        page.wait_for_function("[...document.querySelectorAll('.figgy-editor')].every(r=>{const d=r.figgy.diagnostics();return !d.dirty&&!d.frame_pending&&!d.busy&&!d.queued;})",polling=100,timeout=180000)
+        for index in range(2):page.locator('.figgy-editor').nth(index).screenshot(path=str(tmp_path/f'complete-next-round-{index}.png'))
+        execute('watcher.cancel(); session.cancel()')

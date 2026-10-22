@@ -8,6 +8,7 @@ import time
 import pytest
 import figgyplot as figgy
 from figgyplot.desktop import poll_events
+from native_input import click as send_native_click
 
 requires_x11 = pytest.mark.skipif(
     not os.environ.get("DISPLAY") or not shutil.which("xdotool") or not shutil.which("xclip") or not shutil.which("wmctrl"),
@@ -18,6 +19,7 @@ requires_x11 = pytest.mark.skipif(
 class Inputs:
     def __init__(self, window):
         self.window = window
+        self.events = []
         self.pump()
         self.wid = self.xdo("search", "--pid", os.getpid(), "--name", "^Figgy$").splitlines()[-1]
         # A window manager may reuse an offscreen/right-edge placement after
@@ -40,22 +42,40 @@ class Inputs:
     def info(self):
         return json.loads(self.window.info_json())
 
+    @staticmethod
+    def input_state(state):
+        # Keep the event trace bounded without retaining 64 complete layout
+        # snapshots inside each of 128 before/after input records.
+        result={key:state.get(key) for key in ['surface_frames','pointer_sequence',
+            'pointer_input','selected','revision','properties_open','surface_size',
+            'scale_factor','controls','error']}
+        result['scale_probe']=[entry for entry in state.get('layout_probe',[])
+                               if entry.get('kind')=='scale_control'][-6:]
+        return result
+
     def input_frame(self, *args):
         """Wait for the host to present an input instead of assuming a fixed delay.
 
         Software Vulkan can take longer than the usual 100 ms under CI load;
         sending the next gesture before a toolbar click is consumed loses input.
         """
-        before = self.info()['surface_frames']
+        state = self.info();before = state['surface_frames']
+        entry={'input':args,'before':self.input_state(state),'started':time.monotonic()}
+        self.events.append(entry)
+        del self.events[:-128]
         pointer = self.xdo('getmouselocation', '--shell') if args[0]=='mousemove' else None
         self.xdo(*args)
         if pointer is not None and pointer == self.xdo('getmouselocation', '--shell'):
             self.pump()
+            entry['after']=self.input_state(self.info())
+            entry['finished']=time.monotonic()
             return
         deadline = time.monotonic()+5
         while True:
             self.pump()
-            if self.info()['surface_frames'] > before:
+            state=self.info();entry['after']=self.input_state(state)
+            entry['finished']=time.monotonic()
+            if state['surface_frames'] > before:
                 return
             assert time.monotonic() < deadline, self.info()
 
@@ -65,8 +85,7 @@ class Inputs:
         # Deliver a real motion event before pressing on the new chart surface.
         self.input_frame("mousemove", "--window", self.wid, x+8, y+8)
         self.input_frame("mousemove", "--window", self.wid, x, y)
-        self.input_frame("mousedown", 1)
-        self.input_frame("mouseup", 1)
+        send_native_click(self.input_frame)
 
     def click(self, name):
         from object_navigation import ensure_native_control_visible
@@ -76,6 +95,24 @@ class Inputs:
     def key(self, key):
         self.xdo("key", key)
         self.pump()
+
+
+@requires_x11
+def test_click_remains_a_short_press_when_frames_are_slow(tmp_path,monkeypatch):
+    with figgy.Figure(backend='native') as fig:
+        fig.axes[0].pie([3,2,1])
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);original=inputs.pump
+            def slow_frame():
+                time.sleep(.9)  # Exceed egui's 0.8s click duration between frames.
+                original()
+            monkeypatch.setattr(inputs,'pump',slow_frame)
+            inputs.click('properties')
+            (tmp_path/'click-events.json').write_text(json.dumps(inputs.events))
+            assert inputs.info()['pointer_input']['state']=='Released'
+            assert inputs.info()['properties_open']
+        finally:handle.close();Inputs.pump()
 
 
 @requires_x11

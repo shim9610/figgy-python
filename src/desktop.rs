@@ -24,6 +24,7 @@ struct Control {
     dirty: AtomicBool,
     stats: Mutex<Value>,
     settings: Mutex<Option<Arc<Control>>>,
+    review: Arc<Mutex<Value>>,
 }
 #[pyclass(module = "figgyplot._native")]
 pub struct WindowHandle {
@@ -31,6 +32,33 @@ pub struct WindowHandle {
 }
 #[pymethods]
 impl WindowHandle {
+    fn configure_review(&self, json: &str) -> PyResult<()> {
+        let mut state: Value = parse(json)?;
+        if !state["figure_id"].is_string() || !state["comments"].is_string() {
+            return Err(invalid(
+                "review controls require a Figure ID and comment text",
+            ));
+        }
+        state["request"] = Value::Null;
+        state["error"] = json!("");
+        *self.control.review.lock().unwrap() = state;
+        self.refresh();
+        Ok(())
+    }
+    fn review_request_json(&self) -> String {
+        let state = self.control.review.lock().unwrap();
+        if state["request"]["finalized"] == true {
+            state["request"].to_string()
+        } else {
+            "null".into()
+        }
+    }
+    fn review_result(&self, error: &str) {
+        let mut state = self.control.review.lock().unwrap();
+        state["request"] = Value::Null;
+        state["error"] = json!(error);
+        self.refresh();
+    }
     fn close(&self) {
         self.control.close.store(true, Ordering::Release);
     }
@@ -39,6 +67,7 @@ impl WindowHandle {
     }
     fn info_json(&self) -> String {
         let mut stats = self.control.stats.lock().unwrap().clone();
+        stats["review"] = self.control.review.lock().unwrap().clone();
         if let Some(settings) = self.control.settings.lock().unwrap().as_ref() {
             stats["settings_window"] = if settings.close.load(Ordering::Acquire) {
                 Value::Null
@@ -81,6 +110,8 @@ struct SurfaceWindow {
     chart_pressed: bool,
     edit_area: bool,
     cursor: (f32, f32),
+    pointer_sequence: u64,
+    pointer_input: Value,
     panel: Rect,
     scale: f32,
     editor: editor::Editor,
@@ -172,6 +203,7 @@ impl SurfaceWindow {
         );
         let ui_renderer = egui_wgpu::Renderer::new(c.renderer.device(), format, Default::default());
         let mut editor = editor::Editor::default();
+        editor.review = Some(Arc::clone(&control.review));
         if settings_only {
             editor.begin_settings(&c);
         }
@@ -202,6 +234,8 @@ impl SurfaceWindow {
             chart_pressed: false,
             edit_area: false,
             cursor: (0., 0.),
+            pointer_sequence: 0,
+            pointer_input: Value::Null,
             panel: rect,
             scale: 1.,
             editor,
@@ -1200,6 +1234,7 @@ impl SurfaceWindow {
         if !ctx.input(|i| i.pointer.any_down()) && !ctx.egui_wants_keyboard_input() {
             c.end_edit();
         }
+        self.editor.finalize_review(c.data.revision);
         // Explicit export may temporarily select its RGBA target pipelines.
         c.renderer
             .ensure_target_format(self.config.format)
@@ -1477,7 +1512,7 @@ impl SurfaceWindow {
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
             Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
         });
-        *self.control.stats.lock().unwrap() = json!({"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        *self.control.stats.lock().unwrap() = json!({"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }
@@ -1597,11 +1632,41 @@ impl ApplicationHandler for App {
         let Some(w) = self.windows.get_mut(&id) else {
             return;
         };
+        let reviewing = !w.control.review.lock().unwrap()["request"].is_null();
+        if reviewing
+            && matches!(
+                event,
+                WindowEvent::CloseRequested
+                    | WindowEvent::MouseInput { .. }
+                    | WindowEvent::CursorMoved { .. }
+                    | WindowEvent::MouseWheel { .. }
+                    | WindowEvent::KeyboardInput { .. }
+                    | WindowEvent::Ime(_)
+            )
+        {
+            return;
+        }
         if matches!(event, WindowEvent::CloseRequested) {
             w.control.close.store(true, Ordering::Release);
             return;
         }
         let response = w.input.on_window_event(&w.window, &event);
+        let pointer = match &event {
+            WindowEvent::CursorMoved { position, .. } => Some(json!({
+                "kind":"motion", "position":[position.x,position.y],
+                "consumed":response.consumed
+            })),
+            WindowEvent::MouseInput { state, button, .. } => Some(json!({
+                "kind":"button", "state":format!("{state:?}"),
+                "button":format!("{button:?}"), "position":[w.cursor.0,w.cursor.1],
+                "consumed":response.consumed
+            })),
+            _ => None,
+        };
+        if let Some(pointer) = pointer {
+            w.pointer_sequence += 1;
+            w.pointer_input = pointer;
+        }
         if matches!(
             event,
             WindowEvent::MouseInput {
