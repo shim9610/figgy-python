@@ -53,6 +53,10 @@ impl WindowHandle {
             "null".into()
         }
     }
+    fn review_draft_json(&self) -> String {
+        let state = self.control.review.lock().unwrap();
+        json!({"comments":state["comments"],"target_comments":state["target_comments"]}).to_string()
+    }
     fn review_result(&self, error: &str) {
         let mut state = self.control.review.lock().unwrap();
         state["request"] = Value::Null;

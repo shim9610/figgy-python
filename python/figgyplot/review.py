@@ -630,8 +630,9 @@ class Session:
                     doc.update(draft=fig.get_settings(),draft_revision=fig.revision);changed=True
                 handle=self._handles.get(fid)
                 if doc and doc['approval'] is None and handle is not None:
-                    text=json.loads(handle.info_json())['review'].get('comments','')
-                    targeted=json.loads(handle.info_json())['review'].get('target_comments',[])
+                    draft=json.loads(handle.review_draft_json())
+                    text=draft.get('comments') or ''
+                    targeted=draft.get('target_comments') or []
                     previous=[v for v in doc['comments'] if v.get('channel')=='ui_target']
                     if targeted!=previous:
                         doc['comments']=[v for v in doc['comments'] if v.get('channel')!='ui_target']+[dict(v,channel='ui_target') for v in targeted];changed=True

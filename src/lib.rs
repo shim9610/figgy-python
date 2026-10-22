@@ -602,7 +602,7 @@ impl FigureAccess<'_> {
         let started = self.data.host_work.start();
         let mut state = self.snapshot();
         state.config = config;
-        let result = self.apply_settings(&serde_json::to_string(&state).map_err(runtime)?);
+        let result = self.apply_settings_model(state);
         self.data.host_work.finish("commit_config", started);
         result
     }
@@ -1203,14 +1203,13 @@ impl FigureAccess<'_> {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let started = self.data.host_work.start();
-        let result = self.apply_settings_inner(json);
+        let result = parse(json).and_then(|next| self.apply_settings_model(next));
         self.data.host_work.finish("apply_settings", started);
         result
     }
-    fn apply_settings_inner(&mut self, json: &str) -> PyResult<()> {
+    fn apply_settings_model(&mut self, mut next: Settings) -> PyResult<()> {
         let before = serde_json::to_value(self.snapshot()).map_err(runtime)?;
         let base_revision = self.data.revision;
-        let mut next: Settings = parse(json)?;
         if !self.data.history.restoring_identities() {
             identity::track_identities(&before, &mut next)?;
         }

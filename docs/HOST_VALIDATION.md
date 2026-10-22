@@ -735,3 +735,44 @@ RGBA readbacks/PNG display transport and unchanged source upload counts.
 Workflow/assets preflight has 112 passes; formatting, locked compilation,
 JavaScript syntax and installed browser asset comparisons also pass. Full Actions
 integration results are reported by the PR checks, independently of local results.
+
+## Native typing follow-up (2026-10-22)
+
+The annotation-drag measurements did not cover typing latency. Actual X11
+character input exposed a separate wrapper cost: every annotation-property
+keystroke serialized and reparsed the entire Settings document, and built its
+property description before and after accepting that edit. The native form now
+serializes only the edited annotation, then passes its typed Config through the
+same model validation, renderer acceptance and history boundary used by JSON
+settings. The public JSON boundary still rejects unknown fields. Text changes
+remain immediate; there is no delayed commit, skipped validation or dropped input.
+
+An unchanged document's object navigation is reused by revision during inline
+editing and comment composition. Ending an inactive history gesture avoids a
+document snapshot. Review polling reads the small comment draft once instead of
+serializing and decoding full window diagnostics twice. Durable draft writes
+and the approval barrier remain in place. Renderer source and repaint policy
+are unchanged.
+
+`scripts/profile_text_input.py` presents 24 separately delivered character
+inputs in each of four native editors, with the durable review controller active,
+12 series and 16 annotations. On Linux/llvmpipe, annotation-property UI work
+fell from **110.36 to 74.48 ms total** (4.60 to 3.10 ms per input; about 33%).
+Whole-frame totals were 460.00 and 417.52 ms, including software submit/present.
+The other editors had small UI costs before and after; whole-frame timings
+varied, so this does not establish a general frame-rate improvement or Windows
+IME performance. Raw stages, driver waits and the tested wheel hash are in
+`docs/measurements/native-typing-20261022.json`. Driver wait times are not FPS.
+
+Four new real-input cases cover inline text, annotation properties, general
+review comments and targeted comments with the inspector open. They verify
+per-character text, CJK paste, the renderer's structured superscript encoding,
+exact unrelated SSOT preservation, unchanged uploads, Undo/Redo and durable
+recovery. Typing creates no temporary chart views, axis rasters or series styles;
+unchanged drafts do not rebuild navigation or property descriptions. Six existing
+native/Jupyter checks for numeric editing, multiline/resize/format preservation,
+CJK targeted comments and annotation drag also passed. Settings/history/review
+checks passed 240 cases, and workflow/assets checks passed 72. One UI case and
+seven action-contract cases initially lacked their environment flags; all eight
+were subsequently executed and passed in those totals. Full PR CI is separate
+from these local results.

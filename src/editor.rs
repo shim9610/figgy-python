@@ -29,6 +29,7 @@ pub(crate) struct Editor {
     pub advanced_requested: bool,
     pub picked: Option<Value>,
     pub(super) navigator: navigation::Navigator,
+    navigation_cache: Option<(u64, Vec<navigation::Node>)>,
     save_path: String,
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
@@ -63,6 +64,7 @@ impl Default for Editor {
             advanced_requested: false,
             picked: None,
             navigator: navigation::Navigator::default(),
+            navigation_cache: None,
             save_path: "figure.png".into(),
             raw: String::new(),
             text_ranges: HashMap::new(),
@@ -714,10 +716,19 @@ impl Editor {
             });
         });
         self.navigator.review_enabled = self.review_enabled();
-        let nodes = navigation::nodes(&c.snapshot());
+        if self
+            .navigation_cache
+            .as_ref()
+            .is_none_or(|(revision, _)| *revision != c.data.revision)
+        {
+            let started = c.data.host_work.start();
+            self.navigation_cache = Some((c.data.revision, navigation::nodes(&c.snapshot())));
+            c.data.host_work.finish("native_navigation", started);
+        }
+        let nodes = &self.navigation_cache.as_ref().unwrap().1;
         if let Some(node) = self.navigator.show(
             ui,
-            &nodes,
+            nodes,
             c.data.chart.config().active_layer(),
             selected.as_deref(),
             &mut self.controls,
@@ -1182,6 +1193,14 @@ impl Editor {
     }
 
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
+        if target.starts_with("annotation:") && c.data.document.is_none() {
+            // The basic form may accept a text edit. Describe its resulting
+            // revision once, rather than building the full catalog on both
+            // sides of each keystroke.
+            self.basic_properties(ui, c, target);
+            self.catalog_properties(ui, c, target, false);
+            return;
+        }
         let object = self.inspector_object(ui, c, target);
         let primary = object.as_ref().is_some_and(|v| {
             v.id.starts_with("series/")
@@ -1201,21 +1220,30 @@ impl Editor {
         self.catalog_properties(ui, c, target, false);
     }
     fn basic_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
-        let mut state = serde_json::to_value(c.snapshot()).unwrap();
         if let Some(id) = target.strip_prefix("annotation:") {
-            if let Some(item) = state["config"]["annotations"]["items"]
-                .as_array_mut()
-                .and_then(|items| items.iter_mut().find(|v| v["id"] == id))
+            if let Some(index) = c
+                .data
+                .chart
+                .config()
+                .annotations
+                .items
+                .iter()
+                .position(|v| v.id == id)
             {
-                let changed = self.annotation_properties(ui, item);
-                if self.delete_annotation {
-                    state["config"]["annotations"]["items"]
-                        .as_array_mut()
-                        .unwrap()
-                        .retain(|v| v["id"] != id);
-                }
+                let mut item =
+                    serde_json::to_value(&c.data.chart.config().annotations.items[index]).unwrap();
+                let changed = self.annotation_properties(ui, &mut item);
                 if changed || self.delete_annotation {
-                    match c.apply_settings(&state.to_string()) {
+                    let result = (|| {
+                        let mut config = c.data.chart.config().clone();
+                        if self.delete_annotation {
+                            config.annotations.items.remove(index);
+                        } else {
+                            config.annotations.items[index] = parse(&item.to_string())?;
+                        }
+                        c.commit_config(config)
+                    })();
+                    match result {
                         Ok(_) => self.error.clear(),
                         Err(error) => self.error = error.to_string(),
                     }
@@ -1223,6 +1251,7 @@ impl Editor {
             }
             return;
         }
+        let mut state = serde_json::to_value(c.snapshot()).unwrap();
         let scoped_path = match c.data.chart.config().active_layer() {
             renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
                 format!("/config/subplots/{i}/config")
