@@ -39,6 +39,7 @@
         "work_id": {
           "type": "string"
         },
+        "intent": {"enum": ["revise", "finish"]},
         "source": {
           "type": "object"
         },
@@ -245,6 +246,7 @@
           "type": "string",
           "minLength": 1
         },
+        "intent": {"enum": ["revise", "finish"]},
         "manifest": {
           "type": "string",
           "minLength": 1

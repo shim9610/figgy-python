@@ -56,7 +56,7 @@ export function render({model,el}) {
   let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
   // Session metadata is separate from chart SSOT and ordinary inspector fields.
   const reviewPanel=document.createElement('section');reviewPanel.className='figgy-review';reviewPanel.hidden=true;
-  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><span data-review-status role="status"></span></div>';
+  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><button data-review-finish>Save and finish</button><span data-review-status role="status"></span></div>';
   root.append(reviewPanel);
   const reviewComment=reviewPanel.querySelector('textarea'),reviewStatus=reviewPanel.querySelector('[data-review-status]');
   let reviewBusy=false,reviewLoaded=false,reviewTargets=[],reviewFontLoaded='';
@@ -87,7 +87,7 @@ export function render({model,el}) {
     }
     if(state.approved)reviewStatus.textContent='Review saved';
   }
-  async function submitReview(disposition){
+  async function submitReview(disposition,intent='revise'){
     if(reviewBusy)return;
     reviewBusy=true;reviewPanel.querySelectorAll('button,textarea').forEach(v=>v.disabled=true);
     reviewStatus.textContent='Saving review…';
@@ -95,7 +95,7 @@ export function render({model,el}) {
       await finishInline(true);await controlQueue;await queue;await flush();
       root.querySelector('.figgy-body').inert=true;root.querySelector('.figgy-toolbar').inert=true;
       trace('review.send',{revision,disposition});
-      model.send({action:'review_submit',disposition,comments:reviewComment.value,target_comments:reviewTargets,revision});
+      model.send({action:'review_submit',disposition,intent,comments:reviewComment.value,target_comments:reviewTargets,revision});
     }catch(e){reviewFailure(String(e));}
   }
   function reviewFailure(message){
@@ -107,6 +107,7 @@ export function render({model,el}) {
   const reviewMessage=message=>{if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
   reviewPanel.querySelector('[data-review-changes]').addEventListener('click',()=>submitReview('request_changes'));
   reviewPanel.querySelector('[data-review-accept]').addEventListener('click',()=>submitReview('accept'));
+  reviewPanel.querySelector('[data-review-finish]').addEventListener('click',()=>submitReview('accept','finish'));
   function saveReviewDraft(){model.send({action:'review_comment',comments:reviewComment.value,target_comments:reviewTargets});}
   reviewComment.addEventListener('input',saveReviewDraft);
   function editTargetComment(target,label,existing=null){

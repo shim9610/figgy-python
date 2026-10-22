@@ -153,7 +153,7 @@ class FigureWidget(anywidget.AnyWidget):
                 # common commit path; do not start another barrier inside a comm.
                 session._set_target_comments(self.figure.id,content.get('target_comments',[]))
                 session._submit(self.figure.id, content['disposition'],
-                    content.get('comments'), content['revision'])
+                    content.get('comments'), content['revision'], content.get('intent','revise'))
             except Exception as exc:
                 self.send(dict(action='review_result',error=str(exc)))
         elif action == "mounted":

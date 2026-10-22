@@ -202,6 +202,7 @@ struct FigureCore {
     columns: HashMap<String, (usize, f64, f64)>,
     revision: u64,
     history: edit_history::History,
+    host_work: host_work::Profile,
     uploads: u64,
     readbacks: u64,
     png_encodes: u64,
@@ -598,9 +599,12 @@ impl FigureAccess<'_> {
             .ok_or_else(|| invalid(format!("unknown decoration: {target}")))
     }
     fn commit_config(&mut self, config: Config) -> PyResult<()> {
+        let started = self.data.host_work.start();
         let mut state = self.snapshot();
         state.config = config;
-        self.apply_settings(&serde_json::to_string(&state).map_err(runtime)?)
+        let result = self.apply_settings(&serde_json::to_string(&state).map_err(runtime)?);
+        self.data.host_work.finish("commit_config", started);
+        result
     }
     fn snapshot(&self) -> Settings {
         Settings {
@@ -1006,6 +1010,7 @@ impl FigureCore {
                 columns: HashMap::new(),
                 revision: 0,
                 history: Default::default(),
+                host_work: Default::default(),
                 uploads: 0,
                 readbacks: 0,
                 png_encodes: 0,
@@ -1197,6 +1202,12 @@ impl FigureAccess<'_> {
         Ok(())
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
+        let started = self.data.host_work.start();
+        let result = self.apply_settings_inner(json);
+        self.data.host_work.finish("apply_settings", started);
+        result
+    }
+    fn apply_settings_inner(&mut self, json: &str) -> PyResult<()> {
         let before = serde_json::to_value(self.snapshot()).map_err(runtime)?;
         let base_revision = self.data.revision;
         let mut next: Settings = parse(json)?;
@@ -1555,6 +1566,18 @@ impl FigureAccess<'_> {
             .map(|h| format!("{h:?}")))
     }
     fn drag(&mut self, target: &str, dx: f32, dy: f32, handle: Option<&str>) -> PyResult<bool> {
+        let started = self.data.host_work.start();
+        let result = self.drag_inner(target, dx, dy, handle);
+        self.data.host_work.finish("drag", started);
+        result
+    }
+    fn drag_inner(
+        &mut self,
+        target: &str,
+        dx: f32,
+        dy: f32,
+        handle: Option<&str>,
+    ) -> PyResult<bool> {
         if !dx.is_finite() || !dy.is_finite() {
             return Err(invalid("drag must be finite"));
         }
@@ -1563,25 +1586,7 @@ impl FigureAccess<'_> {
         }
         if target.starts_with("annotation:") {
             let view = self.annotation_view()?;
-            let map = view.annotation_map();
-            let id = map
-                .find(self.annotation_index(target)?)
-                .ok_or_else(|| invalid("annotation is not visible"))?;
-            let mut config = self.data.chart.config().clone();
-            let moved = if let Some(handle) = handle {
-                let handle = ALL_HANDLES
-                    .into_iter()
-                    .find(|h| format!("{h:?}") == handle)
-                    .ok_or_else(|| invalid("unknown resize handle"))?;
-                map.resize_by(&mut config.annotations, id, handle, dx, dy)
-            } else {
-                map.drag_by(&mut config.annotations, id, dx, dy)
-            };
-            if moved == Some(renderer::layout::NudgeResult::Moved) {
-                self.commit_config(config)?;
-                return Ok(true);
-            }
-            return Ok(false);
+            return self.drag_annotation_with_map(view.annotation_map(), target, dx, dy, handle);
         }
 
         let id = self.element(target)?;
@@ -1606,6 +1611,55 @@ impl FigureAccess<'_> {
         } else {
             Ok(false)
         }
+    }
+    /// The presented view already owns the renderer's measured anchor space.
+    /// Deltas must be in that map's pixels (surface pixels for a native view).
+    fn drag_annotation_with_map(
+        &mut self,
+        map: &renderer::annotation::AnnotationMap,
+        target: &str,
+        dx: f32,
+        dy: f32,
+        handle: Option<&str>,
+    ) -> PyResult<bool> {
+        let started = self.data.host_work.start();
+        if !dx.is_finite() || !dy.is_finite() {
+            return Err(invalid("drag must be finite"));
+        }
+        let index = self.annotation_index(target)?;
+        if map.layer().items.get(index).map(|item| &item.id)
+            != self
+                .data
+                .chart
+                .config()
+                .annotations
+                .items
+                .get(index)
+                .map(|item| &item.id)
+        {
+            return Err(invalid(
+                "annotation frame must be refreshed after reordering",
+            ));
+        }
+        let id = map
+            .find(index)
+            .ok_or_else(|| invalid("annotation is not visible"))?;
+        let mut config = self.data.chart.config().clone();
+        let moved = if let Some(handle) = handle {
+            let handle = ALL_HANDLES
+                .into_iter()
+                .find(|h| format!("{h:?}") == handle)
+                .ok_or_else(|| invalid("unknown resize handle"))?;
+            map.resize_by(&mut config.annotations, id, handle, dx, dy)
+        } else {
+            map.drag_by(&mut config.annotations, id, dx, dy)
+        };
+        let moved = moved == Some(renderer::layout::NudgeResult::Moved);
+        if moved {
+            self.commit_config(config)?;
+        }
+        self.data.host_work.finish("annotation_move", started);
+        Ok(moved)
     }
     fn pick_json(&mut self, py: Python<'_>, x: f32, y: f32) -> PyResult<String> {
         if self.data.document.is_some() {
@@ -1685,7 +1739,7 @@ impl FigureAccess<'_> {
                 + u64::from(t.row_bytes) * u64::from(t.height)
         });
         json!({"adapter": self.context.adapter_info, "gpu_context_id":self.context.id,"figure_id":self.data.figure_id,"gpu_sharing":"process","active_figures":self.renderer.chart_order().len(),"figure_column_bytes":self.data.columns.values().map(|v|v.0 as u64 * 8).sum::<u64>(), "revision": self.data.revision, "column_uploads": self.data.uploads, "rgba_readbacks": self.data.readbacks, "png_encodes": self.data.png_encodes, "columns": self.data.columns.len(),
-            "selection_value_readbacks":self.data.selection_value_readbacks,"pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
+            "host_work":self.data.host_work.snapshot(),"selection_value_readbacks":self.data.selection_value_readbacks,"pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
             "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes + self.data.document.as_ref().map_or(0, |r| r.gpu_bytes()), "allocation_mode": if self.data.document.is_some() { "bounded" } else { "resident" }, "preparation": self.data.preparation}).to_string()
     }
 }
@@ -1699,6 +1753,7 @@ mod drawing;
 mod edit_history;
 mod editor;
 mod gpu;
+mod host_work;
 mod identity;
 mod interaction;
 mod navigation;

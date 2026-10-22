@@ -140,15 +140,16 @@ impl Editor {
                         input.inner.rect.intersect(input.inner_rect),
                     );
                     ui.horizontal(|ui| {
-                        for (key, label, disposition) in [
-                            ("review_changes", "Request changes", "request_changes"),
-                            ("review_accept", "Accept", "accept"),
+                        for (key, label, disposition, intent) in [
+                            ("review_changes", "Request changes", "request_changes", "revise"),
+                            ("review_accept", "Accept", "accept", "revise"),
+                            ("review_finish", "Save and finish", "accept", "finish"),
                         ] {
                             let button = ui.button(label);
                             self.controls.insert(key.into(), button.rect);
                             if button.clicked() {
                                 c.end_edit();
-                                state["request"] = json!({"disposition":disposition,
+                                state["request"] = json!({"disposition":disposition,"intent":intent,
                                     "comments":comments,"target_comments":state["target_comments"],"revision":c.data.revision,"finalized":false});
                                 state["error"] = json!("");
                             }

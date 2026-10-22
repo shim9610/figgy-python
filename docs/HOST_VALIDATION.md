@@ -2,10 +2,47 @@
 
 ## Current 0.3 validation setup
 
-The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.18.0`
-and `figgy-model 0.12.0`. The dated measurements and test totals below belong
+The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.18.1`
+and `figgy-model 0.12.1`. The dated measurements and test totals below belong
 to earlier checkpoints; they are not a test count or performance claim for the
 current release candidate.
+
+### Native annotation binding and review lifecycle (2026-10-22)
+
+The native drag path previously constructed a complete temporary `ChartView`
+for every pointer move merely to obtain its annotation map. The renderer API
+also creates grid, axis and annotation GPU resources. The host now reuses the
+presented map in its physical pixel space, falling back to a fresh logical map
+when layout, scale or annotation identity has changed. The renderer's own
+`ChartRenderStamp` selects axis versus annotation refresh; series styles rebuild
+only when their specs, display scale or pool generation change. No renderer
+internals or drawing/cache policies are modified.
+
+[Before/after measurements](measurements/native-annotation-drag-20261022.json)
+record normal and burst gestures for text and arrows at two sizes. For each
+32-move gesture, the fixed native path makes zero temporary annotation views,
+zero axis refreshes and zero style rebuilds. Complete SSOT checks preserve
+everything except the moved coordinates. A new counter assertion fails against
+the instrumented baseline wheel. Review-controller gestures additionally record
+durable manifest writes. Timings are CPU wall times on llvmpipe, with input-driver
+waits excluded; they are not physical-GPU frame-rate measurements.
+
+An installed release wheel passed 212 focused review, history, recovery and
+negative-oracle cases, and 134 workflow/asset checks. Two 12-case actual-host
+runs cover dragging/resize/text/Undo and review submission/storage failures,
+Korean targeted comments, native connect and both hosts' finish controls. The
+final wheel repeated the three new/expanded UI cases. Full collection is 827
+cases; these local checks do not establish that commit's full CI result.
+[Package checks](measurements/native-review-package-20261022.json) compare all
+installed package files with the release wheel, and packaged Python/browser/
+skill sources with the worktree.
+
+Review storage tests cover process readers/writers, nested locking, Windows
+sharing-error retries, unrelated errors and bounded failure propagation. A
+separate Windows job executes the same storage cases with real byte locks.
+Successor approval tests reject changes to arrays even when extents match, and
+source-backed finish validates exact approved settings/data without new windows.
+Colour swatches and reference-image attachments remain a future improvement.
 
 ### Layout and review editing follow-up (2026-10-22)
 

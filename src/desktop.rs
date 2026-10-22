@@ -94,6 +94,8 @@ struct SurfaceWindow {
     ui_renderer: egui_wgpu::Renderer,
     view: Option<renderer::ChartView>,
     styles: Vec<renderer::ChartStyle>,
+    style_specs: Vec<SeriesConfig>,
+    last_stamp: Option<renderer::ChartRenderStamp>,
     last_revision: u64,
     last_scale: f32,
     last_pool_generation: u32,
@@ -218,6 +220,8 @@ impl SurfaceWindow {
             ui_renderer,
             view: None,
             styles: vec![],
+            style_specs: vec![],
+            last_stamp: None,
             last_revision: u64::MAX,
             last_scale: 0.,
             last_pool_generation: 0,
@@ -746,12 +750,43 @@ impl SurfaceWindow {
                 } else if self.dragging
                     && let Some(target) = &self.selected
                 {
-                    c.drag(
-                        target,
-                        (self.cursor.0 - old.0) / scale,
-                        (self.cursor.1 - old.1) / scale,
-                        self.handle.as_deref(),
-                    )?;
+                    let stamp = c
+                        .renderer
+                        .chart_render_stamp(c.data.chart_id)
+                        .map_err(runtime)?;
+                    let map = self.view.as_ref().map(|view| view.annotation_map());
+                    let reusable = target.starts_with("annotation:")
+                        && !stamp.needs_raster_since(self.last_stamp.as_ref())
+                        && self.last_panel == Some(panel)
+                        && self.last_scale == scale
+                        && map.is_some_and(|map| {
+                            c.annotation_index(target).ok().is_some_and(|i| {
+                                map.layer().items.get(i).map(|v| &v.id)
+                                    == c.data
+                                        .chart
+                                        .config()
+                                        .annotations
+                                        .items
+                                        .get(i)
+                                        .map(|v| &v.id)
+                            })
+                        });
+                    if reusable {
+                        c.drag_annotation_with_map(
+                            map.unwrap(),
+                            target,
+                            self.cursor.0 - old.0,
+                            self.cursor.1 - old.1,
+                            self.handle.as_deref(),
+                        )?;
+                    } else {
+                        c.drag(
+                            target,
+                            (self.cursor.0 - old.0) / scale,
+                            (self.cursor.1 - old.1) / scale,
+                            self.handle.as_deref(),
+                        )?;
+                    }
                     self.last_input = Some(input_received);
                     self.window.request_redraw();
                 }
@@ -1071,6 +1106,7 @@ impl SurfaceWindow {
         if c.data.document.is_some() && !self.settings_only {
             return self.frame_bounded(&mut c);
         }
+        let frame_started = c.data.host_work.start();
         c.renderer
             .ensure_target_format(self.config.format)
             .map_err(runtime)?;
@@ -1124,6 +1160,7 @@ impl SurfaceWindow {
         } else {
             "Click a chart to select it, then click or drag inside to edit".into()
         };
+        let ui_started = c.data.host_work.start();
         let mut output = ctx.run_ui(input, |root| {
             if self.chooser.as_ref().is_some_and(|v| {
                 v.rect.is_positive()
@@ -1287,6 +1324,7 @@ impl SurfaceWindow {
                     });
             }
         });
+        c.data.host_work.finish("native_ui", ui_started);
         if std::mem::take(&mut self.editor.history_replayed) {
             fn contains(nodes: &[navigation::Node], target: &str) -> bool {
                 nodes
@@ -1378,12 +1416,19 @@ impl SurfaceWindow {
                     .map_err(runtime)?,
             );
         }
+        let current_stamp = c
+            .renderer
+            .chart_render_stamp(c.data.chart_id)
+            .map_err(runtime)?;
+        let specs = c.gpu_series(&c.data.series);
+        let view_changed = scale != self.last_scale || self.last_panel != Some(panel);
+        let pool_changed = self.last_pool_generation != c.renderer.pool().generation();
         if !self.settings_only
             && (c.data.revision != self.last_revision
                 || self.selected != self.rendered_selection
-                || scale != self.last_scale
-                || self.last_pool_generation != c.renderer.pool().generation()
-                || self.last_panel != Some(panel))
+                || current_stamp.needs_draw_since(self.last_stamp.as_ref())
+                || view_changed
+                || pool_changed)
         {
             let preview_target = self
                 .chooser
@@ -1409,17 +1454,38 @@ impl SurfaceWindow {
                 .selected
                 .as_deref()
                 .and_then(|target| c.annotation_index(target).ok());
-            c.renderer
-                .refresh_axis_with_selection(
-                    self.view.as_mut().unwrap(),
-                    &Chart::new(display.clone()),
-                    display.chart_area.0,
-                    &boxes,
-                )
-                .map_err(runtime)?;
+            // Follow the renderer's invalidation contract, like its web host.
+            // A document revision alone does not mean axes or styles changed.
+            let refresh_axis = current_stamp.needs_raster_since(self.last_stamp.as_ref())
+                || view_changed
+                || self.last_revision == u64::MAX
+                || (self.selected != self.rendered_selection
+                    && self
+                        .selected
+                        .iter()
+                        .chain(self.rendered_selection.iter())
+                        .any(|target| !target.starts_with("annotation:")));
+            if refresh_axis {
+                let raster_started = c.data.host_work.start();
+                c.renderer
+                    .refresh_axis_with_selection(
+                        self.view.as_mut().unwrap(),
+                        &Chart::new(display.clone()),
+                        display.chart_area.0,
+                        &boxes,
+                    )
+                    .map_err(runtime)?;
+                c.data
+                    .host_work
+                    .finish("native_axis_refresh", raster_started);
+            }
             // Let the renderer draw the selection from the current annotation
             // raster. A box taken from the previous view is stale after an edit.
-            if self.view.as_ref().unwrap().annotation_selected() != annotation_selected {
+            if (!refresh_axis
+                && current_stamp.needs_annotation_raster_since(self.last_stamp.as_ref()))
+                || self.view.as_ref().unwrap().annotation_selected() != annotation_selected
+            {
+                let annotation_started = c.data.host_work.start();
                 c.renderer
                     .refresh_annotations(
                         self.view.as_mut().unwrap(),
@@ -1428,31 +1494,39 @@ impl SurfaceWindow {
                         annotation_selected,
                     )
                     .map_err(runtime)?;
+                c.data
+                    .host_work
+                    .finish("native_annotation_refresh", annotation_started);
             }
-            let specs = c.gpu_series(&c.data.series);
-            self.styles = specs
-                .iter()
-                .zip(&c.data.series)
-                .map(|(s, local)| {
-                    let mut style_spec = s.clone();
-                    style_spec.series_id = local.series_id.clone();
-                    c.renderer
-                        .create_style_for_series_scaled(&style_spec, scale)
-                        .map_err(runtime)
-                })
-                .collect::<PyResult<Vec<_>>>()?;
+            if self.style_specs != specs || scale != self.last_scale || pool_changed {
+                let styles_started = c.data.host_work.start();
+                self.styles = specs
+                    .iter()
+                    .zip(&c.data.series)
+                    .map(|(s, local)| {
+                        let mut style_spec = s.clone();
+                        style_spec.series_id = local.series_id.clone();
+                        c.renderer
+                            .create_style_for_series_scaled(&style_spec, scale)
+                            .map_err(runtime)
+                    })
+                    .collect::<PyResult<Vec<_>>>()?;
+                c.data.host_work.finish("native_styles", styles_started);
+                self.style_specs = specs.clone();
+            }
+            self.last_stamp = Some(current_stamp);
             self.last_revision = c.data.revision;
             self.rendered_selection = self.selected.clone();
             self.last_scale = scale;
             self.last_pool_generation = c.renderer.pool().generation();
             self.last_panel = Some(panel);
         }
-        let specs = c.gpu_series(&c.data.series);
         let series = specs
             .iter()
             .zip(&self.styles)
             .map(|(config, style)| renderer::Series { config, style })
             .collect::<Vec<_>>();
+        let prepare_started = c.data.host_work.start();
         let prepared = if self.settings_only {
             None
         } else {
@@ -1466,6 +1540,8 @@ impl SurfaceWindow {
                     .map_err(runtime)?,
             )
         };
+        c.data.host_work.finish("native_prepare", prepare_started);
+        let present_started = c.data.host_work.start();
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(f)
             | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
@@ -1529,6 +1605,9 @@ impl SurfaceWindow {
             .submit(extra.into_iter().chain(std::iter::once(encoder.finish())));
         c.renderer.queue().present(frame);
         c.renderer.end_gpu_frame();
+        c.data
+            .host_work
+            .finish("native_submit_present", present_started);
         for id in &output.textures_delta.free {
             self.ui_renderer.free_texture(id);
         }
@@ -1584,6 +1663,7 @@ impl SurfaceWindow {
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
             Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
         });
+        c.data.host_work.finish("native_frame", frame_started);
         *self.control.stats.lock().unwrap() = json!({"property_catalog_builds":self.editor.property_builds,"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }

@@ -1,6 +1,7 @@
 """Crash-safe review manifests and immutable numeric payloads."""
 from contextlib import contextmanager
 import hashlib
+import errno
 import io
 import json
 import os
@@ -12,6 +13,27 @@ import threading
 import time
 
 import numpy as np
+
+_WINDOWS = os.name == 'nt'
+
+
+def _windows_retry(operation, *, timeout=30):
+    """Retry sharing/byte-lock contention, retaining the original error on timeout.
+
+    Permission failures on Unix and unrelated Windows I/O errors are not retried.
+    A sharing denial can be reported as EACCES without winerror by the CRT.
+    """
+    deadline = time.monotonic()+timeout
+    while True:
+        try:
+            return operation()
+        except OSError as exc:
+            transient = _WINDOWS and (getattr(exc,'winerror',None) in (5,32,33)
+                                     or exc.errno in (errno.EACCES,errno.EAGAIN,errno.EDEADLK))
+            remaining = deadline-time.monotonic()
+            if not transient or remaining<=0:
+                raise
+            time.sleep(min(.02,remaining))
 
 
 def encoded(value):
@@ -38,7 +60,7 @@ def atomic_write(path, data):
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        _windows_retry(lambda: os.replace(temporary, path))
         _sync_directory(path.parent)
     finally:
         if os.path.exists(temporary):
@@ -56,29 +78,35 @@ class Store:
         self.path.mkdir(parents=True, exist_ok=True)
         (self.path/'data').mkdir(exist_ok=True)
         self.mutex = threading.RLock()
+        self._local = threading.local()
         self._seen_generation = None
 
     @contextmanager
     def locked(self):
-        with self.mutex, (self.path/'.lock').open('a+b') as stream:
-            if os.name == 'nt':
-                import msvcrt
-                stream.seek(0)
-                if not stream.read(1):
-                    stream.write(b'0'); stream.flush()
-                stream.seek(0)
-                msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(stream, fcntl.LOCK_EX)
-            try:
+        with self.mutex:
+            if getattr(self._local,'held',False):
                 yield
-            finally:
-                if os.name == 'nt':
+                return
+            # Windows permits locking beyond EOF. Do not read or initialize
+            # byte zero before locking: a peer may already own that byte.
+            with (self.path/'.lock').open('a+b') as stream:
+                if _WINDOWS:
+                    import msvcrt
                     stream.seek(0)
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+                    _windows_retry(lambda: msvcrt.locking(stream.fileno(),msvcrt.LK_NBLCK,1))
                 else:
-                    fcntl.flock(stream, fcntl.LOCK_UN)
+                    import fcntl
+                    fcntl.flock(stream, fcntl.LOCK_EX)
+                self._local.held=True
+                try:
+                    yield
+                finally:
+                    self._local.held=False
+                    if _WINDOWS:
+                        stream.seek(0)
+                        msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        fcntl.flock(stream, fcntl.LOCK_UN)
 
     def read(self):
         state = json.loads((self.path/'manifest.json').read_text(encoding='utf-8'))

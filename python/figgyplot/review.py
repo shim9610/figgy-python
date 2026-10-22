@@ -33,6 +33,22 @@ def _replace_ui_comment(doc, text):
     if text:doc['comments'].append(dict(id=_id(),text=text,target=None,channel='ui'))
 
 
+def _same_approved_content(previous, current):
+    """Approval covers exact persistent settings AND every source payload."""
+    approval=previous['approval']
+    return (approval is not None
+            and approval['persistent_hash']==current['baseline_hash']
+            and previous['columns']==current['baseline_columns']
+            and previous.get('bounded_data',{})==current.get('baseline_bounded_data',{})
+            and previous['dpi']==current['dpi'])
+
+
+def _carry_approval(previous, current, round_id):
+    current['approval']=dict(previous['approval'],revision=current['baseline_revision'],
+        settings=copy.deepcopy(current['baseline']),instance_id=current['instance_id'],
+        changes=[],comment_text='',carried_from=dict(round_id=round_id,approval_id=previous['approval']['id']))
+
+
 def _source(value):
     value = copy.deepcopy(value or {})
     if value.get('entrypoint'):
@@ -343,6 +359,29 @@ class Session:
             if remaining<=0:return None
             time.sleep(min(.05,remaining))
 
+    def connect(self, *, after=None, timeout=None):
+        """Present native review and wait for its feedback in the same process.
+
+        The agent keeps this call pending. A separate native UI controller and
+        subscriber are unnecessary; ordinary present/run_events remain available.
+        """
+        if timeout is not None and (not isinstance(timeout,(int,float)) or not 0<=timeout<=3600):
+            raise ValueError('timeout must be between 0 and 3600 seconds or None')
+        current=self.snapshot()['rounds'][-1]
+        if current['backend']!='native':
+            raise ValueError('connect() hosts native windows; use watch() and subscribe() for notebook review')
+        if current['status']=='building' and any(fid not in self._figures for fid in current['documents']):
+            raise RuntimeError('Call session.start() in the builder process before connecting to its cache')
+        self.present()
+        deadline=None if timeout is None else time.monotonic()+timeout
+        while True:
+            self.poll()
+            events=[event for event in self.events() if event['work_id']!=after]
+            if events:return events[0]
+            if self.status['state'] in ('completed','cancelled'):return None
+            if deadline is not None and time.monotonic()>=deadline:return None
+            time.sleep(.02)
+
     def _comment_text(self, figure_id):
         return _ui_comment(self.snapshot()['rounds'][-1]['documents'][figure_id])
 
@@ -362,7 +401,7 @@ class Session:
                 _replace_ui_comment(doc,text)
                 self._store.write(state)
 
-    def submit(self, figure_id, disposition, *, comments=None, expected_revision=None):
+    def submit(self, figure_id, disposition, *, comments=None, expected_revision=None, intent='revise'):
         """Durably approve accepted state, then close views; never approve on close."""
         if disposition not in ('accept','request_changes','skip'):
             raise ValueError('Disposition must be accept, request_changes or skip')
@@ -370,30 +409,32 @@ class Session:
         if fig is None:raise ValueError('Restore the Figure before submitting it')
         if fig.backend=='webgpu' and any(not w._closed for w in fig._widgets):
             raise RuntimeError('Use await session.submit_async() to flush notebook edits')
-        return self._submit(figure_id,disposition,comments,expected_revision)
+        return self._submit(figure_id,disposition,comments,expected_revision,intent)
 
-    async def submit_async(self, figure_id, disposition, *, comments=None, expected_revision=None):
+    async def submit_async(self, figure_id, disposition, *, comments=None, expected_revision=None, intent='revise'):
         fig=self._figures[figure_id]
         if fig.backend=='webgpu':await fig.sync()
-        return self._submit(figure_id,disposition,comments,expected_revision)
+        return self._submit(figure_id,disposition,comments,expected_revision,intent)
 
-    def _submit(self, figure_id, disposition, comments, expected_revision):
+    def _submit(self, figure_id, disposition, comments, expected_revision, intent='revise'):
         if disposition not in ('accept','request_changes','skip'):
             raise ValueError('Unknown review disposition')
+        if intent not in ('revise','finish') or (intent=='finish' and disposition!='accept'):
+            raise ValueError('Finish intent requires an accepted Figure')
         if comments is not None and not isinstance(comments,str):raise ValueError('Review comments must be text')
         fig=self._figures[figure_id]
         with fig._lock, self._store.locked():
-            approval=self._commit_approval(figure_id,disposition,comments,expected_revision)
+            approval=self._commit_approval(figure_id,disposition,comments,expected_revision,intent)
         # Closing a view may call observers that read the session. Release the
         # manifest lock before closing, on both first delivery and retries.
         self._close_views(fig,disposition)
         return copy.deepcopy(approval)
 
-    def _commit_approval(self, figure_id, disposition, comments, expected_revision):
+    def _commit_approval(self, figure_id, disposition, comments, expected_revision, intent='revise'):
         state=self._store.read();r=state['rounds'][-1];doc=r['documents'][figure_id]
         # Repeated delivery of the same approval never creates another work ID.
         if doc['approval'] is not None:
-            if doc['approval']['disposition']!=disposition or (comments is not None and doc['approval']['comment_text']!=comments):
+            if doc['approval']['disposition']!=disposition or doc['approval'].get('intent','revise')!=intent or (comments is not None and doc['approval']['comment_text']!=comments):
                 raise ValueError('Figure already approved with different feedback')
             self._store.write(state)
             return doc['approval']
@@ -415,13 +456,16 @@ class Session:
         if comments is not None:
             _replace_ui_comment(doc,comments)
         for ref in self._store.references(doc):self._store.get(ref)
-        approval=dict(id=_id(),disposition=disposition,revision=revision,settings=approved,
+        approval=dict(id=_id(),disposition=disposition,intent=intent,revision=revision,settings=approved,
             instance_id=doc['instance_id'],
             persistent_hash=digest(persistent(approved)),changes=changes(doc['baseline'],approved),
             comment_text=_ui_comment(doc))
         doc.update(approval=approval,draft=approved,draft_revision=revision)
         if all(d['approval'] is not None for d in r['documents'].values()):
             needs_work=any(d['approval']['disposition']=='request_changes' or d['approval']['changes'] or d['comments'] for d in r['documents'].values())
+            finishing=any(d['approval'].get('intent')=='finish' for d in r['documents'].values()) and not any(d['approval']['disposition']=='request_changes' for d in r['documents'].values())
+            r['intent']='finish' if finishing else 'revise'
+            needs_work=needs_work or finishing
             r.update(status='ready' if needs_work else 'completed',work_id=_id() if needs_work else None)
         self._store.write(state)
         self._store.collect(state)
@@ -436,6 +480,7 @@ class Session:
     def events(self):
         state=self.snapshot()
         return [dict(protocol=1,session_id=state['session_id'],round_id=r['id'],work_id=r['work_id'],
+                     intent=r.get('intent','revise'),
                      manifest=str(self.cache_dir/'manifest.json'),source=r['source'])
                 for r in state['rounds'] if r['status']=='ready']
 
@@ -443,7 +488,7 @@ class Session:
     def status(self):
         r=self.snapshot()['rounds'][-1]
         return dict(round=r['number'],state=r['status'],work_id=r['work_id'],
-                    pending=[fid for fid,doc in r['documents'].items() if doc['approval'] is None],
+                    pending=[] if r['status'] in ('completed','cancelled') else [fid for fid,doc in r['documents'].items() if doc['approval'] is None],
                     error=r.get('error'))
 
     def feedback(self, work_id):
@@ -522,6 +567,40 @@ class Session:
             self._store.write(state)
         self.close()
 
+    def finish(self, work_id, *, claim_token=None, timeout=180):
+        """Save the accepted review and finish without opening another review.
+
+        Recorded builders are executed and rendered once to verify the source
+        still reproduces the exact accepted settings and arrays. Manual sessions
+        without source retain their complete approved binary checkpoint.
+        """
+        state=self.snapshot()
+        if work_id in state['completed_work']:
+            if work_id not in state.get('finished_work',{}):
+                raise ValueError('Work already regenerated; finish the current review round instead')
+            return state['finished_work'][work_id]
+        feedback=self.feedback(work_id)
+        if feedback['round']['source'].get('entrypoint'):
+            number=self.regenerate(work_id,claim_token=claim_token,timeout=timeout,_finish=True)
+        else:
+            if claim_token is None:claim_token=self.claim(work_id)['token']
+            with self._store.locked():
+                state=self._store.read();r=state['rounds'][-1]
+                if work_id in state['completed_work']:
+                    if work_id not in state.get('finished_work',{}):raise ValueError('Work already regenerated')
+                    return state['finished_work'][work_id]
+                if r['status']!='ready' or r['work_id']!=work_id:raise ValueError('Stale or unknown review work ID')
+                if r.get('claim',{}).get('token')!=claim_token or r['claim']['expires']<=time.time():
+                    raise ValueError('Source writer lease is invalid or expired')
+                for doc in r['documents'].values():
+                    for ref in self._store.references(doc):self._store.get(ref)
+                r.update(status='completed',intent='finish')
+                number=r['number'];state['completed_work'][work_id]=number
+                state.setdefault('finished_work',{})[work_id]=number
+                self._store.write(state);self._store.collect(state)
+        self.close()
+        return number
+
     def poll(self):
         """Pump native input and durable submissions; call only on the main thread."""
         from .desktop import poll_events
@@ -535,7 +614,7 @@ class Session:
             if request is None:continue
             try:
                 self._set_target_comments(fid,request.get('target_comments',[]))
-                self.submit(fid,request['disposition'],comments=request['comments'],expected_revision=request['revision'])
+                self.submit(fid,request['disposition'],comments=request['comments'],expected_revision=request['revision'],intent=request.get('intent','revise'))
             except Exception as exc:
                 handle.review_result(str(exc))
                 failed=True
@@ -581,15 +660,19 @@ class Session:
                 self.close();self.present()
             await asyncio.sleep(.1)
 
-    def regenerate(self, work_id, *, superseded=None, claim_token=None, present=False, timeout=180):
+    def regenerate(self, work_id, *, superseded=None, claim_token=None, present=False, timeout=180, _finish=False):
         """Run updated source, render every result, reconcile edits, publish once."""
         superseded=dict(superseded or {})
         if any(not isinstance(reason,str) or not reason.strip() for reason in superseded.values()):
             raise ValueError('Superseded edits/Figures require non-empty reasons')
         state=self.snapshot()
-        if work_id in state['completed_work']:return state['completed_work'][work_id]
+        if work_id in state['completed_work']:
+            if _finish and work_id not in state.get('finished_work',{}):raise ValueError('Work already regenerated')
+            return state['completed_work'][work_id]
         if claim_token is None:claim_token=self.claim(work_id)['token']
         feedback=self.feedback(work_id);old=feedback['round'];source=_source(old['source'])
+        if old.get('intent')=='finish' and not _finish:
+            raise ValueError('This is a finish request; use finish() rather than creating another review round')
         if old.get('claim',{}).get('token')!=claim_token or old['claim']['expires']<=time.time():
             raise ValueError('Source writer lease is invalid or expired')
         known={c['id'] for doc in old['documents'].values() for c in doc['approval']['changes']}|{'figure:'+fid for fid in old['documents']}
@@ -614,10 +697,23 @@ class Session:
                     for change in doc['approval']['changes']:
                         if change['id'] not in superseded and not preserved(change,current['documents'][fid]['baseline']):
                             raise ValueError('Source did not reproduce approved edit: '+fid+' '+change['path'])
+                    successor=current['documents'][fid]
+                    same=_same_approved_content(doc,successor)
+                    if _finish and not same:
+                        raise ValueError('Finish must preserve the exact approved settings and data: '+fid)
+                    if same and (doc['approval']['disposition']=='accept' or _finish):
+                        _carry_approval(doc,successor,old['id'])
+                        if _finish:successor['approval'].update(disposition='accept',intent='finish')
+                if _finish and set(current['documents'])!=set(old['documents']):
+                    raise ValueError('Finish cannot add or remove Figures')
+                if _finish or all(doc['approval'] is not None for doc in current['documents'].values()):
+                    current['status']='completed'
                 if _source(source)['digest']!=source['digest']:raise ValueError('Source changed during candidate validation')
                 with self._store.locked():
                     state=self._store.read()
-                    if work_id in state['completed_work']:return state['completed_work'][work_id]
+                    if work_id in state['completed_work']:
+                        if _finish and work_id not in state.get('finished_work',{}):raise ValueError('Work already regenerated')
+                        return state['completed_work'][work_id]
                     active=state['rounds'][-1]
                     if active['status']!='ready' or active['work_id']!=work_id:
                         raise ValueError('Stale round; candidate was not published')
@@ -630,6 +726,7 @@ class Session:
                     current.update(number=active['number']+1,source=source,superseded=superseded)
                     active['status']='completed';state['rounds'].append(current)
                     state['completed_work'][work_id]=current['number']
+                    if _finish:state.setdefault('finished_work',{})[work_id]=current['number']
                     self._store.write(state);self._store.collect(state)
                     number=current['number']
             except Exception as exc:
@@ -657,14 +754,14 @@ class Session:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['protocol','skill','status','events','subscribe','feedback','claim','regenerate','show','cancel'])
+    parser.add_argument('action',choices=['protocol','skill','status','events','subscribe','connect','feedback','claim','regenerate','finish','show','cancel'])
     parser.add_argument('cache',nargs='?')
     parser.add_argument('work',nargs='?')
     parser.add_argument('--superseded',help='JSON file mapping edit IDs or figure:ID to reasons')
     parser.add_argument('--after',help='Last delivered work ID for feedback subscription')
     parser.add_argument('--worker',help='Stable agent/staging-workspace identifier for a writer lease')
     parser.add_argument('--claim-token',help='Writer lease token returned by claim')
-    parser.add_argument('--timeout',type=float,default=180,help='Maximum subscription wait or candidate execution/render seconds')
+    parser.add_argument('--timeout',type=float,help='Maximum wait or candidate execution/render seconds; connect waits indefinitely by default')
     args=parser.parse_args()
     package=Path(__file__).parent
     if args.action=='protocol':
@@ -675,13 +772,17 @@ def main():
     with Session.open(args.cache) as session:
         if args.action=='status':result=session.status
         elif args.action=='events':result=session.events()
-        elif args.action=='subscribe':result=session.subscribe(after=args.after,timeout=args.timeout)
+        elif args.action=='subscribe':result=session.subscribe(after=args.after,timeout=args.timeout if args.timeout is not None else 60)
+        elif args.action=='connect':result=session.connect(after=args.after,timeout=args.timeout)
         elif args.action=='feedback':result=session.feedback(args.work)
         elif args.action=='claim':result=session.claim(args.work,worker_id=args.worker)
         elif args.action=='regenerate':
             if not args.claim_token:parser.error('regenerate requires --claim-token from claim')
             superseded=json.loads(Path(args.superseded).read_text()) if args.superseded else None
-            result=dict(round=session.regenerate(args.work,superseded=superseded,claim_token=args.claim_token,timeout=args.timeout))
+            result=dict(round=session.regenerate(args.work,superseded=superseded,claim_token=args.claim_token,timeout=args.timeout if args.timeout is not None else 180))
+        elif args.action=='finish':
+            if not args.claim_token:parser.error('finish requires --claim-token from claim')
+            result=dict(round=session.finish(args.work,claim_token=args.claim_token,timeout=args.timeout if args.timeout is not None else 180),finished=True)
         elif args.action=='show':session.present();session.run_events();result=session.events()
         else:session.cancel();result={'cancelled':True}
         print(json.dumps(result,ensure_ascii=False,allow_nan=False))

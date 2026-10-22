@@ -3033,23 +3033,64 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
-def test_annotation_drag_reuses_inspector_descriptions_until_release(tmp_path):
+def test_review_connect_and_finish_buttons_use_a_terminal_lifecycle_signal(tmp_path,monkeypatch):
+    from figgyplot.review import Session
+    with Session(tmp_path/'native-connect',backend='native') as session:
+        fig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='signal')
+        session.start();before=fig.get_settings();session._set_comment_text('plot','저장 후 종료')
+        poll=session.poll;clicked=False
+        def automate_review():
+            nonlocal clicked
+            poll()
+            if not clicked:
+                inputs=Inputs(session._handles['plot'])
+                inputs.click('review_finish');clicked=True
+                poll()
+        monkeypatch.setattr(session,'poll',automate_review)
+        event=session.connect(timeout=10)
+        assert clicked and event['intent']=='finish'
+        assert session.snapshot()['rounds'][-1]['documents']['plot']['approval']['settings']==before
+        assert session.finish(event['work_id'])==1
+        assert session.status['state']=='completed'
+        assert not session._handles
+    source="import json\nfrom figgyplot.review import Session\nsession=Session(backend='webgpu')\nfig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='signal')\ndisplay(session.widget(fig))"
+    with notebook(tmp_path/'browser-finish',source,allow_closed=True) as (page,execute):
+        check_display_frame_ready(page)
+        before=page.evaluate(ROOT+'.snapshot()')
+        page.locator('[data-review-comments]').fill('저장 후 종료')
+        click_button(page,'[data-review-finish]')
+        page.wait_for_function("!document.querySelector('.figgy-editor')")
+        event=json.loads(execute('print(json.dumps(session.events()[0]))'))
+        assert event['intent']=='finish'
+        approved=json.loads(execute('print(json.dumps(session.snapshot()["rounds"][-1]["documents"]["plot"]["approval"]["settings"]))'))
+        assert approved==before
+        assert execute('print(session.finish(session.events()[0]["work_id"]))').strip()=='1'
+        assert json.loads(execute('print(json.dumps(session.status))'))['state']=='completed'
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+@pytest.mark.parametrize('annotation',['arrow','text'])
+def test_annotation_drag_reuses_inspector_descriptions_until_release(tmp_path, monkeypatch, annotation):
     from time import perf_counter
     measurement={}
+    monkeypatch.setenv('FIGGY_PROFILE_HOST','1')
     def assert_only_arrow_coordinates_changed(host,before,after):
         (tmp_path/f'{host}-drag-ssot.json').write_text(json.dumps(dict(before=before,after=after),indent=2))
         old=json.loads(json.dumps(before));new=json.loads(json.dumps(after))
-        a=old['config']['annotations']['items'][0]['kind']['Arrow']
-        b=new['config']['annotations']['items'][0]['kind']['Arrow']
-        assert a['from']!=b['from'] and a['to']!=b['to']
-        for key in ('from','to'):
+        kind='Arrow' if annotation=='arrow' else 'Text'
+        a=old['config']['annotations']['items'][0]['kind'][kind]
+        b=new['config']['annotations']['items'][0]['kind'][kind]
+        keys=('from','to') if annotation=='arrow' else ('anchor',)
+        for key in keys:
+            assert a[key]!=b[key]
             for axis in ('x','y'):
                 assert b[key]['Ratio'][axis]>a[key]['Ratio'][axis]
             b[key]=a[key]
         assert new==old
     with figgy.Figure(backend='native') as fig:
         fig.axes[0].plot([0,1],[2,3],id='one')
-        fig.axes[0].arrow(.2,.2,.3,.2,coords='ratio',id='arrow')
+        if annotation=='arrow':fig.axes[0].arrow(.2,.2,.3,.2,coords='ratio',id='arrow')
+        else:fig.axes[0].text(.2,.2,'Move this text',coords='ratio',id='arrow')
         fig.axes[0].text(.7,.7,'Keep this annotation',coords='ratio',id='fixed')
         handle=fig.show(block=False)
         try:
@@ -3057,22 +3098,30 @@ def test_annotation_drag_reuses_inspector_descriptions_until_release(tmp_path):
             rect=json.loads(fig._native.bounds_json('annotation:arrow'))['rect']
             start=native_point(inputs.info(),(rect[0]+rect[2]/2,rect[1]+rect[3]/2))
             inputs.click_rect([*start,0,0]);before=inputs.info()['property_catalog_builds'];old=fig.get_settings();uploads=fig.info['column_uploads']
+            if annotation=='text':time.sleep(.5)  # This gesture is a drag, not double-click text editing.
             inputs.input_frame('mousemove','--window',inputs.wid,*map(round,start));inputs.input_frame('mousedown',1)
+            work_before=fig.info['host_work']
             begin=perf_counter()
             for step in range(1,7):inputs.input_frame('mousemove','--window',inputs.wid,round(start[0]+step*3),round(start[1]+step*2))
             during=inputs.info()['property_catalog_builds'];inputs.input_frame('mouseup',1)
+            work_after=fig.info['host_work']
+            for stage in ('annotation_view','native_axis_refresh','native_styles'):
+                assert work_after.get(stage,{}).get('count',0)==work_before.get(stage,{}).get('count',0), (stage,work_before,work_after)
+            assert work_after['native_annotation_refresh']['count']>work_before.get('native_annotation_refresh',{}).get('count',0)
             measurement['native']=dict(moves=6,inspector_rebuilds_during=during-before,elapsed=perf_counter()-begin,last_input_to_submit_ms=inputs.info()['last_input_to_submit_ms'])
             assert during-before<=1
             assert_only_arrow_coordinates_changed('native',old,fig.get_settings())
             assert fig.info['column_uploads']==uploads
         finally:handle.close();Inputs.pump()
-    source="import figgyplot as fg\nfig,ax=fg.subplots(backend='webgpu')\nax.plot([0,1],[2,3],id='one');ax.arrow(.2,.2,.3,.2,coords='ratio',id='arrow')\nax.text(.7,.7,'Keep this annotation',coords='ratio',id='fixed')\ndisplay(fig.widget())"
+    item="ax.arrow(.2,.2,.3,.2,coords='ratio',id='arrow')" if annotation=='arrow' else "ax.text(.2,.2,'Move this text',coords='ratio',id='arrow')"
+    source="import figgyplot as fg\nfig,ax=fg.subplots(backend='webgpu')\nax.plot([0,1],[2,3],id='one');"+item+"\nax.text(.7,.7,'Keep this annotation',coords='ratio',id='fixed')\ndisplay(fig.widget())"
     with notebook(tmp_path/'browser-drag',source) as (page,execute):
         check_display_frame_ready(page)
         click_button(page,'[data-properties]')
         rect=page.evaluate(ROOT+'.annotations()')[0]['rect']
         start=browser_surface_point(page,(rect[0]+rect[2]/2,rect[1]+rect[3]/2))
         page.mouse.click(*start);page.evaluate(ROOT+'.flush()')
+        if annotation=='text':time.sleep(.5)
         before=page.evaluate(ROOT+'.stats.inspector_rebuilds')
         old=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
         begin=perf_counter();page.mouse.move(*start);page.mouse.down()
