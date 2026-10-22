@@ -279,7 +279,7 @@ are zeroed. Re-running the original baseline test accepted all ten original
 family/backend resident-data faults; the strengthened checks reject them.
 
 Local validation passed **209 focused cases in 11.14 seconds**, **nine headful
-browser cases in 127.57 seconds**, and **131 preflight cases in 3.27 seconds**.
+browser cases in 127.57 seconds**, and **131 preflight cases in 2.90 seconds**.
 The unchanged runtime wheel is the previously verified
 `88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b` artifact.
 Ordinary and priority collection both contain **785 unique cases**: all previous
@@ -319,3 +319,12 @@ Fourteen local execution-contract tests passed, including a real two-shard
 pytest/JUnit run and twelve deliberately invalid reports. Collection proves
 that the four selected lists contain all 785 current IDs exactly once, including
 all original 642 cases. This audit is also part of CI preflight.
+
+
+The first sharded run (CI #59) exposed a nested-test isolation error: its sample
+pytest subprocess inherited the parent project's collection root when CI's
+`--basetemp` lived inside the repository. The same repository-local layout
+reproduced the failure locally. The sample subprocess now explicitly fixes its
+root to its own temporary directory; the full audit remains strict. All 14
+execution-contract cases pass in that repository-local layout (0.64 seconds),
+and preflight passes all 131 cases (2.90 seconds).

@@ -87,7 +87,10 @@ def test_actual_pytest_shards_produce_exact_auditable_execution(tmp_path):
                 'import pytest, run_ci_tests as runner; '
                 'runner.PRIORITY=("test_sample.py",); '
                 'raise SystemExit(pytest.main(sys.argv[2:], plugins=[runner.PriorityFirst()]))')
+        # CI basetemp is inside the repository: fix the nested collection root
+        # so parent project discovery cannot prefix the sample node IDs.
         result = subprocess.run([sys.executable, '-c', code, str(ROOT / 'scripts'), '-q',
+            f'--rootdir={tmp_path}',
             '--ci-shard-count=2', f'--ci-shard-index={index}',
             f'--ci-test-plan={directory / "test-plan.json"}',
             f'--junitxml={directory / "junit.xml"}', 'test_sample.py'],

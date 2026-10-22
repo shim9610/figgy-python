@@ -21,10 +21,10 @@
     "headful_browser_cases_passed": 9,
     "headful_browser_seconds": 127.57,
     "preflight_cases_passed": 131,
-    "preflight_seconds": 3.27,
+    "preflight_seconds": 2.9,
     "wrong_cache_writer_input_mutation_checks_rejected": 2,
     "execution_contract_cases_passed": 14,
-    "execution_contract_seconds": 0.69
+    "execution_contract_seconds": 0.64
   },
   "collection": {
     "previous": 642,
@@ -91,5 +91,5 @@
   },
   "browser_capture": "The complete widget is translated by the fractional part of its DOM origin to align canvas pixels with the device grid. CSS and backing remain exactly 960x600 at DPR 1. No cropping, resampling or relaxed image shape is used.",
   "scope": "These close the demonstrated oracle gaps for the listed scenes and recovery families. They do not establish every feature combination, font rasterization or usability.",
-  "required_ci": "Pending validation of the final commit. CI #58 passed 470 of 771 tests before its job deadline and is not a complete result. The new required integration check audits exact passing JUnit IDs across all four disjoint shards."
+  "required_ci": "Pending validation of the final commit. CI #58 passed 470 of 771 tests before its deadline. CI #59 caught a repository-local subprocess root isolation error, reproduced locally and fixed with an explicit sample-test root. The required integration check audits exact passing JUnit IDs across all four disjoint shards."
 }
