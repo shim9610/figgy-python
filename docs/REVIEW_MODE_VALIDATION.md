@@ -163,8 +163,8 @@ notebook output may still scroll vertically.
 All **six affected cases passed in 96.74 seconds** on the unchanged runtime
 wheel: that readiness regression, the trusted annotation-input regression,
 Cartesian/radial multiline editing in both hosts and queued resize/editing at
-scales 1 and 2. CI runs the exact failed radial case and both controlled input
-regressions before the full suite. The collection now has **642 cases**. The
+scales 1 and 2. CI orders the exact failed radial case and both controlled input
+regressions first in the full suite. The collection now has **642 cases**. The
 existing full suite, assertions and time limits remain in place; no complete
 local 642-case pass is claimed. Local Chromium is 154; CI #53 used Chromium 156.
 
@@ -186,3 +186,28 @@ These are demonstrated test gaps, not observed production data corruption.
 Feature-specific independent visual assertions and complete restored-column
 value/type/shape comparisons are still needed for those stronger guarantees.
 No full-suite or usability guarantee follows from the affected-case pass above.
+
+## Execute the complete collection once
+
+The historical 640-case local JUnit record contains 2443.445 seconds of case
+time. Running the priority groups separately repeats 55 of those cases, adding
+246.020 seconds: **2689.465 seconds (44m 49s)** before collection, job setup and
+shutdown. That leaves no useful margin within the unchanged 45-minute job
+budget. These are measured local costs, not a prediction of the CI runner's
+exact runtime. [The per-case costs and collection comparison](measurements/ci-test-order-20261022.json)
+retain the calculation.
+
+`scripts/run_ci_tests.py` now runs one complete pytest collection and orders the
+past failures first. A comparison against ordinary pytest collection found
+**642 original IDs, 642 ordered IDs and 642 unique IDs**, with identical
+multisets: zero omissions or additions. The runner records both lists in the
+CI artifact `test-plan.json`. It rejects duplicated node IDs and missing required
+priority cases with exit code 4; both rejection paths were exercised locally.
+The workflow retains every test, its assertions, fail-fast behavior and the
+45-minute job budget. Only duplicate execution is removed.
+
+The first **57 cases passed together in 254.33 seconds** in the recorded order,
+including the exact failed radial editor case, two resize/input regressions,
+both scale cases, inactive-overlay editing, packaged assets, slow native clicks,
+radial detail selection and radial annotation drawing in both hosts. Preflight
+passed **117 cases in 2.03 seconds**. The runtime wheel is unchanged.

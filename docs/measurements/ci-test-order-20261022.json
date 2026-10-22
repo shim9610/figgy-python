@@ -1,0 +1,259 @@
+{
+  "historical_local_run": {
+    "cases": 640,
+    "seconds": 2444.04,
+    "junit_sha256": "dba1bfa4ae739ef881e342e26430f70fcd0c2be252c1f98e362d117e410ad090",
+    "summed_case_seconds": 2443.445
+  },
+  "duplicate_work": {
+    "cases": 55,
+    "summed_seconds": 246.02,
+    "full_plus_duplicate_case_seconds": 2689.465,
+    "items": [
+      {
+        "nodeid": "tests.test_interaction_parity::test_annotation_drawing_editing_and_cancel_in_both_hosts[radial]",
+        "seconds": 128.761
+      },
+      {
+        "nodeid": "tests.test_interaction_parity::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]",
+        "seconds": 37.09
+      },
+      {
+        "nodeid": "tests.test_interaction_parity::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]",
+        "seconds": 14.95
+      },
+      {
+        "nodeid": "tests.test_interaction_parity::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]",
+        "seconds": 15.994
+      },
+      {
+        "nodeid": "tests.test_interaction_parity::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]",
+        "seconds": 12.473
+      },
+      {
+        "nodeid": "tests.test_interaction_parity::test_radial_detail_tree_selection_edits_only_the_chosen_child[native]",
+        "seconds": 29.857
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_source_asset_provenance",
+        "seconds": 0.012
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_runtime_asset_check_does_not_require_tomllib",
+        "seconds": 0.011
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_crlf_changes_are_rejected_with_asset_diagnostics",
+        "seconds": 0.006
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_git_autocrlf_checkout_preserves_manifest_bytes[False]",
+        "seconds": 0.34
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_git_autocrlf_checkout_preserves_manifest_bytes[True]",
+        "seconds": 0.326
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_check_does_not_depend_on_callers_git_subdirectory",
+        "seconds": 0.014
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_inside_another_checkout",
+        "seconds": 0.013
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_must_match_built_asset_provenance[bytes]",
+        "seconds": 0.019
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_must_match_built_asset_provenance[missing]",
+        "seconds": 0.018
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_must_match_built_asset_provenance[hash]",
+        "seconds": 0.018
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_must_match_built_asset_provenance[path]",
+        "seconds": 0.019
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_must_match_built_asset_provenance[files]",
+        "seconds": 0.019
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[renderer]",
+        "seconds": 0.012
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[model]",
+        "seconds": 0.012
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[manifest]",
+        "seconds": 0.012
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[mode]",
+        "seconds": 0.008
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[crlf]",
+        "seconds": 0.009
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[deletion]",
+        "seconds": 0.013
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_host_patch_cannot_change_native_sources_or_build_configuration[invalid]",
+        "seconds": 0.013
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_lockfile_changes_are_rejected[checksum-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc-figgy-model]",
+        "seconds": 0.015
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_lockfile_changes_are_rejected[checksum-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc-figgy-renderer]",
+        "seconds": 0.015
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_lockfile_changes_are_rejected[version-9.0.0-figgy-model]",
+        "seconds": 0.015
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_lockfile_changes_are_rejected[version-9.0.0-figgy-renderer]",
+        "seconds": 0.014
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_lockfile_changes_are_rejected[source-git+https://github.com/shim9610/figgy#7777777777777777777777777777777777777777-figgy-model]",
+        "seconds": 0.016
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_lockfile_changes_are_rejected[source-git+https://github.com/shim9610/figgy#7777777777777777777777777777777777777777-figgy-renderer]",
+        "seconds": 0.016
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[native_revision]",
+        "seconds": 0.016
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[wasm_revision]",
+        "seconds": 0.015
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[script_revision]",
+        "seconds": 0.015
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[path]",
+        "seconds": 0.014
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[renderer_version]",
+        "seconds": 0.014
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[missing]",
+        "seconds": 0.014
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_pairing_metadata_changes_are_rejected[duplicate]",
+        "seconds": 0.015
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_overrides_rejected_even_with_unchanged_lock[[patch.crates-io]\\nfiggy-renderer = { git = \"https://github.com/shim9610/figgy\", rev = \"7777777777777777777777777777777777777777\" }]",
+        "seconds": 0.008
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_overrides_rejected_even_with_unchanged_lock[[patch.crates-io]\\nmodel_alias = { package = \"figgy-model\", path = \"../model\" }]",
+        "seconds": 0.008
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_registry_overrides_rejected_even_with_unchanged_lock[[replace]\\n\"figgy-model:0.11.0\" = { path = \"../model\" }]",
+        "seconds": 0.009
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_direct_nonregistry_renderer_rejected[, path = \"../renderer\"]",
+        "seconds": 0.009
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_direct_nonregistry_renderer_rejected[, git = \"https://github.com/shim9610/figgy\"]",
+        "seconds": 0.009
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_direct_nonregistry_renderer_rejected[, registry = \"other\"]",
+        "seconds": 0.009
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_dirty_wasm_checkout_is_rejected_before_download[False]",
+        "seconds": 0.019
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_dirty_wasm_checkout_is_rejected_before_download[True]",
+        "seconds": 0.021
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[None]",
+        "seconds": 0.004
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[checksum]",
+        "seconds": 0.003
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[revision]",
+        "seconds": 0.003
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[dirty]",
+        "seconds": 0.004
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[path]",
+        "seconds": 0.003
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[manifest]",
+        "seconds": 0.003
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[source]",
+        "seconds": 0.003
+      },
+      {
+        "nodeid": "tests.test_packaged_assets::test_published_archive_matches_exact_wasm_source[inventory]",
+        "seconds": 0.003
+      },
+      {
+        "nodeid": "tests.test_radial_desktop::test_click_remains_a_short_press_when_frames_are_slow",
+        "seconds": 5.689
+      }
+    ]
+  },
+  "unchanged_job_budget_seconds": 2700,
+  "scope": "Historical local case times, excluding setup/collection/shutdown overhead. These are not a CI runtime guarantee.",
+  "collection_comparison": {
+    "baseline_cases": 642,
+    "ordered_cases": 642,
+    "unique_cases": 642,
+    "same_multiset": true,
+    "missing": [],
+    "added": [],
+    "priority_cases": 57
+  },
+  "failure_guards": {
+    "missing_required_cases_exit": 4,
+    "duplicate_nodeids_exit": 4
+  },
+  "correction": "One complete pytest collection, stable priority ordering, one execution per node ID. Preserve all assertions, fail-fast behavior and the existing 45-minute budget.",
+  "ordered_priority_execution": {
+    "passed": 57,
+    "failed": 0,
+    "seconds": 254.33,
+    "preflight_passed": 117,
+    "preflight_seconds": 2.03,
+    "runtime_changed": false
+  }
+}

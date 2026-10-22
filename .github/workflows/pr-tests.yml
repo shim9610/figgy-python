@@ -102,7 +102,7 @@ jobs:
     # Keep the required check red when preflight/build fails or is skipped.
     if: always()
     runs-on: ubuntu-24.04
-    # Measured test workload is ~39m; build time has its own job budget.
+    # Measured full suite is ~41m; priority ordering adds no duplicate execution.
     timeout-minutes: 45
     env:
       WGPU_BACKEND: vulkan
@@ -159,27 +159,9 @@ jobs:
             openbox > /tmp/figgyplot-openbox.log 2>&1 &
             wm_pid=$!
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
-            # Reject invalid resize readiness and observed editor failures first.
-            # The queue-order cases must fail on the original a1e79a8 wheel.
-            .venv/bin/python -m pytest -x -vv --capture=tee-sys --durations=20 \
-              --basetemp=ci-results/layout-probe --junitxml=ci-results/layout-probe.xml \
-              'tests/test_interaction_parity.py::test_surface_readiness_rejects_matching_pre_resize_css_and_backing' \
-              'tests/test_interaction_parity.py::test_annotation_mouse_input_uses_live_layout_after_resize' \
-              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]' \
-              'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]' \
-              'tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]' \
-              'tests/test_interaction_parity.py::test_inactive_overlay_objects_can_be_edited_and_dragged_directly[native]' \
-              2>&1 | tee ci-results/layout-probe.log
-            # Measure the last failed radial screenshot before the full suite.
-            # Await current surface completion before the unchanged capture deadline.
-            .venv/bin/python -m pytest -x -vv --capture=tee-sys --durations=20 \
-              --basetemp=ci-results/priority --junitxml=ci-results/priority.xml \
-              tests/test_packaged_assets.py \
-              'tests/test_radial_desktop.py::test_click_remains_a_short_press_when_frames_are_slow' \
-              'tests/test_interaction_parity.py::test_radial_detail_tree_selection_edits_only_the_chosen_child[native]' \
-              'tests/test_interaction_parity.py::test_annotation_drawing_editing_and_cancel_in_both_hosts[radial]' \
-              2>&1 | tee ci-results/priority.log
-            .venv/bin/python -m pytest -x -vv --capture=tee-sys --durations=30 \
+            # Order past failures first without running them a second time.
+            # test-plan.json retains all original and ordered node IDs.
+            .venv/bin/python scripts/run_ci_tests.py -x -vv --capture=tee-sys --durations=30 \
               --basetemp=ci-results/full --junitxml=ci-results/junit.xml \
               2>&1 | tee ci-results/full.log
           SCRIPT
