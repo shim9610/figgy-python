@@ -95,7 +95,8 @@
               "channel": {
                 "enum": [
                   "api",
-                  "ui"
+                  "ui",
+                  "ui_target"
                 ]
               },
               "text": {

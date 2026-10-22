@@ -1910,6 +1910,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bounded::default_bounded_json, m)?)?;
     m.add_function(wrap_pyfunction!(draw_style_specs_json, m)?)?;
     m.add_function(wrap_pyfunction!(font_family_available, m)?)?;
+    m.add_function(wrap_pyfunction!(review_font_data, m)?)?;
     m.add_function(wrap_pyfunction!(text_segments_json, m)?)?;
     m.add_function(wrap_pyfunction!(segments_plain_text, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
@@ -2025,4 +2026,10 @@ fn rebuild_legend_json(series: &str, rich: &str, colormap: Option<&str>) -> PyRe
         }
     }
     serde_json::to_string(&rich).map_err(runtime)
+}
+
+#[pyfunction]
+fn review_font_data(py: Python<'_>, family: &str) -> PyResult<(Py<PyBytes>, u32)> {
+    let (bytes, index) = ui_fonts::resolve(family).map_err(invalid)?;
+    Ok((PyBytes::new(py, &bytes).unbind(), index))
 }

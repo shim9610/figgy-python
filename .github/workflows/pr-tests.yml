@@ -72,7 +72,7 @@ jobs:
       - name: Install native software-GPU and X11 runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl
+          sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl fonts-noto-cjk
       - name: Build and install the exact PR wheel
         run: |
           cargo fmt --check
@@ -136,7 +136,7 @@ jobs:
       - name: Install native software-GPU and X11 runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl
+          sudo apt-get install -y git mesa-vulkan-drivers libvulkan1 libxkbcommon0 libxkbcommon-x11-0 xvfb xdotool xclip openbox wmctrl fonts-noto-cjk
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: pr-linux-wheel

@@ -108,7 +108,12 @@ class Session:
     """
     protocol = 1
 
-    def __init__(self, cache_dir=None, *, source=None, backend='native'):
+    def __init__(self, cache_dir=None, *, source=None, backend='native', review_font=None, review_font_size=14):
+        if review_font is not None:
+            if not isinstance(review_font,str) or not review_font.strip():raise ValueError('review_font must name an installed font family')
+            from ._review_font import font_data
+            font_data(review_font)
+        if not isinstance(review_font_size,(int,float)) or not 8<=review_font_size<=72:raise ValueError('review_font_size must be between 8 and 72')
         cache=Path(cache_dir) if cache_dir is not None else Path(tempfile.mkdtemp(prefix='figgyplot-review-'))
         if cache.exists() and (not cache.is_dir() or any(cache.iterdir())):
             raise ValueError('Use a dedicated empty review cache directory; use Session.open() for an existing cache')
@@ -125,6 +130,7 @@ class Session:
             if backend not in ('native','webgpu'):
                 raise ValueError('Review backend must be native or webgpu')
             state = dict(protocol=1, session_id=_id(), generation=0, completed_work={},
+                         review_style=dict(font_family=review_font,font_size=review_font_size),
                          rounds=[dict(id=_id(),number=1,status='building',source=_source(source),
                                       backend=backend,documents={},work_id=None)])
             self._store.write(state)
@@ -264,6 +270,10 @@ class Session:
         if threading.current_thread() is not threading.main_thread():
             raise RuntimeError('Review presentation runs on the main thread')
         state=self.snapshot();r=state['rounds'][-1]
+        family=state.get('review_style',{}).get('font_family')
+        if family:
+            from ._review_font import font_data
+            font_data(family)
         prepared=[]
         try:
             for fid,doc in r['documents'].items():
@@ -276,7 +286,7 @@ class Session:
                     old=self._handles.get(fig.id)
                     if old is None or old.closed:
                         handle=fig.show(block=False)
-                        handle.configure_review(json.dumps(dict(figure_id=fig.id,comments=self._comment_text(fig.id))))
+                        handle.configure_review(json.dumps(self._review_state(fig.id)))
                         self._handles[fig.id]=handle
                 else:
                     from IPython.display import display
@@ -294,9 +304,44 @@ class Session:
         if figure.backend!='webgpu':raise ValueError('Notebook review requires backend=webgpu')
         if figure.id not in self._figures or self._figures[figure.id] is not figure:
             raise ValueError('Figure does not belong to this review session')
-        widget=figure.widget();widget.review=dict(enabled=True,figure_id=figure.id,comments=self._comment_text(figure.id))
+        widget=figure.widget();review=self._review_state(figure.id)
+        family=review.get('font_family')
+        if family:
+            from ._review_font import font_data
+            widget.review_font_data=font_data(family)
+        widget.review=review
         self._widgets[figure.id]=widget
         return widget
+
+    def _review_state(self, figure_id):
+        state=self.snapshot();doc=state['rounds'][-1]['documents'][figure_id]
+        return dict(enabled=True,figure_id=figure_id,comments=_ui_comment(doc),
+            target_comments=[c for c in doc['comments'] if c.get('channel')=='ui_target'],
+            **state.get('review_style',{}))
+
+    def _set_target_comments(self, figure_id, comments):
+        if not isinstance(comments,list):raise ValueError('Target comments must be a list')
+        ids=set()
+        for item in comments:
+            if not isinstance(item,dict) or set(item)-{'id','text','target','channel','label'} or not all(isinstance(item.get(k),str) and item[k].strip() for k in ('id','text','target')) or item['id'] in ids or ('label' in item and not isinstance(item['label'],str)):
+                raise ValueError('Target comments require unique IDs, nonempty text and a stable target')
+            ids.add(item['id'])
+        with self._store.locked():
+            state=self._store.read();doc=self._mutable(state,figure_id)
+            updated=[c for c in doc['comments'] if c.get('channel')!='ui_target']+[dict(c,channel='ui_target') for c in comments]
+            if updated!=doc['comments']:doc['comments']=updated;self._store.write(state)
+
+    def subscribe(self, *, after=None, timeout=60):
+        """Wait for one complete durable batch; does not pump UI or invoke a model."""
+        if not isinstance(timeout,(int,float)) or not 0<=timeout<=3600:raise ValueError('timeout must be between 0 and 3600 seconds')
+        deadline=time.monotonic()+timeout
+        while True:
+            events=[event for event in self.events() if event['work_id']!=after]
+            if events:return events[0]
+            if self.status['state'] in ('completed','cancelled'):return None
+            remaining=deadline-time.monotonic()
+            if remaining<=0:return None
+            time.sleep(min(.05,remaining))
 
     def _comment_text(self, figure_id):
         return _ui_comment(self.snapshot()['rounds'][-1]['documents'][figure_id])
@@ -489,6 +534,7 @@ class Session:
             request=json.loads(handle.review_request_json())
             if request is None:continue
             try:
+                self._set_target_comments(fid,request.get('target_comments',[]))
                 self.submit(fid,request['disposition'],comments=request['comments'],expected_revision=request['revision'])
             except Exception as exc:
                 handle.review_result(str(exc))
@@ -506,6 +552,10 @@ class Session:
                 handle=self._handles.get(fid)
                 if doc and doc['approval'] is None and handle is not None:
                     text=json.loads(handle.info_json())['review'].get('comments','')
+                    targeted=json.loads(handle.info_json())['review'].get('target_comments',[])
+                    previous=[v for v in doc['comments'] if v.get('channel')=='ui_target']
+                    if targeted!=previous:
+                        doc['comments']=[v for v in doc['comments'] if v.get('channel')!='ui_target']+[dict(v,channel='ui_target') for v in targeted];changed=True
                     if text!=_ui_comment(doc):
                         _replace_ui_comment(doc,text);changed=True
             if changed:self._store.write(state)
@@ -607,13 +657,14 @@ class Session:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['protocol','skill','status','events','feedback','claim','regenerate','show','cancel'])
+    parser.add_argument('action',choices=['protocol','skill','status','events','subscribe','feedback','claim','regenerate','show','cancel'])
     parser.add_argument('cache',nargs='?')
     parser.add_argument('work',nargs='?')
     parser.add_argument('--superseded',help='JSON file mapping edit IDs or figure:ID to reasons')
+    parser.add_argument('--after',help='Last delivered work ID for feedback subscription')
     parser.add_argument('--worker',help='Stable agent/staging-workspace identifier for a writer lease')
     parser.add_argument('--claim-token',help='Writer lease token returned by claim')
-    parser.add_argument('--timeout',type=float,default=180,help='Maximum candidate execution/render seconds')
+    parser.add_argument('--timeout',type=float,default=180,help='Maximum subscription wait or candidate execution/render seconds')
     args=parser.parse_args()
     package=Path(__file__).parent
     if args.action=='protocol':
@@ -624,6 +675,7 @@ def main():
     with Session.open(args.cache) as session:
         if args.action=='status':result=session.status
         elif args.action=='events':result=session.events()
+        elif args.action=='subscribe':result=session.subscribe(after=args.after,timeout=args.timeout)
         elif args.action=='feedback':result=session.feedback(args.work)
         elif args.action=='claim':result=session.claim(args.work,worker_id=args.worker)
         elif args.action=='regenerate':

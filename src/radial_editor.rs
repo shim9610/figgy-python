@@ -229,11 +229,30 @@ impl Editor {
         });
         if self.inspector_open && !overlay {
             egui::Panel::right("radial_properties")
-                .exact_size(INSPECTOR_WIDTH)
+                .exact_size(self.inspector_width)
                 .show(root, |ui| {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                    let edge = egui::Rect::from_min_size(
+                        ui.max_rect().min - egui::vec2(4., 0.),
+                        egui::vec2(7., ui.available_height()),
+                    );
+                    let grip = ui
+                        .interact(
+                            edge,
+                            egui::Id::new("bounded_inspector_resize"),
+                            egui::Sense::drag(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+                    self.controls.insert("inspector_resize".into(), grip.rect);
+                    if grip.dragged() {
+                        self.inspector_width = (self.inspector_width
+                            - ui.input(|i| i.pointer.delta().x))
+                        .clamp(280., 640.);
+                    }
                     self.bounded_navigator(ui, c);
                     let form = egui::ScrollArea::vertical()
                         .id_salt("bounded_properties")
+                        .auto_shrink([false, false])
                         .show(ui, |ui| self.radial_properties(ui, c));
                     self.controls
                         .insert("properties_viewport".into(), form.inner_rect);
@@ -249,9 +268,12 @@ impl Editor {
             egui::Window::new("Properties")
                 .id(egui::Id::new("radial_overlay"))
                 .anchor(egui::Align2::RIGHT_TOP, [-16., 70.])
-                .default_width(INSPECTOR_WIDTH)
-                .resizable(false)
+                .default_width(self.inspector_width)
+                .min_width(280.)
+                .max_width(640.)
+                .resizable(true)
                 .show(root.ctx(), |ui| {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                     self.bounded_navigator(ui, c);
                     let form = egui::ScrollArea::vertical()
                         .id_salt("bounded_properties")
@@ -280,6 +302,10 @@ impl Editor {
                         .map(|i| format!("slice_{}_{i}", selected["group"].as_u64().unwrap_or(0)))
                 })
         };
+        self.navigator.review_enabled = self
+            .review
+            .as_ref()
+            .is_some_and(|v| v.lock().unwrap().is_object());
         let nodes = navigation::nodes(&c.snapshot());
         if let Some(node) = self.navigator.show(
             ui,
@@ -342,6 +368,7 @@ impl Editor {
                 self.error = error.to_string();
             }
         }
+        self.take_tree_review_target();
     }
 
     fn bounded_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
@@ -516,14 +543,17 @@ impl Editor {
                     self.error = error.to_string();
                 }
             }
-            ui.small("Wheel over plot: zoom values · Fit: automatic range");
+            ui.small(if view["axis"] == "radius" {
+                "Set the radial range explicitly; wheel zoom is disabled."
+            } else {
+                "Wheel over plot: zoom values · Fit: automatic range"
+            });
             ui.separator();
         }
         false
     }
 
     fn radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
-        self.basic_radial_properties(ui, c);
         let chart = &c.data.document.as_ref().unwrap().chart;
         let target = if self.figure_properties {
             "figure".into()
@@ -546,6 +576,14 @@ impl Editor {
                         .unwrap_or_else(|| "data_area".into())
                 })
         };
+        if target == "data_area" || target == "figure" {
+            self.catalog_properties(ui, c, &target, true);
+            if target == "data_area" {
+                self.bounded_context_properties(ui, c);
+            }
+            return;
+        }
+        self.basic_radial_properties(ui, c);
         self.catalog_properties(ui, c, &target, false);
     }
     fn basic_radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {

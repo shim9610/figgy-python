@@ -349,7 +349,7 @@ impl SurfaceWindow {
             })
     }
     fn sidebar_pixels(&self) -> u32 {
-        (editor::INSPECTOR_WIDTH * self.ctx.pixels_per_point()).round() as u32
+        (self.editor.inspector_width * self.ctx.pixels_per_point()).round() as u32
     }
     fn sync_inspector_size(&mut self) {
         if self.settings_only || self.inspector_overlay() {
@@ -624,6 +624,16 @@ impl SurfaceWindow {
                     }
                     self.panel_focus
                         .select(c.data.chart.config(), c.data.identity.as_ref(), at);
+                    if self.edit_area
+                        && let Some(index) = at
+                    {
+                        self.selected = Some(if index == 0 {
+                            "data_area".into()
+                        } else {
+                            format!("subplot_{}:data_area", index - 1)
+                        });
+                        self.editor.inspector_open = true;
+                    }
                     self.last_revision = u64::MAX;
                     self.window.request_redraw();
                     return Ok(());
@@ -997,6 +1007,9 @@ impl SurfaceWindow {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
+                if active_coordinate_config(&display).polar.is_some() {
+                    return Ok(());
+                }
                 // Decorations and the surrounding canvas do not own plot zoom.
                 let Ok(area) = active_coordinate_config(&display).data_area() else {
                     return Ok(());
@@ -1135,6 +1148,65 @@ impl SurfaceWindow {
                     previous_selection != self.selected && self.selected.is_some(),
                 );
                 self.fit_stage_width();
+                if self.editor.review_enabled()
+                    && root.input(|i| i.pointer.secondary_clicked())
+                    && self.editor.stage.contains(egui::pos2(
+                        self.cursor.0 / ctx.pixels_per_point(),
+                        self.cursor.1 / ctx.pixels_per_point(),
+                    ))
+                {
+                    let (display, panel, scale) = self.display(&c);
+                    let index = interaction::panels_at(&display, self.cursor)
+                        .first()
+                        .copied()
+                        .unwrap_or(0);
+                    let mut targets = interaction::decorations_at(&display, index, self.cursor)
+                        .into_iter()
+                        .map(|(layer, target)| (layer, target))
+                        .collect::<Vec<_>>();
+                    if index == 0 && c.data.chart.config().annotations.visible {
+                        if let Some(i) = self.view.as_ref().and_then(|v| {
+                            let map = v.annotation_map();
+                            map.element(map.hit_test([self.cursor.0, self.cursor.1])?)
+                                .map(|a| a.index)
+                        }) {
+                            targets = vec![(
+                                renderer::LayerRef::Annotations,
+                                format!(
+                                    "annotation:{}",
+                                    c.data.chart.config().annotations.items[i].id
+                                ),
+                            )];
+                        }
+                    }
+                    if targets.iter().all(|(_, v)| v.ends_with("data_area")) {
+                        if let Ok(hits) = c.pick_panel_candidates(
+                            index,
+                            GpuPickRequest {
+                                canvas_position_px: [self.cursor.0, self.cursor.1],
+                                display_panel_px: panel,
+                                display_scale: scale,
+                                max_distance_px: 6.,
+                            },
+                        ) {
+                            if !hits.is_empty() {
+                                targets = hits
+                                    .into_iter()
+                                    .map(|h| (h.layer, h.reference.series_id().to_owned()))
+                                    .collect();
+                            }
+                        }
+                    }
+                    self.editor.review_target(
+                        egui::pos2(
+                            self.cursor.0 / ctx.pixels_per_point(),
+                            self.cursor.1 / ctx.pixels_per_point(),
+                        ),
+                        &c,
+                        targets,
+                    );
+                }
+                self.editor.review_context_ui(root);
                 // Tree/toolbar edits cancel a stale chooser before applying anything.
                 if self
                     .chooser
@@ -1512,7 +1584,7 @@ impl SurfaceWindow {
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
             Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
         });
-        *self.control.stats.lock().unwrap() = json!({"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        *self.control.stats.lock().unwrap() = json!({"property_catalog_builds":self.editor.property_builds,"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }

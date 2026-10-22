@@ -7,6 +7,35 @@ and `figgy-model 0.12.0`. The dated measurements and test totals below belong
 to earlier checkpoints; they are not a test count or performance claim for the
 current release candidate.
 
+### Layout and review editing follow-up (2026-10-22)
+
+The installed release wheel passed **273 focused model, history, recovery and
+oracle cases**, **9 real native/Jupyter interaction cases**, and **131 workflow
+and packaged-asset checks**, with no skips in those runs. Full collection contains
+806 cases; the focused runs do not establish a complete CI result.
+
+The input cases cover first-click plot geometry editing, inspector resizing,
+unchanged plot dimensions when opening the inspector, disabled polar/radar wheel
+zoom, annotation drawing, targeted Korean review comments, comment editing and
+deletion, title/series ownership, and annotation dragging. Geometry checks also
+resize radar, box, pie/donut and bar documents and restore their exact settings
+with Undo. Subscription is checked through both Python and the CLI across the
+complete Figure approval barrier.
+
+Annotation drag checks save complete before/after SSOT dumps. Only the selected
+arrow's four coordinate values change; the other annotation, series, axes and
+layout remain identical, and no columns are uploaded again. During the synthetic
+gesture, property descriptions rebuild 0 times in native and 1 time in the
+browser. [Recorded counters and SSOT changes](measurements/layout-review-host-work-20261022.json)
+include the tested wheel digest. Elapsed times include input-driver waits and
+are not a physical-GPU frame-rate measurement. Renderer drawing/cache behavior
+is unchanged.
+
+Environment: Linux x86_64, Python 3.12.14, llvmpipe Vulkan, Xvfb/Openbox,
+Chromium 154/SwiftShader and installed Noto Sans CJK KR. Rust formatting, JS
+syntax, installed-package checks and property-catalog inventory checks passed.
+Physical GPU and Windows/macOS runtime behavior remain unverified by these runs.
+
 Automatic pull-request checks are enabled in
 [PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
 integration. The [interaction parity guard](../scripts/check_interaction_parity.py)

@@ -2,6 +2,7 @@
 //! Descriptions are derived from accepted SSOT; they are not a second model.
 use super::*;
 use renderer::annotation::AnnotationSpace;
+mod layout;
 mod links;
 mod optional;
 
@@ -16,7 +17,7 @@ pub(crate) struct Field {
     pub choices: Vec<Value>,
     pub integer: bool,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub(crate) struct Object {
     pub id: String,
     pub target: Option<String>,
@@ -1054,8 +1055,10 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         }
     }
+    layout::fields(fields, state, node);
     out.fields.sort_by_key(|field| {
         let rank = match field.group.as_str() {
+            "Figure size" | "Panel geometry" | "Plot area" => 0,
             "Line" | "Vectors" | "Bars" | "Contours" | "Appearance" | "Figure grid" => 0,
             "Title" | "Tick labels" => 0,
             "Markers" => 1,
@@ -1086,13 +1089,12 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
 }
 
 impl editor::Editor {
-    pub(super) fn catalog_properties(
+    pub(super) fn inspector_object(
         &mut self,
-        ui: &mut egui::Ui,
-        c: &mut FigureAccess<'_>,
+        ui: &egui::Ui,
+        c: &FigureAccess<'_>,
         target: &str,
-        primary: bool,
-    ) {
+    ) -> Option<Object> {
         let layer = c
             .data
             .document
@@ -1100,12 +1102,45 @@ impl editor::Editor {
             .map_or(c.data.chart.config().active_layer(), |d| {
                 d.chart.active_layer()
             });
-        let Some(object) = selected(
+        let dragging = ui.input(|i| {
+            i.pointer.primary_down()
+                && i.pointer
+                    .press_origin()
+                    .is_some_and(|p| self.stage.contains(p))
+        });
+        if let Some((name, owner, preferred, revision, value)) = &self.property_cache {
+            if name == target
+                && *owner == layer
+                && preferred == &self.inspector_owner
+                && (dragging || *revision == c.data.revision)
+            {
+                return Some(value.clone());
+            }
+        }
+        let value = selected(
             &c.snapshot(),
             target,
             layer,
             self.inspector_owner.as_deref(),
-        ) else {
+        )?;
+        self.property_builds += 1;
+        self.property_cache = Some((
+            target.into(),
+            layer,
+            self.inspector_owner.clone(),
+            c.data.revision,
+            value.clone(),
+        ));
+        Some(value)
+    }
+    pub(super) fn catalog_properties(
+        &mut self,
+        ui: &mut egui::Ui,
+        c: &mut FigureAccess<'_>,
+        target: &str,
+        primary: bool,
+    ) {
+        let Some(object) = self.inspector_object(ui, c, target) else {
             return;
         };
         let mut groups = Vec::<String>::new();
@@ -1140,12 +1175,28 @@ impl editor::Editor {
             }
             let response = egui::CollapsingHeader::new(group)
                 .id_salt((&object.id, group))
-                .default_open(primary && index < 2)
+                .default_open((primary && index < 2 && !target.ends_with("data_area")) || matches!(group.as_str(), "Panel geometry" | "Plot area" | "Figure size"))
                 .show(ui, |ui| {
                     for field in fields {
                         let mut value = field.value.clone();
                         let mut changed = false;
                         let response = ui.push_id((&object.id,&field.id),|ui|match field.kind.as_str() {
+                            "rectangle" => {
+                                let mut numbers=value.as_array().unwrap().iter().filter_map(Value::as_f64).collect::<Vec<_>>();
+                                if numbers.is_empty() {
+                                    if let Ok(frame)=c.document_frame() {
+                                        if let Some(r)=frame.decorations().entries().find(|(_,e)|e.id.element_id()=="data_area").and_then(|(id,_)|frame.decorations().bounds(id)) {numbers=vec![r.x as f64,r.y as f64,r.width as f64,r.height as f64];}
+                                    }
+                                }
+                                let mut response=ui.label(&field.label);
+                                if numbers.len()==4 {
+                                    for (i,key) in ["x","y","width","height"].into_iter().enumerate() {
+                                        ui.horizontal(|ui| {ui.label(key);let r=ui.add(egui::DragValue::new(&mut numbers[i]).speed(1.));changed|=r.changed();self.controls.insert(format!("plot_{key}"),r.rect);response=r;});
+                                    }
+                                    value=json!(numbers);
+                                }
+                                response
+                            }
                             "action" => {
                                 let r=ui.button(&field.label);
                                 changed=r.clicked();
@@ -1223,7 +1274,7 @@ impl editor::Editor {
                             let focused=ui.memory(|m|m.has_focus(id));
                             let draft=self.property_text.entry(format!("{}/{}",object.id,field.id)).or_insert_with(||(initial.clone(),field.value.clone(),c.data.revision));
                             if !focused&&draft.1!=field.value {*draft=(initial,field.value.clone(),c.data.revision);}
-                            let r = ui.add(egui::TextEdit::singleline(&mut draft.0).id(id));
+                            let r = ui.add_sized([ui.available_width(),ui.spacing().interact_size.y],egui::TextEdit::singleline(&mut draft.0).id(id));
                             if r.gained_focus(){draft.1=field.value.clone();draft.2=c.data.revision;}
                                 if r.lost_focus() {
                                 let text=&draft.0;
@@ -1378,6 +1429,9 @@ pub(crate) fn apply(
     }
     let mut result = serde_json::to_value(state).map_err(runtime)?;
     if field.kind != "action" && value == field.value {
+        return Ok(result);
+    }
+    if layout::apply(&mut result, &object, field, &value)? {
         return Ok(result);
     }
     if field.group == "Shared axes" {

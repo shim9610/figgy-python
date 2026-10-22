@@ -1,5 +1,6 @@
 //! Native editing controls. Chart validation/rendering remain renderer APIs.
 use super::*;
+mod review;
 use egui::{Color32, RichText, Stroke};
 
 pub const INSPECTOR_WIDTH: f32 = 320.;
@@ -7,6 +8,17 @@ pub const INSPECTOR_WIDTH: f32 = 320.;
 pub(crate) struct Editor {
     pub(crate) review: Option<Arc<Mutex<Value>>>,
     pub inspector_open: bool,
+    pub inspector_width: f32,
+    review_font: String,
+    review_context: review::Context,
+    pub(super) property_cache: Option<(
+        String,
+        renderer::LayerRef,
+        Option<String>,
+        u64,
+        crate::property_catalog::Object,
+    )>,
+    pub(crate) property_builds: u64,
     pub selection_hint: String,
     pub panel_focused: bool,
     pub(super) drawing: crate::drawing::Drawing,
@@ -36,6 +48,11 @@ impl Default for Editor {
         Self {
             review: None,
             inspector_open: false,
+            inspector_width: INSPECTOR_WIDTH,
+            review_font: String::new(),
+            review_context: Default::default(),
+            property_cache: None,
+            property_builds: 0,
             selection_hint: String::new(),
             panel_focused: true,
             drawing: Default::default(),
@@ -71,6 +88,23 @@ impl Editor {
         if state.is_null() {
             return;
         }
+        let family = state["font_family"].as_str().unwrap_or("");
+        if !family.is_empty() && family != self.review_font {
+            match crate::ui_fonts::install_review(root.ctx(), family) {
+                Ok(()) => self.review_font = family.into(),
+                Err(e) => self.error = e,
+            }
+            root.ctx().request_repaint();
+            return;
+        }
+        let font = egui::FontId::new(
+            state["font_size"].as_f64().unwrap_or(14.) as f32,
+            if self.review_font.is_empty() {
+                egui::FontFamily::Proportional
+            } else {
+                egui::FontFamily::Name("figgy-review".into())
+            },
+        );
         let pending = !state["request"].is_null();
         let mut comments = state["comments"].as_str().unwrap_or("").to_owned();
         egui::Panel::bottom("review_comments")
@@ -81,7 +115,12 @@ impl Editor {
                     .inner_margin(12),
             )
             .show(root, |ui| {
-                ui.label(RichText::new("Review comments").strong());
+                ui.horizontal(|ui|{
+                    ui.label(RichText::new("Review comments").strong());
+                    let button=ui.button(format!("Element comments ({})",state["target_comments"].as_array().map_or(0,Vec::len)));
+                    self.controls.insert("review_target_list".into(),button.rect);
+                    if button.clicked(){self.review_context.list=true;}
+                });
                 ui.add_enabled_ui(!pending, |ui| {
                     let input = egui::ScrollArea::vertical()
                         .id_salt("review_comment_scroll")
@@ -90,7 +129,7 @@ impl Editor {
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             ui.add(
-                                egui::TextEdit::multiline(&mut comments)
+                                egui::TextEdit::multiline(&mut comments).font(font.clone())
                                     .desired_width(f32::INFINITY)
                                     .desired_rows(2)
                                     .hint_text("Describe changes for the next version…"),
@@ -110,7 +149,7 @@ impl Editor {
                             if button.clicked() {
                                 c.end_edit();
                                 state["request"] = json!({"disposition":disposition,
-                                    "comments":comments,"revision":c.data.revision,"finalized":false});
+                                    "comments":comments,"target_comments":state["target_comments"],"revision":c.data.revision,"finalized":false});
                                 state["error"] = json!("");
                             }
                         }
@@ -585,7 +624,9 @@ impl Editor {
                 .inner_margin(egui::Margin::symmetric(18, 3)))
             .show(root, |ui| {
                 let help = ui.label(RichText::new(
-                    "Ctrl + wheel: Zoom X  ·  Shift + wheel: Zoom Y  ·  Wheel: Zoom XY  ·  Drag plot: Pan  ·  Click: Edit")
+                    if interaction::panel(c.data.chart.config(),interaction::panel_index(c.data.chart.config().active_layer())).polar.is_some() {
+                        "Polar coordinates · Wheel zoom disabled · Set ranges in Properties · Click: Edit"
+                    } else {"Ctrl + wheel: Zoom X  ·  Shift + wheel: Zoom Y  ·  Wheel: Zoom XY  ·  Drag plot: Pan  ·  Click: Edit"})
                     .size(12.).color(Color32::from_rgb(105, 116, 131)));
                 self.controls.insert("navigation_help".into(), help.rect);
             });
@@ -623,14 +664,26 @@ impl Editor {
                 // Menus use Foreground. Keep the panel below them so reopening
                 // a menu cannot let its parent panel intercept the item click.
                 .order(egui::Order::Middle)
-                .fixed_pos(egui::pos2(area.right() - INSPECTOR_WIDTH, area.top()))
+                .fixed_pos(egui::pos2(area.right() - self.inspector_width, area.top()))
                 .movable(false)
                 .show(root.ctx(), |ui| {
+                    let left =
+                        egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(7., area.height()));
+                    let resize = ui
+                        .interact(left, egui::Id::new("inspector_resize"), egui::Sense::drag())
+                        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+                    self.controls.insert("inspector_resize".into(), resize.rect);
+                    if resize.dragged() {
+                        self.inspector_width = (self.inspector_width
+                            - ui.input(|i| i.pointer.delta().x))
+                        .clamp(280., 640.);
+                    }
                     egui::Frame::NONE
                         .fill(Color32::from_rgb(248, 249, 251))
                         .inner_margin(18)
                         .show(ui, |ui| {
-                            ui.set_width(INSPECTOR_WIDTH - 36.);
+                            ui.set_width(self.inspector_width - 36.);
+                            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                             ui.set_height((area.height() - 36.).max(100.));
                             self.inspector(ui, c, selected);
                         });
@@ -659,6 +712,7 @@ impl Editor {
                 }
             });
         });
+        self.navigator.review_enabled = self.review_enabled();
         let nodes = navigation::nodes(&c.snapshot());
         if let Some(node) = self.navigator.show(
             ui,
@@ -678,6 +732,7 @@ impl Editor {
             *selected = node.target;
             self.picked = None;
         }
+        self.take_tree_review_target();
         ui.add_space(6.);
         let context = format!("{:?}/{:?}", c.data.chart.config().active_layer(), selected);
         let context_changed = context != self.inspector_context;
@@ -1126,16 +1181,11 @@ impl Editor {
     }
 
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
-        let snapshot = c.snapshot();
-        let object = crate::property_catalog::selected(
-            &snapshot,
-            target,
-            c.data.chart.config().active_layer(),
-            self.inspector_owner.as_deref(),
-        );
+        let object = self.inspector_object(ui, c, target);
         let primary = object.as_ref().is_some_and(|v| {
             v.id.starts_with("series/")
                 || v.id.starts_with("figure/")
+                || target.ends_with("data_area")
                 || target
                     .rsplit(':')
                     .next()
@@ -1577,10 +1627,9 @@ fn text_field(
         return false;
     };
     ui.label(label);
-    let response = ui.add(
-        egui::TextEdit::singleline(&mut value)
-            .hint_text(hint)
-            .desired_width(f32::INFINITY),
+    let response = ui.add_sized(
+        [ui.available_width(), ui.spacing().interact_size.y],
+        egui::TextEdit::singleline(&mut value).hint_text(hint),
     );
     controls.insert(key.into(), response.rect);
     if response.changed() {
