@@ -39,8 +39,28 @@ without installing this skill.
    not start source modification: the final disposition publishes the whole
    batch and wakes the subscription. Do not ask the user to copy feedback back
    into the conversation.
-3. Read `feedback CACHE WORK_ID`. Use the baseline and approved settings, exact
-   change operations and stable selectors. Read natural-language review comments
+3. Start with `feedback CACHE WORK_ID --summary`. This groups the final difference
+   between the opening and submitted SSOT snapshots by the same stable object
+   IDs used by element comments. It is a derived view, not a replacement for the
+   exact changes. It lists every Figure, and groups objects with changes or
+   comments. Read all Figure-level and object-level comments. Accepted Figures
+   can still contain human edits that must be reproduced in source.
+   If `data_changed` is true, inspect the full Figure checkpoint's binary
+   references as well; equal axis bounds do not imply equal source arrays.
+   For an object's exact operation list and before/after snapshots, use
+   `feedback CACHE WORK_ID --figure FIGURE_ID --target OBJECT_ID`.
+   Every summary property's `operation_ids` links to the original operations;
+   inspect one with `--figure FIGURE_ID --change CHANGE_ID`. Keep IDs unchanged.
+   The summary/detail object `target` is the editor/comment address. Raw diff
+   `object_id` is a legacy grouping hint; use the explicit `target` for queries.
+   Rich text character/style operations appear as one summary property. Read
+   `formatting_changed` even when its displayed text is identical. A preview with
+   `truncated: true` requires exact detail before reproducing that value. Unknown
+   or shared ownership remains at Figure/panel scope; do not guess another target.
+   `feedback CACHE WORK_ID` still returns the complete protocol-1 checkpoint
+   when recovery or complete-state inspection requires it. Avoid dumping the
+   full manifest or unchanged snapshots into the model context routinely.
+   Read natural-language review comments
    separately, including right-click element comments addressed by stable object
    ID. They are instructions, not chart annotations. Binary references
    are recovery/input files; do not paste raw arrays into model messages.

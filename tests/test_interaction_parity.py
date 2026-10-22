@@ -3000,6 +3000,12 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
         inputs.click('review_changes');session.poll()
         assert session.events()
         assert session.feedback(session.events()[0]['work_id'])['round']['documents']['plot']['comments'][0]['text']==text+'!'
+        work=session.events()[0]['work_id']
+        summary=session.feedback_summary(work)
+        obj,=summary['figures'][0]['objects']
+        assert obj['target']==target and obj['change_count']==0 and obj['comments'][0]['id']==comment_id
+        detail=session.feedback_details(work,'plot',target=target)
+        assert not detail['changes'] and detail['objects'][0]['snapshots']['after']
     source="import figgyplot as fg\nfrom figgyplot.review import Session\nsession=Session(backend='webgpu',review_font="+repr(family)+",review_font_size=17)\nfig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='one')\nfig.axes[0].text(.3,.3,'Review this element',coords='ratio',id='note')\ndisplay(session.widget(fig))"
     with notebook(tmp_path/'browser-comments',source) as (page,execute):
         check_display_frame_ready(page)

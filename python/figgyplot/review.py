@@ -497,6 +497,16 @@ class Session:
         if r is None:raise ValueError('Stale or unknown review work ID')
         return dict(protocol=1,session_id=state['session_id'],round=copy.deepcopy(r))
 
+    def feedback_summary(self, work_id):
+        """Readable object groups linked to every exact snapshot-diff operation."""
+        from ._review_summary import summary
+        return summary(self.feedback(work_id))
+
+    def feedback_details(self, work_id, figure_id, *, target=None, change_id=None):
+        """Inspect exact changes and object snapshots without another render."""
+        from ._review_summary import details
+        return details(self.feedback(work_id),figure_id,target=target,change_id=change_id)
+
     def claim(self, work_id, *, worker_id=None, seconds=1800):
         """Lease one staging writer before an agent edits source for this work."""
         from .figure import _timeout
@@ -763,10 +773,21 @@ def main():
     parser.add_argument('--worker',help='Stable agent/staging-workspace identifier for a writer lease')
     parser.add_argument('--claim-token',help='Writer lease token returned by claim')
     parser.add_argument('--timeout',type=float,help='Maximum wait or candidate execution/render seconds; connect waits indefinitely by default')
+    parser.add_argument('--summary',action='store_true',help='Object-grouped feedback summary with links to exact change IDs')
+    parser.add_argument('--figure',help='Figure ID for exact feedback details')
+    parser.add_argument('--target',help='Stable editor/comment object ID within --figure')
+    parser.add_argument('--change',help='Exact change ID within --figure')
     args=parser.parse_args()
+    if (args.summary or args.figure is not None or args.target is not None or args.change is not None) and args.action!='feedback':
+        parser.error('summary/figure/target/change options apply only to feedback')
+    if args.summary and (args.figure is not None or args.target is not None or args.change is not None):
+        parser.error('--summary cannot be combined with detail filters')
+    if (args.target is not None or args.change is not None) and args.figure is None:
+        parser.error('--target and --change require --figure')
     package=Path(__file__).parent
     if args.action=='protocol':
-        print(json.dumps(dict(protocol=1,skill=str(package/'skills/figgyplot-review/SKILL.md'),schema=str(package/'review-feedback-v1.schema.json'),event_schema=str(package/'review-feedback-v1.schema.json')+'#/$defs/events')));return
+        schema=str(package/'review-feedback-v1.schema.json')
+        print(json.dumps(dict(protocol=1,skill=str(package/'skills/figgyplot-review/SKILL.md'),schema=schema,event_schema=schema+'#/$defs/events',summary_schema=schema+'#/$defs/summary',details_schema=schema+'#/$defs/details')));return
     if args.action=='skill':
         print((package/'skills/figgyplot-review/SKILL.md').read_text(encoding='utf-8'));return
     if not args.cache:parser.error('cache is required for this action')
@@ -775,7 +796,10 @@ def main():
         elif args.action=='events':result=session.events()
         elif args.action=='subscribe':result=session.subscribe(after=args.after,timeout=args.timeout if args.timeout is not None else 60)
         elif args.action=='connect':result=session.connect(after=args.after,timeout=args.timeout)
-        elif args.action=='feedback':result=session.feedback(args.work)
+        elif args.action=='feedback':
+            if args.summary:result=session.feedback_summary(args.work)
+            elif args.figure is not None:result=session.feedback_details(args.work,args.figure,target=args.target,change_id=args.change)
+            else:result=session.feedback(args.work)
         elif args.action=='claim':result=session.claim(args.work,worker_id=args.worker)
         elif args.action=='regenerate':
             if not args.claim_token:parser.error('regenerate requires --claim-token from claim')

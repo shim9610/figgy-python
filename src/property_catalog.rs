@@ -346,6 +346,139 @@ fn panel_path(layer: renderer::LayerRef) -> String {
         _ => "/config".into(),
     }
 }
+/// SSOT roots use the same layer/decoration addresses as the editor. Review
+/// summaries consume these bindings instead of inventing another object model.
+fn decoration_path(node: &navigation::Node) -> Option<String> {
+    let short = node.target.as_deref()?.rsplit(':').next()?;
+    let panel = panel_path(node.layer);
+    Some(match short {
+        "chart_title" => format!("{panel}/chart_title"),
+        "legend" => format!("{panel}/legend"),
+        "data_area" => format!("{panel}/chart_area"),
+        _ if short.starts_with("colorbar") => format!("{panel}/colorbar"),
+        _ if short.starts_with("axis_") || short.starts_with("tick_labels_") => {
+            let side = short.rsplit('_').next()?;
+            let axis = match side {
+                "bottom" => "bottom_x",
+                "top" => "top_x",
+                "left" => "left_y",
+                _ => "right_y",
+            };
+            let base = match node.layer {
+                renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i)
+                    if side == "right" =>
+                {
+                    format!("{panel}/overlays/{i}/y_axis")
+                }
+                _ => format!("{panel}/{axis}"),
+            };
+            if short.starts_with("axis_title_") {
+                format!("{base}/title_option")
+            } else if short.starts_with("tick_labels_") {
+                format!("{base}/label_style")
+            } else {
+                base
+            }
+        }
+        _ => return None,
+    })
+}
+
+#[pyfunction]
+pub(crate) fn review_object_bindings_json(settings: &str) -> PyResult<String> {
+    fn paths(state: &Value, node: &navigation::Node) -> Vec<String> {
+        let family = ["radial", "categorical", "boxplot", "radar"]
+            .into_iter()
+            .find(|k| state[*k].is_object());
+        let target = node.target.as_deref().unwrap_or("");
+        if node.kind == "figure" {
+            return vec![String::new()];
+        }
+        if let Some((_, id)) = node.key.split_once("/annotation/") {
+            let owner = family.map_or("/config".into(), |f| format!("/{f}"));
+            let root = format!("{owner}/annotations/items");
+            return state
+                .pointer(&root)
+                .and_then(Value::as_array)
+                .and_then(|v| v.iter().position(|v| v["id"] == id))
+                .map(|i| vec![format!("{root}/{i}")])
+                .unwrap_or_default();
+        }
+        if let Some(family) = family {
+            let root = format!("/{family}");
+            if node.kind == "panel" {
+                return vec![root];
+            }
+            if target == "chart_title" {
+                return vec![format!("{root}/title"), format!("{root}/chart_title")];
+            }
+            if target == "legend" {
+                return vec![format!("{root}/legend")];
+            }
+            if node.key.starts_with("bounded/series/") {
+                for name in ["series", "slices", "split/children"] {
+                    let path = format!("{root}/{name}");
+                    if let Some(items) = state.pointer(&path).and_then(Value::as_array) {
+                        if let Some(i) = items.iter().enumerate().find_map(|(i, v)| {
+                            let fallback = if name == "slices" {
+                                format!("slice_0_{i}")
+                            } else if name == "split/children" {
+                                format!("slice_1_{i}")
+                            } else {
+                                String::new()
+                            };
+                            (v["id"].as_str().unwrap_or(&fallback) == target).then_some(i)
+                        }) {
+                            return vec![format!("{path}/{i}")];
+                        }
+                    }
+                }
+            }
+            // Fields without a separable bounded object belong to its panel;
+            // the complete raw changes remain available there.
+            return vec![];
+        }
+        if node.key.starts_with("series/") {
+            return state["series"]
+                .as_array()
+                .and_then(|v| v.iter().position(|v| v["series_id"] == target))
+                .map(|i| vec![format!("/series/{i}")])
+                .unwrap_or_default();
+        }
+        let panel = panel_path(node.layer);
+        if node.kind == "panel" {
+            return vec![panel];
+        }
+        if node.kind == "layer" {
+            if let renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) =
+                node.layer
+            {
+                return vec![format!("{panel}/overlays/{i}")];
+            }
+        }
+        if target.ends_with("colorbar_title") {
+            return vec![format!("{panel}/colorbar/axis/title_option")];
+        }
+        if target.ends_with("colorbar_tick_labels") {
+            return vec![format!("{panel}/colorbar/axis/label_style")];
+        }
+        if target.ends_with("colorbar_axis") {
+            return vec![format!("{panel}/colorbar/axis")];
+        }
+        decoration_path(node).into_iter().collect()
+    }
+    fn visit(state: &Value, nodes: &[navigation::Node], out: &mut Vec<Value>) {
+        for node in nodes {
+            out.push(json!({"id":node.key,"label":node.label,"kind":node.kind,"paths":paths(state,node)}));
+            visit(state, &node.children, out);
+        }
+    }
+    let settings: Settings = parse(settings)?;
+    let state = serde_json::to_value(&settings).map_err(runtime)?;
+    let mut out = vec![];
+    visit(&state, &navigation::nodes(&settings), &mut out);
+    serde_json::to_string(&out).map_err(runtime)
+}
 fn add_default(
     out: &mut Vec<Field>,
     state: &Value,
@@ -919,40 +1052,7 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
         }
     } else {
         let config = state.pointer(&panel).unwrap();
-        let path = if short == "chart_title" {
-            Some(format!("{panel}/chart_title"))
-        } else if short == "legend" {
-            Some(format!("{panel}/legend"))
-        } else if short.starts_with("colorbar") {
-            Some(format!("{panel}/colorbar"))
-        } else if short == "data_area" {
-            Some(format!("{panel}/chart_area"))
-        } else if short.starts_with("axis_") || short.starts_with("tick_labels_") {
-            let side = short.rsplit('_').next().unwrap();
-            let axis = match side {
-                "bottom" => "bottom_x",
-                "top" => "top_x",
-                "left" => "left_y",
-                _ => "right_y",
-            };
-            let base = match node.layer {
-                renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i)
-                    if side == "right" =>
-                {
-                    format!("{panel}/overlays/{i}/y_axis")
-                }
-                _ => format!("{panel}/{axis}"),
-            };
-            Some(if short.starts_with("axis_title_") {
-                format!("{base}/title_option")
-            } else if short.starts_with("tick_labels_") {
-                format!("{base}/label_style")
-            } else {
-                base
-            })
-        } else {
-            None
-        };
+        let path = decoration_path(node);
         if short.starts_with("colorbar") {
             colorbar_fields(fields, state, &panel);
             let path = if short == "colorbar_title" {

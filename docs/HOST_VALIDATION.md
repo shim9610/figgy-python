@@ -776,3 +776,25 @@ checks passed 240 cases, and workflow/assets checks passed 72. One UI case and
 seven action-contract cases initially lacked their environment flags; all eight
 were subsequently executed and passed in those totals. Full PR CI is separate
 from these local results.
+
+## Review summary and exact detail views (2026-10-22)
+
+The [feedback view contract](REVIEW_FEEDBACK_VIEWS.md) adds summary-first agent
+consumption while preserving full protocol-1 checkpoints. Object summaries use
+the native editor's stable ownership addresses and retain every exact operation
+ID. Detail queries return the original operations in order and complete object
+snapshots, including deleted objects. Reverted edits disappear; comments remain
+separate; formatting-only and truncated text remain distinguishable. Binary
+reference changes are reported even when settings and axis bounds are identical.
+
+Seventeen new summary/schema/CLI tests and 169 existing review, recovery,
+history, navigation and property cases passed. Six actual native/Jupyter cases
+passed, covering typing, contextual editor behavior and targeted-comment IDs
+through the new summary/detail APIs. Workflow/assets checks passed 72 cases
+with the actual maturin-action metadata supplied. In total these are 264 local
+cases; full PR CI remains a separate check. The installed 35-file release
+package matches the tested wheel and worktree sources. The sample JSON and
+wheel hash are in `docs/measurements/review-summary-20261022.json`: 42,610 bytes
+of complete feedback become a 1,794-byte summary, while the six original
+operations remain unchanged. No renderer or LLM timing improvement is inferred
+from that payload measurement.
