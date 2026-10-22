@@ -99,8 +99,8 @@ jobs:
   integration:
     name: PR / Linux integration
     needs: build
-    # Keep the required check red when preflight/build fails or is skipped.
-    if: always()
+    # Fail closed on upstream failure, but let superseded runs be cancelled.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     # Measured full suite is ~41m; priority ordering adds no duplicate execution.
     timeout-minutes: 45

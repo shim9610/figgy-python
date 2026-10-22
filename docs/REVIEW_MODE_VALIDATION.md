@@ -211,3 +211,12 @@ including the exact failed radial editor case, two resize/input regressions,
 both scale cases, inactive-overlay editing, packaged assets, slow native clicks,
 radial detail selection and radial annotation drawing in both hosts. Preflight
 passed **117 cases in 2.03 seconds**. The runtime wheel is unchanged.
+
+The integration job also used `if: always()`. GitHub's [cancellation reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation)
+explicitly states that a running job with this condition continues on
+cancellation. The job now uses `if: ${{ !cancelled() }}`: an upstream failed or
+skipped build still runs the existing result guard and fails the required check,
+while a superseded workflow can stop. Preflight passed **117 cases in 2.10
+seconds** after this workflow-only change. An already-running job retains the
+workflow definition with which it started; this change does not alter that job
+retroactively.
