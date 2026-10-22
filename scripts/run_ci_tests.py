@@ -25,6 +25,8 @@ PRIORITY = (
 
 class PriorityFirst:
     def pytest_addoption(self, parser):
+        parser.addoption('--ci-shard-index', type=int, default=0)
+        parser.addoption('--ci-shard-count', type=int, default=1)
         parser.addoption('--ci-test-plan', default='ci-results/test-plan.json',
                          help='Record every collected node ID before and after ordering')
 
@@ -43,9 +45,19 @@ class PriorityFirst:
             raise pytest.UsageError('CI collection is missing required priority cases: ' + ', '.join(missing))
         items.sort(key=rank)
         ordered = [item.nodeid for item in items]
+        index = config.getoption('--ci-shard-index')
+        count = config.getoption('--ci-shard-count')
+        if count < 1 or not 0 <= index < count:
+            raise pytest.UsageError('CI shard index must be within a positive shard count')
+        items[:] = items[index::count]
+        selected = [item.nodeid for item in items]
+        for item in items:
+            item.user_properties.append(('ci_nodeid', item.nodeid))
         plan = Path(config.getoption('--ci-test-plan'))
         plan.parent.mkdir(parents=True, exist_ok=True)
-        plan.write_text(json.dumps(dict(count=len(items), original=original, ordered=ordered), indent=2) + '\n')
+        plan.write_text(json.dumps(dict(count=len(ordered), original=original, ordered=ordered, selected=selected,
+                                              shard=dict(index=index, count=count)), indent=2) + '\n')
+
 
 
 if __name__ == '__main__':

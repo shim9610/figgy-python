@@ -279,13 +279,43 @@ are zeroed. Re-running the original baseline test accepted all ten original
 family/backend resident-data faults; the strengthened checks reject them.
 
 Local validation passed **209 focused cases in 11.14 seconds**, **nine headful
-browser cases in 127.57 seconds**, and **117 preflight cases in 2.07 seconds**.
+browser cases in 127.57 seconds**, and **131 preflight cases in 3.27 seconds**.
 The unchanged runtime wheel is the previously verified
 `88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b` artifact.
-Ordinary and priority collection both contain **771 unique cases**: all previous
-642 IDs remain, with 129 additions and zero duplicates. The new oracle and
-browser cases run first within the single full collection. No full local
-771-case pass is claimed; required CI must validate the final commit.
+Ordinary and priority collection both contain **785 unique cases**: all previous
+642 IDs remain, with 143 additions and zero duplicates. Each runner collects the complete plan, orders the priority cases first and
+executes one disjoint quarter. No full local 785-case pass is claimed; required
+CI must validate the final commit.
 [The before/after contract and measurements](measurements/acceptance-oracles-20261022.json)
 distinguish these results. These finite scenes do not claim every feature
 combination, exact font rasterization or general usability.
+
+
+### Complete execution is a required assertion
+
+[CI #58](https://github.com/shim9610/figgy-python/actions/runs/39734785159)
+passed 470 of 771 cases before its configured 45-minute job limit cancelled the
+run. It reported no assertion failure; it did not establish a full-suite pass.
+The nine added browser oracles occupied approximately 125 seconds of the logged
+test interval. Existing radial GPU work was substantially slower: the same
+radial-detail WebGPU test's first submission increased from 11.622 seconds in
+CI #56 to 42.342 seconds, while pipeline preparation increased from 0.501 to
+0.660 seconds. This observation locates the larger stall in GPU completion,
+without attributing it to a particular runner CPU or renderer change.
+[The measurements](measurements/ci58-execution-deadline-20261022.json) preserve
+that distinction.
+
+The suite now runs on four independent software-GPU runners. Each collects the
+identical full ordered plan, then selects `ordered[index::4]`. Individual test
+deadlines, correctness assertions and the 45-minute per-job limit are retained.
+No test is intentionally run twice. The existing required check name,
+`PR / Linux integration`, now verifies that every shard succeeded and audits
+all four JUnit reports against their complete plans. Missing artifacts, changed
+plans, wrong partitions, missing/duplicate execution IDs, failures, errors and
+skips fail this check. Exact pytest node IDs are written into JUnit properties;
+Python class names are not used to guess them.
+
+Fourteen local execution-contract tests passed, including a real two-shard
+pytest/JUnit run and twelve deliberately invalid reports. Collection proves
+that the four selected lists contain all 785 current IDs exactly once, including
+all original 642 cases. This audit is also part of CI preflight.

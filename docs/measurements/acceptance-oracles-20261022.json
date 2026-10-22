@@ -20,16 +20,25 @@
     "focused_seconds": 11.14,
     "headful_browser_cases_passed": 9,
     "headful_browser_seconds": 127.57,
-    "preflight_cases_passed": 117,
-    "preflight_seconds": 2.07,
-    "wrong_cache_writer_input_mutation_checks_rejected": 2
+    "preflight_cases_passed": 131,
+    "preflight_seconds": 3.27,
+    "wrong_cache_writer_input_mutation_checks_rejected": 2,
+    "execution_contract_cases_passed": 14,
+    "execution_contract_seconds": 0.69
   },
   "collection": {
     "previous": 642,
-    "current": 771,
-    "added": 129,
+    "current": 785,
+    "added": 143,
     "omitted": 0,
-    "duplicates": 0
+    "duplicates": 0,
+    "shards": 4,
+    "per_shard": [
+      197,
+      196,
+      196,
+      196
+    ]
   },
   "visual_contract": {
     "document": [
@@ -82,5 +91,5 @@
   },
   "browser_capture": "The complete widget is translated by the fractional part of its DOM origin to align canvas pixels with the device grid. CSS and backing remain exactly 960x600 at DPR 1. No cropping, resampling or relaxed image shape is used.",
   "scope": "These close the demonstrated oracle gaps for the listed scenes and recovery families. They do not establish every feature combination, font rasterization or usability.",
-  "required_ci": "Pending validation of the final commit; the previous 642-case CI result must not be described as the new 771-case result."
+  "required_ci": "Pending validation of the final commit. CI #58 passed 470 of 771 tests before its job deadline and is not a complete result. The new required integration check audits exact passing JUnit IDs across all four disjoint shards."
 }
