@@ -12,6 +12,7 @@ from PIL import ImageGrab
 import figgyplot as figgy
 from figgyplot.desktop import poll_events
 from object_navigation import ensure_native_control_visible
+from native_input import click as send_native_click
 
 
 @pytest.mark.skipif(not os.environ.get('DISPLAY') or not shutil.which('xdotool') or not shutil.which('xclip'), reason='requires X11, xdotool and xclip')
@@ -31,7 +32,7 @@ def test_editor_preserves_canvas_and_edits_in_separate_settings_window(tmp_path)
     def xdo(*args): return subprocess.check_output(['xdotool', *map(str,args)],text=True).strip()
     def click_rect(rect, wid=None):
         xdo('mousemove','--window',wid or chart_id,round(rect[0]+rect[2]/2),round(rect[1]+rect[3]/2));pump()
-        xdo('mousedown',1);pump();xdo('mouseup',1);pump()
+        send_native_click(xdo);pump()
     def click(name):
         ensure_native_control_visible(info,xdo,pump,chart_id,name)
         click_rect(info()['controls'][name])

@@ -616,12 +616,13 @@ impl Editor {
                         }),
                 );
             });
+        self.review_ui(root, c);
         if self.inspector_open {
-            let mut area = root.max_rect();
-            area.min.y = root.available_rect_before_wrap().top();
-            area.max.y -= 30.;
+            let area = root.available_rect_before_wrap();
             egui::Area::new(egui::Id::new("inspector"))
-                .order(egui::Order::Foreground)
+                // Menus use Foreground. Keep the panel below them so reopening
+                // a menu cannot let its parent panel intercept the item click.
+                .order(egui::Order::Middle)
                 .fixed_pos(egui::pos2(area.right() - INSPECTOR_WIDTH, area.top()))
                 .movable(false)
                 .show(root.ctx(), |ui| {
@@ -635,7 +636,6 @@ impl Editor {
                         });
                 });
         }
-        self.review_ui(root, c);
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(root, |ui| {
@@ -1377,7 +1377,13 @@ impl Editor {
                 changed = true;
             }
             let node = &mut config[key];
-            changed |= scale_control(ui, node, "axis_scale", &mut self.controls);
+            changed |= scale_control(
+                ui,
+                node,
+                "axis_scale",
+                &mut self.controls,
+                &mut self.layout_probe,
+            );
             let mut labels = node["label_style"]["visible"].as_bool().unwrap_or(true);
             let response = ui.checkbox(&mut labels, "Tick labels");
             self.controls
@@ -1636,10 +1642,14 @@ fn scale_control(
     axis: &mut Value,
     id: &str,
     controls: &mut HashMap<String, egui::Rect>,
+    probe: &mut std::collections::VecDeque<Value>,
 ) -> bool {
     ui.label("Scale");
     let previous = axis["scale"].as_str().unwrap_or("Linear");
     let mut value = previous.to_owned();
+    let capture = std::env::var_os("FIGGY_LAYOUT_PROBE").is_some()
+        && ui.input(|i| i.pointer.any_pressed() || i.pointer.any_released());
+    let mut items = vec![];
     let response = egui::ComboBox::from_id_salt(id)
         .selected_text(if previous == "Logarithmic" {
             "Logarithmic (base 10)"
@@ -1652,10 +1662,32 @@ fn scale_control(
                 ("Logarithmic", "Logarithmic (base 10)"),
             ] {
                 let response = ui.selectable_value(&mut value, name.to_owned(), label);
+                if capture {
+                    let rect = |r:egui::Rect| [r.min.x,r.min.y,r.width(),r.height()];
+                    items.push(json!({"name":name,"clicked":response.clicked(),
+                        "hovered":response.hovered(),"contains_pointer":response.contains_pointer(),
+                        "enabled":response.enabled(),"id":format!("{:?}",response.id),
+                        "rect":rect(response.rect),"interact_rect":rect(response.interact_rect),
+                        "clip":rect(ui.clip_rect()),"layer":format!("{:?}",response.layer_id),
+                        "pointer":ui.ctx().pointer_hover_pos().map(|p|[p.x,p.y]),
+                        "layer_at_pointer":ui.ctx().pointer_hover_pos().and_then(|p|ui.ctx().layer_id_at(p)).map(|v|format!("{v:?}")),
+                        "transform":ui.ctx().layer_transform_to_global(response.layer_id).map(|t|json!({
+                            "scaling":t.scaling,"translation":[t.translation.x,t.translation.y],"global_rect":rect(t*response.rect)}))}));
+                }
                 controls.insert(format!("{id}_{name}"), response.rect);
             }
         });
     controls.insert(id.into(), response.response.rect);
+    if capture {
+        probe.push_back(json!({"kind":"scale_control","id":id,"previous":previous,
+            "value":value,"items":items,"button_clicked":response.response.clicked(),
+            "parent_layer":format!("{:?}",response.response.layer_id),
+            "popup_open":egui::ComboBox::is_open(ui.ctx(),response.response.id),
+            "pass":ui.ctx().current_pass_index(),"frame":ui.ctx().cumulative_frame_nr()}));
+        while probe.len() > 64 {
+            probe.pop_front();
+        }
+    }
     ui.label("Log view omits zero and negative values; source data is preserved.");
     if value == previous {
         return false;

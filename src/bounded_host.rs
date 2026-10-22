@@ -208,7 +208,45 @@ impl SurfaceWindow {
                     ]
                 };
                 if self.editor.drawing.tool != crate::drawing::Tool::Select {
-                    if let Some(origin) = ctx.input(|i| i.pointer.press_origin()) {
+                    // press_origin is cleared when egui processes a release.
+                    // A short press/release can arrive in the same frame.
+                    let origin = ctx.input(|i| {
+                        i.pointer.press_origin().or_else(|| {
+                            i.raw.events.iter().rev().find_map(|event| match event {
+                                egui::Event::PointerButton {
+                                    pos,
+                                    button: egui::PointerButton::Primary,
+                                    pressed: true,
+                                    ..
+                                } => Some(*pos),
+                                _ => None,
+                            })
+                        })
+                    });
+                    if std::env::var_os("FIGGY_LAYOUT_PROBE").is_some()
+                        && ctx.input(|i| i.pointer.any_pressed() || i.pointer.any_released())
+                    {
+                        let mut probe = ctx.input(|i| json!({
+                            "kind":"drawing_input", "tool":self.editor.drawing.tool.name(),
+                            "press_origin":i.pointer.press_origin().map(|p|[p.x,p.y]),
+                            "resolved_origin":origin.map(|p|[p.x,p.y]),
+                            "pointer":i.pointer.interact_pos().map(|p|[p.x,p.y]),
+                            "released":i.pointer.any_released(),
+                            "events":i.raw.events.iter().filter_map(|e| match e {
+                                egui::Event::PointerButton{pos,button,pressed,..}=>Some(json!({
+                                    "position":[pos.x,pos.y],"button":format!("{button:?}"),"pressed":pressed})),
+                                _=>None,
+                            }).collect::<Vec<_>>()
+                        }));
+                        probe["clicked"] = json!(response.clicked());
+                        probe["drag_started"] = json!(response.drag_started());
+                        probe["button_down"] = json!(response.is_pointer_button_down_on());
+                        probe["frame"] = json!(ctx.cumulative_frame_nr());
+                        probe["pass"] = json!(ctx.current_pass_index());
+                        self.editor.layout_probe.push_back(probe);
+                        while self.editor.layout_probe.len()>64 {self.editor.layout_probe.pop_front();}
+                    }
+                    if let Some(origin) = origin {
                         if image_rect.contains(origin)
                             && self.editor.drawing.gesture.is_none()
                             && (response.drag_started()
@@ -580,6 +618,8 @@ impl SurfaceWindow {
             "chart_panel":[self.panel.x,self.panel.y,self.panel.width,self.panel.height],
             "surface_size":[self.config.width,self.config.height], "scale_factor":self.window.scale_factor(),
             "surface_frames":self.frames, "gpu_context_id":c.context.id, "figure_id":c.data.figure_id,
+            "pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,
+            "layout_probe":self.editor.layout_probe,
             "column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,
             "revision":c.data.revision,
             "decorations":self.bounded_surface.as_ref().map(|s|s.frame.decorations().entries().filter_map(|(id,e)|s.frame.decorations().bounds(id).map(|r|(e.id.element_id(),json!([r.x,r.y,r.width,r.height])))).collect::<serde_json::Map<_,_>>()),

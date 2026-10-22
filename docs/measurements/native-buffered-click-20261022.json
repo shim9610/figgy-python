@@ -1,0 +1,4581 @@
+{
+  "scenario": "A short native text-placement click on a boxplot is buffered into one egui frame",
+  "before": {
+    "wheel_sha256": "f5de068f208dbdefec7564cf5b07be418f329538fb07348ee8e6b48272972ed8",
+    "test": "test_annotation_drawing_editing_and_cancel_in_both_hosts[boxplot]",
+    "result": "failed: inline_text was absent after a complete X11 click",
+    "seconds": 4.9,
+    "armed": {
+      "stage": "text-armed",
+      "settings": {
+        "schema_version": 2,
+        "renderer_version": "0.18.1",
+        "config": {
+          "chart_area": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "top_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "bottom_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 80.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "left_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 110.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "right_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "chart_title": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 28.0,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "top_margin": 32.0
+          },
+          "grid": {
+            "show_major_x": true,
+            "major_x_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_x_width": 1.0,
+            "major_x_style": "Solid",
+            "show_major_y": true,
+            "major_y_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_y_width": 1.0,
+            "major_y_style": "Solid",
+            "show_minor_x": false,
+            "minor_x_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_x_width": 0.5,
+            "minor_x_style": "Dot",
+            "show_minor_y": false,
+            "minor_y_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_y_width": 0.5,
+            "minor_y_style": "Dot"
+          },
+          "legend": {
+            "visible": false,
+            "content": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 14.0,
+              "font": ""
+            },
+            "corner": "TopRight",
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "padding": 8.0,
+            "bg_color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 0.85
+            },
+            "border_color": {
+              "r": 0.6,
+              "g": 0.6,
+              "b": 0.6,
+              "a": 1.0
+            }
+          }
+        },
+        "series": [],
+        "boxplot": {
+          "decorations": {
+            "data_area": null,
+            "offsets": [],
+            "selected": null
+          },
+          "title": "",
+          "categories": [
+            {
+              "id": "category_0",
+              "label": "Box 1"
+            },
+            {
+              "id": "category_1",
+              "label": "Box 2"
+            }
+          ],
+          "series": [
+            {
+              "id": "series_0",
+              "label": "Distribution",
+              "values": [
+                {
+                  "q1": 1.5,
+                  "median": 2.0,
+                  "q3": 3.0,
+                  "whisker_low": 1.0,
+                  "whisker_high": 4.0,
+                  "mean": 2.3333333333333335,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                },
+                {
+                  "q1": 3.5,
+                  "median": 5.0,
+                  "q3": 7.0,
+                  "whisker_low": 2.0,
+                  "whisker_high": 9.0,
+                  "mean": 5.333333333333333,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                }
+              ],
+              "color": {
+                "r": 0.12156863,
+                "g": 0.46666667,
+                "b": 0.7058824,
+                "a": 1.0
+              },
+              "style": null
+            }
+          ],
+          "direction": "Vertical",
+          "style": {
+            "material": "Matte",
+            "corner_radius": 0.0,
+            "outline": true,
+            "outline_width": 1.2,
+            "outline_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "median_width": 1.2,
+            "median_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "whisker_width": 1.2,
+            "whisker_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "caps": true,
+            "cap_ratio": 0.5,
+            "notched": false,
+            "notch_depth": 0.22,
+            "show_mean": false,
+            "mean_size": 7.0,
+            "mean_color": {
+              "r": 0.7058824,
+              "g": 0.1764706,
+              "b": 0.1764706,
+              "a": 1.0
+            },
+            "show_outliers": true,
+            "outlier_size": 7.0,
+            "outlier_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "outlier_shape": "Circle",
+            "outlier_filled": false,
+            "texture_strength": 0.2,
+            "texture_scale": 1.0,
+            "gloss": 0.45,
+            "emphasis_brightness": 0.08
+          },
+          "overrides": [],
+          "hovered": null,
+          "selected": null,
+          "labels": "None",
+          "label_decimals": 1,
+          "value_suffix": "",
+          "value_title": "",
+          "category_title": "",
+          "value_range": null,
+          "grid": true,
+          "legend": true,
+          "group_width": 0.65,
+          "box_gap": 8.0,
+          "font_family": "sans-serif",
+          "font_size": 18.333334,
+          "text_color": {
+            "r": 0.1254902,
+            "g": 0.18039216,
+            "b": 0.23529412,
+            "a": 1.0
+          },
+          "background": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          }
+        },
+        "identity": {
+          "figure": "2c2545dd-b73b-4701-b515-8bf79e7f47f4",
+          "groups": {},
+          "layout": null,
+          "panels": [
+            {
+              "id": "main",
+              "overlays": []
+            }
+          ],
+          "retired": []
+        }
+      },
+      "host": {
+        "chart_family": "boxplot",
+        "chart_panel": [
+          45,
+          135,
+          901,
+          563
+        ],
+        "column_uploads": 0,
+        "controls": {
+          "advanced": [
+            448.59375,
+            13.5,
+            152.15625,
+            30.0
+          ],
+          "copy": [
+            610.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "draw": [
+            335.5625,
+            13.5,
+            57.03125,
+            30.0
+          ],
+          "draw_arrow": [
+            139.125,
+            60.0,
+            60.4375,
+            30.0
+          ],
+          "draw_data_anchor": [
+            495.0625,
+            60.0,
+            90.59375,
+            30.0
+          ],
+          "draw_hline": [
+            209.5625,
+            60.0,
+            57.40625,
+            30.0
+          ],
+          "draw_hspan": [
+            343.4375,
+            60.0,
+            66.28125,
+            30.0
+          ],
+          "draw_select": [
+            8.0,
+            60.0,
+            60.0,
+            30.0
+          ],
+          "draw_text": [
+            78.0,
+            60.0,
+            51.125,
+            30.0
+          ],
+          "draw_vline": [
+            276.96875,
+            60.0,
+            56.46875,
+            30.0
+          ],
+          "draw_vspan": [
+            419.71875,
+            60.0,
+            65.34375,
+            30.0
+          ],
+          "edit_area": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "fit": [
+            402.59375,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "layout_mode": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "properties": [
+            197.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "redo": [
+            130.9375,
+            13.5,
+            56.625,
+            30.0
+          ],
+          "save": [
+            656.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "select_mode": [
+            243.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "undo": [
+            63.15625,
+            13.5,
+            57.78125,
+            30.0
+          ]
+        },
+        "decoration_selected": null,
+        "decorations": {
+          "axis_bottom": [
+            41.39225387573242,
+            508.3333740234375,
+            897.6077270507812,
+            6.0
+          ],
+          "axis_left": [
+            41.39225387573242,
+            29.0,
+            6.0,
+            485.3333740234375
+          ],
+          "data_area": [
+            44.39225387573242,
+            32.0,
+            891.6077270507812,
+            479.3333740234375
+          ],
+          "legend": [
+            417.14874267578125,
+            556.8780517578125,
+            117.03582763671875,
+            12.78863525390625
+          ],
+          "tick_labels_bottom": [
+            243.8538360595703,
+            524.8779907226562,
+            492.6845703125,
+            12.78863525390625
+          ],
+          "tick_labels_left": [
+            14.0,
+            25.07803726196289,
+            20.392257690429688,
+            492.1219787597656
+          ]
+        },
+        "drawing_tool": "text",
+        "error": "",
+        "figure_id": 1,
+        "gpu_context_id": 1,
+        "host": "winit-wgpu",
+        "inspector_overlay": false,
+        "layout_mode": false,
+        "png_encodes": 0,
+        "pointer_input": {
+          "button": "Left",
+          "consumed": true,
+          "kind": "button",
+          "position": [
+            105.0,
+            75.0
+          ],
+          "state": "Released"
+        },
+        "pointer_sequence": 22,
+        "properties_open": false,
+        "review": null,
+        "revision": 2,
+        "rgba_readbacks": 0,
+        "scale_factor": 1.0,
+        "selected": null,
+        "surface_frames": 77,
+        "surface_size": [
+          992,
+          744
+        ],
+        "window_role": "chart"
+      }
+    },
+    "placed": {
+      "stage": "text-placed",
+      "settings": {
+        "schema_version": 2,
+        "renderer_version": "0.18.1",
+        "config": {
+          "chart_area": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "top_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "bottom_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 80.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "left_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 110.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "right_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "chart_title": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 28.0,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "top_margin": 32.0
+          },
+          "grid": {
+            "show_major_x": true,
+            "major_x_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_x_width": 1.0,
+            "major_x_style": "Solid",
+            "show_major_y": true,
+            "major_y_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_y_width": 1.0,
+            "major_y_style": "Solid",
+            "show_minor_x": false,
+            "minor_x_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_x_width": 0.5,
+            "minor_x_style": "Dot",
+            "show_minor_y": false,
+            "minor_y_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_y_width": 0.5,
+            "minor_y_style": "Dot"
+          },
+          "legend": {
+            "visible": false,
+            "content": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 14.0,
+              "font": ""
+            },
+            "corner": "TopRight",
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "padding": 8.0,
+            "bg_color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 0.85
+            },
+            "border_color": {
+              "r": 0.6,
+              "g": 0.6,
+              "b": 0.6,
+              "a": 1.0
+            }
+          }
+        },
+        "series": [],
+        "boxplot": {
+          "decorations": {
+            "data_area": null,
+            "offsets": [],
+            "selected": null
+          },
+          "title": "",
+          "categories": [
+            {
+              "id": "category_0",
+              "label": "Box 1"
+            },
+            {
+              "id": "category_1",
+              "label": "Box 2"
+            }
+          ],
+          "series": [
+            {
+              "id": "series_0",
+              "label": "Distribution",
+              "values": [
+                {
+                  "q1": 1.5,
+                  "median": 2.0,
+                  "q3": 3.0,
+                  "whisker_low": 1.0,
+                  "whisker_high": 4.0,
+                  "mean": 2.3333333333333335,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                },
+                {
+                  "q1": 3.5,
+                  "median": 5.0,
+                  "q3": 7.0,
+                  "whisker_low": 2.0,
+                  "whisker_high": 9.0,
+                  "mean": 5.333333333333333,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                }
+              ],
+              "color": {
+                "r": 0.12156863,
+                "g": 0.46666667,
+                "b": 0.7058824,
+                "a": 1.0
+              },
+              "style": null
+            }
+          ],
+          "direction": "Vertical",
+          "style": {
+            "material": "Matte",
+            "corner_radius": 0.0,
+            "outline": true,
+            "outline_width": 1.2,
+            "outline_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "median_width": 1.2,
+            "median_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "whisker_width": 1.2,
+            "whisker_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "caps": true,
+            "cap_ratio": 0.5,
+            "notched": false,
+            "notch_depth": 0.22,
+            "show_mean": false,
+            "mean_size": 7.0,
+            "mean_color": {
+              "r": 0.7058824,
+              "g": 0.1764706,
+              "b": 0.1764706,
+              "a": 1.0
+            },
+            "show_outliers": true,
+            "outlier_size": 7.0,
+            "outlier_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "outlier_shape": "Circle",
+            "outlier_filled": false,
+            "texture_strength": 0.2,
+            "texture_scale": 1.0,
+            "gloss": 0.45,
+            "emphasis_brightness": 0.08
+          },
+          "overrides": [],
+          "hovered": null,
+          "selected": null,
+          "labels": "None",
+          "label_decimals": 1,
+          "value_suffix": "",
+          "value_title": "",
+          "category_title": "",
+          "value_range": null,
+          "grid": true,
+          "legend": true,
+          "group_width": 0.65,
+          "box_gap": 8.0,
+          "font_family": "sans-serif",
+          "font_size": 18.333334,
+          "text_color": {
+            "r": 0.1254902,
+            "g": 0.18039216,
+            "b": 0.23529412,
+            "a": 1.0
+          },
+          "background": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          }
+        },
+        "identity": {
+          "figure": "2c2545dd-b73b-4701-b515-8bf79e7f47f4",
+          "groups": {},
+          "layout": null,
+          "panels": [
+            {
+              "id": "main",
+              "overlays": []
+            }
+          ],
+          "retired": []
+        }
+      },
+      "host": {
+        "chart_family": "boxplot",
+        "chart_panel": [
+          45,
+          135,
+          901,
+          563
+        ],
+        "column_uploads": 0,
+        "controls": {
+          "advanced": [
+            448.59375,
+            13.5,
+            152.15625,
+            30.0
+          ],
+          "copy": [
+            610.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "draw": [
+            335.5625,
+            13.5,
+            57.03125,
+            30.0
+          ],
+          "draw_arrow": [
+            139.125,
+            60.0,
+            60.4375,
+            30.0
+          ],
+          "draw_data_anchor": [
+            495.0625,
+            60.0,
+            90.59375,
+            30.0
+          ],
+          "draw_hline": [
+            209.5625,
+            60.0,
+            57.40625,
+            30.0
+          ],
+          "draw_hspan": [
+            343.4375,
+            60.0,
+            66.28125,
+            30.0
+          ],
+          "draw_select": [
+            8.0,
+            60.0,
+            60.0,
+            30.0
+          ],
+          "draw_text": [
+            78.0,
+            60.0,
+            51.125,
+            30.0
+          ],
+          "draw_vline": [
+            276.96875,
+            60.0,
+            56.46875,
+            30.0
+          ],
+          "draw_vspan": [
+            419.71875,
+            60.0,
+            65.34375,
+            30.0
+          ],
+          "edit_area": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "fit": [
+            402.59375,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "layout_mode": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "properties": [
+            197.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "redo": [
+            130.9375,
+            13.5,
+            56.625,
+            30.0
+          ],
+          "save": [
+            656.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "select_mode": [
+            243.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "undo": [
+            63.15625,
+            13.5,
+            57.78125,
+            30.0
+          ]
+        },
+        "decoration_selected": null,
+        "decorations": {
+          "axis_bottom": [
+            41.39225387573242,
+            508.3333740234375,
+            897.6077270507812,
+            6.0
+          ],
+          "axis_left": [
+            41.39225387573242,
+            29.0,
+            6.0,
+            485.3333740234375
+          ],
+          "data_area": [
+            44.39225387573242,
+            32.0,
+            891.6077270507812,
+            479.3333740234375
+          ],
+          "legend": [
+            417.14874267578125,
+            556.8780517578125,
+            117.03582763671875,
+            12.78863525390625
+          ],
+          "tick_labels_bottom": [
+            243.8538360595703,
+            524.8779907226562,
+            492.6845703125,
+            12.78863525390625
+          ],
+          "tick_labels_left": [
+            14.0,
+            25.07803726196289,
+            20.392257690429688,
+            492.1219787597656
+          ]
+        },
+        "drawing_tool": "text",
+        "error": "",
+        "figure_id": 1,
+        "gpu_context_id": 1,
+        "host": "winit-wgpu",
+        "inspector_overlay": false,
+        "layout_mode": false,
+        "png_encodes": 0,
+        "pointer_input": {
+          "button": "Left",
+          "consumed": true,
+          "kind": "button",
+          "position": [
+            355.0,
+            360.0
+          ],
+          "state": "Released"
+        },
+        "pointer_sequence": 26,
+        "properties_open": false,
+        "review": null,
+        "revision": 2,
+        "rgba_readbacks": 0,
+        "scale_factor": 1.0,
+        "selected": null,
+        "surface_frames": 86,
+        "surface_size": [
+          992,
+          744
+        ],
+        "window_role": "chart"
+      }
+    }
+  },
+  "after": {
+    "wheel_sha256": "88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b",
+    "same_frame_probe": {
+      "button_down": false,
+      "clicked": true,
+      "drag_started": false,
+      "events": [
+        {
+          "button": "Primary",
+          "position": [
+            355.0,
+            360.0
+          ],
+          "pressed": true
+        },
+        {
+          "button": "Primary",
+          "position": [
+            355.0,
+            360.0
+          ],
+          "pressed": false
+        }
+      ],
+      "frame": 85,
+      "kind": "drawing_input",
+      "pass": 0,
+      "pointer": [
+        355.0,
+        360.0
+      ],
+      "press_origin": null,
+      "released": true,
+      "resolved_origin": [
+        355.0,
+        360.0
+      ],
+      "tool": "text"
+    },
+    "armed": {
+      "stage": "text-armed",
+      "settings": {
+        "schema_version": 2,
+        "renderer_version": "0.18.1",
+        "config": {
+          "chart_area": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "top_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "bottom_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 80.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "left_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 110.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "right_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "chart_title": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 28.0,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "top_margin": 32.0
+          },
+          "grid": {
+            "show_major_x": true,
+            "major_x_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_x_width": 1.0,
+            "major_x_style": "Solid",
+            "show_major_y": true,
+            "major_y_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_y_width": 1.0,
+            "major_y_style": "Solid",
+            "show_minor_x": false,
+            "minor_x_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_x_width": 0.5,
+            "minor_x_style": "Dot",
+            "show_minor_y": false,
+            "minor_y_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_y_width": 0.5,
+            "minor_y_style": "Dot"
+          },
+          "legend": {
+            "visible": false,
+            "content": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 14.0,
+              "font": ""
+            },
+            "corner": "TopRight",
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "padding": 8.0,
+            "bg_color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 0.85
+            },
+            "border_color": {
+              "r": 0.6,
+              "g": 0.6,
+              "b": 0.6,
+              "a": 1.0
+            }
+          }
+        },
+        "series": [],
+        "boxplot": {
+          "decorations": {
+            "data_area": null,
+            "offsets": [],
+            "selected": null
+          },
+          "title": "",
+          "categories": [
+            {
+              "id": "category_0",
+              "label": "Box 1"
+            },
+            {
+              "id": "category_1",
+              "label": "Box 2"
+            }
+          ],
+          "series": [
+            {
+              "id": "series_0",
+              "label": "Distribution",
+              "values": [
+                {
+                  "q1": 1.5,
+                  "median": 2.0,
+                  "q3": 3.0,
+                  "whisker_low": 1.0,
+                  "whisker_high": 4.0,
+                  "mean": 2.3333333333333335,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                },
+                {
+                  "q1": 3.5,
+                  "median": 5.0,
+                  "q3": 7.0,
+                  "whisker_low": 2.0,
+                  "whisker_high": 9.0,
+                  "mean": 5.333333333333333,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                }
+              ],
+              "color": {
+                "r": 0.12156863,
+                "g": 0.46666667,
+                "b": 0.7058824,
+                "a": 1.0
+              },
+              "style": null
+            }
+          ],
+          "direction": "Vertical",
+          "style": {
+            "material": "Matte",
+            "corner_radius": 0.0,
+            "outline": true,
+            "outline_width": 1.2,
+            "outline_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "median_width": 1.2,
+            "median_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "whisker_width": 1.2,
+            "whisker_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "caps": true,
+            "cap_ratio": 0.5,
+            "notched": false,
+            "notch_depth": 0.22,
+            "show_mean": false,
+            "mean_size": 7.0,
+            "mean_color": {
+              "r": 0.7058824,
+              "g": 0.1764706,
+              "b": 0.1764706,
+              "a": 1.0
+            },
+            "show_outliers": true,
+            "outlier_size": 7.0,
+            "outlier_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "outlier_shape": "Circle",
+            "outlier_filled": false,
+            "texture_strength": 0.2,
+            "texture_scale": 1.0,
+            "gloss": 0.45,
+            "emphasis_brightness": 0.08
+          },
+          "overrides": [],
+          "hovered": null,
+          "selected": null,
+          "labels": "None",
+          "label_decimals": 1,
+          "value_suffix": "",
+          "value_title": "",
+          "category_title": "",
+          "value_range": null,
+          "grid": true,
+          "legend": true,
+          "group_width": 0.65,
+          "box_gap": 8.0,
+          "font_family": "sans-serif",
+          "font_size": 18.333334,
+          "text_color": {
+            "r": 0.1254902,
+            "g": 0.18039216,
+            "b": 0.23529412,
+            "a": 1.0
+          },
+          "background": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          }
+        },
+        "identity": {
+          "figure": "1bccaa56-20df-4f2f-8d3f-56725fbe3656",
+          "groups": {},
+          "layout": null,
+          "panels": [
+            {
+              "id": "main",
+              "overlays": []
+            }
+          ],
+          "retired": []
+        }
+      },
+      "host": {
+        "chart_family": "boxplot",
+        "chart_panel": [
+          45,
+          135,
+          901,
+          563
+        ],
+        "column_uploads": 0,
+        "controls": {
+          "advanced": [
+            448.59375,
+            13.5,
+            152.15625,
+            30.0
+          ],
+          "copy": [
+            610.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "draw": [
+            335.5625,
+            13.5,
+            57.03125,
+            30.0
+          ],
+          "draw_arrow": [
+            139.125,
+            60.0,
+            60.4375,
+            30.0
+          ],
+          "draw_data_anchor": [
+            495.0625,
+            60.0,
+            90.59375,
+            30.0
+          ],
+          "draw_hline": [
+            209.5625,
+            60.0,
+            57.40625,
+            30.0
+          ],
+          "draw_hspan": [
+            343.4375,
+            60.0,
+            66.28125,
+            30.0
+          ],
+          "draw_select": [
+            8.0,
+            60.0,
+            60.0,
+            30.0
+          ],
+          "draw_text": [
+            78.0,
+            60.0,
+            51.125,
+            30.0
+          ],
+          "draw_vline": [
+            276.96875,
+            60.0,
+            56.46875,
+            30.0
+          ],
+          "draw_vspan": [
+            419.71875,
+            60.0,
+            65.34375,
+            30.0
+          ],
+          "edit_area": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "fit": [
+            402.59375,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "layout_mode": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "properties": [
+            197.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "redo": [
+            130.9375,
+            13.5,
+            56.625,
+            30.0
+          ],
+          "save": [
+            656.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "select_mode": [
+            243.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "undo": [
+            63.15625,
+            13.5,
+            57.78125,
+            30.0
+          ]
+        },
+        "decoration_selected": null,
+        "decorations": {
+          "axis_bottom": [
+            41.39225387573242,
+            508.3333740234375,
+            897.6077270507812,
+            6.0
+          ],
+          "axis_left": [
+            41.39225387573242,
+            29.0,
+            6.0,
+            485.3333740234375
+          ],
+          "data_area": [
+            44.39225387573242,
+            32.0,
+            891.6077270507812,
+            479.3333740234375
+          ],
+          "legend": [
+            417.14874267578125,
+            556.8780517578125,
+            117.03582763671875,
+            12.78863525390625
+          ],
+          "tick_labels_bottom": [
+            243.8538360595703,
+            524.8779907226562,
+            492.6845703125,
+            12.78863525390625
+          ],
+          "tick_labels_left": [
+            14.0,
+            25.07803726196289,
+            20.392257690429688,
+            492.1219787597656
+          ]
+        },
+        "drawing_tool": "text",
+        "error": "",
+        "figure_id": 3,
+        "gpu_context_id": 1,
+        "host": "winit-wgpu",
+        "inspector_overlay": false,
+        "layout_mode": false,
+        "layout_probe": [
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 30,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              169.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              169.0,
+              75.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": true,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": true
+              }
+            ],
+            "frame": 36,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              355.0,
+              360.0
+            ],
+            "press_origin": [
+              355.0,
+              360.0
+            ],
+            "released": false,
+            "resolved_origin": [
+              355.0,
+              360.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 76,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              105.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              105.0,
+              75.0
+            ],
+            "tool": "text"
+          }
+        ],
+        "png_encodes": 0,
+        "pointer_input": {
+          "button": "Left",
+          "consumed": true,
+          "kind": "button",
+          "position": [
+            105.0,
+            75.0
+          ],
+          "state": "Released"
+        },
+        "pointer_sequence": 23,
+        "properties_open": false,
+        "review": null,
+        "revision": 2,
+        "rgba_readbacks": 0,
+        "scale_factor": 1.0,
+        "selected": null,
+        "surface_frames": 79,
+        "surface_size": [
+          992,
+          744
+        ],
+        "window_role": "chart"
+      }
+    },
+    "placed": {
+      "stage": "text-placed",
+      "settings": {
+        "schema_version": 2,
+        "renderer_version": "0.18.1",
+        "config": {
+          "chart_area": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "top_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "bottom_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 80.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "left_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 110.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "right_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "chart_title": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 28.0,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "top_margin": 32.0
+          },
+          "grid": {
+            "show_major_x": true,
+            "major_x_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_x_width": 1.0,
+            "major_x_style": "Solid",
+            "show_major_y": true,
+            "major_y_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_y_width": 1.0,
+            "major_y_style": "Solid",
+            "show_minor_x": false,
+            "minor_x_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_x_width": 0.5,
+            "minor_x_style": "Dot",
+            "show_minor_y": false,
+            "minor_y_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_y_width": 0.5,
+            "minor_y_style": "Dot"
+          },
+          "legend": {
+            "visible": false,
+            "content": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 14.0,
+              "font": ""
+            },
+            "corner": "TopRight",
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "padding": 8.0,
+            "bg_color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 0.85
+            },
+            "border_color": {
+              "r": 0.6,
+              "g": 0.6,
+              "b": 0.6,
+              "a": 1.0
+            }
+          }
+        },
+        "series": [],
+        "boxplot": {
+          "decorations": {
+            "data_area": null,
+            "offsets": [],
+            "selected": null
+          },
+          "title": "",
+          "categories": [
+            {
+              "id": "category_0",
+              "label": "Box 1"
+            },
+            {
+              "id": "category_1",
+              "label": "Box 2"
+            }
+          ],
+          "series": [
+            {
+              "id": "series_0",
+              "label": "Distribution",
+              "values": [
+                {
+                  "q1": 1.5,
+                  "median": 2.0,
+                  "q3": 3.0,
+                  "whisker_low": 1.0,
+                  "whisker_high": 4.0,
+                  "mean": 2.3333333333333335,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                },
+                {
+                  "q1": 3.5,
+                  "median": 5.0,
+                  "q3": 7.0,
+                  "whisker_low": 2.0,
+                  "whisker_high": 9.0,
+                  "mean": 5.333333333333333,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                }
+              ],
+              "color": {
+                "r": 0.12156863,
+                "g": 0.46666667,
+                "b": 0.7058824,
+                "a": 1.0
+              },
+              "style": null
+            }
+          ],
+          "direction": "Vertical",
+          "style": {
+            "material": "Matte",
+            "corner_radius": 0.0,
+            "outline": true,
+            "outline_width": 1.2,
+            "outline_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "median_width": 1.2,
+            "median_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "whisker_width": 1.2,
+            "whisker_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "caps": true,
+            "cap_ratio": 0.5,
+            "notched": false,
+            "notch_depth": 0.22,
+            "show_mean": false,
+            "mean_size": 7.0,
+            "mean_color": {
+              "r": 0.7058824,
+              "g": 0.1764706,
+              "b": 0.1764706,
+              "a": 1.0
+            },
+            "show_outliers": true,
+            "outlier_size": 7.0,
+            "outlier_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "outlier_shape": "Circle",
+            "outlier_filled": false,
+            "texture_strength": 0.2,
+            "texture_scale": 1.0,
+            "gloss": 0.45,
+            "emphasis_brightness": 0.08
+          },
+          "overrides": [],
+          "hovered": null,
+          "selected": null,
+          "labels": "None",
+          "label_decimals": 1,
+          "value_suffix": "",
+          "value_title": "",
+          "category_title": "",
+          "value_range": null,
+          "grid": true,
+          "legend": true,
+          "group_width": 0.65,
+          "box_gap": 8.0,
+          "font_family": "sans-serif",
+          "font_size": 18.333334,
+          "text_color": {
+            "r": 0.1254902,
+            "g": 0.18039216,
+            "b": 0.23529412,
+            "a": 1.0
+          },
+          "background": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          }
+        },
+        "identity": {
+          "figure": "1bccaa56-20df-4f2f-8d3f-56725fbe3656",
+          "groups": {},
+          "layout": null,
+          "panels": [
+            {
+              "id": "main",
+              "overlays": []
+            }
+          ],
+          "retired": []
+        }
+      },
+      "host": {
+        "chart_family": "boxplot",
+        "chart_panel": [
+          45,
+          135,
+          901,
+          563
+        ],
+        "column_uploads": 0,
+        "controls": {
+          "advanced": [
+            448.59375,
+            13.5,
+            152.15625,
+            30.0
+          ],
+          "copy": [
+            610.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "draw": [
+            335.5625,
+            13.5,
+            57.03125,
+            30.0
+          ],
+          "draw_arrow": [
+            139.125,
+            60.0,
+            60.4375,
+            30.0
+          ],
+          "draw_data_anchor": [
+            495.0625,
+            60.0,
+            90.59375,
+            30.0
+          ],
+          "draw_hline": [
+            209.5625,
+            60.0,
+            57.40625,
+            30.0
+          ],
+          "draw_hspan": [
+            343.4375,
+            60.0,
+            66.28125,
+            30.0
+          ],
+          "draw_select": [
+            8.0,
+            60.0,
+            62.0,
+            30.0
+          ],
+          "draw_text": [
+            80.0,
+            60.0,
+            49.125,
+            30.0
+          ],
+          "draw_vline": [
+            276.96875,
+            60.0,
+            56.46875,
+            30.0
+          ],
+          "draw_vspan": [
+            419.71875,
+            60.0,
+            65.34375,
+            30.0
+          ],
+          "edit_area": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "fit": [
+            402.59375,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "inline_text": [
+            355.0,
+            361.0,
+            40.0,
+            32.0
+          ],
+          "layout_mode": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "properties": [
+            197.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "redo": [
+            130.9375,
+            13.5,
+            56.625,
+            30.0
+          ],
+          "save": [
+            656.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "select_mode": [
+            243.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "undo": [
+            63.15625,
+            13.5,
+            57.78125,
+            30.0
+          ]
+        },
+        "decoration_selected": null,
+        "decorations": {
+          "axis_bottom": [
+            41.39225387573242,
+            508.3333740234375,
+            897.6077270507812,
+            6.0
+          ],
+          "axis_left": [
+            41.39225387573242,
+            29.0,
+            6.0,
+            485.3333740234375
+          ],
+          "data_area": [
+            44.39225387573242,
+            32.0,
+            891.6077270507812,
+            479.3333740234375
+          ],
+          "legend": [
+            417.14874267578125,
+            556.8780517578125,
+            117.03582763671875,
+            12.78863525390625
+          ],
+          "tick_labels_bottom": [
+            243.8538360595703,
+            524.8779907226562,
+            492.6845703125,
+            12.78863525390625
+          ],
+          "tick_labels_left": [
+            14.0,
+            25.07803726196289,
+            20.392257690429688,
+            492.1219787597656
+          ]
+        },
+        "drawing_tool": "select",
+        "error": "",
+        "figure_id": 3,
+        "gpu_context_id": 1,
+        "host": "winit-wgpu",
+        "inspector_overlay": false,
+        "layout_mode": false,
+        "layout_probe": [
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 30,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              169.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              169.0,
+              75.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": true,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": true
+              }
+            ],
+            "frame": 36,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              355.0,
+              360.0
+            ],
+            "press_origin": [
+              355.0,
+              360.0
+            ],
+            "released": false,
+            "resolved_origin": [
+              355.0,
+              360.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 76,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              105.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              105.0,
+              75.0
+            ],
+            "tool": "text"
+          },
+          {
+            "button_down": false,
+            "clicked": true,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 85,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              355.0,
+              360.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              355.0,
+              360.0
+            ],
+            "tool": "text"
+          }
+        ],
+        "png_encodes": 0,
+        "pointer_input": {
+          "button": "Left",
+          "consumed": true,
+          "kind": "button",
+          "position": [
+            355.0,
+            360.0
+          ],
+          "state": "Released"
+        },
+        "pointer_sequence": 27,
+        "properties_open": false,
+        "review": null,
+        "revision": 2,
+        "rgba_readbacks": 0,
+        "scale_factor": 1.0,
+        "selected": null,
+        "surface_frames": 97,
+        "surface_size": [
+          992,
+          744
+        ],
+        "window_role": "chart"
+      }
+    },
+    "completed": {
+      "stage": "closing",
+      "settings": {
+        "schema_version": 2,
+        "renderer_version": "0.18.1",
+        "config": {
+          "chart_area": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "top_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "bottom_x": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 80.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "left_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": true,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": true,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 110.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "right_y": {
+            "scale": "Linear",
+            "min": 0.0,
+            "max": 1.0,
+            "major_spacing": 0.2,
+            "minor_count": 4,
+            "inverted": false,
+            "label_style": {
+              "visible": true,
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 18.0,
+              "label_visible": false,
+              "label_font": "",
+              "label_offset_x": 0.0,
+              "label_offset_y": 0.0,
+              "format": "Decimal",
+              "significant_digits": 3
+            },
+            "tick": "Inside",
+            "title_option": {
+              "text": {
+                "segments": [],
+                "color": {
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0,
+                  "a": 1.0
+                },
+                "font_size": 22.0,
+                "font": ""
+              },
+              "visible": false,
+              "offset_x": 0.0,
+              "offset_y": 0.0
+            },
+            "out_margin": 25.0,
+            "line_offset": 0.0,
+            "line_visible": true,
+            "line_color": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "line_width": 1.0,
+            "line_style": "Solid",
+            "major_tick_length": 5.0,
+            "minor_tick_length": 3.0
+          },
+          "chart_title": {
+            "text": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 28.0,
+              "font": ""
+            },
+            "visible": true,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "top_margin": 32.0
+          },
+          "grid": {
+            "show_major_x": true,
+            "major_x_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_x_width": 1.0,
+            "major_x_style": "Solid",
+            "show_major_y": true,
+            "major_y_color": {
+              "r": 0.78431374,
+              "g": 0.78431374,
+              "b": 0.78431374,
+              "a": 1.0
+            },
+            "major_y_width": 1.0,
+            "major_y_style": "Solid",
+            "show_minor_x": false,
+            "minor_x_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_x_width": 0.5,
+            "minor_x_style": "Dot",
+            "show_minor_y": false,
+            "minor_y_color": {
+              "r": 0.9019608,
+              "g": 0.9019608,
+              "b": 0.9019608,
+              "a": 1.0
+            },
+            "minor_y_width": 0.5,
+            "minor_y_style": "Dot"
+          },
+          "legend": {
+            "visible": false,
+            "content": {
+              "segments": [],
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "font_size": 14.0,
+              "font": ""
+            },
+            "corner": "TopRight",
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "padding": 8.0,
+            "bg_color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 0.85
+            },
+            "border_color": {
+              "r": 0.6,
+              "g": 0.6,
+              "b": 0.6,
+              "a": 1.0
+            }
+          }
+        },
+        "series": [],
+        "boxplot": {
+          "decorations": {
+            "data_area": null,
+            "offsets": [],
+            "selected": null
+          },
+          "title": "",
+          "active_layer": "Annotations",
+          "annotations": {
+            "visible": true,
+            "items": [
+              {
+                "id": "annotation_18e0b5fed1825545_f",
+                "kind": {
+                  "Text": {
+                    "anchor": {
+                      "Ratio": {
+                        "x": 0.32066503,
+                        "y": 0.43349132
+                      }
+                    },
+                    "text": {
+                      "segments": [
+                        {
+                          "text": "R",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "e",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "v",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "i",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "e",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "w",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": " ",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "t",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "h",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "i",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "s",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": " ",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "r",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "e",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "g",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "i",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "o",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "n",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": " ",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "a",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "g",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "a",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "i",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        },
+                        {
+                          "text": "n",
+                          "bold": false,
+                          "italic": false,
+                          "underline": false,
+                          "superscript": false,
+                          "subscript": false,
+                          "greek": false
+                        }
+                      ],
+                      "color": {
+                        "r": 0.13725491,
+                        "g": 0.1764706,
+                        "b": 0.23529412,
+                        "a": 1.0
+                      },
+                      "font_size": 16.0,
+                      "font": ""
+                    },
+                    "box_style": null
+                  }
+                }
+              },
+              {
+                "id": "annotation_18e0b5ffed1445b9_10",
+                "kind": {
+                  "Arrow": {
+                    "from": {
+                      "Data": {
+                        "x": 0.16284030675888062,
+                        "y": 5.242652893066406
+                      }
+                    },
+                    "to": {
+                      "Data": {
+                        "x": 0.5452444553375244,
+                        "y": 3.1527167558670044
+                      }
+                    },
+                    "style": {
+                      "line": {
+                        "color": {
+                          "r": 0.23529412,
+                          "g": 0.23529412,
+                          "b": 0.23529412,
+                          "a": 1.0
+                        },
+                        "width": 1.5,
+                        "style": "Solid"
+                      },
+                      "head_length": 10.0,
+                      "head_width": 8.0
+                    },
+                    "text": null
+                  }
+                }
+              },
+              {
+                "id": "annotation_18e0b60056466cbe_11",
+                "kind": {
+                  "ReferenceLine": {
+                    "axis": "Y",
+                    "value": 3.1527167558670044,
+                    "style": {
+                      "color": {
+                        "r": 0.23529412,
+                        "g": 0.23529412,
+                        "b": 0.23529412,
+                        "a": 1.0
+                      },
+                      "width": 1.5,
+                      "style": "Solid"
+                    },
+                    "label": null
+                  }
+                }
+              }
+            ]
+          },
+          "categories": [
+            {
+              "id": "category_0",
+              "label": "Box 1"
+            },
+            {
+              "id": "category_1",
+              "label": "Box 2"
+            }
+          ],
+          "series": [
+            {
+              "id": "series_0",
+              "label": "Distribution",
+              "values": [
+                {
+                  "q1": 1.5,
+                  "median": 2.0,
+                  "q3": 3.0,
+                  "whisker_low": 1.0,
+                  "whisker_high": 4.0,
+                  "mean": 2.3333333333333335,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                },
+                {
+                  "q1": 3.5,
+                  "median": 5.0,
+                  "q3": 7.0,
+                  "whisker_low": 2.0,
+                  "whisker_high": 9.0,
+                  "mean": 5.333333333333333,
+                  "sample_count": 3,
+                  "median_ci": null,
+                  "outliers": []
+                }
+              ],
+              "color": {
+                "r": 0.12156863,
+                "g": 0.46666667,
+                "b": 0.7058824,
+                "a": 1.0
+              },
+              "style": null
+            }
+          ],
+          "direction": "Vertical",
+          "style": {
+            "material": "Matte",
+            "corner_radius": 0.0,
+            "outline": true,
+            "outline_width": 1.2,
+            "outline_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "median_width": 1.2,
+            "median_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "whisker_width": 1.2,
+            "whisker_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "caps": true,
+            "cap_ratio": 0.5,
+            "notched": false,
+            "notch_depth": 0.22,
+            "show_mean": false,
+            "mean_size": 7.0,
+            "mean_color": {
+              "r": 0.7058824,
+              "g": 0.1764706,
+              "b": 0.1764706,
+              "a": 1.0
+            },
+            "show_outliers": true,
+            "outlier_size": 7.0,
+            "outlier_color": {
+              "r": 0.1254902,
+              "g": 0.18039216,
+              "b": 0.23529412,
+              "a": 1.0
+            },
+            "outlier_shape": "Circle",
+            "outlier_filled": false,
+            "texture_strength": 0.2,
+            "texture_scale": 1.0,
+            "gloss": 0.45,
+            "emphasis_brightness": 0.08
+          },
+          "overrides": [],
+          "hovered": null,
+          "selected": null,
+          "labels": "None",
+          "label_decimals": 1,
+          "value_suffix": "",
+          "value_title": "",
+          "category_title": "",
+          "value_range": null,
+          "grid": true,
+          "legend": true,
+          "group_width": 0.65,
+          "box_gap": 8.0,
+          "font_family": "sans-serif",
+          "font_size": 18.333334,
+          "text_color": {
+            "r": 0.1254902,
+            "g": 0.18039216,
+            "b": 0.23529412,
+            "a": 1.0
+          },
+          "background": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          }
+        },
+        "identity": {
+          "figure": "1bccaa56-20df-4f2f-8d3f-56725fbe3656",
+          "groups": {},
+          "layout": null,
+          "panels": [
+            {
+              "id": "main",
+              "overlays": []
+            }
+          ],
+          "retired": [
+            "annotation/annotation_18e0b600bef55f4a_12"
+          ]
+        }
+      },
+      "host": {
+        "chart_family": "boxplot",
+        "chart_panel": [
+          45,
+          135,
+          901,
+          563
+        ],
+        "column_uploads": 0,
+        "controls": {
+          "advanced": [
+            448.59375,
+            13.5,
+            152.15625,
+            30.0
+          ],
+          "auto_range": [
+            1001.0,
+            449.0,
+            122.09375,
+            30.0
+          ],
+          "bounded_category_title": [
+            1001.0,
+            775.25,
+            280.0,
+            20.125
+          ],
+          "bounded_title": [
+            1001.0,
+            719.125,
+            280.0,
+            20.125
+          ],
+          "bounded_value_title": [
+            1001.0,
+            831.375,
+            280.0,
+            20.125
+          ],
+          "copy": [
+            610.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "draw": [
+            335.5625,
+            13.5,
+            57.03125,
+            30.0
+          ],
+          "draw_arrow": [
+            139.125,
+            60.0,
+            60.4375,
+            30.0
+          ],
+          "draw_data_anchor": [
+            495.0625,
+            60.0,
+            90.59375,
+            30.0
+          ],
+          "draw_hline": [
+            209.5625,
+            60.0,
+            57.40625,
+            30.0
+          ],
+          "draw_hspan": [
+            343.4375,
+            60.0,
+            66.28125,
+            30.0
+          ],
+          "draw_select": [
+            8.0,
+            60.0,
+            62.0,
+            30.0
+          ],
+          "draw_text": [
+            80.0,
+            60.0,
+            49.125,
+            30.0
+          ],
+          "draw_vline": [
+            276.96875,
+            60.0,
+            56.46875,
+            30.0
+          ],
+          "draw_vspan": [
+            419.71875,
+            60.0,
+            65.34375,
+            30.0
+          ],
+          "edit_area": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "fit": [
+            402.59375,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "font_family": [
+            1001.0,
+            623.0,
+            315.0,
+            20.125
+          ],
+          "font_size": [
+            1211.0,
+            653.125,
+            105.0,
+            30.0
+          ],
+          "layout_mode": [
+            289.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "object_search": [
+            1001.0,
+            145.9375,
+            273.0,
+            20.125
+          ],
+          "properties": [
+            197.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "properties_header": [
+            1001.0,
+            397.0,
+            209.28125,
+            16.0
+          ],
+          "properties_viewport": [
+            1001.0,
+            423.0,
+            315.0,
+            289.0
+          ],
+          "range_max": [
+            1123.875,
+            489.0,
+            51.125,
+            30.0
+          ],
+          "range_min": [
+            1034.40625,
+            489.0,
+            43.25,
+            30.0
+          ],
+          "redo": [
+            130.9375,
+            13.5,
+            56.625,
+            30.0
+          ],
+          "save": [
+            656.75,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "select_mode": [
+            243.5625,
+            10.5,
+            36.0,
+            36.0
+          ],
+          "tree:bounded/annotation/annotation_18e0b5fed1825545_f": [
+            1057.0,
+            295.0,
+            255.0,
+            24.0
+          ],
+          "tree:bounded/annotation/annotation_18e0b5ffed1445b9_10": [
+            1057.0,
+            321.0,
+            255.0,
+            24.0
+          ],
+          "tree:bounded/annotation/annotation_18e0b60056466cbe_11": [
+            1057.0,
+            347.0,
+            255.0,
+            24.0
+          ],
+          "tree:bounded/annotations": [
+            1048.0,
+            269.0,
+            264.0,
+            24.0
+          ],
+          "tree:bounded/axes": [
+            1048.0,
+            191.0,
+            264.0,
+            24.0
+          ],
+          "tree:bounded/data": [
+            1048.0,
+            217.0,
+            264.0,
+            24.0
+          ],
+          "tree:bounded/legend": [
+            1045.0,
+            181.0,
+            267.0,
+            8.0
+          ],
+          "tree:bounded/series/series_0": [
+            1057.0,
+            243.0,
+            255.0,
+            24.0
+          ],
+          "tree_toggle:bounded": [
+            1013.0,
+            113.0,
+            20.0,
+            24.0
+          ],
+          "tree_toggle:bounded/annotations": [
+            1025.0,
+            269.0,
+            20.0,
+            24.0
+          ],
+          "tree_toggle:bounded/axes": [
+            1025.0,
+            191.0,
+            20.0,
+            24.0
+          ],
+          "tree_toggle:bounded/data": [
+            1025.0,
+            217.0,
+            20.0,
+            24.0
+          ],
+          "tree_toggle:figure/1bccaa56-20df-4f2f-8d3f-56725fbe3656": [
+            1001.0,
+            87.0,
+            20.0,
+            24.0
+          ],
+          "undo": [
+            63.15625,
+            13.5,
+            57.78125,
+            30.0
+          ]
+        },
+        "decoration_selected": null,
+        "decorations": {
+          "axis_bottom": [
+            41.39225387573242,
+            508.3333740234375,
+            897.6077270507812,
+            6.0
+          ],
+          "axis_left": [
+            41.39225387573242,
+            29.0,
+            6.0,
+            485.3333740234375
+          ],
+          "data_area": [
+            44.39225387573242,
+            32.0,
+            891.6077270507812,
+            479.3333740234375
+          ],
+          "legend": [
+            417.14874267578125,
+            556.8780517578125,
+            117.03582763671875,
+            12.78863525390625
+          ],
+          "tick_labels_bottom": [
+            243.8538360595703,
+            524.8779907226562,
+            492.6845703125,
+            12.78863525390625
+          ],
+          "tick_labels_left": [
+            14.0,
+            25.07803726196289,
+            20.392257690429688,
+            492.1219787597656
+          ]
+        },
+        "drawing_tool": "select",
+        "error": "",
+        "figure_id": 3,
+        "gpu_context_id": 1,
+        "host": "winit-wgpu",
+        "inspector_overlay": false,
+        "layout_mode": false,
+        "layout_probe": [
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 30,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              169.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              169.0,
+              75.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": true,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": true
+              }
+            ],
+            "frame": 36,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              355.0,
+              360.0
+            ],
+            "press_origin": [
+              355.0,
+              360.0
+            ],
+            "released": false,
+            "resolved_origin": [
+              355.0,
+              360.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 76,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              105.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              105.0,
+              75.0
+            ],
+            "tool": "text"
+          },
+          {
+            "button_down": false,
+            "clicked": true,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 85,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              355.0,
+              360.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              355.0,
+              360.0
+            ],
+            "tool": "text"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  105.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 109,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              105.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              105.0,
+              75.0
+            ],
+            "tool": "text"
+          },
+          {
+            "button_down": false,
+            "clicked": true,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  355.0,
+                  360.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 118,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              355.0,
+              360.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              355.0,
+              360.0
+            ],
+            "tool": "text"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  169.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 201,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              169.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              169.0,
+              75.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": true,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  364.0,
+                  379.0
+                ],
+                "pressed": true
+              }
+            ],
+            "frame": 207,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              364.0,
+              379.0
+            ],
+            "press_origin": [
+              364.0,
+              379.0
+            ],
+            "released": false,
+            "resolved_origin": [
+              364.0,
+              379.0
+            ],
+            "tool": "arrow"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  524.0,
+                  473.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 235,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              524.0,
+              473.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": null,
+            "tool": "arrow"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  238.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  238.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 254,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              238.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              238.0,
+              75.0
+            ],
+            "tool": "hline"
+          },
+          {
+            "button_down": true,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  364.0,
+                  379.0
+                ],
+                "pressed": true
+              }
+            ],
+            "frame": 260,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              364.0,
+              379.0
+            ],
+            "press_origin": [
+              364.0,
+              379.0
+            ],
+            "released": false,
+            "resolved_origin": [
+              364.0,
+              379.0
+            ],
+            "tool": "hline"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  524.0,
+                  473.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 288,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              524.0,
+              473.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": null,
+            "tool": "hline"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  377.0,
+                  75.0
+                ],
+                "pressed": true
+              },
+              {
+                "button": "Primary",
+                "position": [
+                  377.0,
+                  75.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 302,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              377.0,
+              75.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": [
+              377.0,
+              75.0
+            ],
+            "tool": "hspan"
+          },
+          {
+            "button_down": true,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  364.0,
+                  379.0
+                ],
+                "pressed": true
+              }
+            ],
+            "frame": 308,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              364.0,
+              379.0
+            ],
+            "press_origin": [
+              364.0,
+              379.0
+            ],
+            "released": false,
+            "resolved_origin": [
+              364.0,
+              379.0
+            ],
+            "tool": "hspan"
+          },
+          {
+            "button_down": false,
+            "clicked": false,
+            "drag_started": false,
+            "events": [
+              {
+                "button": "Primary",
+                "position": [
+                  524.0,
+                  473.0
+                ],
+                "pressed": false
+              }
+            ],
+            "frame": 336,
+            "kind": "drawing_input",
+            "pass": 0,
+            "pointer": [
+              524.0,
+              473.0
+            ],
+            "press_origin": null,
+            "released": true,
+            "resolved_origin": null,
+            "tool": "hspan"
+          }
+        ],
+        "png_encodes": 0,
+        "pointer_input": {
+          "button": "Left",
+          "consumed": true,
+          "kind": "button",
+          "position": [
+            1070.0,
+            664.0
+          ],
+          "state": "Released"
+        },
+        "pointer_sequence": 76,
+        "properties_open": true,
+        "review": null,
+        "revision": 8,
+        "rgba_readbacks": 0,
+        "scale_factor": 1.0,
+        "selected": null,
+        "surface_frames": 362,
+        "surface_size": [
+          1312,
+          744
+        ],
+        "window_role": "chart"
+      }
+    },
+    "draft_settings_identical": true
+  },
+  "input_contract": {
+    "egui_version": "0.36.2",
+    "source": "https://docs.rs/egui/0.36.2/src/egui/input_state/mod.rs.html",
+    "behavior": "PointerState clears press_origin when processing PointerButton release, including when a press and release are buffered in the same frame."
+  },
+  "fix": "If the held-pointer snapshot has no origin, use the last primary-button press position in the current ordered raw events. Preserve the existing image hit test, drag preview and release commit.",
+  "scope": "Native wrapper input handling; no renderer, chart SSOT or timing threshold changes.",
+  "validation": {
+    "focused_passed": 8,
+    "seconds": 352.12,
+    "coverage": "Cartesian, logarithmic/inverted, vertical/horizontal boxplot, categorical, radial, radar and polar; each includes native and browser creation, editing, cancellation and export.",
+    "full_suite": {
+      "tests": 640,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2444.032,
+      "wheel_sha256": "88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b"
+    }
+  }
+}

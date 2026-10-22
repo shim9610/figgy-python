@@ -97,6 +97,13 @@ presentation or completed GPU execution. `benchmarks/ui_surface.py` measures
 surface submission rate; the existing `compare.py` measures completed RGBA
 readback. Do not compare the two as the same FPS metric.
 
+Both native chart families also report `pointer_sequence` and `pointer_input`
+for the last cursor-motion or mouse-button event included in a submitted surface frame. The event
+records its kind, physical client coordinates, button/state and egui's consumed
+flag. These diagnose delivered input independently of chart SSOT or selection;
+a surface-frame increment alone does not identify which input was processed.
+The UI harness retains bounded before/after input records and timestamps.
+
 ## Jupyter
 
 Native and Jupyter WebGPU hosts support Cartesian, radial, categorical and boxplot

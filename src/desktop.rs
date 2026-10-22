@@ -110,6 +110,8 @@ struct SurfaceWindow {
     chart_pressed: bool,
     edit_area: bool,
     cursor: (f32, f32),
+    pointer_sequence: u64,
+    pointer_input: Value,
     panel: Rect,
     scale: f32,
     editor: editor::Editor,
@@ -232,6 +234,8 @@ impl SurfaceWindow {
             chart_pressed: false,
             edit_area: false,
             cursor: (0., 0.),
+            pointer_sequence: 0,
+            pointer_input: Value::Null,
             panel: rect,
             scale: 1.,
             editor,
@@ -1508,7 +1512,7 @@ impl SurfaceWindow {
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
             Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
         });
-        *self.control.stats.lock().unwrap() = json!({"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        *self.control.stats.lock().unwrap() = json!({"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }
@@ -1647,6 +1651,22 @@ impl ApplicationHandler for App {
             return;
         }
         let response = w.input.on_window_event(&w.window, &event);
+        let pointer = match &event {
+            WindowEvent::CursorMoved { position, .. } => Some(json!({
+                "kind":"motion", "position":[position.x,position.y],
+                "consumed":response.consumed
+            })),
+            WindowEvent::MouseInput { state, button, .. } => Some(json!({
+                "kind":"button", "state":format!("{state:?}"),
+                "button":format!("{button:?}"), "position":[w.cursor.0,w.cursor.1],
+                "consumed":response.consumed
+            })),
+            _ => None,
+        };
+        if let Some(pointer) = pointer {
+            w.pointer_sequence += 1;
+            w.pointer_input = pointer;
+        }
         if matches!(
             event,
             WindowEvent::MouseInput {

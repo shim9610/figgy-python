@@ -7,6 +7,7 @@ import subprocess
 import time
 import numpy as np
 import pytest
+from native_input import click as send_native_click
 from figgyplot import subplots, release_gpu
 from figgyplot.desktop import poll_events
 from object_navigation import ensure_native_control_visible
@@ -45,12 +46,7 @@ def test_surface_drag_resize_reopen_and_no_png(tmp_path):
         x, y = point(rect)
         xdo("mousemove", "--window", wid, x, y)
         pump()
-        if double:
-            xdo("click", "--repeat", 2, "--delay", 70, 1)
-        else:
-            xdo("mousedown", 1)
-            pump()
-            xdo("mouseup", 1)
+        send_native_click(xdo,double=double)
         pump()
 
     def click(name):
@@ -215,12 +211,7 @@ def test_surface_heatmap_edits_sync_without_image_transport():
         x, y = round(rect[0] + rect[2] / 2), round(rect[1] + rect[3] / 2)
         xdo("mousemove", "--window", wid, x, y)
         pump()
-        if double:
-            xdo("click", "--repeat", 2, "--delay", 70, 1)
-        else:
-            xdo("mousedown", 1)
-            pump()
-            xdo("mouseup", 1)
+        send_native_click(xdo,double=double)
         pump()
 
     try:

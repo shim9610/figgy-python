@@ -1077,10 +1077,13 @@ for key in ['top_x','right_y']:
     fig.configure(config={key:{'label_style':{'visible':False,'font_size':11.,'significant_digits':6},'title_option':{'offset_x':3.,'offset_y':4.}}})
 """
     axes=['bottom_x','top_x','left_y','right_y']
+    snapshots=[]
     def check_edit(get_state, edit, source, field, value, linked=True):
         before=get_state()['config']
         edit(targets[source],field,value)
         after=get_state()['config']
+        snapshots.append({'axis':source,'field':field,'value':value,'before':before,'after':after})
+        (tmp_path/'axis-state-transitions.json').write_text(json.dumps(snapshots))
         changed={'label_format':['label_style','format'],'significant_digits':['label_style','significant_digits'],
                  'tick_labels_visible':['label_style','visible'],'tick_direction':['tick'],'axis_scale':['scale']}.get(field,[field])
         destination=opposite if source==primary else primary
@@ -1125,6 +1128,9 @@ for key in ['top_x','right_y']:
                 click_control(field)
                 if field in ['label_format','tick_direction','axis_scale']:
                     prefix='tick' if field=='tick_direction' else field
+                    if field=='axis_scale' and value=='Linear':
+                        from PIL import ImageGrab
+                        ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-linear-menu.png')
                     inputs.click(prefix+'_'+value)
                 elif field!='tick_labels_visible':
                     inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers',str(value));inputs.key('Return')
@@ -1139,7 +1145,10 @@ for key in ['top_x','right_y']:
                 other.axes[0].plot([1,10,100],[1,10,100],id='signal')
                 exec(code,{'fig':other})
                 assert other.get_settings()['config']==fig.get_settings()['config']
-        finally: handle.close();Inputs.pump()
+        finally:
+            (tmp_path/'native-axis-input-events.json').write_text(json.dumps(inputs.events))
+            (tmp_path/'native-axis-settings.json').write_text(json.dumps(fig.get_settings()))
+            handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"display(fig.widget())"
     with notebook(tmp_path/('paired_'+dimension),source) as (page,execute):
         click_button(page, '[data-properties]')
@@ -1504,6 +1513,11 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
     def items(state): return owner(state).get('annotations',{}).get('items',[])
     with figgy.Figure(backend='native') as fig:
         exec(setup, {'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
+        inputs=None;samples=[]
+        def drawing_probe(stage):
+            samples.append({'stage':stage,'settings':fig.get_settings(),'host':inputs.info()})
+            (tmp_path/'native-drawing-states.json').write_text(json.dumps(samples))
+            (tmp_path/'native-drawing-inputs.json').write_text(json.dumps(inputs.events))
         try:
             inputs=Inputs(handle);inputs.click('draw');revision=fig.revision
             inputs.click('layout_mode');inputs.click('draw_arrow')
@@ -1526,7 +1540,9 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
             # The existing bounded hover route may resume after cancellation.
             if kind is None:assert fig.revision==revision
             inputs.click('draw_text');revision=fig.revision;point=native_point(inputs.info(),(330,240))
+            drawing_probe('text-armed')
             inputs.click_rect([point[0]-1,point[1]-1,2,2])
+            drawing_probe('text-placed')
             assert 'inline_text' in inputs.info()['controls'] and not items(fig.get_settings())
             inputs.xdo('type','--clearmodifiers','Discard this');inputs.pump();inputs.key('Escape')
             assert not items(fig.get_settings())
@@ -1566,7 +1582,9 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
             inputs.click('delete_annotation');assert len(items(fig.get_settings()))==len(ids)-1
             assert not inputs.info()['error']
             assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
-        finally:handle.close();Inputs.pump()
+        finally:
+            if inputs is not None:drawing_probe('closing')
+            handle.close();Inputs.pump()
     source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
     with notebook(tmp_path/family,source) as (page,execute):
         click_button(page, '[data-draw]')
@@ -2576,13 +2594,29 @@ def test_radial_detail_tree_selection_edits_only_the_chosen_child(tmp_path,backe
         import copy
         with figgy.Figure(backend=backend) as fig:
             exec(setup,{'fig':fig,'copy':copy});handle=fig.show(block=False)
+            samples=[];started=time.monotonic();inputs=None
+            def probe(stage):
+                sample={'stage':stage,'elapsed_seconds':time.monotonic()-started,
+                        'settings':fig.get_settings(),'host':json.loads(handle.info_json())}
+                if inputs is not None:
+                    (tmp_path/'native-input-events.json').write_text(json.dumps(inputs.events))
+                samples.append(sample)
+                (tmp_path/'native-detail-states.json').write_text(json.dumps(samples))
             try:
-                inputs=Inputs(handle);inputs.click('properties');choose_native_object(inputs,'Detail B','bounded/series/slice_1_1')
-                inputs.click('section:Series style');inputs.click('property:Series style/custom')
+                inputs=Inputs(handle);probe('opened')
+                inputs.click('properties');probe('properties')
+                choose_native_object(inputs,'Detail B','bounded/series/slice_1_1');probe('selected-child')
+                inputs.click('section:Series style');probe('style-section')
+                inputs.click('property:Series style/custom');probe('custom-style')
                 inputs.click('property:Series style/style/gap_degrees');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','5');inputs.key('Return')
+                probe('edited-gap')
                 chart=fig.get_settings()['radial'];assert chart['split']['children'][1]['style']['gap_degrees']==5
                 assert chart['split']['children'][0]['style'] is None and all(v['style'] is None for v in chart['slices'])
                 assert not inputs.info()['error']
+            except Exception:
+                probe('failure')
+                print('FIGGY NATIVE DETAIL FAILURE '+json.dumps(samples[-1]),flush=True)
+                raise
             finally:handle.close();Inputs.pump()
         return
     source='import copy,json\nimport figgyplot as fg\nfig=fg.Figure(backend="webgpu")\n'+setup+'\ndisplay(fig.widget())'
@@ -2707,6 +2741,13 @@ def test_native_review_long_comments_keep_approval_controls_reachable(tmp_path,f
         else:fig.axes[0].plot([0,1],[1,3],id='signal')
         session.present();handle=fig._windows[-1];inputs=Inputs(handle)
         with pytest.raises(RuntimeError,match='already has'):fig.show(block=False)
+        inputs.click('properties')
+        if family=='cartesian':inputs.click_rect(inputs.info()['decorations']['axis_bottom'])
+        props=inputs.info()['controls']['properties_viewport']
+        review=inputs.info()['controls']['review_comments']
+        (tmp_path/'review-property-bounds.json').write_text(json.dumps({'properties':props,'review':review}))
+        assert (props[0]+props[2]<=review[0] or review[0]+review[2]<=props[0]
+                or props[1]+props[3]<=review[1] or review[1]+review[3]<=props[1])
         session.comment(fig.id,'Preserve the original data',target={'series_id':'signal'})
         inputs.click('review_comments')
         import subprocess
