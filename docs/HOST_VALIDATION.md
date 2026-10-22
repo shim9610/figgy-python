@@ -36,6 +36,14 @@ Chromium 154/SwiftShader and installed Noto Sans CJK KR. Rust formatting, JS
 syntax, installed-package checks and property-catalog inventory checks passed.
 Physical GPU and Windows/macOS runtime behavior remain unverified by these runs.
 
+PR run 61 did not execute tests: its build job exhausted the existing 20-minute
+budget after the Azure Ubuntu mirror downloaded 105 MB in 14 minutes 37 seconds
+(120 kB/s). Font unpacking/setup took seconds. The
+[timestamped log evidence](measurements/ci61-ubuntu-mirror-20261022.json) records
+the download separately from font configuration and build cancellation. Both CI
+install steps now use the official Ubuntu archive for the same signed packages;
+test assertions, execution auditing and job budgets are unchanged.
+
 Automatic pull-request checks are enabled in
 [PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
 integration. The [interaction parity guard](../scripts/check_interaction_parity.py)

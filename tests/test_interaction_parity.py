@@ -2960,7 +2960,7 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
     from PIL import ImageGrab
     family='Noto Sans CJK KR' if font_family_available('Noto Sans CJK KR') else 'DejaVu Sans'
     text='이 주석을 오른쪽으로 이동해 주세요' if family=='Noto Sans CJK KR' else 'Move this annotation to the right'
-    with Session(tmp_path/'native-cache',backend='native',review_font=family) as session:
+    with Session(tmp_path/'native-cache',backend='native',review_font=family,review_font_size=17) as session:
         fig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='one')
         fig.axes[0].set_title('Review title')
         fig.axes[0].text(.3,.3,'Review this element',coords='ratio',id='note')
@@ -3000,7 +3000,7 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
         inputs.click('review_changes');session.poll()
         assert session.events()
         assert session.feedback(session.events()[0]['work_id'])['round']['documents']['plot']['comments'][0]['text']==text+'!'
-    source="import figgyplot as fg\nfrom figgyplot.review import Session\nsession=Session(backend='webgpu',review_font="+repr(family)+")\nfig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='one')\nfig.axes[0].text(.3,.3,'Review this element',coords='ratio',id='note')\ndisplay(session.widget(fig))"
+    source="import figgyplot as fg\nfrom figgyplot.review import Session\nsession=Session(backend='webgpu',review_font="+repr(family)+",review_font_size=17)\nfig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='one')\nfig.axes[0].text(.3,.3,'Review this element',coords='ratio',id='note')\ndisplay(session.widget(fig))"
     with notebook(tmp_path/'browser-comments',source) as (page,execute):
         check_display_frame_ready(page)
         page.wait_for_function("document.querySelector('.figgy-editor').style.getPropertyValue('--figgy-review-font') !== ''")
@@ -3009,6 +3009,7 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
         page.mouse.click(*browser_surface_point(page,(bounds[0]+bounds[2]/2,bounds[1]+bounds[3]/2)),button='right')
         menu=page.locator('[data-review-target]');menu.wait_for(state='visible');target=menu.get_attribute('data-review-target');menu.click()
         page.locator('[data-review-target-text]').fill(text)
+        assert page.locator('[data-review-target-text]').evaluate('e=>getComputedStyle(e).fontSize')=='17px'
         screenshot_editor(page,tmp_path/'browser-element-comment.png')
         page.locator('[data-review-target-save]').click()
         assert json.loads(execute('import json;print(json.dumps(session._review_state("plot")["target_comments"]))'))[0]['target']==target

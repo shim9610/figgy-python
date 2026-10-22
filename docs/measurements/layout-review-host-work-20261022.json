@@ -2,8 +2,8 @@
   "native": {
     "moves": 6,
     "inspector_rebuilds_during": 0,
-    "elapsed": 1.2204828760004602,
-    "last_input_to_submit_ms": 15.535155999999999,
+    "elapsed": 1.1376548249972984,
+    "last_input_to_submit_ms": 17.884905999999997,
     "changed_ssot_paths": [
       "/config/annotations/items/0/kind/Arrow/from/Ratio/x",
       "/config/annotations/items/0/kind/Arrow/from/Ratio/y",
@@ -11,13 +11,13 @@
       "/config/annotations/items/0/kind/Arrow/to/Ratio/y"
     ],
     "additional_column_uploads": 0,
-    "before_ssot_sha256": "84296781d0bd93138dd16dc49d7c28197a594cffa72c832e97cfa01bf9f50093",
-    "after_ssot_sha256": "5398e4f6fa6e051046a0bdd4f10286d22c5dbc55cbf11aa74d7f33c5f791e3ab"
+    "before_ssot_sha256": "5127bec2d9f505e1f25ce060b22424f368070422b098a083a416cc63cc80e165",
+    "after_ssot_sha256": "58fa155eb4932c6446bc86c8ebc72c879a614d2d0fe0c7538d434b80a372a2a0"
   },
   "browser": {
     "moves": 8,
     "inspector_rebuilds_during": 1,
-    "elapsed": 0.6332177699950989,
+    "elapsed": 0.6138199410052039,
     "changed_ssot_paths": [
       "/config/annotations/items/0/kind/Arrow/from/Ratio/x",
       "/config/annotations/items/0/kind/Arrow/from/Ratio/y",
@@ -25,9 +25,9 @@
       "/config/annotations/items/0/kind/Arrow/to/Ratio/y"
     ],
     "additional_column_uploads": 0,
-    "before_ssot_sha256": "6679b21391077989e0a58527a1f35a2ff3dbe26363072eb47fbe584f8d2cb4a5",
-    "after_ssot_sha256": "fd637029ca65df1996a3f2d6962615d3ceff14fb37d076b28855cbf74ba55bad"
+    "before_ssot_sha256": "9de4d043330443860b2f49c8fa17bff7c48bfc89f05d34d5693b727c7d105610",
+    "after_ssot_sha256": "b9b58cb9f23aca7ce0c86b9337bc7439858c74f692fa9c8ea93e4ec9962c9121"
   },
   "scope": "Host property reconstruction during synthetic input; elapsed includes test-driver waits. This is not a physical-GPU FPS benchmark. Renderer drawing and caching are unchanged.",
-  "wheel_sha256": "260aa58a2ade208ca26fed322b7fe955dcf52f25645a4df5d84232aa2b538e55"
+  "wheel_sha256": "aa645f288addec66ca41d043821ef7604214b0f5ed49c670b6fed90f78bfe733"
 }

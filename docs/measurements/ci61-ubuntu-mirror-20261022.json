@@ -1,0 +1,21 @@
+{
+  "run_url": "https://github.com/shim9610/figgy-python/actions/runs/39757910485",
+  "job_id": 119754629400,
+  "head_sha": "5bf952a1ec4f61c03babfa7bc22612db406d149f",
+  "job_started_utc": "2026-10-22T09:46:03Z",
+  "install_started_utc": "2026-10-22T09:46:21Z",
+  "install_finished_utc": "2026-10-22T10:01:12Z",
+  "configured_build_job_timeout_minutes": 20,
+  "cancellation_log_utc": "2026-10-22T10:06:13.1207037Z",
+  "source_mirror": "azure.archive.ubuntu.com",
+  "log_evidence": [
+    "2026-10-22T09:46:48.8407856Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 fonts-noto-cjk all 1:20230817+repack1-3 [61.2 MB]",
+    "2026-10-22T09:57:51.8568173Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 fonts-noto-mono all 20201225-2 [435 kB]",
+    "2026-10-22T10:01:05.1042319Z Fetched 105 MB in 14min 37s (120 kB/s)",
+    "2026-10-22T10:01:06.4954100Z Unpacking fonts-noto-cjk (1:20230817+repack1-3) ...",
+    "2026-10-22T10:01:09.2746424Z Setting up fonts-noto-cjk (1:20230817+repack1-3) ...",
+    "2026-10-22T10:06:13.1207037Z ##[error]The operation was canceled."
+  ],
+  "tests_executed": false,
+  "change": "Use archive.ubuntu.com instead of the Azure mirror for the same signed Ubuntu packages in both build and integration jobs. Preserve all tests, assertions, execution auditing and time budgets."
+}

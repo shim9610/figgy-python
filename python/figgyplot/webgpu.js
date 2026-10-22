@@ -77,7 +77,7 @@ export function render({model,el}) {
     const state=model.get('review')??{};reviewPanel.hidden=!state.enabled;
     reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||model.get('status')!=='ready'||!!state.approved);
     if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewTargets=clone(state.target_comments??[]);reviewLoaded=true;}
-    reviewComment.style.fontSize=`${state.font_size??14}px`;
+    reviewComment.style.fontSize=reviewDialog.style.fontSize=`${state.font_size??14}px`;
     if(state.font_family&&reviewFontLoaded!==state.font_family){
       reviewFontLoaded=state.font_family;
       const data=model.get('review_font_data');
