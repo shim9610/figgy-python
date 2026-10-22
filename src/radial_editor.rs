@@ -576,7 +576,12 @@ impl Editor {
                         .unwrap_or_else(|| "data_area".into())
                 })
         };
-        if target == "data_area" || target == "figure" {
+        let explicit_plot = chart
+            .decorations()
+            .selected
+            .as_ref()
+            .is_some_and(|v| v.element_id() == "data_area");
+        if target == "figure" || target == "data_area" && (self.edit_area || explicit_plot) {
             self.catalog_properties(ui, c, &target, true);
             if target == "data_area" {
                 self.bounded_context_properties(ui, c);

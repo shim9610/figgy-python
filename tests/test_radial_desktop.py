@@ -138,6 +138,27 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         assert selected != original and selected != 2
         inputs.key("Escape")
         assert inputs.info()["selected"] is None
+        # Clearing a data selection restores the global form. Layout remains a
+        # separate mode rather than replacing unselected title/style controls.
+        (tmp_path/'cleared-selection.json').write_text(json.dumps(dict(window=inputs.info(),settings=fig.get_settings()),indent=2))
+        assert "radial_title" in inputs.info()["controls"]
+        # Compare mode switches with the same pointer/hover state. Moving from
+        # a slice to the toolbar legitimately clears renderer hover animation.
+        rect=inputs.info()['controls']['layout_mode']
+        inputs.input_frame('mousemove','--window',inputs.wid,round(rect[0]+rect[2]/2),round(rect[1]+rect[3]/2))
+        deadline=time.monotonic()+3
+        while fig.get_settings()['radial']['interaction']['hover_progress']!=0:
+            assert time.monotonic()<deadline
+            inputs.pump()
+        before_layout=fig.get_settings()
+        inputs.click("layout_mode")
+        assert "plot_width" in inputs.info()["controls"]
+        assert "radial_title" not in inputs.info()["controls"]
+        (tmp_path/'layout-mode-settings.json').write_text(json.dumps(dict(before=before_layout,after=fig.get_settings(),window=inputs.info()),indent=2))
+        assert fig.get_settings()==before_layout
+        inputs.click("select_mode")
+        assert "radial_title" in inputs.info()["controls"]
+        assert fig.get_settings()==before_layout
         inputs.click_rect(inputs.info()["controls"]["radial_title"])
         inputs.key("ctrl+a")
         inputs.xdo("type", "--clearmodifiers", "Reviewed donut")

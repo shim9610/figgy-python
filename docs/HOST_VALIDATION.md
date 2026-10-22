@@ -10,7 +10,7 @@ current release candidate.
 ### Layout and review editing follow-up (2026-10-22)
 
 The installed release wheel passed **273 focused model, history, recovery and
-oracle cases**, **9 real native/Jupyter interaction cases**, and **134 workflow
+oracle cases**, **12 real UI cases** (9 paired native/Jupyter and 3 native-only), and **134 workflow
 and packaged-asset checks**, with no skips in those runs. Full collection contains
 809 cases; the focused runs do not establish a complete CI result.
 
@@ -54,6 +54,16 @@ both APT commands. No repository error is ignored. Three local installer checks
 exercise the real APT URI planner, detect vendor feeds when isolation is removed,
 and stop installation after an update failure. See the
 [failed setup evidence](measurements/ci62-image-apt-sources-20261022.json).
+
+Run 63 completed three shards with 202 passing cases each. The fourth exposed
+a native form regression: after Esc cleared a pie selection, the geometry form
+hid the ordinary title/material controls. The existing test was retained and
+reproduced locally before the fix. Geometry now takes priority for explicit plot
+selection or Layout mode; ordinary unselected editing keeps its global form.
+The expanded test edits title/material, checks Copy Python and no readbacks, and
+compares complete settings across mode switches with the same settled pointer
+hover state. All 12 focused UI cases and the 48 cases not executed after that CI
+failure passed locally. See the [before/after control evidence](measurements/native-unselected-form-20261022.json).
 
 Automatic pull-request checks are enabled in
 [PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
