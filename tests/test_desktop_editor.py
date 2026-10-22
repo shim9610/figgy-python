@@ -130,7 +130,8 @@ def test_editor_preserves_canvas_and_edits_in_separate_settings_window(tmp_path)
         invalid=copy.deepcopy(baseline);invalid['config']['bottom_x']['min']=invalid['config']['bottom_x']['max']
         def paste_settings(value):
             click_rect(info()['settings_window']['controls']['settings_json'],settings_id)
-            subprocess.run(['xclip','-selection','clipboard','-t','UTF8_STRING'],input=json.dumps(value),text=True,check=True,timeout=3)
+            from native_input import set_clipboard
+            set_clipboard(json.dumps(value))
             key('ctrl+a');key('ctrl+v')
             click_rect(info()['settings_window']['controls']['apply_settings'],settings_id)
         paste_settings(invalid)

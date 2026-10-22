@@ -44,6 +44,20 @@ Successor approval tests reject changes to arrays even when extents match, and
 source-backed finish validates exact approved settings/data without new windows.
 Colour swatches and reference-image attachments remain a future improvement.
 
+Run 65's four Linux pytest summaries report 827 passing cases, and the real
+Windows storage job passed all seven cases. Shard 0 nevertheless timed out:
+its 207 cases finished in 11m19s, then a clipboard-owner process retained the
+CI logging pipe until job cancellation roughly 33 minutes later. The execution
+audit correctly rejected a cancelled shard. Artifact upload itself took seconds.
+The [timestamped failure and local controls](measurements/ci65-clipboard-pipe-20261022.json)
+separate these phases. A clipboard writer now redirects the background owner's
+streams without terminating the owner. A real X11 negative control verifies
+Python can exit while its inherited output remains open; the fixed writer's
+output closes while its Unicode clipboard remains available. Tests also run
+through the actual tee pipeline and exercise JSON settings paste. Pytest return,
+interpreter exit and pipeline exit have distinct CI markers. Assertions, audit
+rules and budgets are unchanged; full collection now contains 828 cases.
+
 ### Layout and review editing follow-up (2026-10-22)
 
 The installed release wheel passed **273 focused model, history, recovery and

@@ -178,6 +178,7 @@ jobs:
               --ci-shard-count=4 --ci-shard-index="$CI_SHARD" \
               --basetemp=ci-results/full --junitxml=ci-results/junit.xml \
               2>&1 | tee ci-results/full.log
+            echo 'CI pytest log pipeline exited'
           SCRIPT
       - name: Save integration results
         if: always()

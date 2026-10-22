@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import figgyplot as figgy
 from test_radial_desktop import Inputs
+from native_input import set_clipboard
 from jupyter_harness import notebook, button_point_without_frames, click_button
 from browser_timing import screenshot_editor
 
@@ -2812,8 +2813,7 @@ def test_native_review_long_comments_keep_approval_controls_reachable(tmp_path,f
         session.comment(fig.id,'Preserve the original data',target={'series_id':'signal'})
         inputs.click('review_comments')
         import subprocess
-        subprocess.run(['xclip','-selection','clipboard'],input=comments,text=True,
-                       stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
+        set_clipboard(comments)
         inputs.key('ctrl+v');inputs.pump();session.poll()
         info=inputs.info();width,height=info['surface_size']
         for key in ['review_comments','review_changes','review_accept']:
@@ -2973,7 +2973,7 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
         target=next(v['id'] for v in fig.editor_properties() if v['target']=='annotation:note')
         inputs.click('review_target:'+target);inputs.click('review_target_text')
         import subprocess
-        subprocess.run(['xclip','-selection','clipboard'],input=text,text=True,check=True)
+        set_clipboard(text)
         inputs.key('ctrl+v');inputs.pump()
         ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-element-comment.png')
         inputs.click('review_target_save');session.poll()
@@ -2982,7 +2982,7 @@ def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
         comment_id=comments[0]['id']
         inputs.click('review_target_list');inputs.click('review_target_edit:'+comment_id)
         inputs.click('review_target_text');inputs.key('ctrl+a')
-        subprocess.run(['xclip','-selection','clipboard'],input=text+'!',text=True,check=True)
+        set_clipboard(text+'!')
         inputs.key('ctrl+v');inputs.click('review_target_save');session.poll();inputs.key('Escape')
         assert session._review_state('plot')['target_comments'][0]['id']==comment_id
         # A decoration uses its own stable target, separately from annotations.
