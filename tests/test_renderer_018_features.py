@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pytest
 import figgyplot as figgy
+from feature_visual_assertions import FEATURES, populate as populate_reference_scene, assert_feature_image
 
 
 def populate(figure, feature):
@@ -39,10 +40,6 @@ def populate(figure, feature):
     return ax
 
 
-FEATURES = ['mapped_points', 'vector_points', 'vector_grid', 'steps', 'baseline_fill',
-            'series_fill', 'polar', 'radar', 'annotations']
-
-
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
 @pytest.mark.parametrize('feature', FEATURES)
 def test_features_round_trip_and_replay_without_reupload(backend, feature):
@@ -60,9 +57,13 @@ def test_features_round_trip_and_replay_without_reupload(backend, feature):
         assert target.info.get('column_uploads') == uploads
         if backend == 'native':
             image = source.render_rgba()
-            assert image.shape == (600, 960, 4)
-            assert np.any(image[..., :3] < 150)
-            assert np.array_equal(image, target.render_rgba())
+            assert image.shape == (600,960,4)
+            assert np.array_equal(image,target.render_rgba())
+            # Retain the original API/combination replay coverage above. An
+            # independently authored scene rejects a shared wrong readback.
+            with figgy.Figure(backend='native',figsize=(9.6,6),dpi=100) as reference:
+                populate_reference_scene(reference,feature)
+                assert_feature_image(reference.render_rgba(),feature)
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])

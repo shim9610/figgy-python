@@ -10,6 +10,8 @@ import pytest
 PRIORITY = (
     'tests/test_interaction_parity.py::test_surface_readiness_rejects_matching_pre_resize_css_and_backing',
     'tests/test_interaction_parity.py::test_annotation_mouse_input_uses_live_layout_after_resize',
+    'tests/test_acceptance_oracles.py',
+    'tests/test_feature_visual_browser.py',
     'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[1]',
     'tests/test_interaction_parity.py::test_inline_editor_resize_uses_current_units_and_applies_real_edits[2]',
     'tests/test_interaction_parity.py::test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]',

@@ -10,6 +10,7 @@ import pytest
 import figgyplot as fg
 from figgyplot.review import Session
 from figgyplot._review_diff import changes, persistent, preserved
+from recovery_assertions import record_uploads, assert_arrays, assert_cached_columns, assert_cached_bounded, assert_renderer_columns
 
 
 def create(session, id='plot', family='line'):
@@ -19,6 +20,8 @@ def create(session, id='plot', family='line'):
     elif family=='mapped':ax.scatter([0,1],[2,3],c=[1,2],s=[2,4],id='mapped')
     elif family=='matrix':ax.imshow([[1,2],[3,4]],id='field')
     elif family=='vector':ax.quiver([0,1],[1,2],[2,1],[1,3],id='arrows')
+    elif family=='vector_grid':ax.quiver([0,1],[1,2],[[2,1],[1,3]],[[1,2],[3,1]],values=[[1,2],[3,4]],id='arrows')
+    elif family=='fill_pair':ax.fill_between([0,1],[2,3],[1,2],id='band')
     elif family=='pie':ax.pie([3,2,1])
     elif family=='bar':ax.bar(['A','B'],[3,4])
     elif family=='box':ax.boxplot([[1,2,3],[2,4,6]])
@@ -29,10 +32,10 @@ def create(session, id='plot', family='line'):
     return fig
 
 
-@pytest.mark.parametrize('family',['line','mapped','matrix','vector','pie','bar','box','radar','panels'])
+@pytest.mark.parametrize('family',['line','mapped','matrix','vector','vector_grid','fill_pair','pie','bar','box','radar','panels'])
 @pytest.mark.parametrize('backend',['native','webgpu'])
-def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backend):
-    with Session(tmp_path/'cache',backend=backend) as session:
+def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backend,monkeypatch):
+    with record_uploads(monkeypatch) as original, Session(tmp_path/'cache',backend=backend) as session:
         fig=create(session,family=family)
         session.start();baseline=fig.get_settings()
         fig.axes[0].set_title('Approved title')
@@ -46,11 +49,15 @@ def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backen
         assert checkpoint['baseline']==baseline and checkpoint['approval']['settings']==approved
         if family in ('pie','bar','box','radar'):assert checkpoint['bounded_data']
         assert 'Keep this title' not in json.dumps(approved)
-    with Session.open(tmp_path/'cache') as resumed:
+        assert_cached_columns(tmp_path/'cache',checkpoint,original)
+        assert_cached_bounded(tmp_path/'cache',checkpoint,family)
+    with record_uploads(monkeypatch) as uploaded, Session.open(tmp_path/'cache') as resumed:
         recovered=resumed.restore('plot',backend=backend)
         assert recovered.get_settings()==approved
+        assert_arrays(original,uploaded,'restored upload')
         if backend=='native':assert recovered.to_png().startswith(b'\x89PNG')
         assert resumed.events()==[signal]
+        assert_renderer_columns(recovered,original)
 
 
 def test_all_figure_barrier_comments_and_idempotent_submission(tmp_path):

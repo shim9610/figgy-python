@@ -168,10 +168,10 @@ regressions first in the full suite. The collection now has **642 cases**. The
 existing full suite, assertions and time limits remain in place; no complete
 local 642-case pass is claimed. Local Chromium is 154; CI #53 used Chromium 156.
 
-## Limits of the current acceptance tests
+## Acceptance gaps observed before the oracle correction
 
 Counts include packaging and release guards and do not measure feature or UX
-coverage. Isolated assertion audits found two concrete gaps:
+coverage. Before the correction below, isolated assertion audits found two gaps:
 
 - All nine native feature round-trip cases accept a substituted white RGBA
   image with one black pixel. Their model/replay assertions still execute, but
@@ -182,10 +182,10 @@ coverage. Isolated assertion audits found two concrete gaps:
   and a valid PNG signature do not verify every restored data value. A separate
   input-snapshot test checks one stored float32 payload, not every restore handoff.
 
-These are demonstrated test gaps, not observed production data corruption.
-Feature-specific independent visual assertions and complete restored-column
-value/type/shape comparisons are still needed for those stronger guarantees.
-No full-suite or usability guarantee follows from the affected-case pass above.
+These were demonstrated test gaps, not observed production data corruption.
+The independent scene and restored-array assertions below address these cases.
+Finite acceptance scenes still do not establish every feature combination or
+general usability.
 
 ## Execute the complete collection once
 
@@ -220,3 +220,69 @@ while a superseded workflow can stop. Preflight passed **117 cases in 2.10
 seconds** after this workflow-only change. An already-running job retains the
 workflow definition with which it started; this change does not alter that job
 retroactively.
+
+## Independent feature and recovery oracles
+
+The original API/combination replay fixtures remain intact. Each of the nine
+native feature replay cases now also renders an independently authored reference
+scene. Its expected probes come from declared input geometry and colors, never
+from another rendered image or renderer-reported bounds. The document is
+960 x 600 with a fixed 400 x 400 plot at (100,100), hidden Cartesian decoration
+and fixed [0,4] ranges. The assertions check:
+
+- Mapped points: gray values, positions, different marker areas and empty space.
+- Point/grid vectors: mapped colors, shafts, directional heads and empty tails.
+- Steps: required horizontal/vertical segments and absence of linear diagonals.
+- Baseline/series fills: filled interiors and empty regions below/above the
+  declared boundaries.
+- Polar coordinates: asymmetric radii, radians, clockwise direction and chords.
+- Radar: two differently colored polygons, declared range and empty interiors.
+- Annotations: reference-line color/position, span opacity and text in its
+  authored region.
+
+The identical oracle checks nine actual displayed Jupyter WebGPU canvases. A
+fractional Jupyter output origin otherwise creates a 601-row enclosing capture
+for a 600px canvas. The fixture translates the entire widget onto the device
+pixel grid, retaining exactly 960 x 600 CSS/backing dimensions at DPR 1. No rows
+are cropped, pixels resampled or dimension assertions relaxed.
+
+Recovery tests retain independent copies of the original renderer inputs in
+test code only. They compare every baseline/approved NPY payload and every
+restored upload by column identity, dtype, shape, all values and payload bits.
+The NPY oracle reads files directly rather than reusing the restore reader.
+Bounded numeric checkpoints are also compared with literal expectations for
+pie/bar/box/radar inputs, including box statistics and sample-count dtype.
+Coverage includes mapped values/sizes, matrices and edge coordinates, point/grid
+vector components and mapped grids, shared-X fill pairs and panel/overlay data.
+
+Native inspection reads every restored column through the production GPU
+selection-readback path using temporary test-only probe series referencing the
+existing buffers; sample-upload counters must remain unchanged. These probes
+run after complete approved-SSOT assertions and are discarded with the test
+Figure. Browser inspection compares actual transfer snapshot bytes. Additional
+float32/float64 cases include signed zero, nontrivial finite precision, a custom
+NaN payload and both infinities. Cache/upload/transfer bits are exact; native
+finite GPU values use the packed pair-of-f32 representation's 2e-14 relative
+bound, with zero absolute tolerance. Native selection JSON represents nonfinite
+values as null, so exact nonfinite bit preservation is asserted at the lossless
+boundaries rather than claimed for that JSON observation.
+
+Negative controls are part of ordinary CI: **45 wrong image cases**, **nine
+single-pixel substitutions through the actual replay test**, **42 wrong restore
+payloads** (zero/reversed/wrong dtype), and **14 wrong device/transfer contents**
+must all be rejected. In the latter cases, settings, cache and observed upload
+arguments remain correct: only the final native upload or browser transfer bytes
+are zeroed. Re-running the original baseline test accepted all ten original
+family/backend resident-data faults; the strengthened checks reject them.
+
+Local validation passed **207 focused cases in 10.93 seconds**, **nine headful
+browser cases in 127.57 seconds**, and **117 preflight cases in 2.07 seconds**.
+The unchanged runtime wheel is the previously verified
+`88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b` artifact.
+Ordinary and priority collection both contain **769 unique cases**: all previous
+642 IDs remain, with 127 additions and zero duplicates. The new oracle and
+browser cases run first within the single full collection. No full local
+769-case pass is claimed; required CI must validate the final commit.
+[The before/after contract and measurements](measurements/acceptance-oracles-20261022.json)
+distinguish these results. These finite scenes do not claim every feature
+combination, exact font rasterization or general usability.
