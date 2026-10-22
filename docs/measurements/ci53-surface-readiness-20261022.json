@@ -1,0 +1,95 @@
+{
+  "ci": {
+    "run": 53,
+    "url": "https://github.com/shim9610/figgy-python/actions/runs/39716629618",
+    "commit": "819692ac1ba362bb9061fd881b05b44be7f7e32a",
+    "result": {
+      "passed": 251,
+      "failed": 1,
+      "seconds": 1726.82
+    },
+    "case": "test_inline_text_resize_multiline_and_existing_format_in_both_hosts[radial]",
+    "browser": "156.0.8078.4",
+    "input": {
+      "annotation": [
+        846,
+        506.0000305175781,
+        62.265625,
+        38.400001525878906
+      ],
+      "canvas": {
+        "x": 389,
+        "y": 361.9375,
+        "width": 960,
+        "height": 600
+      },
+      "units": [
+        960,
+        600
+      ],
+      "point": [
+        1243,
+        873.9375305175781
+      ],
+      "viewport": [
+        980,
+        820
+      ],
+      "backing": [
+        960,
+        600
+      ]
+    },
+    "host": {
+      "kind": "radial",
+      "busy": 0,
+      "queued": 0,
+      "dirty": true,
+      "frame_pending": false,
+      "frame_error": null,
+      "edit_inflight": null,
+      "edit_pending": false,
+      "canvas": [
+        960,
+        600
+      ],
+      "disposed": false
+    },
+    "gpu": {
+      "submitted": 1,
+      "completed": 1,
+      "completedCanvas": [
+        960,
+        600
+      ]
+    }
+  },
+  "conclusion": "Matching CSS and backing dimensions can both describe the preceding allocation after viewport shrink. The readiness predicate accepted that state and subsequent input was outside the viewport. This observation corrects the earlier incomplete coordinate-read hypothesis; it does not establish a renderer or SSOT failure.",
+  "correction": "Require a positive CSS canvas allocation fitting the requested horizontal viewport as well as CSS/backing/DPR agreement. Keep the input helper's live geometry and canvas hit check. Editor font, containment, value and post-input assertions remain independent.",
+  "limitations": "This is an input precondition, not proof that all automatic layout or GPU rendering has completed. Full vertical containment is not required because notebook output may scroll.",
+  "local": {
+    "browser": "154.0.8037.57",
+    "negative": {
+      "cases": 1,
+      "failed": 1,
+      "seconds": 1.69,
+      "condition": "The recorded CI allocation must be rejected, but the old predicate returned true."
+    },
+    "positive": {
+      "cases": 6,
+      "passed": 6,
+      "seconds": 96.74,
+      "coverage": [
+        "controlled delayed CSS/backing resize",
+        "trusted annotation input after resize",
+        "radial multiline native/Jupyter editing",
+        "Cartesian multiline native/Jupyter editing",
+        "queued resize and real edits at DPR 1",
+        "queued resize and real edits at DPR 2"
+      ]
+    },
+    "wheel_sha256": "88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b",
+    "runtime_changed": false
+  },
+  "status": "Local correction validated; required CI must run on the new commit before it can be described as passing."
+}

@@ -44,13 +44,19 @@ OBSERVE = """()=>{
 }"""
 
 
-def wait_surface(page, viewport, dpr=1):
-    # Size readiness is independent of font, containment and assertion success.
-    page.wait_for_function("""([width,height,dpr])=>{
+SURFACE_READY = """([width,height,dpr])=>{
         const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();
         return innerWidth===width&&innerHeight===height&&devicePixelRatio===dpr&&
+            r.width>0&&r.height>0&&r.left>=0&&r.right<=width+1&&
             c.width===Math.round(r.width*dpr)&&c.height===Math.round(r.height*dpr);
-    }""", arg=[*viewport, dpr], polling=20)
+    }"""
+
+
+def wait_surface(page, viewport, dpr=1):
+    # Jupyter may still have its preceding allocation after innerWidth changes.
+    # Matching old CSS/backing sizes do not make that overflow ready for input.
+    # Do not depend on the inline editor's font, bounds or asserted content here.
+    page.wait_for_function(SURFACE_READY, arg=[*viewport, dpr], polling=20)
 
 
 def observe(page, folder, label):

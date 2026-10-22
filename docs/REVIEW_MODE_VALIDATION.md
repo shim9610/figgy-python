@@ -139,3 +139,50 @@ regression, Cartesian/radial multiline editing, and scale 1/2 editing. Runtime
 files and the release wheel are unchanged. The collection now contains **641
 cases**; no complete local 641-case pass is claimed. Required CI validates the
 complete updated collection.
+
+## CI #53 resize-readiness correction
+
+CI #53 failed the same radial multiline case after **251 passed and one failed**
+in 1726.82 seconds. Unlike the preceding separate observations, its input helper
+read annotation geometry and live DOM bounds together. The DOM itself was still
+960 x 600 in the new 980 x 820 viewport; the requested point remained
+(1243, 873.94). Thus the preceding coordinate-read correction did not fix the
+underlying readiness error: matching CSS and backing dimensions can both be old.
+[The measured input, host and GPU state](measurements/ci53-surface-readiness-20261022.json)
+preserve this distinction. No renderer or SSOT failure is established here.
+
+A controlled browser regression using the exact CI allocation **failed against
+the old predicate** (one failed in 1.69 seconds). Readiness now also requires a
+positive canvas allocation that fits the requested horizontal viewport, while
+preserving CSS/backing/DPR agreement. The regression withholds the new allocation
+for 200 ms and checks that readiness waits for its delivery. It does not wait for
+the asserted text content, font or inline-editor bounds. This is an input
+precondition, not a claim that all automatic layout or GPU work has completed;
+notebook output may still scroll vertically.
+
+All **six affected cases passed in 96.74 seconds** on the unchanged runtime
+wheel: that readiness regression, the trusted annotation-input regression,
+Cartesian/radial multiline editing in both hosts and queued resize/editing at
+scales 1 and 2. CI runs the exact failed radial case and both controlled input
+regressions before the full suite. The collection now has **642 cases**. The
+existing full suite, assertions and time limits remain in place; no complete
+local 642-case pass is claimed. Local Chromium is 154; CI #53 used Chromium 156.
+
+## Limits of the current acceptance tests
+
+Counts include packaging and release guards and do not measure feature or UX
+coverage. Isolated assertion audits found two concrete gaps:
+
+- All nine native feature round-trip cases accept a substituted white RGBA
+  image with one black pixel. Their model/replay assertions still execute, but
+  nonblank output plus replay-image equality is not an independent visual oracle.
+  A targeted data/colorbar pixel-change case rejects that same substituted image.
+- All ten column-backed restoration family/backend cases accept arrays zeroed
+  only during restoration, while preserving shape and dtype. Settings equality
+  and a valid PNG signature do not verify every restored data value. A separate
+  input-snapshot test checks one stored float32 payload, not every restore handoff.
+
+These are demonstrated test gaps, not observed production data corruption.
+Feature-specific independent visual assertions and complete restored-column
+value/type/shape comparisons are still needed for those stronger guarantees.
+No full-suite or usability guarantee follows from the affected-case pass above.

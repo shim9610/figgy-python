@@ -1647,6 +1647,30 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires a real browser')
+def test_surface_readiness_rejects_matching_pre_resize_css_and_backing(tmp_path):
+    from playwright.sync_api import sync_playwright
+    from inline_editor_harness import SURFACE_READY,wait_surface
+    with sync_playwright() as p:
+        browser=p.chromium.launch(executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
+                                  headless=False,args=['--no-sandbox'])
+        try:
+            page=browser.new_page(viewport={'width':980,'height':820})
+            page.set_content('''<style>body{margin:0}canvas{position:absolute;left:389px;top:361.9375px;width:960px;height:600px}</style>
+                <div class="figgy-editor"><canvas width="960" height="600"></canvas></div>''')
+            old=page.evaluate("""()=>{const c=document.querySelector('canvas'),r=c.getBoundingClientRect();
+                return {viewport:[innerWidth,innerHeight],canvas:[r.x,r.y,r.width,r.height],backing:[c.width,c.height]};}""")
+            assert not page.evaluate(SURFACE_READY,[980,820,1]),old
+            page.evaluate("""()=>{window.layoutDelivered=false;setTimeout(()=>{
+                const c=document.querySelector('canvas');c.style.width='511px';c.style.height='319.375px';
+                c.width=511;c.height=319;window.layoutDelivered=true;
+            },200);}""")
+            wait_surface(page,(980,820))
+            assert page.evaluate('layoutDelivered')
+            (tmp_path/'surface-readiness.json').write_text(json.dumps({'before':old,'after':page.locator('canvas').evaluate('c=>[c.width,c.height,c.getBoundingClientRect().width]')}))
+        finally:browser.close()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real browser')
 def test_annotation_mouse_input_uses_live_layout_after_resize(tmp_path):
     from playwright.sync_api import sync_playwright
     from inline_editor_harness import annotation_point
