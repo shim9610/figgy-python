@@ -10,9 +10,9 @@ current release candidate.
 ### Layout and review editing follow-up (2026-10-22)
 
 The installed release wheel passed **273 focused model, history, recovery and
-oracle cases**, **9 real native/Jupyter interaction cases**, and **131 workflow
+oracle cases**, **9 real native/Jupyter interaction cases**, and **134 workflow
 and packaged-asset checks**, with no skips in those runs. Full collection contains
-806 cases; the focused runs do not establish a complete CI result.
+809 cases; the focused runs do not establish a complete CI result.
 
 The input cases cover first-click plot geometry editing, inspector resizing,
 unchanged plot dimensions when opening the inspector, disabled polar/radar wheel
@@ -43,6 +43,17 @@ budget after the Azure Ubuntu mirror downloaded 105 MB in 14 minutes 37 seconds
 the download separately from font configuration and build cancellation. Both CI
 install steps now use the official Ubuntu archive for the same signed packages;
 test assertions, execution auditing and job budgets are unchanged.
+
+Run 62 built the wheel successfully, but one shard's setup failed when the
+image's unrelated Microsoft APT feed returned HTTP 403. Its log also showed
+that replacing a host in `ubuntu.sources` did not override the image's separate
+mirrorlist. The final [shared installer](../scripts/install_ci_runtime.sh) uses
+an explicit temporary source list for the official Ubuntu archive and security
+feeds, with the Ubuntu archive signing key and image source parts disabled for
+both APT commands. No repository error is ignored. Three local installer checks
+exercise the real APT URI planner, detect vendor feeds when isolation is removed,
+and stop installation after an update failure. See the
+[failed setup evidence](measurements/ci62-image-apt-sources-20261022.json).
 
 Automatic pull-request checks are enabled in
 [PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
