@@ -4,7 +4,8 @@
   "before": {
     "single_pixel_feature_tests_accepted": 9,
     "zero_restore_payload_tests_accepted": 10,
-    "zero_resident_data_tests_accepted": 10
+    "zero_resident_data_tests_accepted": 10,
+    "writer_mutation_tests_accepted_before_source_snapshot_fix": 2
   },
   "after": {
     "native_feature_scenes": 9,
@@ -15,17 +16,18 @@
     "wrong_device_or_transfer_checks_rejected": 14,
     "normal_restore_cases": 22,
     "float_precision_cases": 4,
-    "focused_cases_passed": 207,
-    "focused_seconds": 10.93,
+    "focused_cases_passed": 209,
+    "focused_seconds": 11.14,
     "headful_browser_cases_passed": 9,
     "headful_browser_seconds": 127.57,
     "preflight_cases_passed": 117,
-    "preflight_seconds": 2.07
+    "preflight_seconds": 2.07,
+    "wrong_cache_writer_input_mutation_checks_rejected": 2
   },
   "collection": {
     "previous": 642,
-    "current": 769,
-    "added": 127,
+    "current": 771,
+    "added": 129,
     "omitted": 0,
     "duplicates": 0
   },
@@ -75,9 +77,10 @@
     "gpu": "Read every native column via GPU selection readback, using temporary test-only probe series without any sample upload.",
     "native_finite_rtol": 2e-14,
     "native_finite_atol": 0,
-    "nonfinite": "Native selection JSON represents nonfinite values as null. NaN payloads, infinities and signed-zero bits are checked exactly at lossless boundaries, not promised as bit-identical GPU representation."
+    "nonfinite": "Native selection JSON represents nonfinite values as null. NaN payloads, infinities and signed-zero bits are checked exactly at lossless boundaries, not promised as bit-identical GPU representation.",
+    "original_capture": "Copy the original array before delegating to the cache writer or renderer; restoration capture remains before the renderer upload."
   },
   "browser_capture": "The complete widget is translated by the fractional part of its DOM origin to align canvas pixels with the device grid. CSS and backing remain exactly 960x600 at DPR 1. No cropping, resampling or relaxed image shape is used.",
   "scope": "These close the demonstrated oracle gaps for the listed scenes and recovery families. They do not establish every feature combination, font rasterization or usability.",
-  "required_ci": "Pending validation of the final commit; the previous 642-case CI result must not be described as the new 769-case result."
+  "required_ci": "Pending validation of the final commit; the previous 642-case CI result must not be described as the new 771-case result."
 }

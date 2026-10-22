@@ -247,7 +247,7 @@ pixel grid, retaining exactly 960 x 600 CSS/backing dimensions at DPR 1. No rows
 are cropped, pixels resampled or dimension assertions relaxed.
 
 Recovery tests retain independent copies of the original renderer inputs in
-test code only. They compare every baseline/approved NPY payload and every
+test code only, before the cache writer or renderer can mutate them. They compare every baseline/approved NPY payload and every
 restored upload by column identity, dtype, shape, all values and payload bits.
 The NPY oracle reads files directly rather than reusing the restore reader.
 Bounded numeric checkpoints are also compared with literal expectations for
@@ -270,19 +270,22 @@ boundaries rather than claimed for that JSON observation.
 Negative controls are part of ordinary CI: **45 wrong image cases**, **nine
 single-pixel substitutions through the actual replay test**, **42 wrong restore
 payloads** (zero/reversed/wrong dtype), and **14 wrong device/transfer contents**
-must all be rejected. In the latter cases, settings, cache and observed upload
+must all be rejected. Two additional controls require rejection when the cache
+writer mutates its original input in place. Recording the expectation after the
+writer incorrectly accepted both faults; pre-write snapshots now reject them.
+In the resident-data cases, settings, cache and observed upload
 arguments remain correct: only the final native upload or browser transfer bytes
 are zeroed. Re-running the original baseline test accepted all ten original
 family/backend resident-data faults; the strengthened checks reject them.
 
-Local validation passed **207 focused cases in 10.93 seconds**, **nine headful
+Local validation passed **209 focused cases in 11.14 seconds**, **nine headful
 browser cases in 127.57 seconds**, and **117 preflight cases in 2.07 seconds**.
 The unchanged runtime wheel is the previously verified
 `88e7f7cc4bfa8edf93ae9240f289144b530fc493dbe1f73a66355fb7b1537c2b` artifact.
-Ordinary and priority collection both contain **769 unique cases**: all previous
-642 IDs remain, with 127 additions and zero duplicates. The new oracle and
+Ordinary and priority collection both contain **771 unique cases**: all previous
+642 IDs remain, with 129 additions and zero duplicates. The new oracle and
 browser cases run first within the single full collection. No full local
-769-case pass is claimed; required CI must validate the final commit.
+771-case pass is claimed; required CI must validate the final commit.
 [The before/after contract and measurements](measurements/acceptance-oracles-20261022.json)
 distinguish these results. These finite scenes do not claim every feature
 combination, exact font rasterization or general usability.

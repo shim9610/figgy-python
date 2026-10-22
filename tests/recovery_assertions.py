@@ -14,9 +14,10 @@ class RecordedUploads:
         return getattr(self.native, name)
 
     def upload_column(self, name, array):
-        self.native.upload_column(name, array)
         assert name not in self.arrays, ('duplicate upload', name)
-        self.arrays[name] = np.array(array, copy=True)
+        original = np.array(array, copy=True)
+        self.native.upload_column(name, array)
+        self.arrays[name] = original
 
 
 @contextmanager

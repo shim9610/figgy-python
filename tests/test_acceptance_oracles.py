@@ -6,7 +6,7 @@ from figgyplot.review import Session
 
 from feature_visual_assertions import FEATURES, populate, assert_feature_image
 from test_review import test_complete_binary_checkpoint_restores_all_families as check_restore
-from recovery_assertions import record_uploads, assert_arrays, assert_cached_columns, assert_renderer_columns
+from recovery_assertions import RecordedUploads, record_uploads, assert_arrays, assert_cached_columns, assert_renderer_columns
 
 
 @pytest.fixture(scope='module',params=FEATURES)
@@ -84,6 +84,18 @@ def test_restore_oracle_rejects_wrong_payload(tmp_path,monkeypatch,backend,famil
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])
+def test_checkpoint_oracle_rejects_writer_mutating_original_input(tmp_path,monkeypatch,backend):
+    from figgyplot._review_store import Store
+    put=Store.put
+    def changed(store,array):
+        array[:]=0
+        return put(store,array)
+    monkeypatch.setattr(Store,'put',changed)
+    with pytest.raises(AssertionError,match='columns:'):
+        check_restore(tmp_path,'line',backend,monkeypatch)
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
 @pytest.mark.parametrize('family',['line','mapped','matrix','vector','vector_grid','fill_pair','panels'])
 def test_renderer_oracle_rejects_wrong_resident_values(tmp_path,monkeypatch,backend,family):
     # Keep cache files and the observed upload arguments correct. Corrupt only
@@ -122,8 +134,11 @@ def test_restore_preserves_float_types_bits_and_gpu_values(tmp_path,monkeypatch,
     bits=y.view(np.uint32 if dtype==np.float32 else np.uint64)
     bits[6]=0x7fc00042 if dtype==np.float32 else 0x7ff8000000000042
     x=np.arange(len(y),dtype=dtype)
-    with record_uploads(monkeypatch) as original, Session(tmp_path,backend=backend) as session:
-        figure=session.figure(id='precision');figure.axes[0].plot(x,y,id='signal')
+    original={}
+    with Session(tmp_path,backend=backend) as session:
+        figure=session.figure(id='precision')
+        figure._native=RecordedUploads(figure._native,original)
+        figure.axes[0].plot(x,y,id='signal')
         assert original['signal/x'].dtype==x.dtype
         assert original['signal/y'].tobytes()==y.tobytes()
         session.start();session.submit('precision','request_changes')

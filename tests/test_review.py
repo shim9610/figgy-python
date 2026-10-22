@@ -10,11 +10,14 @@ import pytest
 import figgyplot as fg
 from figgyplot.review import Session
 from figgyplot._review_diff import changes, persistent, preserved
-from recovery_assertions import record_uploads, assert_arrays, assert_cached_columns, assert_cached_bounded, assert_renderer_columns
+from recovery_assertions import RecordedUploads, record_uploads, assert_arrays, assert_cached_columns, assert_cached_bounded, assert_renderer_columns
 
 
-def create(session, id='plot', family='line'):
+def create(session, id='plot', family='line', uploads=None):
     fig=session.figure(id=id)
+    if uploads is not None:
+        # Capture before the review cache writer can touch the input.
+        fig._native=RecordedUploads(fig._native,uploads)
     ax=fig.axes[0]
     if family=='line':ax.plot([0,1],[2,3],id='signal')
     elif family=='mapped':ax.scatter([0,1],[2,3],c=[1,2],s=[2,4],id='mapped')
@@ -35,8 +38,9 @@ def create(session, id='plot', family='line'):
 @pytest.mark.parametrize('family',['line','mapped','matrix','vector','vector_grid','fill_pair','pie','bar','box','radar','panels'])
 @pytest.mark.parametrize('backend',['native','webgpu'])
 def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backend,monkeypatch):
-    with record_uploads(monkeypatch) as original, Session(tmp_path/'cache',backend=backend) as session:
-        fig=create(session,family=family)
+    original={}
+    with Session(tmp_path/'cache',backend=backend) as session:
+        fig=create(session,family=family,uploads=original)
         session.start();baseline=fig.get_settings()
         fig.axes[0].set_title('Approved title')
         approved=fig.get_settings();counter='column_uploads' if backend=='native' else 'transfer_snapshot_bytes';uploads=fig.info[counter]
