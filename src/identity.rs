@@ -415,9 +415,13 @@ impl FigureAccess<'_> {
     }
 
     pub(super) fn annotation_view(&self) -> PyResult<renderer::ChartView> {
+        let started = self.data.host_work.start();
         let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
-        self.renderer
+        let result = self
+            .renderer
             .create_chart_view(&chart, chart.config().chart_area.0)
-            .map_err(runtime)
+            .map_err(runtime);
+        self.data.host_work.finish("annotation_view", started);
+        result
     }
 }

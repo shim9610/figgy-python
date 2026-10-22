@@ -10,6 +10,7 @@
 | [Renderer 0.18 features](RENDERER_018_FEATURES.md) | ID-addressed grids, polar/radar, vectors, maps, fills, layers, annotations and complete-document replay |
 | [Desktop editor](DESKTOP_EDITOR.md) | Zoom/pan, selection, visibility, properties, code export and windows |
 | [Editor commands and history](EDITOR_COMMANDS.md) | Shared property commands, Undo/Redo, reset, atomic validation and field inventory |
+| [Review feedback views](REVIEW_FEEDBACK_VIEWS.md) | Object summaries, exact snapshot changes, targeted comments and agent detail queries |
 | [Edit and reuse demo](README_DEMO.md) | Real clipboard paste, batch application and recording reproduction |
 | [Hosts](HOSTS.md) | Native surface and browser WebGPU behavior, data transfer and export |
 | [GPU preparation](PREPARATION.md) | Explicit prewarming and cache boundaries |

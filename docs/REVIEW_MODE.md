@@ -31,7 +31,7 @@ first acknowledges notebook edits. `skip` is an explicit programmatic dispositio
 `session.start()` seals a complete set for headless use without opening views.
 `session.comment(figure_id, text, target=...)` appends a targeted API comment.
 The editable UI comment has its own channel; changing or clearing it preserves
-API comments and their targets. Both channels are included in feedback.
+API comments and their targets. All comment channels are included in feedback.
 Runtime revision counters are scoped to recorded Figure instance IDs. Recovery
 creates a new instance; baseline and approved instance/revision pairs therefore
 remain explicit. Persistent hashes and stable IDs identify the compared states.
@@ -72,6 +72,33 @@ controller's working directory, module state or UI event loop.
 
 ## Feedback and persistence
 
+For native agent use, `python -m figgyplot.review connect CACHE` combines window
+presentation and feedback waiting in one main-thread process. Keep the execution
+call pending, then reconnect after regeneration. It has no default timeout.
+The builder calls `session.start()` before handing its cache to that command;
+an in-process `session.connect()` can seal the Figures it still owns directly.
+Existing `present()` / `run_events()`, notebook `watch()` with `subscribe`, and
+manual `events` remain available. The library does not launch a model SDK.
+
+Successor rounds retain an accepted chart's approval only when its complete
+persistent settings, DPI, column references and bounded numeric payloads match
+the accepted checkpoint exactly. Matching settings or min/max alone are not
+sufficient. Changed and new charts still require approval.
+
+`Save and finish` submits an accepted checkpoint with `intent="finish"` through
+both hosts. The complete-batch event carries that intent separately from review
+comments. `finish CACHE WORK_ID --claim-token TOKEN` validates any recorded
+builder against the exact accepted settings and data and terminates without
+another review window. A session without recorded source saves its approved
+settings and binary data as a terminal checkpoint. File exports remain explicit
+in source/agent instructions; this button does not invent export paths.
+
+On Windows, the store locks a byte beyond EOF without reading or initializing
+it first. Lock acquisition and atomic replacement retry bounded sharing
+contention, while unrelated errors still propagate. Same-thread nested store
+transactions reuse the outer lock. Separate Windows CI exercises real process
+contention; deterministic tests cover transient failures and timeout behavior.
+
 The versioned session manifest carries session/round/work IDs, source entry point,
 function, arguments and digest, per-Figure schema/renderer versions, baseline and
 approved revisions, full baseline/approved settings, canonical persistent hashes,
@@ -103,7 +130,7 @@ Readers and active writers are protected by the same lock. Cleanup never depends
 on an agent acknowledgement or compares unrelated Figure revision counters.
 
 The filesystem adapter is local and agent-neutral. A disconnected agent resumes
-by polling `python -m figgyplot.review events CACHE`; raw arrays never enter the
+through `python -m figgyplot.review subscribe CACHE --timeout 50`; raw arrays never enter the
 feedback text. `feedback CACHE WORK` reads structured feedback. Before editing
 source, `claim CACHE WORK --worker ID` obtains a renewable writer lease;
 `regenerate CACHE WORK --claim-token TOKEN` validates updated source and publishes
@@ -116,7 +143,7 @@ their approved windows are closed.
 
 The [bundled skill](../python/figgyplot/skills/figgyplot-review/SKILL.md) is also
 available through `python -m figgyplot.review skill`. Agent hosts use their
-existing terminal/tool runner to poll events while a human reviews the figures.
+existing terminal/tool runner to keep a feedback subscription pending while a human reviews the figures.
 The adapter does not require a vendor model SDK. A disconnected agent resumes
 the same durable work ID instead of relying on an in-memory notification.
 
@@ -134,3 +161,32 @@ source builder's reproducible inputs/arguments. The checkpoint restores the
 chart without inferring those computations from its rendered result.
 
 ![One of two validated next-round Figures in the live browser review controller](images/review-mode-browser.png)
+
+
+## Review fonts and element comments
+
+Initialize `Session(..., review_font="Noto Sans CJK KR", review_font_size=14)`
+with an installed family that supports the user's primary language. This is
+review UI typography, separate from document typography. Native review inputs
+load the actual font face; notebook widgets transfer the selected standalone
+face to the browser. Unknown families fail at initialization rather than silently
+substituting a Latin face. Font metadata survives reopening the cache.
+
+Right-click a chart object or an object-tree row and choose **Add review comment**.
+The comment is addressed by its stable object ID and is stored in the `ui_target`
+metadata channel. **Element comments** reopens the list for editing/deletion.
+
+![Element review comment using the configured Korean font](images/review-element-comment-cjk.png)
+General UI comments, targeted UI comments and API comments are preserved
+independently; they are never inserted into chart annotations or SSOT.
+
+`Session.open(cache).subscribe(after=last_work_id, timeout=50)` waits for one
+complete durable feedback event. Use it from an agent execution process while
+the controller continues `run_events()` or `watch()`. The last required Figure's
+disposition publishes a requested-change batch and wakes the subscription.
+Timeout or session completion returns `None` (`null` from the CLI), not approval.
+Check `status`: stop for `completed`/`cancelled`, otherwise resubscribe.
+Reconnect using the cache and the last
+delivered work ID. Manual `events` lookup remains available. Subscription does
+not invoke a model vendor or create an automatic conversation turn on its own;
+the waiting execution-tool result delivers the signal to the attached agent.

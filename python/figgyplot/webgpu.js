@@ -56,17 +56,38 @@ export function render({model,el}) {
   let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
   // Session metadata is separate from chart SSOT and ordinary inspector fields.
   const reviewPanel=document.createElement('section');reviewPanel.className='figgy-review';reviewPanel.hidden=true;
-  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><span data-review-status role="status"></span></div>';
+  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><button data-review-finish>Save and finish</button><span data-review-status role="status"></span></div>';
   root.append(reviewPanel);
   const reviewComment=reviewPanel.querySelector('textarea'),reviewStatus=reviewPanel.querySelector('[data-review-status]');
-  let reviewBusy=false,reviewLoaded=false;
+  let reviewBusy=false,reviewLoaded=false,reviewTargets=[],reviewFontLoaded='';
+  const reviewDialog=document.createElement('dialog');reviewDialog.className='figgy-review-dialog';root.append(reviewDialog);
+  const reviewMenu=document.createElement('div');reviewMenu.className='figgy-review-menu';reviewMenu.popover='auto';root.append(reviewMenu);
+  const closeReviewMenu=()=>{if(reviewMenu.matches(':popover-open'))reviewMenu.hidePopover();};
+  function openReviewMenu(objects,point){
+    closeReviewMenu();reviewMenu.replaceChildren();
+    for(const node of objects){const button=document.createElement('button');button.dataset.reviewTarget=node.key;button.textContent=`Add review comment · ${node.label}`;button.onclick=()=>editTargetComment(node.key,node.label);reviewMenu.append(button);}
+    if(!objects.length)return;
+    reviewMenu.style.left='0px';reviewMenu.style.top='0px';reviewMenu.showPopover();
+    const rect=reviewMenu.getBoundingClientRect();
+    reviewMenu.style.left=`${Math.max(8,Math.min(point[0],innerWidth-rect.width-8))}px`;
+    reviewMenu.style.top=`${Math.max(8,Math.min(point[1],innerHeight-rect.height-8))}px`;
+    reviewMenu.querySelector('button')?.focus({preventScroll:true});
+  }
   function reviewState(){
     const state=model.get('review')??{};reviewPanel.hidden=!state.enabled;
     reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||model.get('status')!=='ready'||!!state.approved);
-    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewLoaded=true;}
+    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewTargets=clone(state.target_comments??[]);reviewLoaded=true;}
+    reviewComment.style.fontSize=reviewDialog.style.fontSize=`${state.font_size??14}px`;
+    if(state.font_family&&reviewFontLoaded!==state.font_family){
+      reviewFontLoaded=state.font_family;
+      const data=model.get('review_font_data');
+      const bytes=data instanceof DataView?data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength):data;
+      const face=new FontFace(`figgy-review-${client}`,bytes);
+      face.load().then(font=>{document.fonts.add(font);root.style.setProperty('--figgy-review-font',JSON.stringify(font.family));}).catch(e=>{reviewStatus.textContent=`Review font could not be loaded: ${e}`;});
+    }
     if(state.approved)reviewStatus.textContent='Review saved';
   }
-  async function submitReview(disposition){
+  async function submitReview(disposition,intent='revise'){
     if(reviewBusy)return;
     reviewBusy=true;reviewPanel.querySelectorAll('button,textarea').forEach(v=>v.disabled=true);
     reviewStatus.textContent='Saving review…';
@@ -74,7 +95,7 @@ export function render({model,el}) {
       await finishInline(true);await controlQueue;await queue;await flush();
       root.querySelector('.figgy-body').inert=true;root.querySelector('.figgy-toolbar').inert=true;
       trace('review.send',{revision,disposition});
-      model.send({action:'review_submit',disposition,comments:reviewComment.value,revision});
+      model.send({action:'review_submit',disposition,intent,comments:reviewComment.value,target_comments:reviewTargets,revision});
     }catch(e){reviewFailure(String(e));}
   }
   function reviewFailure(message){
@@ -86,7 +107,38 @@ export function render({model,el}) {
   const reviewMessage=message=>{if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
   reviewPanel.querySelector('[data-review-changes]').addEventListener('click',()=>submitReview('request_changes'));
   reviewPanel.querySelector('[data-review-accept]').addEventListener('click',()=>submitReview('accept'));
-  reviewComment.addEventListener('change',()=>model.send({action:'review_comment',comments:reviewComment.value}));
+  reviewPanel.querySelector('[data-review-finish]').addEventListener('click',()=>submitReview('accept','finish'));
+  function saveReviewDraft(){model.send({action:'review_comment',comments:reviewComment.value,target_comments:reviewTargets});}
+  reviewComment.addEventListener('input',saveReviewDraft);
+  function editTargetComment(target,label,existing=null){
+    closeReviewMenu();reviewDialog.replaceChildren();
+    const heading=document.createElement('h3');heading.textContent=`Review comment · ${label}`;
+    const input=document.createElement('textarea');input.dataset.reviewTargetText='';input.value=existing?.text??'';input.rows=4;
+    const save=document.createElement('button');save.dataset.reviewTargetSave='';save.textContent='Save comment';
+    const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>reviewDialog.close();
+    save.onclick=()=>{if(!input.value.trim())return;const item={id:existing?.id??crypto.randomUUID(),target,label,text:input.value,channel:'ui_target'};reviewTargets=reviewTargets.filter(v=>v.id!==item.id);reviewTargets.push(item);saveReviewDraft();reviewDialog.close();};
+    reviewDialog.append(heading,input,save,cancel);reviewDialog.showModal();input.focus();
+  }
+  const commentsButton=document.createElement('button');commentsButton.dataset.reviewTargetList='';commentsButton.textContent='Element comments';reviewPanel.querySelector('div').append(commentsButton);
+  commentsButton.onclick=()=>{reviewDialog.replaceChildren();for(const item of reviewTargets){const row=document.createElement('section'),name=document.createElement('strong'),text=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');name.textContent=item.label??item.target;text.textContent=item.text;edit.textContent='Edit';edit.onclick=()=>{reviewDialog.close();editTargetComment(item.target,item.label??item.target,item);};remove.textContent='Delete';remove.onclick=()=>{reviewTargets=reviewTargets.filter(v=>v.id!==item.id);saveReviewDraft();row.remove();};row.append(name,text,edit,remove);reviewDialog.append(row);}const close=document.createElement('button');close.textContent='Close';close.onclick=()=>reviewDialog.close();reviewDialog.append(close);reviewDialog.showModal();};
+  canvas.addEventListener('contextmenu',event=>{if(!chart||!(model.get('review')??{}).enabled||reviewBusy)return;event.preventDefault();const point=localPoint(event),clientPoint=[event.clientX,event.clientY];enqueue(async()=>{
+    await geometryFrame();let hits=[];
+    const index=kind?0:panelAt(point)??0;
+    const owner=kind?snapshot()[kind]:snapshot().config;
+    let annotation=null;
+    if(index===0&&owner.annotations?.visible!==false&&owner.annotations?.items?.length){await annotationGeometry();annotation=chart.hit_annotation(...point);}
+    if(Number.isInteger(annotation))hits=[{layer:'Annotations',target:kind?`annotation_${annotation}`:`annotation:${owner.annotations.items[annotation].id}`}];
+    else if(kind){const target=chart.hit_decoration(...point,true);if(target)hits=[{layer:'Base',target}];if(!hits.length||hits.every(v=>v.target==='data_area')){const hit=JSON.parse(chart.pick(...point,false));if(hit)hits=[{layer:'Base',target:kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id}];}}
+    else{hits=decorationsAt(point,index);if(hits.every(v=>v.target.endsWith('data_area'))){const data=await pickPanelCandidates(point,index);if(data.length)hits=data.map(v=>({layer:v.layer,target:v.ref.series_id}));}}
+    const objects=hits.map(hit=>allNodes().find(v=>v.node.target===hostTarget(hit.target)&&sameLayer(v.node.layer,hit.layer))?.node).filter(Boolean);
+    openReviewMenu(objects,clientPoint);
+  });});
+  root.addEventListener('pointerdown',event=>{if(!reviewMenu.contains(event.target))closeReviewMenu();});
+  root.addEventListener('contextmenu',event=>{
+    const row=event.target.closest('[role=treeitem]');if(!row||!(model.get('review')??{}).enabled||reviewBusy)return;
+    const node=allNodes().find(v=>v.node.key===row.dataset.node)?.node;if(!node?.target)return;
+    event.preventDefault();openReviewMenu([node],[event.clientX,event.clientY]);
+  });
   model.on('change:review',reviewState);model.on('change:status',reviewState);model.on('msg:custom',reviewMessage);reviewState();
   function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
   function replayEdit(action,args={}){
@@ -152,7 +204,7 @@ export function render({model,el}) {
     const overlaps=index===null?[]:overlappingPanels(index);switchChart.hidden=overlaps.length<2;
     if(!switchChart.hidden){const [x,y,w]=panelRect(index);switchChart.textContent=`Switch chart (${overlaps.length})`;switchChart.style.left=`${(x+w)/canvas.width*100}%`;switchChart.style.top=`${y/canvas.height*100}%`;switchChart.onclick=()=>enqueue(()=>openChooser(overlaps.map(panelChoice),[x+w,y+30]));}
     const name=index===null?'':text(panelConfig(index).chart_title?.text)||panelId(index);
-    root.querySelector('[data-hint]').textContent=hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
+    root.querySelector('[data-hint]').textContent=(kind==='radar'||(!kind&&configOf(local).polar))?'Polar coordinates · Wheel zoom disabled · Set radial range in Properties':hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
   }
   function layersInPanel(index){const cfg=panelConfig(index);return [baseLayer(index),...(cfg.overlays??[]).map((_,i)=>index===0?{Overlay:i}:{SubplotOverlay:[index-1,i]})];}
   function setPointerLayer(layer){chart.set_active_layer(JSON.stringify(layer));local.config.active_layer=clone(layer);}
@@ -597,6 +649,8 @@ export function render({model,el}) {
   fields.addEventListener('focusout',()=>setTimeout(()=>{if(formRefreshPending&&!sidebarPointer&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0));
   function properties(refresh=true){
     if(!chart)return;
+    if(pointer?.moved){formRefreshPending=true;return;}
+    stats.inspector_rebuilds=(stats.inspector_rebuilds??0)+1;
     let restoreControl=null;
     try{
     if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
@@ -822,11 +876,21 @@ export function render({model,el}) {
     let groupIndex=0;
     for(const [group,entries]of groups){
       const section=document.createElement('details');section.dataset.propertySection=group;
-      const sectionKey=JSON.stringify([object.id,group]),defaultOpen=primary&&groupIndex++<2;
+      const sectionKey=JSON.stringify([object.id,group]),defaultOpen=(primary&&groupIndex++<2)||['Figure size','Panel geometry','Plot area'].includes(group);
       section.open=propertySections.get(sectionKey)??defaultOpen;
       section.addEventListener('toggle',()=>propertySections.set(sectionKey,section.open));
       const heading=document.createElement('summary');heading.textContent=group;section.append(heading);
       for(const field of entries){
+        if(field.kind==='rectangle'){
+          const current=field.value.length?field.value:(kind?JSON.parse(chart.decorations()).find(d=>d.id==='data_area')?.rect:null);
+          if(!current)continue;
+          const inputs=[];
+          for(const [i,key]of ['x','y','width','height'].entries()){
+            const row=document.createElement('label');row.textContent=caption(key);const input=document.createElement('input');input.type='number';input.step='any';input.value=current[i];input.dataset.layoutComponent=key;inputs.push(input);
+            input.addEventListener('change',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:inputs.map(v=>Number(v.value)),base_value:field.value}));row.append(input);section.append(row);
+          }
+          continue;
+        }
         if(field.kind==='action'){
           const button=document.createElement('button');button.textContent=field.label;button.dataset.catalogField=field.id;
           button.addEventListener('click',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:true,base_value:field.value}));section.append(button);continue;
@@ -1026,7 +1090,7 @@ export function render({model,el}) {
     const panels=panelsAt(point);if(focusIndex()===null&&panels.length>1){openChooser(panels.map(panelChoice),point);return;}
     const at=panelAt(point);selected=null;chart.on_press(-100,-100);chart.on_release();chart.set_picked_data('null');
     if(at!==null)setPointerLayer(baseLayer(at));
-    local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;dirty=true;commit();
+    local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;if(at!==null&&root.querySelector('[data-area]').checked){selected=elementName('data_area');inspectorTarget=selected;showProperties();}dirty=true;commit();
   }
   canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;inspectorOwner=null;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e),pointSize=[canvas.width,canvas.height];
     if(drawingTool!=='select'){
@@ -1091,6 +1155,7 @@ export function render({model,el}) {
   canvas.addEventListener('wheel',e=>{
     if(chooser){e.preventDefault();return;}
     if(inlineText){e.preventDefault();return;}
+    if(chart&&(kind==='radar'||(!kind&&configOf(snapshot()).polar)))return;
     if(chart&&kind&&boundedView){
       const horizontal=boundedView.axis==='x';if(horizontal?e.shiftKey&&!e.ctrlKey:e.ctrlKey&&!e.shiftKey)return;
       e.preventDefault();const point=localPoint(e),delta=e.deltaY||e.deltaX;
@@ -1168,6 +1233,6 @@ export function render({model,el}) {
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

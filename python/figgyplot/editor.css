@@ -99,3 +99,13 @@
 .figgy-review textarea {display:block;box-sizing:border-box;width:100%;margin:6px 0;resize:vertical;font:inherit;}
 .figgy-review button {margin-right:8px;}
 .figgy-review [data-review-status] {font-size:13px;}
+
+.figgy-webgpu .figgy-properties { resize: horizontal; overflow: auto; min-width: 280px; max-width: 640px; }
+.figgy-webgpu .figgy-properties input { box-sizing: border-box; }
+
+.figgy-review textarea,.figgy-review-dialog {font-family:var(--figgy-review-font,system-ui,sans-serif);}
+.figgy-review-dialog {max-width:min(440px,90vw);border:1px solid #bbcadd;border-radius:8px;padding:18px;color:#172b44;background:white;}
+.figgy-review-dialog textarea {box-sizing:border-box;display:block;width:100%;margin:12px 0;font:inherit;}
+.figgy-review-dialog button {margin-right:8px;}
+.figgy-review-menu {position:fixed;inset:auto;margin:0;z-index:20;max-width:320px;padding:6px;border:1px solid #bbcadd;border-radius:6px;background:white;box-shadow:0 4px 18px #172b4422;}
+.figgy-review-menu button {display:block;max-width:100%;text-align:left;}

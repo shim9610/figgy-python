@@ -509,6 +509,8 @@ pub(super) fn bounded_view_json(settings: &str) -> PyResult<String> {
 
 #[derive(Default)]
 pub(super) struct Navigator {
+    pub review_enabled: bool,
+    pub comment_target: Option<Node>,
     pub filter: String,
     open: HashMap<String, bool>,
     last_selection: String,
@@ -557,13 +559,21 @@ impl Navigator {
         }
         ui.label(egui::RichText::new("OBJECTS").strong().small());
         ui.horizontal(|ui| {
-            let search = ui.add(
+            let width = (ui.available_width() - 24. - ui.spacing().item_spacing.x).max(20.);
+            let search = ui.add_sized(
+                [width, ui.spacing().interact_size.y],
                 egui::TextEdit::singleline(&mut self.filter)
-                    .hint_text("Find a panel, axis or series…")
-                    .desired_width(ui.available_width() - 30.),
+                    .hint_text("Find a panel, axis or series…"),
             );
             controls.insert("object_search".into(), search.rect);
-            if ui.small_button("×").on_hover_text("Clear search").clicked() {
+            if ui
+                .add_sized(
+                    [24., ui.spacing().interact_size.y],
+                    egui::Button::new("×").small(),
+                )
+                .on_hover_text("Clear search")
+                .clicked()
+            {
                 self.filter.clear();
                 reveal = true;
             }
@@ -655,6 +665,14 @@ impl Navigator {
                             }
                             if selected && reveal {
                                 response.scroll_to_me(Some(egui::Align::Center));
+                            }
+                            if self.review_enabled && node.target.is_some() {
+                                response.context_menu(|ui| {
+                                    if ui.button("Add review comment…").clicked() {
+                                        self.comment_target = Some((*node).clone());
+                                        ui.close();
+                                    }
+                                });
                             }
                             if response.clicked() {
                                 response.request_focus();

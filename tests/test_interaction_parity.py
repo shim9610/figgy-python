@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import figgyplot as figgy
 from test_radial_desktop import Inputs
+from native_input import set_clipboard
 from jupyter_harness import notebook, button_point_without_frames, click_button
 from browser_timing import screenshot_editor
 
@@ -127,6 +128,10 @@ def native_point(info, logical):
 def browser_point(page, logical):
     r=page.locator('.figgy-editor canvas').bounding_box()
     return r['x']+logical[0]*r['width']/960, r['y']+logical[1]*r['height']/600
+
+
+def browser_surface_point(page, point):
+    return page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""", point)
 
 
 def check_bounded_menus_during_preparation(page, execute, kind):
@@ -1468,10 +1473,15 @@ def test_bounded_value_range_wheel_and_fit_work_in_both_hosts(tmp_path, family):
             rect=inputs.info()['decorations']['data_area'];point=native_point(inputs.info(),(rect[0]+rect[2]/2,rect[1]+rect[3]/2))
             inputs.xdo('mousemove','--window',inputs.wid,*map(round,point));inputs.pump();inputs.xdo('click',4);inputs.pump()
             after=fig.get_settings()[kind]
-            assert after['value_range'] is not None
+            assert after['value_range'] is None if kind=='radar' else after['value_range'] is not None
             assert after['series']==before['series']
             panel_before=inputs.info()['chart_panel']
+            before_inspector=inputs.info()
             inputs.click('properties');assert 'range_min' in inputs.info()['controls']
+            if inputs.info()['chart_panel']!=panel_before:
+                from PIL import ImageGrab
+                (tmp_path/'inspector-layout.json').write_text(json.dumps(dict(before=before_inspector,after=inputs.info()),indent=2))
+                ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'inspector-layout.png')
             assert inputs.info()['chart_panel']==panel_before
             inputs.click('fit');assert fig.get_settings()[kind]['value_range'] is None
             assert fig.info['rgba_readbacks']==fig.info['png_encodes']==0
@@ -1481,7 +1491,8 @@ def test_bounded_value_range_wheel_and_fit_work_in_both_hosts(tmp_path, family):
         original=page.evaluate(ROOT+'.snapshot()')[kind]
         area=page.evaluate('async()=> (await '+ROOT+'.decorations()).find(v=>v.id==="data_area").rect')
         page.mouse.move(*browser_point(page,(area[0]+area[2]/2,area[1]+area[3]/2)));page.mouse.wheel(0,-40)
-        page.wait_for_function(ROOT+f'.snapshot().{kind}.value_range !== null')
+        if kind!='radar':page.wait_for_function(ROOT+f'.snapshot().{kind}.value_range !== null')
+        else:assert page.evaluate(ROOT+f'.snapshot().{kind}.value_range') is None
         page.evaluate(ROOT+'.flush()')
         state=page.evaluate(ROOT+'.snapshot()')[kind]
         assert state['series']==original['series']
@@ -2802,8 +2813,7 @@ def test_native_review_long_comments_keep_approval_controls_reachable(tmp_path,f
         session.comment(fig.id,'Preserve the original data',target={'series_id':'signal'})
         inputs.click('review_comments')
         import subprocess
-        subprocess.run(['xclip','-selection','clipboard'],input=comments,text=True,
-                       stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
+        set_clipboard(comments)
         inputs.key('ctrl+v');inputs.pump();session.poll()
         info=inputs.info();width,height=info['surface_size']
         for key in ['review_comments','review_changes','review_accept']:
@@ -2869,3 +2879,264 @@ def test_review_controller_displays_a_complete_regenerated_round(tmp_path,backen
         page.wait_for_function("[...document.querySelectorAll('.figgy-editor')].every(r=>{const d=r.figgy.diagnostics();return !d.dirty&&!d.frame_pending&&!d.busy&&!d.queued;})",polling=100,timeout=180000)
         for index in range(2):page.locator('.figgy-editor').nth(index).screenshot(path=str(tmp_path/f'complete-next-round-{index}.png'))
         execute('watcher.cancel(); session.cancel()')
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+def test_layout_selects_plot_on_first_click_and_exposes_real_geometry(tmp_path):
+    from PIL import ImageGrab
+    with figgy.Figure(backend='native',grid=[['left','right']]) as fig:
+        fig.subplots['left'].plot([0,1],[2,3],id='one')
+        fig.subplots['right'].plot([0,1],[3,2],id='two')
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('layout_mode')
+            inputs.click_rect([*native_point(inputs.info(),(240,300)),0,0])
+            assert inputs.info()['selected']=='data_area'
+            assert inputs.info()['properties_open']
+            assert all('plot_'+key in inputs.info()['controls'] for key in ['x','y','width','height'])
+            before=fig.get_settings();inputs.click('plot_width');inputs.key('ctrl+a');inputs.xdo('type','--clearmodifiers','220');inputs.key('Return')
+            assert not inputs.info()['error']
+            owner=next(v for v in fig.editor_properties() if v['target']=='data_area')
+            bounds=next(v['value'] for v in owner['fields'] if v['id']=='Plot area/bounds')
+            assert bounds[2]==220
+            assert fig.get_settings()['config']['chart_area']==before['config']['chart_area']
+            # Make the inspector wider using its actual separator.
+            old=inputs.info()['controls']['inspector_resize']
+            drag_native(inputs,(old[0]+3,old[1]+old[3]/2),(-100,0))
+            assert inputs.info()['controls']['plot_width'][0] < inputs.info()['surface_size'][0]-150
+            ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-layout-controls.png')
+            assert fig.info['column_uploads']==4
+        finally:handle.close();Inputs.pump()
+    source="import figgyplot as fg\nfig=fg.Figure(backend='webgpu',grid=[['left','right']])\nfig.subplots['left'].plot([0,1],[2,3],id='one')\nfig.subplots['right'].plot([0,1],[3,2],id='two')\ndisplay(fig.widget())"
+    with notebook(tmp_path/'browser-layout',source) as (page,execute):
+        check_display_frame_ready(page)
+        click_button(page,'[data-layout]')
+        page.mouse.click(*browser_point(page,(240,300)))
+        control=page.locator('[data-layout-component=width]');control.wait_for(state='visible')
+        control.fill('220');control.press('Tab');page.evaluate(ROOT+'.flush()')
+        catalog=json.loads(execute('import json;print(json.dumps(fig.editor_properties()))'))
+        owner=next(o for o in catalog if o['target']=='data_area')
+        assert next(f['value'] for f in owner['fields'] if f['id']=='Plot area/bounds')[2]==220
+        screenshot_editor(page,tmp_path/'browser-layout-controls.png')
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+def test_polar_wheel_does_not_modify_angular_or_radial_ranges(tmp_path):
+    with figgy.Figure(backend='native') as fig:
+        ax=fig.axes[0];ax.set_polar();ax.plot([0,90,180,270],[1,2,3,2])
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);rect=inputs.info()['decorations']['data_area']
+            point=(rect[0]+rect[2]/2,rect[1]+rect[3]/2)
+            inputs.xdo('mousemove','--window',inputs.wid,*map(round,point));inputs.pump()
+            before=fig.get_settings()
+            for modifier in [None,'ctrl','shift']:
+                if modifier:inputs.xdo('keydown',modifier)
+                inputs.xdo('click',4);inputs.pump()
+                if modifier:inputs.xdo('keyup',modifier)
+                assert fig.get_settings()['config']==before['config']
+            assert fig.info['column_uploads']==2
+        finally:handle.close();Inputs.pump()
+    source="import figgyplot as fg\nfig,ax=fg.subplots(backend='webgpu')\nax.set_polar();ax.plot([0,90,180,270],[1,2,3,2])\ndisplay(fig.widget())"
+    with notebook(tmp_path/'polar-wheel',source) as (page,execute):
+        check_display_frame_ready(page)
+        before=page.evaluate(ROOT+'.snapshot()')
+        area=page.evaluate('async()=> (await '+ROOT+'.decorations()).data_area.rect')
+        page.mouse.move(*browser_surface_point(page,(area[0]+area[2]/2,area[1]+area[3]/2)))
+        for modifier in [None,'Control','Shift']:
+            if modifier:page.keyboard.down(modifier)
+            page.mouse.wheel(0,-40)
+            if modifier:page.keyboard.up(modifier)
+        page.evaluate(ROOT+'.flush()')
+        after=page.evaluate(ROOT+'.snapshot()')
+        assert after['config']==before['config']
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+def test_element_review_comments_use_selected_font_and_preserve_ssot(tmp_path):
+    from figgyplot.review import Session
+    from figgyplot._native import font_family_available
+    from PIL import ImageGrab
+    family='Noto Sans CJK KR' if font_family_available('Noto Sans CJK KR') else 'DejaVu Sans'
+    text='이 주석을 오른쪽으로 이동해 주세요' if family=='Noto Sans CJK KR' else 'Move this annotation to the right'
+    with Session(tmp_path/'native-cache',backend='native',review_font=family,review_font_size=17) as session:
+        fig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='one')
+        fig.axes[0].set_title('Review title')
+        fig.axes[0].text(.3,.3,'Review this element',coords='ratio',id='note')
+        session.present();handle=session._handles['plot']
+        inputs=Inputs(handle)
+        before=fig.get_settings()
+        bounds=json.loads(fig._native.bounds_json('annotation:note'))['rect']
+        point=native_point(inputs.info(),(bounds[0]+bounds[2]/2,bounds[1]+bounds[3]/2))
+        inputs.input_frame('mousemove','--window',inputs.wid,*map(round,point));inputs.input_frame('click',3)
+        target=next(v['id'] for v in fig.editor_properties() if v['target']=='annotation:note')
+        inputs.click('review_target:'+target);inputs.click('review_target_text')
+        import subprocess
+        set_clipboard(text)
+        inputs.key('ctrl+v');inputs.pump()
+        ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'native-element-comment.png')
+        inputs.click('review_target_save');session.poll()
+        comments=session._review_state('plot')['target_comments']
+        assert len(comments)==1 and comments[0]['target']==target and comments[0]['text']==text
+        comment_id=comments[0]['id']
+        inputs.click('review_target_list');inputs.click('review_target_edit:'+comment_id)
+        inputs.click('review_target_text');inputs.key('ctrl+a')
+        set_clipboard(text+'!')
+        inputs.key('ctrl+v');inputs.click('review_target_save');session.poll();inputs.key('Escape')
+        assert session._review_state('plot')['target_comments'][0]['id']==comment_id
+        # A decoration uses its own stable target, separately from annotations.
+        bounds=inputs.info()['decorations']['chart_title']
+        inputs.input_frame('mousemove','--window',inputs.wid,round(bounds[0]+bounds[2]/2),round(bounds[1]+bounds[3]/2));inputs.input_frame('click',3)
+        title=next(v['id'] for v in fig.editor_properties() if v['target']=='chart_title')
+        inputs.click('review_target:'+title);inputs.click('review_target_text')
+        inputs.xdo('type','--clearmodifiers','Clarify the title');inputs.click('review_target_save');session.poll()
+        comments=session._review_state('plot')['target_comments'];assert len(comments)==2
+        title_comment=next(c for c in comments if c['target']==title)
+        inputs.click('review_target_list');inputs.click('review_target_delete:'+title_comment['id']);session.poll();inputs.key('Escape')
+        comments=session._review_state('plot')['target_comments']
+        assert len(comments)==1 and comments[0]['id']==comment_id and comments[0]['text']==text+'!'
+        assert fig.get_settings()==before
+        inputs.click('review_changes');session.poll()
+        assert session.events()
+        assert session.feedback(session.events()[0]['work_id'])['round']['documents']['plot']['comments'][0]['text']==text+'!'
+        work=session.events()[0]['work_id']
+        summary=session.feedback_summary(work)
+        obj,=summary['figures'][0]['objects']
+        assert obj['target']==target and obj['change_count']==0 and obj['comments'][0]['id']==comment_id
+        detail=session.feedback_details(work,'plot',target=target)
+        assert not detail['changes'] and detail['objects'][0]['snapshots']['after']
+    source="import figgyplot as fg\nfrom figgyplot.review import Session\nsession=Session(backend='webgpu',review_font="+repr(family)+",review_font_size=17)\nfig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='one')\nfig.axes[0].text(.3,.3,'Review this element',coords='ratio',id='note')\ndisplay(session.widget(fig))"
+    with notebook(tmp_path/'browser-comments',source) as (page,execute):
+        check_display_frame_ready(page)
+        page.wait_for_function("document.querySelector('.figgy-editor').style.getPropertyValue('--figgy-review-font') !== ''")
+        before=page.evaluate(ROOT+'.snapshot()')
+        bounds=page.evaluate(ROOT+'.annotations()')[0]['rect']
+        page.mouse.click(*browser_surface_point(page,(bounds[0]+bounds[2]/2,bounds[1]+bounds[3]/2)),button='right')
+        menu=page.locator('[data-review-target]');menu.wait_for(state='visible');target=menu.get_attribute('data-review-target');menu.click()
+        page.locator('[data-review-target-text]').fill(text)
+        assert page.locator('[data-review-target-text]').evaluate('e=>getComputedStyle(e).fontSize')=='17px'
+        screenshot_editor(page,tmp_path/'browser-element-comment.png')
+        page.locator('[data-review-target-save]').click()
+        assert json.loads(execute('import json;print(json.dumps(session._review_state("plot")["target_comments"]))'))[0]['target']==target
+        click_button(page,'[data-review-target-list]');page.get_by_role('button',name='Edit',exact=True).click()
+        page.locator('[data-review-target-text]').fill(text+'!');page.locator('[data-review-target-save]').click()
+        # A series can be addressed directly from the object tree, even in an overlay.
+        click_button(page,'[data-properties]')
+        row=page.locator('[role=treeitem][data-object="one"]');row.wait_for(state='visible');row.click(button='right')
+        menu=page.locator('[data-review-target]');series_target=menu.get_attribute('data-review-target');menu.click()
+        assert series_target!=target
+        page.locator('[data-review-target-text]').fill('Clarify this series');page.locator('[data-review-target-save]').click()
+        click_button(page,'[data-review-target-list]')
+        page.locator('dialog section').filter(has_text='Clarify this series').get_by_role('button',name='Delete',exact=True).click()
+        page.get_by_role('button',name='Close',exact=True).last.click()
+        comments=json.loads(execute('import json;print(json.dumps(session._review_state("plot")["target_comments"]))'))
+        assert len(comments)==1 and comments[0]['target']==target and comments[0]['text']==text+'!'
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        assert not page.locator('[data-review-status]').inner_text().startswith('Review font could not')
+        assert page.evaluate("document.fonts.status")=='loaded'
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+def test_review_connect_and_finish_buttons_use_a_terminal_lifecycle_signal(tmp_path,monkeypatch):
+    from figgyplot.review import Session
+    with Session(tmp_path/'native-connect',backend='native') as session:
+        fig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='signal')
+        session.start();before=fig.get_settings();session._set_comment_text('plot','저장 후 종료')
+        poll=session.poll;clicked=False
+        def automate_review():
+            nonlocal clicked
+            poll()
+            if not clicked:
+                inputs=Inputs(session._handles['plot'])
+                inputs.click('review_finish');clicked=True
+                poll()
+        monkeypatch.setattr(session,'poll',automate_review)
+        event=session.connect(timeout=10)
+        assert clicked and event['intent']=='finish'
+        assert session.snapshot()['rounds'][-1]['documents']['plot']['approval']['settings']==before
+        assert session.finish(event['work_id'])==1
+        assert session.status['state']=='completed'
+        assert not session._handles
+    source="import json\nfrom figgyplot.review import Session\nsession=Session(backend='webgpu')\nfig=session.figure(id='plot');fig.axes[0].plot([0,1],[2,3],id='signal')\ndisplay(session.widget(fig))"
+    with notebook(tmp_path/'browser-finish',source,allow_closed=True) as (page,execute):
+        check_display_frame_ready(page)
+        before=page.evaluate(ROOT+'.snapshot()')
+        page.locator('[data-review-comments]').fill('저장 후 종료')
+        click_button(page,'[data-review-finish]')
+        page.wait_for_function("!document.querySelector('.figgy-editor')")
+        event=json.loads(execute('print(json.dumps(session.events()[0]))'))
+        assert event['intent']=='finish'
+        approved=json.loads(execute('print(json.dumps(session.snapshot()["rounds"][-1]["documents"]["plot"]["approval"]["settings"]))'))
+        assert approved==before
+        assert execute('print(session.finish(session.events()[0]["work_id"]))').strip()=='1'
+        assert json.loads(execute('print(json.dumps(session.status))'))['state']=='completed'
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+@pytest.mark.parametrize('annotation',['arrow','text'])
+def test_annotation_drag_reuses_inspector_descriptions_until_release(tmp_path, monkeypatch, annotation):
+    from time import perf_counter
+    measurement={}
+    monkeypatch.setenv('FIGGY_PROFILE_HOST','1')
+    def assert_only_arrow_coordinates_changed(host,before,after):
+        (tmp_path/f'{host}-drag-ssot.json').write_text(json.dumps(dict(before=before,after=after),indent=2))
+        old=json.loads(json.dumps(before));new=json.loads(json.dumps(after))
+        kind='Arrow' if annotation=='arrow' else 'Text'
+        a=old['config']['annotations']['items'][0]['kind'][kind]
+        b=new['config']['annotations']['items'][0]['kind'][kind]
+        keys=('from','to') if annotation=='arrow' else ('anchor',)
+        for key in keys:
+            assert a[key]!=b[key]
+            for axis in ('x','y'):
+                assert b[key]['Ratio'][axis]>a[key]['Ratio'][axis]
+            b[key]=a[key]
+        assert new==old
+    with figgy.Figure(backend='native') as fig:
+        fig.axes[0].plot([0,1],[2,3],id='one')
+        if annotation=='arrow':fig.axes[0].arrow(.2,.2,.3,.2,coords='ratio',id='arrow')
+        else:fig.axes[0].text(.2,.2,'Move this text',coords='ratio',id='arrow')
+        fig.axes[0].text(.7,.7,'Keep this annotation',coords='ratio',id='fixed')
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.click('properties')
+            rect=json.loads(fig._native.bounds_json('annotation:arrow'))['rect']
+            start=native_point(inputs.info(),(rect[0]+rect[2]/2,rect[1]+rect[3]/2))
+            inputs.click_rect([*start,0,0]);before=inputs.info()['property_catalog_builds'];old=fig.get_settings();uploads=fig.info['column_uploads']
+            if annotation=='text':time.sleep(.5)  # This gesture is a drag, not double-click text editing.
+            inputs.input_frame('mousemove','--window',inputs.wid,*map(round,start));inputs.input_frame('mousedown',1)
+            work_before=fig.info['host_work']
+            begin=perf_counter()
+            for step in range(1,7):inputs.input_frame('mousemove','--window',inputs.wid,round(start[0]+step*3),round(start[1]+step*2))
+            during=inputs.info()['property_catalog_builds'];inputs.input_frame('mouseup',1)
+            work_after=fig.info['host_work']
+            for stage in ('annotation_view','native_axis_refresh','native_styles'):
+                assert work_after.get(stage,{}).get('count',0)==work_before.get(stage,{}).get('count',0), (stage,work_before,work_after)
+            assert work_after['native_annotation_refresh']['count']>work_before.get('native_annotation_refresh',{}).get('count',0)
+            measurement['native']=dict(moves=6,inspector_rebuilds_during=during-before,elapsed=perf_counter()-begin,last_input_to_submit_ms=inputs.info()['last_input_to_submit_ms'])
+            assert during-before<=1
+            assert_only_arrow_coordinates_changed('native',old,fig.get_settings())
+            assert fig.info['column_uploads']==uploads
+        finally:handle.close();Inputs.pump()
+    item="ax.arrow(.2,.2,.3,.2,coords='ratio',id='arrow')" if annotation=='arrow' else "ax.text(.2,.2,'Move this text',coords='ratio',id='arrow')"
+    source="import figgyplot as fg\nfig,ax=fg.subplots(backend='webgpu')\nax.plot([0,1],[2,3],id='one');"+item+"\nax.text(.7,.7,'Keep this annotation',coords='ratio',id='fixed')\ndisplay(fig.widget())"
+    with notebook(tmp_path/'browser-drag',source) as (page,execute):
+        check_display_frame_ready(page)
+        click_button(page,'[data-properties]')
+        rect=page.evaluate(ROOT+'.annotations()')[0]['rect']
+        start=browser_surface_point(page,(rect[0]+rect[2]/2,rect[1]+rect[3]/2))
+        page.mouse.click(*start);page.evaluate(ROOT+'.flush()')
+        if annotation=='text':time.sleep(.5)
+        before=page.evaluate(ROOT+'.stats.inspector_rebuilds')
+        old=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
+        begin=perf_counter();page.mouse.move(*start);page.mouse.down()
+        page.mouse.move(start[0]+24,start[1]+16,steps=8)
+        during=page.evaluate(ROOT+'.stats.inspector_rebuilds')
+        page.mouse.up();page.evaluate(ROOT+'.flush()')
+        measurement['browser']=dict(moves=8,inspector_rebuilds_during=during-before,elapsed=perf_counter()-begin)
+        assert during-before<=1
+        assert_only_arrow_coordinates_changed('browser',old,page.evaluate(ROOT+'.snapshot()'))
+        assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
+        assert not page.locator('.figgy-error').inner_text()
+    (tmp_path/'wrapper-drag-measurement.json').write_text(json.dumps(measurement,indent=2))

@@ -96,6 +96,7 @@ class FigureWidget(anywidget.AnyWidget):
     draw_styles = traitlets.Dict().tag(sync=True)
     auto_prepare = traitlets.Bool(True).tag(sync=True)
     review = traitlets.Dict().tag(sync=True)
+    review_font_data = traitlets.Bytes().tag(sync=True)
 
     def __init__(self, figure, *, auto_prepare=True):
         self.figure = figure
@@ -135,7 +136,10 @@ class FigureWidget(anywidget.AnyWidget):
         if action == "review_comment":
             session = getattr(self.figure, '_review_session', None)
             if session is not None and self.review.get('enabled'):
-                try:session._set_comment_text(self.figure.id, content.get('comments', ''))
+                try:
+                    if session._figures.get(self.figure.id) is not self.figure:raise RuntimeError('Stale review view from a previous round')
+                    session._set_comment_text(self.figure.id, content.get('comments', ''))
+                    if 'target_comments' in content:session._set_target_comments(self.figure.id,content['target_comments'])
                 except Exception as exc:self.send(dict(action='review_result',error=str(exc)))
         elif action == "review_submit":
             try:
@@ -147,8 +151,9 @@ class FigureWidget(anywidget.AnyWidget):
                 # The browser submits only after its input queue and accepted
                 # edit acknowledgements are drained. Verify that revision in the
                 # common commit path; do not start another barrier inside a comm.
+                session._set_target_comments(self.figure.id,content.get('target_comments',[]))
                 session._submit(self.figure.id, content['disposition'],
-                    content.get('comments'), content['revision'])
+                    content.get('comments'), content['revision'], content.get('intent','revise'))
             except Exception as exc:
                 self.send(dict(action='review_result',error=str(exc)))
         elif action == "mounted":
