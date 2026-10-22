@@ -1646,6 +1646,35 @@ def test_annotation_drawing_editing_and_cancel_in_both_hosts(tmp_path, family):
         screenshot_editor(page,tmp_path/f'{family}-drawing.png')
 
 
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real browser')
+def test_annotation_mouse_input_uses_live_layout_after_resize(tmp_path):
+    from playwright.sync_api import sync_playwright
+    from inline_editor_harness import annotation_point
+    with sync_playwright() as p:
+        browser=p.chromium.launch(executable_path=os.environ.get('BROWSER_EXECUTABLE_PATH') or shutil.which('chromium'),
+                                  headless=False,args=['--no-sandbox'])
+        try:
+            page=browser.new_page(viewport={'width':980,'height':820})
+            page.set_content('''<style>body{margin:0}canvas{position:absolute;left:389px;top:361.9375px;width:960px;height:600px}</style>
+                <div class="figgy-editor"><canvas width="960" height="600"></canvas></div>''')
+            page.evaluate("""()=>{
+                const root=document.querySelector('.figgy-editor'),canvas=root.querySelector('canvas');
+                root.figgy={annotations:async()=>[{index:0,rect:[846,506,62,38]}],
+                    snapshot:()=>({config:{chart_area:{width:960,height:600}}}),diagnostics:()=>({kind:'radial'})};
+                window.clicks=[];canvas.addEventListener('dblclick',e=>clicks.push({trusted:e.isTrusted,x:e.clientX,y:e.clientY}));
+            }""")
+            old=page.locator('canvas').bounding_box()
+            stale=[old['x']+854*old['width']/960,old['y']+512*old['height']/600]
+            page.evaluate("""()=>{const c=document.querySelector('canvas');c.style.width='511px';
+                c.style.height='319.375px';c.style.top='438.9375px';}""")
+            page.mouse.dblclick(*stale)
+            assert page.evaluate('clicks')==[]  # The CI point lies outside the viewport.
+            current=annotation_point(page);page.mouse.dblclick(*current['point'])
+            clicks=page.evaluate('clicks');assert len(clicks)==1 and clicks[0]['trusted']
+            (tmp_path/'annotation-input-layout.json').write_text(json.dumps({'stale_point':stale,'current':current,'delivered':clicks}))
+        finally:browser.close()
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
 @pytest.mark.parametrize('family', ['cartesian', 'radial'])
 def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path, family):
@@ -1704,12 +1733,10 @@ def test_inline_text_resize_multiline_and_existing_format_in_both_hosts(tmp_path
         execute("state=fig.get_settings();state['"+kind+"']['active_layer']='Base';state['"+kind+"']['annotations']['items'][0]['kind']['Text']['text']['segments'][0]['bold']=True;fig.apply_settings(state);print('updated')")
         page.wait_for_function(f'({ROOT}.snapshot().{kind}.active_layer??"Base")==="Base" && {ROOT}.snapshot().{kind}.annotations.items[0].kind.Text.text.segments[0].bold===true')
         page.wait_for_function('async()=> (await '+ROOT+'.annotations()).length===1')
-        rect=page.evaluate(ROOT+'.annotations()')[0]['rect'];canvas=page.locator('canvas').bounding_box()
-        # Cartesian geometry is in current physical canvas pixels; bounded maps use document units.
-        size=[960,600] if family=='radial' else page.locator('canvas').evaluate('c=>[c.width,c.height]')
-        reopen={'annotation':rect,'canvas':canvas,'units':size}
+        from inline_editor_harness import annotation_point
+        reopen=annotation_point(page)
         (tmp_path/'inline-reopen-request.json').write_text(json.dumps(reopen,indent=2))
-        page.mouse.dblclick(canvas['x']+(rect[0]+8)*canvas['width']/size[0],canvas['y']+(rect[1]+6)*canvas['height']/size[1])
+        page.mouse.dblclick(*reopen['point'])
         try:
             entry.wait_for(state='visible');page.wait_for_function("document.activeElement?.hasAttribute('data-inline-text')")
         finally:

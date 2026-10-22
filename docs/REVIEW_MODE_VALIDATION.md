@@ -111,3 +111,31 @@ passed all **117 cases in 3.02 seconds**; Cargo format/check passed. All 33 inst
 files match the wheel byte for byte, including the native extension; its 32
 non-native runtime files also match their packaged source files. Installed-wheel
 smoke and editor-control inventory checks passed.
+
+## CI #52 annotation-input follow-up
+
+The preceding local 640-case pass did not reproduce CI #52's browser input
+failure. CI passed four layout probes and 51 priority cases, then stopped at
+**250 passed and one failed** in 1472.42 seconds. The radial multiline-text
+case sent its reopening double-click to **(1243, 873.94)** in a **980 x 820**
+viewport. Its separately read protocol bounding box still described a
+960 x 600 canvas, while the subsequent DOM record was 511 x 319.375. No text
+hit was recorded; all three GPU submissions had completed and the host queue
+was idle. This establishes an invalid test input, not a renderer/SSOT failure.
+The evidence does not determine whether the earlier protocol box was stale
+when returned or the DOM layout changed between the separate reads.
+
+The shared annotation-input helper now prepares annotation geometry and reads
+the live DOM rectangle and coordinate units in one browser operation. It rejects
+points outside the visible canvas before sending real Playwright mouse input.
+Both existing-text helpers use this path. No timing deadline or post-input
+assertion changed. A controlled browser case reproduces the recorded resize:
+the old point delivers no canvas double-click, while the current point delivers
+a trusted mouse event. [The CI request, accepted SSOT and settled host state](measurements/ci52-annotation-input-20261022.json)
+retain the measured failure.
+
+All **five affected cases passed in 94.48 seconds**: the controlled input
+regression, Cartesian/radial multiline editing, and scale 1/2 editing. Runtime
+files and the release wheel are unchanged. The collection now contains **641
+cases**; no complete local 641-case pass is claimed. Required CI validates the
+complete updated collection.
