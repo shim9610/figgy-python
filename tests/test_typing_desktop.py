@@ -22,7 +22,8 @@ def assert_rich_text(text, expected):
 
 @pytest.mark.skipif(not os.environ.get('DISPLAY') or not all(shutil.which(x) for x in ('xdotool','xclip','wmctrl')), reason='requires real X11 input')
 @pytest.mark.parametrize('mode', ['inline', 'inspector', 'review', 'target'])
-def test_native_typing_does_not_rebuild_unrelated_chart_work(tmp_path, monkeypatch, mode):
+@pytest.mark.parametrize('with_image',[False,True])
+def test_native_typing_does_not_rebuild_unrelated_chart_work(tmp_path, monkeypatch, mode, with_image):
     monkeypatch.setenv('FIGGY_PROFILE_HOST', '1')
     with Session(cache_dir=tmp_path/'review', backend='native') as session:
         fig = session.figure(id='plot')
@@ -34,6 +35,14 @@ def test_native_typing_does_not_rebuild_unrelated_chart_work(tmp_path, monkeypat
         handle = session._handles['plot']
         inputs = Inputs(handle)
         try:
+            if with_image:
+                import subprocess
+                from PIL import Image
+                image=tmp_path/'reference.png';Image.new('RGB',(96,64),'#E69F00').save(image)
+                subprocess.run(['xclip','-selection','clipboard','-t','image/png','-i',str(image)],check=True,
+                               stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+                inputs.click('review_comments');inputs.key('ctrl+v');session.poll()
+                assert len(session._review_state('plot')['attachments'])==1
             # Keep the inspector open even for comment/inline drafts: typing
             # there must not reconstruct an unchanged document's object tree.
             inputs.click('properties')

@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import uuid
+import base64
 import numpy as np
 
 from ._review_diff import changes, persistent, preserved
@@ -28,9 +29,14 @@ def _ui_comment(doc):
     return next((c['text'] for c in doc['comments'] if c.get('channel')=='ui'),'')
 
 
-def _replace_ui_comment(doc, text):
+def _replace_ui_comment(doc, text, attachments=None):
+    previous=next((c for c in doc['comments'] if c.get('channel')=='ui'),{})
+    images=previous.get('attachments',[]) if attachments is None else attachments
     doc['comments']=[c for c in doc['comments'] if c.get('channel')!='ui']
-    if text:doc['comments'].append(dict(id=_id(),text=text,target=None,channel='ui'))
+    if text or images:
+        comment=dict(id=previous.get('id') or _id(),text=text,target=None,channel='ui')
+        if images:comment['attachments']=images
+        doc['comments'].append(comment)
 
 
 def _same_approved_content(previous, current):
@@ -167,6 +173,7 @@ class Session:
             for r in state['rounds']:
                 for doc in r['documents'].values():
                     for ref in session._store.references(doc):session._store.get(ref)
+                    for ref in session._store.image_references(doc):session._store.get_image(ref)
             session._store.collect(state)
         return session
 
@@ -321,6 +328,8 @@ class Session:
         if figure.id not in self._figures or self._figures[figure.id] is not figure:
             raise ValueError('Figure does not belong to this review session')
         widget=figure.widget();review=self._review_state(figure.id)
+        images=review['attachments']+[image for c in review['target_comments'] for image in c.get('attachments',[])]
+        review['image_previews']={image['id']:'data:image/png;base64,'+base64.b64encode(self._store.get_image(image)).decode('ascii') for image in images}
         family=review.get('font_family')
         if family:
             from ._review_font import font_data
@@ -332,6 +341,8 @@ class Session:
     def _review_state(self, figure_id):
         state=self.snapshot();doc=state['rounds'][-1]['documents'][figure_id]
         return dict(enabled=True,figure_id=figure_id,comments=_ui_comment(doc),
+            attachments=next((c.get('attachments',[]) for c in doc['comments'] if c.get('channel')=='ui'),[]),
+            cache_dir=str(self.cache_dir),
             target_comments=[c for c in doc['comments'] if c.get('channel')=='ui_target'],
             **state.get('review_style',{}))
 
@@ -339,12 +350,17 @@ class Session:
         if not isinstance(comments,list):raise ValueError('Target comments must be a list')
         ids=set()
         for item in comments:
-            if not isinstance(item,dict) or set(item)-{'id','text','target','channel','label'} or not all(isinstance(item.get(k),str) and item[k].strip() for k in ('id','text','target')) or item['id'] in ids or ('label' in item and not isinstance(item['label'],str)):
+            if not isinstance(item,dict) or set(item)-{'id','text','target','channel','label','attachments'} or not all(isinstance(item.get(k),str) and item[k].strip() for k in ('id','target')) or not isinstance(item.get('text'),str) or not (item['text'].strip() or item.get('attachments')) or item['id'] in ids or ('label' in item and not isinstance(item['label'],str)):
                 raise ValueError('Target comments require unique IDs, nonempty text and a stable target')
             ids.add(item['id'])
         with self._store.locked():
             state=self._store.read();doc=self._mutable(state,figure_id)
-            updated=[c for c in doc['comments'] if c.get('channel')!='ui_target']+[dict(c,channel='ui_target') for c in comments]
+            normalized=[]
+            for c in comments:
+                value=dict(c,channel='ui_target')
+                if 'attachments' in c:value['attachments']=self._normalize_images(c['attachments'])
+                normalized.append(value)
+            updated=[c for c in doc['comments'] if c.get('channel')!='ui_target']+normalized
             if updated!=doc['comments']:doc['comments']=updated;self._store.write(state)
 
     def subscribe(self, *, after=None, timeout=60):
@@ -385,12 +401,53 @@ class Session:
     def _comment_text(self, figure_id):
         return _ui_comment(self.snapshot()['rounds'][-1]['documents'][figure_id])
 
-    def comment(self, figure_id, text, *, target=None):
+    def comment(self, figure_id, text, *, target=None, attachments=()):
         if not isinstance(text,str):raise ValueError('Review comment must be text')
         with self._store.locked():
             state=self._store.read();doc=self._mutable(state,figure_id)
-            doc['comments'].append(dict(id=_id(),text=text,target=target,channel='api'))
+            comment=dict(id=_id(),text=text,target=target,channel='api')
+            if attachments:comment['attachments']=self._normalize_images(list(attachments))
+            doc['comments'].append(comment)
             self._store.write(state)
+
+    def _normalize_images(self, images):
+        if not isinstance(images,list):raise ValueError('Review attachments must be a list')
+        result=[]
+        for item in images:
+            if isinstance(item,(str,Path)):
+                path=Path(item)
+                if path.stat().st_size>20*1024*1024:raise ValueError('Review images must be at most 20 MiB')
+                ref=self._store.put_image(path.read_bytes(),path.name)
+            elif isinstance(item,bytes):ref=self._store.put_image(item)
+            elif isinstance(item,dict) and 'data' in item:
+                data=item['data']
+                if not isinstance(data,str) or len(data)>28*1024*1024:raise ValueError('Review image payload is too large or invalid')
+                ref=self._store.put_image(base64.b64decode(data,validate=True),item.get('name','Review image.png'))
+            elif isinstance(item,dict):
+                ref={k:item[k] for k in ('id','name','file','sha256','bytes','width','height','mime_type') if k in item}
+                self._store.verify_image(ref)
+            else:raise ValueError('Review attachments must be image files, bytes or image references')
+            if not any(v['id']==ref['id'] for v in result):result.append(ref)
+        return result
+
+    def attach_image(self, figure_id, image, *, name='Review image.png'):
+        """Import an image for a review comment; returns a durable PNG reference."""
+        with self._store.locked():
+            state=self._store.read();doc=self._mutable(state,figure_id)
+            item=dict(data=base64.b64encode(image).decode('ascii'),name=name) if isinstance(image,bytes) else image
+            ref,=self._normalize_images([item])
+            assets=doc.setdefault('image_assets',[])
+            if not any(v['id']==ref['id'] for v in assets):assets.append(ref)
+            self._store.write(state)
+            return copy.deepcopy(ref)
+
+    def _set_comment_images(self, figure_id, images):
+        with self._store.locked():
+            state=self._store.read();doc=self._mutable(state,figure_id)
+            previous=next((c.get('attachments',[]) for c in doc['comments'] if c.get('channel')=='ui'),[])
+            normalized=self._normalize_images(images)
+            if previous!=normalized:
+                _replace_ui_comment(doc,_ui_comment(doc),normalized);self._store.write(state)
 
     def _set_comment_text(self, figure_id, text):
         if not isinstance(text,str):raise ValueError('Review comments must be text')
@@ -500,12 +557,23 @@ class Session:
     def feedback_summary(self, work_id):
         """Readable object groups linked to every exact snapshot-diff operation."""
         from ._review_summary import summary
-        return summary(self.feedback(work_id))
+        return self._image_paths(summary(self.feedback(work_id)))
 
     def feedback_details(self, work_id, figure_id, *, target=None, change_id=None):
         """Inspect exact changes and object snapshots without another render."""
         from ._review_summary import details
-        return details(self.feedback(work_id),figure_id,target=target,change_id=change_id)
+        return self._image_paths(details(self.feedback(work_id),figure_id,target=target,change_id=change_id))
+
+    def _image_paths(self, value):
+        def visit(item):
+            if isinstance(item,dict):
+                for image in item.get('attachments',[]):image['path']=str(self.cache_dir/image['file'])
+                for key,child in item.items():
+                    if key!='attachments':visit(child)
+            elif isinstance(item,list):
+                for child in item:visit(child)
+        visit(value)
+        return value
 
     def claim(self, work_id, *, worker_id=None, seconds=1800):
         """Lease one staging writer before an agent edits source for this work."""
@@ -624,6 +692,7 @@ class Session:
             if request is None:continue
             try:
                 self._set_target_comments(fid,request.get('target_comments',[]))
+                self._set_comment_images(fid,request.get('attachments',[]))
                 self.submit(fid,request['disposition'],comments=request['comments'],expected_revision=request['revision'],intent=request.get('intent','revise'))
             except Exception as exc:
                 handle.review_result(str(exc))
@@ -644,10 +713,25 @@ class Session:
                     text=draft.get('comments') or ''
                     targeted=draft.get('target_comments') or []
                     previous=[v for v in doc['comments'] if v.get('channel')=='ui_target']
-                    if targeted!=previous:
-                        doc['comments']=[v for v in doc['comments'] if v.get('channel')!='ui_target']+[dict(v,channel='ui_target') for v in targeted];changed=True
-                    if text!=_ui_comment(doc):
-                        _replace_ui_comment(doc,text);changed=True
+                    raw_images=draft.get('attachments') or []
+                    old_images=next((c.get('attachments',[]) for c in doc['comments'] if c.get('channel')=='ui'),[])
+                    try:
+                        normalized=raw_images if raw_images==old_images else self._normalize_images(raw_images)
+                        normalized_targets=previous
+                        if targeted!=previous:
+                            normalized_targets=[]
+                            for item in targeted:
+                                value=dict(item,channel='ui_target')
+                                if 'attachments' in item:value['attachments']=self._normalize_images(item['attachments'])
+                                normalized_targets.append(value)
+                        if normalized_targets!=previous:
+                            doc['comments']=[v for v in doc['comments'] if v.get('channel')!='ui_target']+normalized_targets;changed=True
+                        if text!=_ui_comment(doc) or normalized!=old_images:
+                            _replace_ui_comment(doc,text,normalized);changed=True
+                        if normalized!=raw_images or normalized_targets!=targeted:
+                            handle.review_images_result(json.dumps(dict(attachments=normalized,target_comments=normalized_targets)))
+                    except (ValueError,OSError) as exc:
+                        handle.review_result(str(exc))
             if changed:self._store.write(state)
 
     def run_events(self, *, on_status=None):

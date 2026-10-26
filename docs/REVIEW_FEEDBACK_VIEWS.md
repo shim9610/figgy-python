@@ -37,6 +37,42 @@ Values and labels longer than 160 characters have an explicit truncation flag;
 exact values remain in the detail snapshots and raw changes. Natural-language
 comments remain separate instructions rather than annotation text or SSOT edits.
 
+## Reference images in review comments
+
+The general review field and element-comment dialog accept PNG, JPEG and WebP
+files. Native windows provide **Attach image…**, **Paste image**, and
+Ctrl/Cmd+V while the comment input is focused. Notebook comments support file
+selection, clipboard paste and dropping an image onto the attachment area.
+Thumbnails open a larger preview; each image can be removed before submission.
+An element comment can consist of an image without text.
+
+Each comment's `attachments` list identifies its own reference images. Images
+are decoded and normalized to PNG during import, stored separately under
+`attachments/SHA256.png`, and verified during recovery. They do not change chart
+Settings, revisions or source arrays. Drafts and submitted comments retain the
+references, including after a controller disconnect. An import is limited to
+20 MiB and 8192 pixels per side; invalid/unsupported images produce a visible
+error rather than a successful empty attachment.
+
+Summary and detail views include the image name, dimensions, MIME type, byte
+count, SHA-256 and absolute `path`, beside the owning comment and stable target.
+Open that path with an image-viewing tool. No image bytes or base64 are inserted
+into feedback JSON. Raw feedback's `file` is relative to the review cache beside
+the event's manifest. Images referenced by retained review rounds survive
+cleanup; files that no retained round owns are collected after successor commit.
+
+Python callers can attach images through the same store:
+
+```python
+session.comment("line", "Use this palette", target="panel/main/chart_title",
+                attachments=["/absolute/path/reference.png"])
+```
+
+`session.attach_image(figure_id, image_bytes, name="Reference.png")` returns a
+durable reference for a later comment or upload acknowledgement. Notebook
+uploads send binary buffers once and receive these references; subsequent text
+edits send metadata rather than resending the image bytes.
+
 ## Inspect the listed changes when needed
 
 ```sh

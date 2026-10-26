@@ -55,7 +55,26 @@ impl WindowHandle {
     }
     fn review_draft_json(&self) -> String {
         let state = self.control.review.lock().unwrap();
-        json!({"comments":state["comments"],"target_comments":state["target_comments"]}).to_string()
+        json!({"comments":state["comments"],"target_comments":state["target_comments"],"attachments":state["attachments"]}).to_string()
+    }
+    fn review_images_result(&self, json: &str) -> PyResult<()> {
+        let value: Value = parse(json)?;
+        let mut state = self.control.review.lock().unwrap();
+        state["attachments"] = value["attachments"].clone();
+        if let Some(comments) = state["target_comments"].as_array_mut() {
+            for comment in comments {
+                if let Some(updated) = value["target_comments"]
+                    .as_array()
+                    .and_then(|items| items.iter().find(|v| v["id"] == comment["id"]))
+                {
+                    if updated.get("attachments").is_some() {
+                        comment["attachments"] = updated["attachments"].clone();
+                    }
+                }
+            }
+        }
+        self.refresh();
+        Ok(())
     }
     fn review_result(&self, error: &str) {
         let mut state = self.control.review.lock().unwrap();
@@ -1402,15 +1421,21 @@ impl SurfaceWindow {
                     egui::vec2(r.width as f32 / dpr, r.height as f32 / dpr),
                 )
                 .shrink(2.);
-                output.shapes.push(egui::epaint::ClippedShape {
-                    clip_rect: self.editor.stage,
-                    shape: egui::Shape::rect_stroke(
-                        rect,
-                        3.,
-                        egui::Stroke::new(1.5, egui::Color32::from_rgb(38, 99, 173)),
-                        egui::StrokeKind::Inside,
-                    ),
-                });
+                // This is a chart-stage decoration. Keep it below egui's
+                // floating windows and menus, including their opaque fills.
+                // Appending it paints the outline through review text inputs.
+                output.shapes.insert(
+                    0,
+                    egui::epaint::ClippedShape {
+                        clip_rect: self.editor.stage,
+                        shape: egui::Shape::rect_stroke(
+                            rect,
+                            3.,
+                            egui::Stroke::new(1.5, egui::Color32::from_rgb(38, 99, 173)),
+                            egui::StrokeKind::Inside,
+                        ),
+                    },
+                );
             }
         }
         if !self.settings_only && self.view.is_none() {
@@ -1805,6 +1830,17 @@ impl ApplicationHandler for App {
         if matches!(event, WindowEvent::CloseRequested) {
             w.control.close.store(true, Ordering::Release);
             return;
+        }
+        if let WindowEvent::KeyboardInput { event: ref key, .. } = event {
+            let paste = key.state == ElementState::Pressed
+                && !key.repeat
+                && ((w.modifiers.control_key() || w.modifiers.super_key())
+                    && matches!(&key.logical_key,Key::Character(v) if v.eq_ignore_ascii_case("v"))
+                    || w.modifiers.shift_key() && key.logical_key == Key::Named(NamedKey::Insert));
+            if paste && w.editor.paste_review_image() {
+                w.window.request_redraw();
+                return;
+            }
         }
         let response = w.input.on_window_event(&w.window, &event);
         let pointer = match &event {

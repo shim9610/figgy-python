@@ -108,9 +108,10 @@ impl Editor {
             },
         );
         let pending = !state["request"].is_null();
+        let mut attachments = state["attachments"].as_array().cloned().unwrap_or_default();
         let mut comments = state["comments"].as_str().unwrap_or("").to_owned();
         egui::Panel::bottom("review_comments")
-            .exact_size(148.)
+            .exact_size(if attachments.is_empty(){180.}else{262.})
             .frame(
                 egui::Frame::NONE
                     .fill(Color32::from_rgb(245, 248, 252))
@@ -141,6 +142,8 @@ impl Editor {
                         "review_comments".into(),
                         input.inner.rect.intersect(input.inner_rect),
                     );
+                    self.review_context.general_focused=input.inner.has_focus();
+                    self.review_context.images.editor(ui,&mut attachments,state["cache_dir"].as_str().unwrap_or(""),"review",&mut self.controls);
                     ui.horizontal(|ui| {
                         for (key, label, disposition, intent) in [
                             ("review_changes", "Request changes", "request_changes", "revise"),
@@ -152,7 +155,7 @@ impl Editor {
                             if button.clicked() {
                                 c.end_edit();
                                 state["request"] = json!({"disposition":disposition,"intent":intent,
-                                    "comments":comments,"target_comments":state["target_comments"],"revision":c.data.revision,"finalized":false});
+                                    "comments":comments,"attachments":attachments,"target_comments":state["target_comments"],"revision":c.data.revision,"finalized":false});
                                 state["error"] = json!("");
                             }
                         }
@@ -169,6 +172,7 @@ impl Editor {
                 });
             });
         state["comments"] = json!(comments);
+        state["attachments"] = json!(attachments);
     }
 
     pub(crate) fn finalize_review(&self, revision: u64) {

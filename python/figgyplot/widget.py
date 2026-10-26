@@ -133,13 +133,23 @@ class FigureWidget(anywidget.AnyWidget):
 
     def _command(self, widget, content, buffers):
         action = content.get("action")
-        if action == "review_comment":
+        if action == 'review_image':
+            try:
+                session=getattr(self.figure,'_review_session',None)
+                if session is None or not self.review.get('enabled') or session._figures.get(self.figure.id) is not self.figure:
+                    raise RuntimeError('This Figure is not an active review view')
+                if len(buffers)!=1:raise ValueError('Expected one review image buffer')
+                attachment=session.attach_image(self.figure.id,bytes(buffers[0]),name=content.get('name','Review image.png'))
+                self.send(dict(action='review_image_result',request=content['request'],attachment=attachment))
+            except Exception as exc:self.send(dict(action='review_image_result',request=content.get('request'),error=str(exc)))
+        elif action == "review_comment":
             session = getattr(self.figure, '_review_session', None)
             if session is not None and self.review.get('enabled'):
                 try:
                     if session._figures.get(self.figure.id) is not self.figure:raise RuntimeError('Stale review view from a previous round')
                     session._set_comment_text(self.figure.id, content.get('comments', ''))
                     if 'target_comments' in content:session._set_target_comments(self.figure.id,content['target_comments'])
+                    if 'attachments' in content:session._set_comment_images(self.figure.id,content['attachments'])
                 except Exception as exc:self.send(dict(action='review_result',error=str(exc)))
         elif action == "review_submit":
             try:
@@ -152,6 +162,7 @@ class FigureWidget(anywidget.AnyWidget):
                 # edit acknowledgements are drained. Verify that revision in the
                 # common commit path; do not start another barrier inside a comm.
                 session._set_target_comments(self.figure.id,content.get('target_comments',[]))
+                session._set_comment_images(self.figure.id,content.get('attachments',[]))
                 session._submit(self.figure.id, content['disposition'],
                     content.get('comments'), content['revision'], content.get('intent','revise'))
             except Exception as exc:

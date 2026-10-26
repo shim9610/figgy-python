@@ -109,3 +109,11 @@
 .figgy-review-dialog button {margin-right:8px;}
 .figgy-review-menu {position:fixed;inset:auto;margin:0;z-index:20;max-width:320px;padding:6px;border:1px solid #bbcadd;border-radius:6px;background:white;box-shadow:0 4px 18px #172b4422;}
 .figgy-review-menu button {display:block;max-width:100%;text-align:left;}
+.figgy-review-images {margin:8px 0;font-size:13px;}
+.figgy-review-image-list {display:flex;gap:8px;overflow:auto;max-height:100px;margin:6px 0;}
+.figgy-review-image-list>span {display:flex;align-items:flex-start;border:1px solid #bbcadd;border-radius:5px;padding:3px;}
+.figgy-review-image-list img {width:80px;height:60px;object-fit:contain;}
+.figgy-review-image-list button {padding:3px;margin:0;}
+.figgy-review-image-preview {max-width:90vw;border:1px solid #bbcadd;border-radius:8px;}
+.figgy-review-image-preview img {display:block;max-width:80vw;max-height:75vh;object-fit:contain;margin-bottom:10px;}
+.figgy-review-images [role=alert] {display:block;color:#aa2d2d;}

@@ -1,6 +1,8 @@
 from object_navigation import ObjectNavigator
 """Same input scenarios must work on native surfaces and real notebook WebGPU."""
 import json
+import base64
+import subprocess
 import os
 import shutil
 import time
@@ -3140,3 +3142,105 @@ def test_annotation_drag_reuses_inspector_descriptions_until_release(tmp_path, m
         assert page.evaluate(ROOT+'.stats.column_uploads')==uploads
         assert not page.locator('.figgy-error').inner_text()
     (tmp_path/'wrapper-drag-measurement.json').write_text(json.dumps(measurement,indent=2))
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires actual native review and clipboard input')
+@pytest.mark.parametrize('kind',['line','radial'])
+def test_native_review_images_paste_preview_remove_and_targeted_submission(tmp_path,kind):
+    from PIL import Image, ImageGrab
+    from figgyplot.review import Session
+    from figgyplot._review_diff import persistent
+    from figgyplot._native import font_family_available
+    image=tmp_path/'reference.png';Image.new('RGB',(96,64),'#E69F00').save(image)
+    family='Noto Sans CJK KR' if font_family_available('Noto Sans CJK KR') else 'DejaVu Sans'
+    with Session(tmp_path/'cache',backend='native',review_font=family) as session:
+        fig=session.figure(id='plot');ax=fig.axes[0]
+        if kind=='radial':ax.donut([3,2,1],labels=['A','B','C'])
+        else:ax.plot([0,1],[2,3],id='signal')
+        ax.set_title('Image review')
+        session.present();inputs=Inputs(session._handles['plot']);before=fig.get_settings()
+        def clipboard_image():
+            subprocess.run(['xclip','-selection','clipboard','-t','image/png','-i',str(image)],check=True,
+                           stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+        clipboard_image();inputs.click('review_comments');inputs.key('ctrl+v');session.poll()
+        ref,=session._review_state('plot')['attachments']
+        assert 'data' not in inputs.info()['review']['attachments'][0]
+        inputs.click('review_image:'+ref['id']);inputs.key('Escape')
+        inputs.click('review_image_remove:'+ref['id']);session.poll()
+        assert not session._review_state('plot')['attachments']
+        inputs.click('review_paste');session.poll()
+        assert len(session._review_state('plot')['attachments'])==1
+        bounds=inputs.info()['decorations']['chart_title']
+        if kind=='radial':
+            # Bounded-host decoration stats are document pixels; Cartesian
+            # decorations are already in surface coordinates.
+            panel=inputs.info()['chart_panel'];area=before['config']['chart_area']
+            bounds=[panel[0]+bounds[0]*panel[2]/area['width'],panel[1]+bounds[1]*panel[3]/area['height'],bounds[2]*panel[2]/area['width'],bounds[3]*panel[3]/area['height']]
+        inputs.input_frame('mousemove','--window',inputs.wid,round(bounds[0]+bounds[2]/2),round(bounds[1]+bounds[3]/2));inputs.input_frame('click',3)
+        target='bounded/chart_title' if kind=='radial' else 'panel/main/chart_title'
+        inputs.click('review_target:'+target);inputs.click('review_target_text');inputs.key('ctrl+v')
+        assert any(k.startswith('review_target_image:') for k in inputs.info()['controls'])
+        inputs.click('review_target_save');session.poll()
+        target_comment,=session._review_state('plot')['target_comments'];assert not target_comment['text']
+        assert len(target_comment['attachments'])==1
+        inputs.click('review_target_list');inputs.click('review_target_edit:'+target_comment['id'])
+        inputs.click('review_target_image_remove:'+ref['id']);inputs.click('review_target_paste')
+        inputs.click('review_target_save');session.poll();inputs.key('Escape')
+        set_clipboard('Keep the palette');inputs.click('review_comments');inputs.key('ctrl+v');session.poll()
+        assert session._review_state('plot')['comments']=='Keep the palette'
+        assert persistent(fig.get_settings())==persistent(before)
+        ImageGrab.grab(xdisplay=os.environ['DISPLAY']).save(tmp_path/'review-images.png')
+        inputs.click('review_changes');session.poll()
+        small=session.feedback_summary(session.events()[0]['work_id'])
+        figure,=small['figures'];obj,=figure['objects']
+        assert obj['target']==target and obj['change_count']==0
+        assert figure['comments'][0]['attachments'][0]['path']==obj['comments'][0]['attachments'][0]['path']
+        assert os.path.isfile(obj['comments'][0]['attachments'][0]['path'])
+    Inputs.pump()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real notebook WebGPU and clipboard input')
+def test_browser_review_images_upload_clipboard_preview_and_targeted_submission(tmp_path):
+    from PIL import Image
+    orange=tmp_path/'reference.png';green=tmp_path/'clipboard.png'
+    Image.new('RGB',(96,64),'#E69F00').save(orange);Image.new('RGB',(96,64),'#009E73').save(green)
+    cache=tmp_path/'cache'
+    source=("from figgyplot.review import Session\n"
+            f"session=Session({str(cache)!r},backend='webgpu')\n"
+            "fig=session.figure(id='plot');ax=fig.axes[0]\n"
+            "ax.plot([0,1],[2,3],id='signal');ax.text(.3,.3,'Review me',coords='ratio',id='note')\n"
+            "display(session.widget(fig))")
+    with notebook(tmp_path/'browser-images',source,allow_closed=True) as (page,execute):
+        check_display_frame_ready(page);before=page.evaluate(ROOT+'.snapshot()')
+        general=page.locator('.figgy-review')
+        general.locator('input[type=file]').set_input_files(orange)
+        general.locator('[data-review-image]').wait_for()
+        page.evaluate("""async encoded=>{const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));await navigator.clipboard.write([new ClipboardItem({'image/png':new Blob([bytes],{type:'image/png'})})]);}""",base64.b64encode(green.read_bytes()).decode())
+        general.locator('[data-review-comments]').click();page.keyboard.press('Control+V')
+        page.wait_for_function("document.querySelectorAll('.figgy-review [data-review-image]').length===2")
+        general.locator('[data-review-image]').first.click()
+        page.wait_for_function("document.querySelector('.figgy-review-image-preview img')?.naturalWidth===96")
+        page.locator('.figgy-review-image-preview button').click()
+        general.locator('[data-review-image-remove]').first.click()
+        assert general.locator('[data-review-image]').count()==1
+        general.locator('[data-review-comments]').fill('Keep the palette')
+        # Editing the review field scrolls a tall notebook output to its bottom.
+        # Bring the chart into view before deriving a viewport pointer position.
+        page.locator('.figgy-editor canvas').scroll_into_view_if_needed()
+        bounds=page.evaluate(ROOT+'.annotations()')[0]['rect']
+        page.mouse.click(*browser_surface_point(page,(bounds[0]+bounds[2]/2,bounds[1]+bounds[3]/2)),button='right')
+        page.locator('[data-review-target]').click()
+        dialog=page.locator('.figgy-review-dialog')
+        assert page.locator('.lm-Menu:visible').count()==0
+        dialog.locator('input[type=file]').set_input_files(orange)
+        dialog.locator('[data-review-target-image]').wait_for()
+        dialog.locator('[data-review-target-save]').click()
+        assert page.evaluate(ROOT+'.snapshot()')==before
+        screenshot_editor(page,tmp_path/'browser-review-images.png')
+        general.locator('[data-review-changes]').click()
+        output=execute("import time,json\nfor _ in range(100):\n    if session.events():break\n    time.sleep(.01)\nprint(json.dumps(session.feedback_summary(session.events()[0]['work_id'])))")
+        summary=json.loads(output.strip());figure,=summary['figures'];obj,=figure['objects']
+        assert obj['target']=='panel/main/annotation/note' and obj['change_count']==0
+        assert not obj['comments'][0]['text']
+        a=figure['comments'][0]['attachments'][0];b=obj['comments'][0]['attachments'][0]
+        assert a['sha256']!=b['sha256'] and os.path.isfile(a['path']) and os.path.isfile(b['path'])

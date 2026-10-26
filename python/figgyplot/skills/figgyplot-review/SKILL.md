@@ -10,6 +10,9 @@ This skill ships with figgyplot. It uses `python -m figgyplot.review` and protoc
 copy this directory into its skill search path; no particular agent vendor,
 model SDK or background service is required. Ordinary plotting remains usable
 without installing this skill.
+Discover these paths once at startup and reuse the same installed Python
+interpreter throughout the session. The commands and export recipe below use
+public APIs; routine feedback handling does not require searching package source.
 
 1. Initialize the controller with a review font that supports the user's primary
    language. Inspect installed fonts and glyph coverage; do not assume the default
@@ -64,6 +67,16 @@ without installing this skill.
    separately, including right-click element comments addressed by stable object
    ID. They are instructions, not chart annotations. Binary references
    are recovery/input files; do not paste raw arrays into model messages.
+   Comments may also contain `attachments`: reference images with a name, PNG
+   dimensions, SHA-256 digest and file location. Summary/detail queries provide
+   each image's absolute `path`; raw feedback has a `file` relative to the cache
+   beside the event's manifest. Open these files with the agent's image-viewing
+   tool and interpret them together with the owning comment and stable target.
+   Do not infer an image's contents from its filename, paste base64 into context,
+   or treat a reference image as a chart SSOT change. An image-only comment still
+   requires inspection. If image viewing is unavailable, report that limitation
+   instead of claiming to have reviewed it. Images remain recoverable while their
+   review revision is retained; consume them before publishing its successor.
    Check the event's `intent` before classifying any comment as a plot edit.
    `finish` requests saving and termination, not another review iteration.
    If the complete batch only asks to save/close/finish, route it to the same
@@ -80,12 +93,17 @@ without installing this skill.
    edit and satisfy the comments. Source builders use `build(session, **arguments)`
    and `session.figure(id=...)`; they do not start an agent or approve themselves.
    For finish-only feedback, save requested exports from the accepted checkpoint
-   and reconcile any exact human edits into source. Then run
+   using the [PNG export recipe](#export-approved-checkpoints-as-png), including
+   approved Figures that no longer have an open review window. Reconcile any
+   exact human edits into source. Then run
    `finish CACHE WORK_ID --claim-token TOKEN`. A recorded builder is rendered and
    checked against the exact accepted settings and binary data, without opening
-   another review round. Do not call ordinary `regenerate` for an explicit finish
+   new review windows. This terminal validation can increment the round number;
+   use `status.state == "completed"`, not the round number, to confirm completion.
+   Do not call ordinary `regenerate`, `connect`, or `show` for an explicit finish
    request. Verify terminal `status`, then stop subscribing.
-6. Run `regenerate CACHE WORK_ID --claim-token TOKEN`. This executes the builder,
+6. For a batch requiring chart revisions, run
+   `regenerate CACHE WORK_ID --claim-token TOKEN`. This executes the builder,
    renders every candidate, checks retained edits and source stability, and
    atomically publishes one complete successor. The live controller displays it
    after publication. Renew the lease with the same worker ID for long work.
@@ -113,3 +131,56 @@ No vendor SDK is invoked by
 subscription, and the agent must remain attached through its execution tools.
 Closing an execution-tool connection does not discard pending durable feedback;
 resume from the cache and last delivered work ID.
+
+## Export approved checkpoints as PNG
+
+Export after claiming the complete feedback batch and before `finish`. Use the
+delivered event's cache path and work ID, and the claim's `token`. Build the export
+map from the requested stable Figure IDs and output paths; the `line` and `donut`
+entries below are examples. Include previously accepted Figures when requested,
+even if only another chart was displayed in this round.
+
+```sh
+EXPORTS='{"line":"/absolute/output/line-final.png","donut":"/absolute/output/donut-final.png"}'
+python - "$CACHE" "$EXPORTS" <<'PY'
+import json
+import sys
+from pathlib import Path
+from figgyplot.review import Session
+
+exports = json.loads(sys.argv[2])
+with Session.open(sys.argv[1]) as session:
+    for figure_id, filename in exports.items():
+        path = Path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        figure = session.restore(figure_id, backend="native")
+        figure.savefig(path)
+PY
+```
+
+`restore()` recovers the accepted settings and binary source data from the
+checkpoint. Explicit `backend="native"` also permits synchronous PNG export of a
+notebook review; it does not open a window. `savefig()` currently supports `.png`;
+it keeps the checkpoint's DPI unless an explicit `dpi=` or `scale=` is requested.
+Do not rerun the source builder just to export, call `present()`/`show()`, or
+reopen an approved Figure. Use this export recipe only for a sealed, approved
+batch. `restore()` claims editing ownership by replacing the checkpoint's Figure
+instance ID; a separate `Session.open()` context does not isolate that change.
+For a read-only preview while a review is still open, ask the active controller
+to export its Figure, or restore an isolated copy of the checkpoint cache. Do not
+restore the live reviewing cache merely to inspect or render it: that invalidates
+the controller's existing Figure instance.
+
+Only after all requested files have been written successfully, finish the claimed
+work and check its terminal state (`TOKEN` is the claim's token):
+
+```sh
+python -m figgyplot.review finish "$CACHE" "$WORK_ID" --claim-token "$TOKEN"
+python -m figgyplot.review status "$CACHE"
+```
+
+For `state: "completed"`, stop without opening another review or subscription.
+If an export or validation fails, report the failure and retain the checkpoint;
+do not mark the work completed or silently skip a requested output. For a finish
+validation error about an approved edit, use the summary/detail queries to
+reconcile that exact edit into the builder, then retry `finish` for the same work.

@@ -111,7 +111,13 @@
               "id": {
                 "type": "string"
               },
-              "target": {}
+              "target": {},
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
+              }
             }
           }
         },
@@ -415,6 +421,12 @@
               },
               "label": {
                 "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
               }
             }
           }
@@ -489,6 +501,12 @@
               },
               "label": {
                 "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
               }
             }
           }
@@ -584,6 +602,12 @@
               },
               "label": {
                 "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
               }
             }
           }
@@ -739,6 +763,12 @@
               },
               "label": {
                 "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
               }
             }
           }
@@ -776,6 +806,57 @@
           "items": {
             "$ref": "#/$defs/change"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "image_attachment": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "file",
+        "sha256",
+        "mime_type",
+        "bytes",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^attachments/[0-9a-f]{64}\\.png$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mime_type": {
+          "const": "image/png"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "path": {
+          "type": "string"
         }
       },
       "additionalProperties": false

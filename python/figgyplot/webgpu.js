@@ -59,7 +59,61 @@ export function render({model,el}) {
   reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><button data-review-finish>Save and finish</button><span data-review-status role="status"></span></div>';
   root.append(reviewPanel);
   const reviewComment=reviewPanel.querySelector('textarea'),reviewStatus=reviewPanel.querySelector('[data-review-status]');
-  let reviewBusy=false,reviewLoaded=false,reviewTargets=[],reviewFontLoaded='';
+  let reviewBusy=false,reviewLoaded=false,reviewTargets=[],reviewFontLoaded='',reviewAttachments=[],reviewImagesUploading=0;
+  const reviewImageRequests=new Map(),reviewImagePreviews=new Map();
+  const imagePreview=document.createElement('dialog');imagePreview.className='figgy-review-image-preview';root.append(imagePreview);
+  function previewReviewImage(item){
+    imagePreview.replaceChildren();const img=document.createElement('img');img.src=reviewImagePreviews.get(item.id)??'';img.alt=item.name;
+    const close=document.createElement('button');close.textContent='Close';close.onclick=()=>imagePreview.close();imagePreview.append(img,close);imagePreview.showModal();
+  }
+  function uploadReviewImage(file){
+    return new Promise(async(resolve,reject)=>{
+      if(file.size>20*1024*1024){reject(Error('Review images must be at most 20 MiB'));return;}
+      const request=crypto.randomUUID();let timer;
+      try{
+        const data=await file.arrayBuffer();
+        timer=setTimeout(()=>{reviewImageRequests.delete(request);reject(Error('Image upload timed out; please try again'));},60000);
+        reviewImageRequests.set(request,{resolve:item=>{clearTimeout(timer);const old=reviewImagePreviews.get(item.id);if(old?.startsWith('blob:'))URL.revokeObjectURL(old);reviewImagePreviews.set(item.id,URL.createObjectURL(file));resolve(item);},reject:error=>{clearTimeout(timer);reject(Error(error));}});
+        model.send({action:'review_image',request,name:file.name??'Clipboard image.png'},{},[data]);
+      }catch(error){clearTimeout(timer);reviewImageRequests.delete(request);reject(error);}
+    });
+  }
+  function imageEditor(container,input,getItems,setItems,prefix){
+    container.className='figgy-review-images';
+    const attach=document.createElement('button');attach.dataset[prefix+'Attach']='';attach.textContent='Attach image…';
+    const files=document.createElement('input');files.type='file';files.accept='image/png,image/jpeg,image/webp';files.multiple=true;files.hidden=true;
+    const hint=document.createElement('span');hint.textContent='Paste or drop an image here';
+    const list=document.createElement('div');list.className='figgy-review-image-list';
+    const error=document.createElement('span');error.setAttribute('role','alert');
+    container.append(attach,files,hint,list,error);
+    const render=()=>{
+      list.replaceChildren();
+      for(const item of getItems()){
+        const group=document.createElement('span'),view=document.createElement('button'),img=document.createElement('img'),remove=document.createElement('button');
+        view.dataset[prefix+'Image']=item.id;view.title=item.name;img.src=reviewImagePreviews.get(item.id)??'';img.alt=item.name;view.append(img);view.onclick=()=>previewReviewImage(item);
+        remove.dataset[prefix+'ImageRemove']=item.id;remove.textContent='×';remove.title='Remove attachment';remove.setAttribute('aria-label',`Remove ${item.name}`);
+        remove.onclick=()=>{if(reviewBusy)return;setItems(getItems().filter(v=>v.id!==item.id));render();};group.append(view,remove);list.append(group);
+      }
+      attach.disabled=reviewBusy||!!(model.get('review')??{}).approved;
+    };
+    const add=async files=>{
+      if(reviewBusy||(model.get('review')??{}).approved)return;
+      reviewImagesUploading++;reviewState();error.textContent='Uploading image…';
+      try{
+        for(const file of files){const item=await uploadReviewImage(file);if(!getItems().some(v=>v.id===item.id))setItems([...getItems(),item]);}
+        error.textContent='';
+      }catch(e){error.textContent=String(e);}
+      finally{reviewImagesUploading--;render();reviewState();}
+    };
+    attach.onclick=()=>files.click();files.onchange=()=>{add([...files.files]);files.value='';};
+    input.addEventListener('paste',event=>{const images=[...(event.clipboardData?.items??[])].filter(v=>v.kind==='file'&&v.type.startsWith('image/')).map(v=>v.getAsFile()).filter(Boolean);if(images.length){event.preventDefault();add(images);}});
+    container.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
+    container.addEventListener('drop',event=>{const images=[...(event.dataTransfer?.files??[])].filter(v=>v.type.startsWith('image/'));if(images.length){event.preventDefault();add(images);}});
+    render();return render;
+  }
+  function disposeReviewImages(){for(const pending of reviewImageRequests.values())pending.reject('Review closed');reviewImageRequests.clear();for(const url of reviewImagePreviews.values())if(url.startsWith('blob:'))URL.revokeObjectURL(url);reviewImagePreviews.clear();if(imagePreview.open)imagePreview.close();}
+  const generalImages=document.createElement('div');reviewComment.parentElement.after(generalImages);
+  const renderReviewImages=imageEditor(generalImages,reviewComment,()=>reviewAttachments,items=>{reviewAttachments=items;saveReviewDraft();},'review');
   const reviewDialog=document.createElement('dialog');reviewDialog.className='figgy-review-dialog';root.append(reviewDialog);
   const reviewMenu=document.createElement('div');reviewMenu.className='figgy-review-menu';reviewMenu.popover='auto';root.append(reviewMenu);
   const closeReviewMenu=()=>{if(reviewMenu.matches(':popover-open'))reviewMenu.hidePopover();};
@@ -75,8 +129,9 @@ export function render({model,el}) {
   }
   function reviewState(){
     const state=model.get('review')??{};reviewPanel.hidden=!state.enabled;
-    reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||model.get('status')!=='ready'||!!state.approved);
-    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewTargets=clone(state.target_comments??[]);reviewLoaded=true;}
+    reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||reviewImagesUploading>0||model.get('status')!=='ready'||!!state.approved);
+    reviewDialog.querySelectorAll('[data-review-target-save]').forEach(button=>button.disabled=reviewImagesUploading>0||reviewBusy);
+    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewTargets=clone(state.target_comments??[]);reviewAttachments=clone(state.attachments??[]);for(const [id,url] of Object.entries(state.image_previews??{}))reviewImagePreviews.set(id,url);reviewLoaded=true;renderReviewImages();}
     reviewComment.style.fontSize=reviewDialog.style.fontSize=`${state.font_size??14}px`;
     if(state.font_family&&reviewFontLoaded!==state.font_family){
       reviewFontLoaded=state.font_family;
@@ -88,14 +143,14 @@ export function render({model,el}) {
     if(state.approved)reviewStatus.textContent='Review saved';
   }
   async function submitReview(disposition,intent='revise'){
-    if(reviewBusy)return;
+    if(reviewBusy||reviewImagesUploading>0)return;
     reviewBusy=true;reviewPanel.querySelectorAll('button,textarea').forEach(v=>v.disabled=true);
     reviewStatus.textContent='Saving review…';
     try{
       await finishInline(true);await controlQueue;await queue;await flush();
       root.querySelector('.figgy-body').inert=true;root.querySelector('.figgy-toolbar').inert=true;
       trace('review.send',{revision,disposition});
-      model.send({action:'review_submit',disposition,intent,comments:reviewComment.value,target_comments:reviewTargets,revision});
+      model.send({action:'review_submit',disposition,intent,comments:reviewComment.value,target_comments:reviewTargets,attachments:reviewAttachments,revision});
     }catch(e){reviewFailure(String(e));}
   }
   function reviewFailure(message){
@@ -104,11 +159,11 @@ export function render({model,el}) {
     reviewStatus.textContent=message;
     reviewState();
   }
-  const reviewMessage=message=>{if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
+  const reviewMessage=message=>{if(message.action==='review_image_result'){const pending=reviewImageRequests.get(message.request);reviewImageRequests.delete(message.request);if(pending){if(message.error)pending.reject(message.error);else pending.resolve(message.attachment);}}else if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
   reviewPanel.querySelector('[data-review-changes]').addEventListener('click',()=>submitReview('request_changes'));
   reviewPanel.querySelector('[data-review-accept]').addEventListener('click',()=>submitReview('accept'));
   reviewPanel.querySelector('[data-review-finish]').addEventListener('click',()=>submitReview('accept','finish'));
-  function saveReviewDraft(){model.send({action:'review_comment',comments:reviewComment.value,target_comments:reviewTargets});}
+  function saveReviewDraft(){model.send({action:'review_comment',comments:reviewComment.value,target_comments:reviewTargets,attachments:reviewAttachments});}
   reviewComment.addEventListener('input',saveReviewDraft);
   function editTargetComment(target,label,existing=null){
     closeReviewMenu();reviewDialog.replaceChildren();
@@ -116,12 +171,14 @@ export function render({model,el}) {
     const input=document.createElement('textarea');input.dataset.reviewTargetText='';input.value=existing?.text??'';input.rows=4;
     const save=document.createElement('button');save.dataset.reviewTargetSave='';save.textContent='Save comment';
     const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>reviewDialog.close();
-    save.onclick=()=>{if(!input.value.trim())return;const item={id:existing?.id??crypto.randomUUID(),target,label,text:input.value,channel:'ui_target'};reviewTargets=reviewTargets.filter(v=>v.id!==item.id);reviewTargets.push(item);saveReviewDraft();reviewDialog.close();};
-    reviewDialog.append(heading,input,save,cancel);reviewDialog.showModal();input.focus();
+    let attachments=clone(existing?.attachments??[]);const images=document.createElement('div');
+    imageEditor(images,input,()=>attachments,items=>{attachments=items;},'reviewTarget');
+    save.onclick=()=>{if(reviewImagesUploading||(!input.value.trim()&&!attachments.length))return;const item={id:existing?.id??crypto.randomUUID(),target,label,text:input.value,channel:'ui_target'};if(attachments.length)item.attachments=attachments;reviewTargets=reviewTargets.filter(v=>v.id!==item.id);reviewTargets.push(item);saveReviewDraft();reviewDialog.close();};
+    reviewDialog.append(heading,input,images,save,cancel);reviewDialog.showModal();input.focus();
   }
-  const commentsButton=document.createElement('button');commentsButton.dataset.reviewTargetList='';commentsButton.textContent='Element comments';reviewPanel.querySelector('div').append(commentsButton);
+  const commentsButton=document.createElement('button');commentsButton.dataset.reviewTargetList='';commentsButton.textContent='Element comments';reviewPanel.querySelector('[data-review-changes]').parentElement.append(commentsButton);
   commentsButton.onclick=()=>{reviewDialog.replaceChildren();for(const item of reviewTargets){const row=document.createElement('section'),name=document.createElement('strong'),text=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');name.textContent=item.label??item.target;text.textContent=item.text;edit.textContent='Edit';edit.onclick=()=>{reviewDialog.close();editTargetComment(item.target,item.label??item.target,item);};remove.textContent='Delete';remove.onclick=()=>{reviewTargets=reviewTargets.filter(v=>v.id!==item.id);saveReviewDraft();row.remove();};row.append(name,text,edit,remove);reviewDialog.append(row);}const close=document.createElement('button');close.textContent='Close';close.onclick=()=>reviewDialog.close();reviewDialog.append(close);reviewDialog.showModal();};
-  canvas.addEventListener('contextmenu',event=>{if(!chart||!(model.get('review')??{}).enabled||reviewBusy)return;event.preventDefault();const point=localPoint(event),clientPoint=[event.clientX,event.clientY];enqueue(async()=>{
+  canvas.addEventListener('contextmenu',event=>{if(!chart||!(model.get('review')??{}).enabled||reviewBusy)return;event.preventDefault();event.stopPropagation();const point=localPoint(event),clientPoint=[event.clientX,event.clientY];enqueue(async()=>{
     await geometryFrame();let hits=[];
     const index=kind?0:panelAt(point)??0;
     const owner=kind?snapshot()[kind]:snapshot().config;
@@ -137,7 +194,7 @@ export function render({model,el}) {
   root.addEventListener('contextmenu',event=>{
     const row=event.target.closest('[role=treeitem]');if(!row||!(model.get('review')??{}).enabled||reviewBusy)return;
     const node=allNodes().find(v=>v.node.key===row.dataset.node)?.node;if(!node?.target)return;
-    event.preventDefault();openReviewMenu([node],[event.clientX,event.clientY]);
+    event.preventDefault();event.stopPropagation();openReviewMenu([node],[event.clientX,event.clientY]);
   });
   model.on('change:review',reviewState);model.on('change:status',reviewState);model.on('msg:custom',reviewMessage);reviewState();
   function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
@@ -1233,6 +1290,6 @@ export function render({model,el}) {
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();disposeReviewImages();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

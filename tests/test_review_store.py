@@ -39,6 +39,26 @@ def storage_reader(path,start):
             previous=state['generation']
 
 
+def test_image_cleanup_retries_windows_preview_sharing_contention(tmp_path,monkeypatch):
+    module=storage_module();store=module.Store(tmp_path)
+    image=tmp_path/'attachments'/('a'*64+'.png');image.write_bytes(b'unreferenced image')
+    state=dict(protocol=1,generation=0,rounds=[
+        dict(number=1,status='completed',documents={'plot':{'comments':[{'attachments':[{'file':'attachments/'+image.name}]}]}}),
+        dict(number=2,status='reviewing',documents={})])
+    store.write(state)
+    original=Path.unlink;attempts=[]
+    def unlink(path,*args,**kwargs):
+        if path==image:
+            attempts.append(path)
+            if len(attempts)==1:raise PermissionError(errno.EACCES,'preview reader still closing')
+        return original(path,*args,**kwargs)
+    monkeypatch.setattr(module,'_WINDOWS',True)
+    monkeypatch.setattr(Path,'unlink',unlink)
+    store.collect(state)
+    assert len(attempts)==2 and not image.exists()
+    assert [r['number'] for r in store.read()['rounds']]==[2]
+
+
 def test_process_subscribers_and_controllers_share_a_durable_head(tmp_path):
     store=storage_module().Store(tmp_path)
     with store.locked():store.write(dict(protocol=1,generation=0,counter=0,rounds=[]))

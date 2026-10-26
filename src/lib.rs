@@ -22,6 +22,7 @@ use renderer::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+mod review_images;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -1975,6 +1976,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
         property_catalog::review_object_bindings_json,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(review_images::review_image_json, m)?)?;
     m.add_function(wrap_pyfunction!(property_catalog::editor_property_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::bounded_view_json, m)?)?;
     m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;

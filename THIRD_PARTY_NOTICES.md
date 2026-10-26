@@ -11,6 +11,8 @@ The font notices are shipped in `figgyplot/licenses/LICENSE-LiberationSans.txt` 
 `figgyplot/licenses/LICENSE-ComicNeue.txt`, including when fonts are embedded in the
 native extension.
 The native desktop uses winit/wgpu and egui. PySide6 is optional benchmark-only tooling.
+Review image attachments use arboard, image, base64 and sha2 (MIT OR Apache-2.0)
+and rfd (MIT) for clipboard access, image decoding, content hashes and native file selection.
 The notebook extra uses anywidget and ipywidgets under their respective licenses.
 
 ## Packaged browser kernel

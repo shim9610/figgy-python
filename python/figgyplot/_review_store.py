@@ -11,6 +11,8 @@ import shutil
 import tempfile
 import threading
 import time
+import base64
+import struct
 
 import numpy as np
 
@@ -69,6 +71,12 @@ def atomic_write(path, data):
 
 class Store:
     @staticmethod
+    def image_references(doc):
+        yield from doc.get('image_assets', [])
+        for comment in doc.get('comments', []):
+            yield from comment.get('attachments', [])
+
+    @staticmethod
     def references(doc):
         for key in ('columns','baseline_columns','bounded_data','baseline_bounded_data'):
             yield from doc.get(key,{}).values()
@@ -77,9 +85,11 @@ class Store:
         self.path = Path(path).resolve()
         self.path.mkdir(parents=True, exist_ok=True)
         (self.path/'data').mkdir(exist_ok=True)
+        (self.path/'attachments').mkdir(exist_ok=True)
         self.mutex = threading.RLock()
         self._local = threading.local()
         self._seen_generation = None
+        self._verified_images = {}
 
     @contextmanager
     def locked(self):
@@ -123,6 +133,7 @@ class Store:
     def write(self, state):
         state['generation'] += 1
         _sync_directory(self.path/'data')
+        _sync_directory(self.path/'attachments')
         atomic_write(self.path/'manifest.json', encoded(state))
         self._seen_generation=state['generation']
 
@@ -167,6 +178,10 @@ class Store:
         for path in (self.path/'data').iterdir():
             if path.name.startswith('.writing-') or ('data/'+path.name not in live and re.fullmatch('[0-9a-f]{64}\\.npy', path.name)):
                 path.unlink()
+        images = {ref['file'] for r in retained for doc in r['documents'].values() for ref in self.image_references(doc)}
+        for path in (self.path/'attachments').iterdir():
+            if ('attachments/'+path.name not in images and re.fullmatch('[0-9a-f]{64}\\.png',path.name)) or path.name.startswith('.writing-'):
+                _windows_retry(path.unlink)
         for path in self.path.glob('.writing-*'):
             path.unlink()
         active={r.get('claim',{}).get('token') for r in retained
@@ -176,3 +191,38 @@ class Store:
             if match and match[1] not in active and path.is_dir():
                 try:shutil.rmtree(path)
                 except OSError:pass  # Retry on access if an expired writer still has files open.
+
+    def put_image(self, data, name='Review image.png'):
+        from ._native import review_image_json
+        if not isinstance(data, bytes):data=bytes(data)
+        image=json.loads(review_image_json(data,str(name)))
+        payload=base64.b64decode(image.pop('data'),validate=True)
+        sha=hashlib.sha256(payload).hexdigest()
+        image.update(id=sha,sha256=sha,file='attachments/'+sha+'.png')
+        path=self.path/image['file']
+        if not path.exists():atomic_write(path,payload)
+        self.get_image(image)
+        return image
+
+    def get_image(self, reference):
+        sha=reference.get('sha256')
+        if (not isinstance(sha,str) or not re.fullmatch('[0-9a-f]{64}',sha)
+                or reference.get('file')!='attachments/'+sha+'.png' or reference.get('id')!=sha
+                or reference.get('mime_type')!='image/png' or not isinstance(reference.get('name'),str)):
+            raise ValueError('Invalid review image reference')
+        data=(self.path/reference['file']).read_bytes()
+        if (len(data)!=reference.get('bytes') or hashlib.sha256(data).hexdigest()!=sha
+                or data[:8]!=b'\x89PNG\r\n\x1a\n' or len(data)<24
+                or tuple(struct.unpack('>II',data[16:24]))!=(reference.get('width'),reference.get('height'))):
+            raise ValueError('Review image integrity check failed: '+sha)
+        return data
+
+    def verify_image(self, reference):
+        sha=reference.get('sha256')
+        if not isinstance(sha,str) or not re.fullmatch('[0-9a-f]{64}',sha) or reference.get('file')!='attachments/'+sha+'.png':
+            raise ValueError('Invalid review image reference')
+        stat=(self.path/reference['file']).stat()
+        stamp=(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns,reference.get('id'),reference.get('name'),reference.get('mime_type'),reference.get('bytes'),reference.get('width'),reference.get('height'))
+        if self._verified_images.get(sha)!=stamp:
+            self.get_image(reference)
+            self._verified_images[sha]=stamp

@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-23",
+  "scope": "Review image attachment UI, durable comment references and agent feedback",
+  "wheel_sha256": "b828139efff096dec27b82de096bc0729baa5cfab7375564f916643d547fbead",
+  "runtime": {
+    "python": "3.12.14",
+    "native": "Linux X11; Mesa lavapipe Vulkan",
+    "browser": "Chromium 154.0.8037.57; SwiftShader WebGPU"
+  },
+  "tests": {
+    "review_images_storage_summary_lifecycle_and_existing_review": 89,
+    "native_and_browser_images_existing_CJK_comments_and_typing": 12,
+    "total_passed": 101
+  },
+  "verified": [
+    "PNG, JPEG and WebP normalize to separately stored PNG references",
+    "JPEG EXIF orientation agrees with the reference preview",
+    "Native line and donut: real X11 clipboard paste, preview, removal and image-only element-comment submission",
+    "Jupyter: file input and real browser clipboard paste, preview, removal and image-only element-comment submission",
+    "Jupyter context menu does not overlap the review dialog",
+    "Figure-level and stable-target image references appear in summary and detail with absolute file paths, without inline image data",
+    "Chart Settings and source arrays remain separate from reference images",
+    "Draft/review recovery detects corrupted image files before cache cleanup",
+    "Failed source regeneration retains images; committed successors collect unreferenced images",
+    "Windows sharing-denial cleanup retry exercised by injected PermissionError",
+    "Eight native typing cases cover inline/inspector/general-review/element-review fields with and without an attachment"
+  ],
+  "checks": [
+    "cargo check --lib",
+    "cargo fmt --check",
+    "JavaScript module syntax",
+    "packaged wheel/source/schema/skill equality",
+    "installed package gate",
+    "upstream asset provenance",
+    "editor-control inventory",
+    "native/browser paired-change gate"
+  ],
+  "not_exercised": [
+    "Windows and macOS native GUI",
+    "Operating-system native file-picker automation",
+    "Browser OS file drag-and-drop automation"
+  ]
+}
