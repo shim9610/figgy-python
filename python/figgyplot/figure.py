@@ -14,6 +14,7 @@ import weakref
 import numpy as np
 
 from . import _document
+from . import _style_runtime
 from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
@@ -177,7 +178,7 @@ class Figure:
     Rendering, initialization, GPU fitting and picking release the GIL.
     """
 
-    def __init__(self, figsize=(8, 5), dpi=120, *, pool_bytes=8 * 1024**2, backend="auto", retain_notebook_data=False, grid=None, id=None):
+    def __init__(self, figsize=(8, 5), dpi=120, *, pool_bytes=8 * 1024**2, backend="auto", retain_notebook_data=False, grid=None, id=None, style=_style_runtime.INHERIT):
         if not math.isfinite(float(dpi)) or dpi <= 0:
             raise ValueError("dpi must be positive and finite")
         figsize = tuple(map(float, figsize))
@@ -196,6 +197,8 @@ class Figure:
         if backend not in ("native", "webgpu"):
             raise ValueError("backend must be auto/native/webgpu")
         self.backend = backend
+        self._style_defaults,self._style_session = _style_runtime.capture(style)
+        self._style_next_index = 0
         if backend == "webgpu":
             from .notebook import NotebookData
             self._native = NotebookData(width, height, pool_bytes, retain_notebook_data)
@@ -212,6 +215,7 @@ class Figure:
         self.subplots = _document.Subplots(self)
         state = self.get_settings()
         state.update(schema_version=2, identity=_document.initial_identity(id))
+        _style_runtime.containers(self,state,initial=True)
         self.apply_settings(state)
         if grid is not None:
             self.set_layout(grid)
@@ -251,6 +255,7 @@ class Figure:
             if len(ids) != len(placement):
                 raise ValueError('a subplot cannot occupy more than one slot')
             old_ids = [p['id'] for p in old]
+            created=[]
             if not state['series'] and len(old) == 1 and not state['config'].get('overlays'):
                 # The empty initial panel may take the first explicit identity.
                 old[0]['id'] = ids[0]
@@ -265,6 +270,7 @@ class Figure:
                     cfg.pop(key, None)
                 state['config'].setdefault('subplots', []).append(dict(config=cfg, series=[]))
                 old.append(dict(id=panel_id, overlays=[]))
+                created.append(panel_id)
             previous = state['identity'].get('layout')
             area = self._default_config['chart_area']
             size = previous['size'] if previous else [area['width'], area['height']]
@@ -274,6 +280,7 @@ class Figure:
                 gap=float(gap), size=size)
             _document.validate(state)
             _document.place_grid(state)
+            _style_runtime.containers(self,state,panel_ids=created)
             self.apply_settings(state)
         return self.subplots
 
@@ -338,6 +345,65 @@ class Figure:
         with self._lock:
             self._require_open()
             return json.loads(self._native.settings_json())
+
+    def extract_style(self, *, scales=False, text=False):
+        """Extract a portable StyleToken; domains and wording are opt-in.
+
+        After browser edits use ``await extract_style_async()`` to include all
+        pending changes. Lengths in the token use points, independent of DPI.
+        """
+        from .styles import extract
+        return extract(self, scales=scales, text=text)
+
+    async def extract_style_async(self, *, scales=False, text=False, timeout=30):
+        """Synchronize browser edits before extracting the accepted style."""
+        await self.sync(timeout=timeout)
+        return self.extract_style(scales=scales, text=text)
+
+    def apply_style(self, token, **options):
+        """Apply a StyleToken/preset atomically and return a StyleReport.
+
+        Appearance is applied by default. ``scales=True`` and ``text=True``
+        opt into captured payloads; text can instead be a set containing
+        titles, axis_titles and/or legend_labels. ``size_scale`` changes
+        visual lengths only. See docs/STYLE_TOKENS.md.
+        """
+        from .styles import apply
+        return apply(self, token, **options)
+
+    @property
+    def style_defaults(self):
+        """A copy of this Figure's captured appearance defaults, or None."""
+        return copy.deepcopy(self._style_defaults)
+
+    def set_style(self, token):
+        """Restyle existing objects and retain appearance defaults for new ones.
+
+        Unlike one-shot apply_style(), subsequent constructors inherit this
+        token. Passing None disables future inheritance without undoing edits.
+        """
+        with self._lock:
+            if token is None:
+                self._style_defaults=self._style_session=None
+                return self
+            value=_style_runtime._token(token)
+            self.apply_style(value)
+            self._style_defaults=value
+            self._style_session=_style_runtime._Session()
+            self._style_next_index=len(self.get_settings()['series'])
+        return self
+
+    def apply_scales(self, scales, *, limits=True, **options):
+        """Apply captured scales only; limits=False keeps bounds and ticks.
+
+        Invalid logarithmic domains are rejected without silently fitting data.
+        """
+        from .styles import StyleToken, apply
+        if scales is None:
+            raise ValueError('no captured scales')
+        panels=[dict(config={}) for _ in scales.get('panels', [])]
+        return apply(self, StyleToken(dict(panels=panels), scales=scales),
+                     scales=True, limits=limits, **options)
 
     @property
     def edit_history(self):
@@ -1146,6 +1212,7 @@ class Axes(FeatureMethods, ChartMethods):
         y_axis['label_style']['visible'] = True
         cfg.setdefault('overlays', []).append(dict(y_axis=y_axis, series=[]))
         ids.append(oid)
+        _style_runtime.containers(self.figure,state,overlays=[(self.subplot_id,oid)])
         self.figure.apply_settings(state)
         return self.figure._axes_for(self.subplot_id, oid)
 
@@ -1210,6 +1277,7 @@ class Axes(FeatureMethods, ChartMethods):
         self.figure.apply_settings(state)
         return self
 
+    @_style_runtime.styled
     def pie(self, values, *, labels=None, colors=None, explode=None, startangle=90,
             inner_radius=None, material="flat", tilt=0, depth=0,
             labels_position="outside", label_format="name_percent", **style):
@@ -1249,10 +1317,14 @@ class Axes(FeatureMethods, ChartMethods):
                            for value, label, color, offset in zip(values, labels, colors, explode)]
         with fig._lock:
             fig._require_open()
+            if fig._style_defaults is not None:
+                state=fig.get_settings();state['radial']=chart
+                chart=_style_runtime.bounded(fig,state,'radial')['radial']
             fig._native.set_radial(json.dumps(chart, allow_nan=False))
         fig._changed()
         return RadialArtist(fig)
 
+    @_style_runtime.styled
     def donut(self, values, *, inner_radius=0.5, **kwargs):
         """Create a donut; accepts the same labels/material/style options as pie."""
         return self.pie(values, inner_radius=inner_radius, **kwargs)
@@ -1292,15 +1364,16 @@ class Axes(FeatureMethods, ChartMethods):
             if self.overlay_id:
                 self._overlay(document).setdefault('series', []).append(sid)
             uploaded = []
+            spec = {"series_id": sid, "label": None, "x_column": names[0], "y_column": names[1], "render_type": render_type}
+            if label is not None:
+                rich = copy.deepcopy(fig.get_settings()["config"]["legend"]["content"])
+                rich["segments"] = _segments(label)
+                spec["label"] = rich
+            spec,document=_style_runtime.series(fig,document,spec,self.subplot_id)
             try:
                 for name, array in [(names[0], x), (names[1], y), *extra_columns]:
                     fig._native.upload_column(name, array)
                     uploaded.append(name)
-                spec = {"series_id": sid, "label": None, "x_column": names[0], "y_column": names[1], "render_type": render_type}
-                if label is not None:
-                    rich = copy.deepcopy(fig.get_settings()["config"]["legend"]["content"])
-                    rich["segments"] = _segments(label)
-                    spec["label"] = rich
                 fig._native.add_series_fitted(
                     json.dumps(spec, allow_nan=False),
                     json.dumps(document["config"], allow_nan=False),
@@ -1311,6 +1384,7 @@ class Axes(FeatureMethods, ChartMethods):
                     fig._native.remove_column(name)
                 raise
             fig._next_series += 1
+            _style_runtime._mark_used(fig)
         fig._changed()
         return Artist(fig, sid)
 
@@ -1342,6 +1416,7 @@ class Axes(FeatureMethods, ChartMethods):
                 if self.overlay_id:
                     self._overlay(state).setdefault('series', []).append(spec['series_id'])
             state['config']['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
+            specs=[_style_runtime.series(fig,state,spec,self.subplot_id)[0] for spec in specs]
             uploaded = []
             try:
                 for name, values in zip(names, (x, lower, upper)):
@@ -1353,9 +1428,11 @@ class Axes(FeatureMethods, ChartMethods):
                     fig._native.remove_column(name)
                 raise
             fig._next_series += 2
+            _style_runtime._mark_used(fig)
         fig._changed()
         return Artist(fig, sid)
 
+    @_style_runtime.styled
     def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None):
         marker_only_format = False
         if isinstance(y, str):
@@ -1403,6 +1480,7 @@ class Axes(FeatureMethods, ChartMethods):
             style = {"Scatter": {"scatter": scatter}} if marker_only_format else {"ScatterLine": {"line": line, "scatter": scatter}}
         return [self._add(x, y, style, label, id)]
 
+    @_style_runtime.styled
     def scatter(self, x, y, *, s=16, color=None, c=None, cmap='viridis', vmin=None, vmax=None,
                 size_domain=None, size_range=(2., 12.), size_scale='area', marker="o", label=None, id=None):
         from ._features import colorbar
@@ -1443,6 +1521,7 @@ class Axes(FeatureMethods, ChartMethods):
                 scale=size_scale.title())
         return self._add(x, y, {'Scatter': dict(scatter=style)}, label, sid, extra_columns=columns, config=cfg)
 
+    @_style_runtime.styled
     def imshow(self, z, *, extent=None, origin="upper", cmap="viridis", vmin=None, vmax=None, interpolation="nearest", id=None):
         z = np.asarray(z)
         if z.ndim != 2 or min(z.shape) < 2 or z.dtype.kind not in "fiu":

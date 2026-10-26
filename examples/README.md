@@ -90,6 +90,7 @@ is a selection of examples, not the complete API surface.
 | [Desktop editor](desktop_editor.py) | `python examples/desktop_editor.py` | Open the native editor with an adjusted layout |
 | [Multiple windows](multiple_windows.py) | `python examples/multiple_windows.py` | Independent figures on a shared main-thread event loop |
 | [Quick start](quickstart.py) | `python examples/quickstart.py` | Write `signal.png`, then open a chart window |
+| [Style profiles](style_gallery.py) | `python examples/style_gallery.py --output output/styles` | Fourteen task-specific native renders, tokens, source/contrast manifest and overview sheets (requires Pillow) |
 | [Jupyter notebook](interactive.ipynb) | `jupyter lab examples/interactive.ipynb` | Edit in the browser using WASM/WebGPU |
 | [Notebook cells](notebook.py) | Run cells in an IPython kernel | Script-form notebook example with async export |
 

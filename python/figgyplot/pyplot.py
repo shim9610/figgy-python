@@ -1,5 +1,6 @@
 """A small stateful interface familiar to matplotlib.pyplot users."""
 from .figure import Figure, subplots as _subplots
+from ._style_runtime import use_style, style_context
 
 _current = None
 

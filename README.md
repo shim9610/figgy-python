@@ -356,6 +356,38 @@ the Python main thread. For an external main-thread loop, call
 `figgy.desktop.poll_events()` regularly. See the complete
 [multiple-window example](examples/multiple_windows.py).
 
+## Reusable style tokens
+
+Apply appearance without replacing the destination data, axis ranges or wording:
+
+```python
+fig.apply_style("paper")
+style = fig.extract_style()
+style.save("my-style.json")
+other.apply_style(figgy.StyleToken.load("my-style.json"), size_scale=1.25)
+```
+
+Declare defaults once within a script; new Figures and later additions inherit
+them, while explicit constructor arguments take precedence:
+
+```python
+figgy.use_style("dashboard.operations")
+fig, ax = figgy.subplots()
+ax.plot(time, latency, style_key="service-a", label="Service A")
+ax.plot([0, 10], [150, 150], style_key="warning", label="Supplied limit")
+
+with figgy.style_context("publication.nature"):
+    paper, paper_ax = figgy.subplots(figsize=(89 / 25.4, 62 / 25.4), dpi=300)
+figgy.use_style(None)
+```
+
+Twenty presets include fourteen task profiles for publication, measurement,
+print, teaching, presentations and seven dashboard purposes. Screen profiles
+offer light/dark and compact/comfortable variants. See the
+[catalog with actual renders](docs/STYLE_PROFILES.md) and
+[style token guide](docs/STYLE_TOKENS.md). Scale and wording changes require
+explicit opt-in; declarations are local to the current execution context.
+
 ## Jupyter
 
 ```bash

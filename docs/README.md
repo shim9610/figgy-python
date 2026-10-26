@@ -7,6 +7,9 @@
 | [Project README](../README.md) | Installation, quick start, interactive demo and chart gallery |
 | [Example index](../examples/README.md) | Runnable chart recipes, image links and commands |
 | [Chart and style API](CHART_TYPES.md) | All chart constructors, host coverage, procedural materials and draw modes |
+| [Style tokens](STYLE_TOKENS.md) | Appearance presets, extraction, JSON reuse, DPI scaling and opt-in axes/text |
+| [Style profiles](STYLE_PROFILES.md) | Execution-local defaults, publication targets and dashboard task catalog with actual renders |
+| [Preset research](STYLE_PRESET_RESEARCH.md) | Verified source guidance, measured palette gaps and profile design decisions |
 | [Renderer 0.18 features](RENDERER_018_FEATURES.md) | ID-addressed grids, polar/radar, vectors, maps, fills, layers, annotations and complete-document replay |
 | [Desktop editor](DESKTOP_EDITOR.md) | Zoom/pan, selection, visibility, properties, code export and windows |
 | [Editor commands and history](EDITOR_COMMANDS.md) | Shared property commands, Undo/Redo, reset, atomic validation and field inventory |

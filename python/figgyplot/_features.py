@@ -5,6 +5,7 @@ import math
 import uuid
 import numpy as np
 from . import _document
+from . import _style_runtime
 
 
 def colorbar(config, values, cmap, vmin, vmax):
@@ -68,12 +69,14 @@ class Annotation:
 
 
 class FeatureMethods:
+    @_style_runtime.styled
     def step(self, x, y=None, *, where='pre', **kwargs):
         modes = dict(pre='StepPre', post='StepPost', mid='StepMid')
         if where not in modes:
             raise ValueError('where must be pre, post or mid')
         return self.plot(x, y, interpolation=modes[where], **kwargs)
 
+    @_style_runtime.styled
     def fill_between(self, x, y1, y2=0, *, color=None, alpha=0.3, label=None, id=None,
                      interpolation='Linear'):
         """Fill to a baseline or another index-aligned line sharing the X column."""
@@ -98,6 +101,7 @@ class FeatureMethods:
         # shared by reference, with no resampling or persistent CPU array copy.
         return self._add_fill_pair(x, lower, upper, line, label, sid)
 
+    @_style_runtime.styled
     def quiver(self, x, y, u, v, *, values=None, cmap='viridis', vmin=None, vmax=None,
                scale=1., units='pixels', pivot='tail', color='black', width=1.,
                head_length=6., head_width=4., min_length=0., label=None, id=None):
@@ -145,6 +149,7 @@ class FeatureMethods:
         return self._add(x, y, {'Vector': dict(components=components, style=style)}, label, sid,
                          extra_columns=columns, config=cfg)
 
+    @_style_runtime.styled
     def radar(self, categories, values, *, labels=None, colors=None, **properties):
         from .figure import _color, _COLORS
         categories = list(categories)
@@ -162,6 +167,7 @@ class FeatureMethods:
                   for i, (row, label, color) in enumerate(zip(values, labels, colors))]
         return self._bounded('radar', cats, series, **properties)
 
+    @_style_runtime.styled
     def annotate(self, kind, *, id=None, **properties):
         """Add a document annotation using upstream geometry and logical pixels.
 
@@ -188,12 +194,15 @@ class FeatureMethods:
         if any(item['id'] == annotation_id for item in layer['items']):
             raise ValueError('duplicate annotation ID')
         layer['items'].append(dict(id=annotation_id, visible=True, kind={kind: properties}))
+        layer['items'][-1]=_style_runtime.annotation(self.figure,state,layer['items'][-1])
         self.figure.apply_settings(state)
         return Annotation(self.figure, annotation_id)
 
+    @_style_runtime.styled
     def axhline(self, y=0, *, color='black', linewidth=1., id=None):
         return self._reference_line('Y', y, color, linewidth, id)
 
+    @_style_runtime.styled
     def axvline(self, x=0, *, color='black', linewidth=1., id=None):
         return self._reference_line('X', x, color, linewidth, id)
 
@@ -202,6 +211,7 @@ class FeatureMethods:
         return self.annotate('ReferenceLine', id=id, axis=axis, value=float(value), label=None,
             style=dict(color=_color(color), width=float(width)*self.figure.dpi/72, style='Solid'))
 
+    @_style_runtime.styled
     def text(self, x, y, text, *, coords='data', fontsize=11, color='black', id=None):
         from .figure import _color, _segments
         if coords not in ('data', 'ratio'):
@@ -211,9 +221,11 @@ class FeatureMethods:
         return self.annotate('Text', id=id, anchor={coords.title(): dict(x=float(x), y=float(y))},
                              text=rich, box_style=None)
 
+    @_style_runtime.styled
     def axhspan(self, ymin, ymax, *, color='gray', alpha=0.25, id=None):
         return self._span('Y', ymin, ymax, color, alpha, id)
 
+    @_style_runtime.styled
     def axvspan(self, xmin, xmax, *, color='gray', alpha=0.25, id=None):
         return self._span('X', xmin, xmax, color, alpha, id)
 
@@ -225,6 +237,7 @@ class FeatureMethods:
         rgba['a'] *= float(alpha)
         return self.annotate('Span', id=id, axis=axis, from_=float(low), to=float(high), fill=rgba)
 
+    @_style_runtime.styled
     def arrow(self, x, y, dx, dy, *, coords='data', color='black', linewidth=1.,
               head_length=8., head_width=6., id=None):
         from .figure import _color

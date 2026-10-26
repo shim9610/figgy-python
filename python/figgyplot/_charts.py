@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import numpy as np
+from . import _style_runtime
 
 
 def family(settings):
@@ -50,10 +51,14 @@ class ChartMethods:
         _merge(chart, properties)
         with fig._lock:
             fig._require_open()
+            if fig._style_defaults is not None:
+                state=fig.get_settings();state[kind]=chart
+                chart=_style_runtime.bounded(fig,state,kind)[kind]
             fig._native.set_bounded(kind, json.dumps(chart, allow_nan=False))
         fig._changed()
         return BoundedArtist(fig, kind)
 
+    @_style_runtime.styled
     def bar(self, x, height, *, label=None, colors=None, color=None,
             mode='grouped', orientation='vertical', **properties):
         """Bounded categorical bars (up to 64 categories / 16 series / 512 bars).
@@ -83,10 +88,12 @@ class ChartMethods:
                              mode={'grouped': 'Grouped', 'stacked': 'Stacked', 'percent_stacked': 'PercentStacked'}[mode],
                              direction=orientation.title(), **properties)
 
+    @_style_runtime.styled
     def barh(self, y, width, **kwargs):
         """Horizontal categorical bars; other arguments follow ``bar``."""
         return self.bar(y, width, orientation='horizontal', **kwargs)
 
+    @_style_runtime.styled
     def bxp(self, stats, *, labels=None, color=None, orientation='vertical', **properties):
         """Plot precomputed boxes without recomputing statistics.
 
@@ -120,6 +127,7 @@ class ChartMethods:
         series = [dict(id='series_0', label='Distribution', values=values, color=_color(_COLORS[0] if color is None else color), style=None)]
         return self._bounded('boxplot', categories, series, direction=orientation.title(), **properties)
 
+    @_style_runtime.styled
     def boxplot(self, x, *, labels=None, whis=1.5, orientation='vertical', **properties):
         """Compute NumPy linear quartiles and actual IQR whiskers, then call bxp.
 
@@ -147,6 +155,7 @@ class ChartMethods:
                               outliers=a[(a < low) | (a > high)].tolist()))
         return self.bxp(stats, labels=labels, orientation=orientation, **properties)
 
+    @_style_runtime.styled
     def errorbar(self, x, y, *, xerr=None, yerr=None, color=None, ecolor=None,
                  linewidth=1.5, elinewidth=1.0, capsize=3, marker='o', markersize=4,
                  linestyle='-', label=None, id=None):
@@ -193,6 +202,7 @@ class ChartMethods:
         suffix = 'XY' if len(errors) == 2 else 'X' if xerr is not None else 'Y'
         return self._add(x, y, {prefix+suffix: style}, label, id, extra_columns=columns)
 
+    @_style_runtime.styled
     def stairs(self, values, edges, *, orientation='vertical', color=None, edgecolor='black',
                linewidth=0.5, baseline=0, gap=1, width=1, label=None, id=None):
         """Render pre-binned histogram bars; one more edge than values."""
@@ -209,6 +219,7 @@ class ChartMethods:
                  baseline=float(baseline), gap_px=float(gap), width_ratio=float(width), orientation=orientation.title())}}
         return self._add(edges if orientation=='vertical' else counts, counts if orientation=='vertical' else edges, style, label, id)
 
+    @_style_runtime.styled
     def hist(self, x, bins=10, *, range=None, weights=None, density=False, **kwargs):
         """Bin one finite sample vector with NumPy; return counts, edges, artist."""
         from .figure import _array
@@ -221,6 +232,7 @@ class ChartMethods:
         counts, edges = np.histogram(x, bins=bins, range=range, weights=weights, density=density)
         return counts, edges, self.stairs(counts, edges, **kwargs)
 
+    @_style_runtime.styled
     def contour(self, *args, levels=7, color='black', linewidth=1, cmap='viridis',
                 vmin=None, vmax=None, filled=False, id=None):
         """Contour(Z) or contour(X,Y,Z), with increasing 1-D sample coordinates.
@@ -276,6 +288,7 @@ class ChartMethods:
             return self._add(x, y, {'HeatmapContour' if filled else 'Contour': style}, id=id,
                              extra_columns=columns, config=config, bounds=(float(x[0]), float(x[-1]), float(y[0]), float(y[-1])))
 
+    @_style_runtime.styled
     def contourf(self, *args, **kwargs):
         """Banded field plus optional contours; default line width is zero."""
         kwargs.setdefault('linewidth', 0)
