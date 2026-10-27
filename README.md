@@ -211,6 +211,25 @@ finally:
 A small `figgy.pyplot` interface is also available. The API is familiar to
 matplotlib users, but does not implement the full matplotlib API.
 
+For a shared-X comparison, construct both panels in one Figure:
+
+```python
+fig, axes = figgy.subplots(2, 1, sharex=True, backend="native")
+try:
+    axes[0].plot(x, np.sin(x), label="Signal")
+    axes[1].plot(x, np.cos(x), label="Reference")
+    axes[1].set_xlabel("Time (s)")
+    axes[0].legend(loc="upper left")
+    fig.savefig("comparison.png")
+finally:
+    fig.close()
+```
+
+Cartesian and supported polar panels can use grids and shared axes. Categorical
+bars, boxplots, radar charts and pies/donuts require separate Figures; they cannot
+be placed in that grid. See the [capability matrix](docs/RENDERER_018_FEATURES.md#construction-and-capability-matrix)
+for polar-root and mixed-chart restrictions.
+
 | Native editor input | Action |
 | --- | --- |
 | Ctrl + wheel | Zoom X around the pointer |
@@ -312,6 +331,19 @@ Ranges, ticks and titles:
   lines of multi-line text (`left`, `center`, `right`); a title taller than its band
   grows the band instead of being clipped. Unicode super/subscripts such as `10⁻³`
   are drawn as super/subscript text.
+- Bounded chart titles accept up to 512 rich characters / eight lines. The rich
+  title holds the full wording; the legacy `title` field is a single-line,
+  160-character compatibility fallback. Category labels and category/value axis
+  names remain single-line. Axis names set before `bar`/`barh`/`boxplot`/`bxp`
+  construction survive; explicit constructor axis names, including `""`, win.
+- `ax.legend(loc="upper left")` places a Cartesian legend; the four supported
+  locations are upper/lower left/right. `fig.update("legend", corner="TopLeft")`
+  edits placement without rebuilding labels. Bounded legends support visibility
+  only; a location request raises an error.
+- `ax.invert_xaxis()` / `ax.invert_yaxis()` toggle Cartesian direction while
+  keeping increasing limits and existing ticks. On `twinx`, Y inversion affects
+  only that secondary axis. Use `fig.update("axis_bottom", major_spacing=2)` for
+  regular ticks; arbitrary `set_xticks`/`set_yticks` positions are not provided.
 - `font=` must name an installed family or `"Liberation Sans"` (or `""` for the
   default); an unknown name raises `ValueError` on the native backend. The browser
   backend cannot see installed fonts and draws an unknown family with the bundled font.
@@ -451,7 +483,8 @@ corners, textures and slice editing. Their bounded model contains up to 64
 categories and uses the upstream radial renderer on the shared GPU device.
 All chart families support native desktop and Jupyter WebGPU editing and PNG export.
 Categorical bars and boxplots use their upstream bounded models; histograms and
-contours use resident Cartesian columns. Multi-panel figures remain unsupported.
+contours use resident Cartesian columns. Cartesian/polar panels support one-level
+grids and shared axes; bounded families require their own single-panel Figures.
 
 `figsize` is in inches; `fontsize`, `linewidth` and `markersize` use points.
 Native Cartesian arrays are uploaded to a resident GPU column pool and reused during edits.

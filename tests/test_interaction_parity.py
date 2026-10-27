@@ -47,6 +47,63 @@ def test_legacy_settings_and_heatmap_legend_preserve_shared_host_model(backend):
 NEEDS_UI = not os.environ.get('DISPLAY') or not all(shutil.which(p) for p in ['xdotool','xclip','wmctrl']) or os.environ.get('FIGGY_TEST_JUPYTER') != '1'
 
 
+def assert_blind_trial_title_pixels(image):
+    assert image.shape == (500,700,4)
+    rgb = image[..., :3].astype(int)
+    ink = (rgb[:,:,0] > 130) & (rgb[:,:,1] < 90) & (rgb[:,:,2] < 90)
+    rows = np.flatnonzero(ink.sum(axis=1) >= 2)
+    bands = np.split(rows, np.flatnonzero(np.diff(rows) > 1) + 1)
+    assert len(bands) == 2 and all(len(b) >= 10 for b in bands), [b.tolist() for b in bands]
+    assert ink.sum() > 150
+    return dict(title_bands=[b.tolist() for b in bands], colored_pixels=int(ink.sum()))
+
+
+def test_blind_trial_title_oracle_rejects_black_and_missing_second_line():
+    with pytest.raises(AssertionError):
+        assert_blind_trial_title_pixels(np.zeros((500,700,4), dtype=np.uint8))
+    with figgy.Figure(backend='native', figsize=(7,5), dpi=100) as fig:
+        fig.axes[0].bar(['A','B'],[2,4])
+        fig.axes[0].set_title('FIRST',fontsize=18,color='#b42020')
+        with pytest.raises(AssertionError):
+            assert_blind_trial_title_pixels(fig.render_rgba())
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.skipif(NEEDS_UI, reason='requires native/Jupyter GPU environment')
+def test_blind_trial_titles_render_two_real_lines_in_both_hosts(tmp_path, backend):
+    """Ready is insufficient: both title lines must be present on the image."""
+    from browser_timing import DISPLAY_SETTLED
+    from PIL import Image
+    import io
+    scene = '''
+ax=fig.axes[0]
+ax.set_xlabel('Requested X')
+ax.set_ylabel('Requested Y')
+ax.set_title('FIRST\\nSECOND',fontsize=18,color='#b42020')
+ax.bar(['A','B'],[2,4])
+'''
+    if backend == 'native':
+        with figgy.Figure(backend=backend, figsize=(7,5), dpi=100) as fig:
+            exec(scene, {'fig': fig})
+            image = fig.render_rgba()
+            fig.savefig(tmp_path/'native.png')
+            state = fig.get_settings()
+    else:
+        source = (f"import figgyplot as fg\nassert fg.__file__ == {figgy.__file__!r}\n"
+                  "fig=fg.Figure(backend='webgpu',figsize=(7,5),dpi=100)\n" + scene + "\ndisplay(fig.widget())")
+        with notebook(tmp_path, source) as (page, execute):
+            page.wait_for_function(DISPLAY_SETTLED, polling=100, timeout=180000)
+            canvas = page.locator('.figgy-editor canvas')
+            canvas.evaluate('''c=>{const r=c.getBoundingClientRect();c.closest('.figgy-editor').style.transform=`translate(${Math.ceil(r.x)-r.x}px,${Math.ceil(r.y)-r.y}px)`;}''')
+            image = np.asarray(Image.open(io.BytesIO(canvas.screenshot(path=str(tmp_path/'browser.png')))).convert('RGBA'))
+            state = page.evaluate(ROOT + '.snapshot()')
+    chart = state['categorical']
+    assert chart['category_title'] == 'Requested X' and chart['value_title'] == 'Requested Y'
+    assert ''.join(s['text'] for s in chart['chart_title']['text']['segments']) == 'FIRST\nSECOND'
+    result = assert_blind_trial_title_pixels(image)
+    (tmp_path/'contract.json').write_text(json.dumps(dict(backend=backend,**result,settings=state),indent=2))
+
+
 @pytest.mark.parametrize('backend',['native','webgpu'])
 @pytest.mark.parametrize('panel',['main','child'])
 def test_marker_size_changes_keep_legend_symbols_owned_by_labelled_series(backend,panel):

@@ -1,0 +1,217 @@
+{
+  "date": "2026-10-28",
+  "timezone": "Asia/Seoul",
+  "baseline_commit": "2e755c7236ce18710b2fbdd84e2ce33bf5c2c801",
+  "package_version": "0.4.0",
+  "renderer_version": "0.18.1",
+  "scope": "Blind-use API defects, rich title adaptation and discovery improvements; no renderer or CI thresholds changed.",
+  "findings": [
+    {
+      "id": "axis-name-construction-order",
+      "before": "First bounded construction omitted names set on the same Axes beforehand.",
+      "after": "The common categorical/box constructor transfers X/Y names by orientation; explicit category/value names, including empty strings, take precedence."
+    },
+    {
+      "id": "bounded-multiline-title",
+      "before": "The title helper copied newlines into the legacy single-line field and validation failed.",
+      "after": "A shared rich-title adapter preserves full wording/segments and derives only the legacy fallback; construction, setters and title-token replay use it."
+    },
+    {
+      "id": "partial-rich-title-style",
+      "before": "Extracted rich-title appearance applied to a legacy-only destination produced an incomplete text object without segments.",
+      "after": "Seed the destination title before merging an appearance patch, preserving its wording and data."
+    },
+    {
+      "id": "documentation-grid-support",
+      "before": "README said multi-panel figures were unsupported.",
+      "after": "Quick-start grid example and matching capability limits distinguish Cartesian/polar grids from separate bounded Figures."
+    }
+  ],
+  "convenience": {
+    "legend": "Four Cartesian corners through Axes.legend(loc=...) or Figure.update(legend, corner=...); secondary Axes own their legend. Bounded loc requests reject atomically.",
+    "inversion": "Cartesian X/Y toggle preserves limits/ticks and follows shared axes. Secondary Y stays local; bounded/polar requests reject atomically.",
+    "discovery": "plot/scatter/imshow/title/axis-name/legend docstrings, tick-spacing alternatives and category-newline error guidance."
+  },
+  "regressions": {
+    "test_file": "tests/test_blind_api_findings.py",
+    "cases": 46,
+    "baseline": {
+      "failed": 46,
+      "passed": 0,
+      "wheel_sha256": "2afe3efa2ed5696430397b4a1e9368e7050b89da548ff475c90a0b0438943dcd",
+      "installed_package_files_match": 38
+    },
+    "candidate": {
+      "passed": 46,
+      "failed": 0
+    },
+    "contracts": [
+      "Complete bounded-model equality and exact native output for names set before versus after first construction.",
+      "Rich title text/style preservation before construction, after edits, token JSON and code replay.",
+      "Legacy-only destination title preserved under appearance-only application.",
+      "Valid 401-character title kept in full; invalid rich-title lengths/line counts/control characters leave settings and revision unchanged.",
+      "Panel/shared-axis/secondary-axis inversion and legend ownership; unsupported requests do not mutate state."
+    ]
+  },
+  "validation": {
+    "broad_installed_api_style_editor_notebook_cases": 664,
+    "additional_final_title_cases": 2,
+    "installed_chart_invalid_state_release_asset_cases": 160,
+    "previously_ui_skipped_numeric_case": "passed with actual native/Jupyter UI",
+    "ci_preflight_cases": 134,
+    "preflight": "actionlint, shellcheck, asset provenance, pinned maturin-action workflow contract and tests passed",
+    "source_and_packaged_python_files_match": 22,
+    "installed_package_files_match": 39,
+    "rust_format": "passed",
+    "whitespace": "passed"
+  },
+  "presentation": {
+    "host_test": "tests/test_interaction_parity.py::test_blind_trial_titles_render_two_real_lines_in_both_hosts",
+    "host_cases_passed": 2,
+    "pixel_expectation": "Two separate red text bands of at least ten rows and more than 150 colored pixels on a 700x500 canvas, plus accepted axis names and complete title SSOT.",
+    "negative_control": "The same assertion rejects a black canvas and an actual single-line native title.",
+    "negative_control_cases_passed": 1,
+    "measured": [
+      {
+        "backend": "native",
+        "title_bands": [
+          [
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          [
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65
+          ]
+        ],
+        "colored_pixels": 826
+      },
+      {
+        "backend": "webgpu",
+        "title_bands": [
+          [
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          [
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65
+          ]
+        ],
+        "colored_pixels": 821
+      }
+    ],
+    "environment": "Linux X11, Mesa lavapipe native, Chromium SwiftShader WebGPU; the notebook kernel import path is asserted to match the test runner installed package."
+  },
+  "datasets": {
+    "independent_domains": 6,
+    "unchanged_analysis_scripts": 6,
+    "input_rows": 338927,
+    "final_pngs_regenerated": 21,
+    "stderr_bytes": 0,
+    "runs": [
+      {
+        "domain": "astronomy",
+        "exit_code": 0,
+        "pngs": 3
+      },
+      {
+        "domain": "finance",
+        "exit_code": 0,
+        "pngs": 3
+      },
+      {
+        "domain": "clinical",
+        "exit_code": 0,
+        "pngs": 3
+      },
+      {
+        "domain": "aviation",
+        "exit_code": 0,
+        "pngs": 4
+      },
+      {
+        "domain": "ecology",
+        "exit_code": 0,
+        "pngs": 4
+      },
+      {
+        "domain": "seismology",
+        "exit_code": 0,
+        "pngs": 4
+      }
+    ]
+  },
+  "artifacts": {
+    "wheel": "figgyplot-0.4.0-cp312-cp312-manylinux_2_39_x86_64.whl",
+    "wheel_sha256": "9d66d08dcaa9d472bfdb06132083d3ce2261637fa68139ff17eb30aabf1b3117",
+    "regression_test_sha256": "4904583c22db0db80688cce8fa6c69f7d63a0b8fb30933fd6790b056201dc587"
+  },
+  "limitations": [
+    "No arbitrary-position tick API was added.",
+    "Bounded category/axis labels remain single-line; rich title limits remain enforced by the upstream model.",
+    "Raw apply_settings/configure patches must still satisfy both legacy and rich-title model constraints.",
+    "Static native output and the focused notebook/native checks do not establish Windows GUI correctness, physical GPU performance or every editor interaction.",
+    "GitHub CI status is tracked separately from these local measurements."
+  ]
+}

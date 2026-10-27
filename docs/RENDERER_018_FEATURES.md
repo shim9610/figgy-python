@@ -62,7 +62,10 @@ requested scale, independently of which layer currently receives interaction.
 | Secondary Y | `right = ax.twinx(id='pressure')`; `right.plot(...)`, `right.set_ylim(...)` | Shares the parent X mapping/plot rectangle; Cartesian only |
 | Subplots | `Figure(grid=...)`, `set_layout`, `subplots`, `share_axes` | Cartesian/polar panels; one level; bounded families require separate Figures |
 | Annotations | `axhline`, `axvline`, `axhspan`, `axvspan`, `text`, `arrow`, `annotate` | One parent-panel annotation layer; subplot-local annotation spaces rejected |
-| Independent bounded titles | `ax.set_title(text, fontsize=..., color=..., visible=...)` | Rich title no longer changes category/data-label font sizes |
+| Independent bounded titles | `ax.set_title(text, fontsize=..., color=..., visible=...)` | Up to 512 rich characters / eight lines; preserved before construction; independent of category/data-label fonts |
+| Bounded axis names | `ax.set_xlabel`, `ax.set_ylabel` before or after construction | Bars/boxes map names by orientation; explicit constructor axis names override inherited names; single-line |
+| Cartesian legend location | `ax.legend(loc='upper left')`; `fig.update('legend', corner='TopLeft')` | Four upper/lower left/right corners; bounded legends support visibility only |
+| Cartesian axis inversion | `ax.invert_xaxis()`, `ax.invert_yaxis()` | Keeps increasing limits and ticks; secondary Y is local; polar and bounded charts rejected |
 | Heatmap legend swatches | `ax.imshow(..., cmap=...)`, series label, `ax.legend()` | Uses the current colormap and preserves independently edited legend text |
 
 For mixed documents containing fields, vectors, histograms or errorbars, renderer

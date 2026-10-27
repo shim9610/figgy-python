@@ -190,8 +190,10 @@ ax.set_ylabel("Count")
 # Choose fig.show() on desktop or display(fig.widget()) in Jupyter.
 ```
 
-Use separate Figures for these examples (bounded families cannot mix with
-Cartesian series):
+The following calls are independent examples, not one combined document.
+Errorbars, histograms and contours are Cartesian and can share a Figure or grid.
+Bars, boxplots, radar and pies/donuts each need a separate single-panel Figure;
+they cannot mix with Cartesian series or occupy grid slots.
 
 ```python
 ax.errorbar([1, 2, 3], [2, 4, 3], yerr=[[.1, .2, .3], [.2, .1, .2]], xerr=.1)
@@ -218,6 +220,11 @@ one box and a sequence of arrays as one box per array; it computes NumPy linear
 quartiles, actual sample whiskers within `whis * IQR` (default 1.5), and all
 outliers. It does not silently drop outliers to fit the bounded limits (128 per
 box, 4096 total). `bxp` uses supplied statistics without recomputing them.
+Axis names may be set before or after `bar`/`barh`/`boxplot`/`bxp`. Horizontal
+charts map the X name to the value axis and the Y name to the category axis.
+Explicit `category_title`/`value_title` constructor properties override inherited
+names, including an explicit empty string. Category labels and these axis names
+are single-line; use the chart title or annotations for longer descriptions.
 The hollow circles beyond the whiskers are these individual outlier values.
 They are data points, not extra boxes or selection handles. With the default
 `whis=1.5`, the fences are `Q1 - 1.5*IQR` and `Q3 + 1.5*IQR`; whiskers extend
@@ -229,6 +236,24 @@ these setters do not perform automatic layout or adjust ticks. Constructors and
 `fit()` are convenience helpers that may compute statistics, ranges, ticks or
 layout. Copy Python replays style/configuration against matching category and
 series IDs, preserving the destination's data values.
+
+`ax.set_title("Comparison\nObserved sample", fontsize=18)` uses the independent
+rich title, with up to 512 characters and eight lines. It does not change the
+category/data-label font. Titles set before construction keep their text and
+rich formatting. The legacy single-line `title` is only a compatibility fallback;
+`chart_title.text.segments` holds the complete displayed wording. Raw SSOT edits
+still have to satisfy both fields' model constraints.
+
+For Cartesian charts, `ax.legend(loc="upper left")` accepts upper/lower left/right
+and their renderer names (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`).
+`fig.update("legend", corner="TopLeft", fontsize=11)` edits the existing legend.
+Bounded legends expose visibility through `ax.legend(False)`; `loc` is rejected.
+
+Use `ax.invert_yaxis()` for depth increasing downwards, after setting increasing
+limits such as `ax.set_ylim(0, 700)`. Inversion preserves limits and tick spacing;
+on `twinx` it affects only that Y axis. Cartesian tick spacing is configurable
+with `fig.update("axis_bottom", major_spacing=2, minor_count=0)`. Explicit
+arbitrary tick-position setters are not part of the API.
 
 Both hosts open the property panel on selection. Drag annotations to move them;
 use Layout and plot-area handles to resize; Fit restores automatic plot layout.

@@ -15,12 +15,24 @@ import numpy as np
 
 from . import _document
 from . import _style_runtime
+from . import _chart_text
 from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 _NAMED = {"blue": "#0000ff", "red": "#ff0000", "green": "#008000", "black": "#000000", "white": "#ffffff", "orange": "#ffa500", "purple": "#800080", "gray": "#808080", "grey": "#808080", "b": "#0000ff", "r": "#ff0000", "g": "#008000", "k": "#000000", "w": "#ffffff"}
 _MARKERS = {"o": "CircleFilled", "s": "SquareFilled", "^": "TriangleFilled", "v": "TriangleDownFilled", "D": "DiamondFilled", "+": "Plus", "x": "Cross", "*": "StarFilled"}
 _LINES = {"-": "Solid", "--": "Dash", ":": "Dot", "-.": "DashDot"}
+_LEGEND_LOCATIONS = {'upper left': 'TopLeft', 'upper right': 'TopRight',
+                     'lower left': 'BottomLeft', 'lower right': 'BottomRight'}
+
+
+def _legend_corner(value):
+    if not isinstance(value, str):
+        raise ValueError('legend location must be upper/lower left/right or a renderer corner name')
+    corner = _LEGEND_LOCATIONS.get(value.lower(), value)
+    if corner not in _LEGEND_LOCATIONS.values():
+        raise ValueError('legend location must be upper/lower left/right or TopLeft/TopRight/BottomLeft/BottomRight')
+    return corner
 
 
 def _color(value):
@@ -556,14 +568,10 @@ class Figure:
             if target == 'chart_title':
                 state = self.get_settings()
                 chart = state[kind]
-                title = chart.get('chart_title') or dict(visible=True, text=dict(
-                    segments=_segments(chart['title']), font_size=chart['font_size']*1.5,
-                    font=chart['font_family'], color=copy.deepcopy(chart.get('text_color', chart.get('label_color'))), align='Left'))
-                title = copy.deepcopy(title)
+                title = _chart_text.title_options(chart)
                 for key, value in properties.items():
                     if key == 'text':
-                        title['text']['segments'] = _segments(str(value))
-                        chart['title'] = str(value)
+                        _chart_text.set_title_text(chart, value)
                     elif key == 'fontsize': title['text']['font_size'] = float(value)*self.dpi/72
                     elif key == 'font': title['text']['font'] = self._check_font(value)
                     elif key == 'color': title['text']['color'] = _color(value)
@@ -674,6 +682,8 @@ class Figure:
                             raise ValueError(f"unsupported property for {target}: {key}")
                     elif key == "offset" and "offset_x" in node:
                         node["offset_x"], node["offset_y"] = map(float, value)
+                    elif target == 'legend' and key in ('corner', 'loc'):
+                        node['corner'] = _legend_corner(value)
                     elif key in ("format", "significant_digits") and "label_style" in node:
                         node["label_style"][key] = copy.deepcopy(value)
                     elif key == "label_style" and "label_style" in node:
@@ -1308,8 +1318,7 @@ class Axes(FeatureMethods, ChartMethods):
             raise ValueError("unsupported radial label placement/format")
         from ._native import default_radial_json
         chart = json.loads(default_radial_json())
-        title = fig.get_settings()["config"]["chart_title"]["text"]
-        chart.update(title=_text(title), font_size=11 * fig.dpi / 72,
+        chart.update(font_size=11 * fig.dpi / 72,
                      kind="Pie" if inner_radius is None else {"Donut": {"inner_radius": float(inner_radius)}},
                      start_angle_degrees=-float(startangle), labels=placements[labels_position],
                      label_format=formats[label_format])
@@ -1320,6 +1329,7 @@ class Axes(FeatureMethods, ChartMethods):
                            for value, label, color, offset in zip(values, labels, colors, explode)]
         with fig._lock:
             fig._require_open()
+            _chart_text.inherit_title(chart, self._config(fig.get_settings()))
             if fig._style_defaults is not None:
                 state=fig.get_settings();state['radial']=chart
                 chart=_style_runtime.bounded(fig,state,'radial')['radial']
@@ -1437,6 +1447,14 @@ class Axes(FeatureMethods, ChartMethods):
 
     @_style_runtime.styled
     def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None):
+        """Plot a line, or a line with markers, from equal-length numeric arrays.
+
+        With y omitted, use sample indices for X. linewidth/markersize are in
+        points; label adds a legend entry and id is a stable edit target.
+        Returns a one-item list of Artist handles. Use legend(loc='upper left')
+        for placement and Figure.update('axis_bottom', major_spacing=...) for
+        regular ticks. This is a plotting subset, not the full matplotlib API.
+        """
         marker_only_format = False
         if isinstance(y, str):
             if fmt is not None:
@@ -1486,6 +1504,15 @@ class Axes(FeatureMethods, ChartMethods):
     @_style_runtime.styled
     def scatter(self, x, y, *, s=16, color=None, c=None, cmap='viridis', vmin=None, vmax=None,
                 size_domain=None, size_range=(2., 12.), size_scale='area', marker="o", label=None, id=None):
+        """Plot numeric X/Y points; return an Artist with a stable id.
+
+        Scalar s is marker area in points squared. An array s maps values through
+        size_domain/size_range (diameters in points), using area or radius scale.
+        color fixes the marker color; numeric c maps through cmap/vmin/vmax and
+        creates a shared color scale. label adds a legend entry. set_xlim/ylim
+        choose automatic ticks; Figure.update('axis_bottom', major_spacing=...)
+        sets regular spacing. Arbitrary set_xticks/set_yticks are not provided.
+        """
         from ._features import colorbar
         x, y = _array(x), _array(y)
         if x.size != y.size or not x.size:
@@ -1526,6 +1553,14 @@ class Axes(FeatureMethods, ChartMethods):
 
     @_style_runtime.styled
     def imshow(self, z, *, extent=None, origin="upper", cmap="viridis", vmin=None, vmax=None, interpolation="nearest", id=None):
+        """Draw a numeric matrix (at least 2x2) and its shared color scale.
+
+        extent=(xmin,xmax,ymin,ymax) gives increasing cell-edge bounds; the default
+        is half a cell outside the sample indices. origin='upper' inverts Y;
+        'lower' leaves it increasing. interpolation is nearest or bilinear.
+        Existing color-scale styling is preserved; explicit cmap replaces its
+        map. Returns the matrix Artist, editable by id with Figure.update.
+        """
         z = np.asarray(z)
         if z.ndim != 2 or min(z.shape) < 2 or z.dtype.kind not in "fiu":
             raise ValueError("imshow expects a numeric matrix with at least 2 rows and columns")
@@ -1559,12 +1594,30 @@ class Axes(FeatureMethods, ChartMethods):
             return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
 
     def set_title(self, text, **kwargs):
+        """Set the chart title, including newlines; keep other title styles.
+
+        Options: fontsize (points), color, font, align, visible. Bounded charts
+        support up to 512 rich characters / eight lines, independently of their
+        category and value labels. Text set before construction is preserved.
+        """
         return self.figure.update("chart_title", _axes=self, text=text, **kwargs)
 
     def set_xlabel(self, text, **kwargs):
+        """Name the horizontal axis, before or after adding the first chart.
+
+        For horizontal bars/boxes this is the value axis. Bounded axis names are
+        single-line and share the model's label font; Cartesian titles also
+        accept fontsize, color and font. Use Figure.update for exact styling.
+        """
         return self.figure.update("axis_title_bottom", _axes=self, text=text, **kwargs)
 
     def set_ylabel(self, text, **kwargs):
+        """Name the vertical axis (the category axis on horizontal bars/boxes).
+
+        The name survives first-chart construction. Bounded axis names are
+        single-line and share label typography; Cartesian titles support
+        fontsize, color and font. On twinx this edits only the overlay's title.
+        """
         if self.overlay_id:
             state = self.figure.get_settings()
             axis = self._overlay(state)['y_axis']
@@ -1656,6 +1709,38 @@ class Axes(FeatureMethods, ChartMethods):
         self.figure._require_cartesian()
         return self._set_lim_keeping_ticks(("left_y", "right_y"), bottom, top)
 
+    def _invert_axis(self, dimension):
+        with self.figure._lock:
+            self.figure._require_cartesian()
+            state = self.figure.get_settings()
+            config = self._config(state)
+            if config.get('polar'):
+                raise ValueError('axis inversion requires a Cartesian panel; polar angles/radii have different semantics')
+            if dimension == 'y' and self.overlay_id:
+                axes = [self._overlay(state)['y_axis']]
+            else:
+                axes = [config[k] for k in (('bottom_x', 'top_x') if dimension == 'x' else ('left_y', 'right_y'))]
+            inverted = not axes[0]['inverted']
+            for axis in axes:
+                axis['inverted'] = inverted
+            self.figure.apply_settings(state)
+
+    def invert_xaxis(self):
+        """Toggle X direction on this Cartesian panel; keep limits and ticks.
+
+        Limits stay increasing. On twinx the panel's shared X axis is inverted.
+        Bounded and polar charts do not use this Cartesian helper.
+        """
+        return self._invert_axis('x')
+
+    def invert_yaxis(self):
+        """Toggle Y direction without changing increasing limits or tick spacing.
+
+        On twinx only the overlay's Y axis changes. Use this instead of passing
+        descending bounds to set_ylim. Bounded/polar charts are unsupported.
+        """
+        return self._invert_axis('y')
+
     def grid(self, visible=True):
         kind = _family(self.figure.get_settings())
         if kind in ('categorical', 'boxplot', 'radar'):
@@ -1666,18 +1751,35 @@ class Axes(FeatureMethods, ChartMethods):
         self._config(state)["grid"]["show_major_y"] = bool(visible)
         self.figure.apply_settings(state)
 
-    def legend(self, visible=True):
+    def legend(self, visible=True, *, loc=None):
+        """Show/hide the legend; Cartesian loc accepts upper/lower left/right.
+
+        Renderer names TopLeft/TopRight/BottomLeft/BottomRight are also accepted.
+        Bounded legends support visibility only; unsupported placement raises
+        before editing. Use Figure.update('legend', fontsize=..., corner=...)
+        to edit an existing Cartesian legend without rebuilding its labels.
+        """
         kind = _family(self.figure.get_settings())
         if kind in ('categorical', 'boxplot', 'radar'):
+            if loc is not None:
+                raise ValueError('bounded legends support visibility only; loc is available on Cartesian charts')
             return self.figure.configure_bounded(kind, legend=bool(visible))
         self.figure._require_cartesian()
+        corner = None if loc is None else _legend_corner(loc)
         from ._native import rebuild_legend_json
         state = self.figure.get_settings()
-        colorbar = self._config(state).get("colorbar")
-        self._config(state)["legend"]["content"] = json.loads(rebuild_legend_json(
-            json.dumps(self._owned_series(state)), json.dumps(self._config(state)["legend"]["content"]),
+        config = self._config(state)
+        colorbar = config.get("colorbar")
+        owner = self._overlay(state) if self.overlay_id else config
+        if owner.get('legend') is None:
+            owner['legend'] = copy.deepcopy(config['legend'])
+        legend = owner['legend']
+        legend["content"] = json.loads(rebuild_legend_json(
+            json.dumps(self._owned_series(state)), json.dumps(legend["content"]),
             json.dumps(colorbar["colormap"]) if colorbar else None))
-        self._config(state)["legend"]["visible"] = bool(visible)
+        legend["visible"] = bool(visible)
+        if corner is not None:
+            legend['corner'] = corner
         self.figure.apply_settings(state)
 
 

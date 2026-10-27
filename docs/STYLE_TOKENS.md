@@ -179,6 +179,12 @@ copied; these remain destination chart semantics.
 Text selection is `True` for all captured groups, or a set containing:
 
 - `titles`: chart titles.
+  Bounded extraction reads the authoritative rich title, including all lines and
+  character formatting. Its optional `text.bounded.title_segments` payload keeps
+  those segments; older tokens containing only `text.bounded.title` still work.
+  Applying appearance alone never imports the source wording, including when the
+  destination still uses its legacy title. The single-line legacy fallback is
+  derived only when title text is explicitly applied.
 - `axis_titles`: all four axis titles, secondary Y titles, and colorbar titles;
   category/value axis titles for applicable bounded charts.
 - `legend_labels`: existing series/slice legend wording.

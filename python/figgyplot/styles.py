@@ -255,7 +255,7 @@ class StyleToken:
                 _check(p,dict(titles='json',axis_titles={key:'json' for key in ('bottom_x','top_x','left_y','right_y')},
                               colorbar_title='json',overlays='json'),'text/panels')
             if 'bounded' in self.text:
-                _check(self.text['bounded'],dict(title=True,category_title=True,value_title=True,legend_labels='json'),'text/bounded')
+                _check(self.text['bounded'],dict(title=True,title_segments='json',category_title=True,value_title=True,legend_labels='json'),'text/bounded')
         # Also reject NaN/inf, non-JSON objects and accidentally supplied arrays.
         json.dumps(self.to_dict(),allow_nan=False)
         return self
@@ -342,6 +342,10 @@ def extract(figure, *, scales=False, text=False):
             if kind:
                 chart=state[kind];text_payload['family']=kind
                 text_payload['bounded']={k:copy.deepcopy(chart[k]) for k in ('title','category_title','value_title') if k in chart}
+                if chart.get('chart_title'):
+                    from .figure import _text
+                    text_payload['bounded']['title'] = _text(chart['chart_title']['text'])
+                    text_payload['bounded']['title_segments'] = copy.deepcopy(chart['chart_title']['text']['segments'])
                 text_payload['bounded']['legend_labels']=[s['label'] for s in chart.get('slices',chart.get('series',[]))]
         return StyleToken(appearance,scale_payload,text_payload)
 
@@ -521,7 +525,14 @@ def apply(figure, token, *, scales=False, text=False, size_scale=1.0,
                 skipped.append('category encodings exhausted; supply explicit styles or split/group categories')
         if kind:
             chart=state[kind]
-            if kind in a.get('bounded',{}):_merge(chart,a['bounded'][kind])
+            if kind in a.get('bounded',{}):
+                patch = a['bounded'][kind]
+                if patch.get('chart_title'):
+                    # An appearance token omits wording. Seed from the target
+                    # before merging its partial rich-title styles.
+                    from ._chart_text import title_options
+                    title_options(chart)
+                _merge(chart,patch)
             elif a.get('bounded'):skipped.append('bounded style: source chart family differs')
             items=chart.get('slices',chart.get('series',[]));itemstyles=a.get('bounded_items',{}).get(kind,[])
             if palette and len(items)>len(palette):skipped.append('bounded palette exhausted; supply explicit colors or group series/slices')
@@ -597,10 +608,8 @@ def apply(figure, token, *, scales=False, text=False, size_scale=1.0,
                 if kind!=payload['family']:raise ValueError('bounded text requires the same family')
                 p=payload['bounded'];chart=state[kind]
                 if 'titles' in groups and 'title' in p:
-                    chart['title']=p['title']
-                    if chart.get('chart_title'):
-                        from .figure import _segments
-                        chart['chart_title']['text']['segments']=_segments(p['title'])
+                    from ._chart_text import set_title_text
+                    set_title_text(chart, p['title'], segments=p.get('title_segments'))
                 if 'axis_titles' in groups:
                     for key in ('category_title','value_title'):
                         if key in p:chart[key]=p[key]

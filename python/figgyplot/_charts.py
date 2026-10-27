@@ -3,7 +3,7 @@ import copy
 import json
 import math
 import numpy as np
-from . import _style_runtime
+from . import _style_runtime, _chart_text
 
 
 def family(settings):
@@ -39,20 +39,27 @@ class BoundedArtist:
 
 class ChartMethods:
     def _bounded(self, kind, categories, series, **properties):
-        from .figure import _color, _text, _merge
+        from .figure import _text, _merge
         from ._native import default_bounded_json
         fig = self.figure
         if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
             raise ValueError('bounded charts require a separate single-panel Figure')
-        chart = json.loads(default_bounded_json(kind))
-        chart.update(categories=categories, series=series,
-                     title=_text(fig.get_settings()['config']['chart_title']['text']),
-                     font_size=11 * fig.dpi / 72)
-        _merge(chart, properties)
         with fig._lock:
             fig._require_open()
+            state = fig.get_settings()
+            config = self._config(state)
+            chart = json.loads(default_bounded_json(kind))
+            chart.update(categories=categories, series=series, font_size=11 * fig.dpi / 72)
+            _chart_text.inherit_title(chart, config)
+            if kind in ('categorical', 'boxplot'):
+                horizontal = properties.get('direction') == 'Horizontal'
+                chart['category_title'] = _text(config['left_y' if horizontal else 'bottom_x']['title_option']['text'])
+                chart['value_title'] = _text(config['bottom_x' if horizontal else 'left_y']['title_option']['text'])
+            _merge(chart, properties)
+            if 'title' in properties and 'chart_title' not in properties:
+                _chart_text.set_title_text(chart, properties['title'])
             if fig._style_defaults is not None:
-                state=fig.get_settings();state[kind]=chart
+                state[kind]=chart
                 chart=_style_runtime.bounded(fig,state,kind)[kind]
             fig._native.set_bounded(kind, json.dumps(chart, allow_nan=False))
         fig._changed()
@@ -81,7 +88,7 @@ class ChartMethods:
         palette = list(colors) if colors is not None else [_COLORS[i % len(_COLORS)] if color is None else color for i in range(n)]
         if len(names) != n or len(palette) != n:
             raise ValueError('labels and colors must match the number of series')
-        categories = [dict(id=f'category_{i}', label=str(v)) for i, v in enumerate(labels)]
+        categories = [dict(id=f'category_{i}', label=_chart_text.category_label(v)) for i, v in enumerate(labels)]
         series = [dict(id=f'series_{i}', label=names[i], values=[None if v is None else float(v) for v in row],
                        color=_color(palette[i]), style=None) for i, row in enumerate(values)]
         return self._bounded('categorical', categories, series,
@@ -123,7 +130,7 @@ class ChartMethods:
                 s.setdefault(key, None)
             s['outliers'] = [float(v) for v in s.get('outliers', [])]
             values.append(s)
-        categories = [dict(id=f'category_{i}', label=str(v)) for i, v in enumerate(names)]
+        categories = [dict(id=f'category_{i}', label=_chart_text.category_label(v)) for i, v in enumerate(names)]
         series = [dict(id='series_0', label='Distribution', values=values, color=_color(_COLORS[0] if color is None else color), style=None)]
         return self._bounded('boxplot', categories, series, direction=orientation.title(), **properties)
 
