@@ -2,8 +2,8 @@
 
 **Plot NumPy data on the GPU. Edit directly. Reuse the settings in Python.**
 
-Explore lines, scatter, errorbars, histograms, heatmaps, contours, categorical
-bars, boxplots, pies and donuts in native windows or Jupyter.
+Explore lines, scatter, errorbars, histograms, heatmaps, contours, polar and radar
+plots, categorical bars, boxplots, pies and donuts in native windows or Jupyter.
 Adjust the axes, text, colors and layout, then copy executable Python to reuse
 the result across datasets. Export the edited chart directly to PNG.
 
@@ -76,9 +76,11 @@ separately. These measurements include RGBA readback and do not measure UI FPS.
 
 ## Install
 
-This description covers the published **figgyplot 0.3.0** release. The
-[source checkout](https://github.com/shim9610/figgy-python#install) may contain
-subsequent changes; its renderer migration does not update installed wheels.
+This distribution is **figgyplot 0.4.0**, using renderer 0.18.1. It includes
+reusable style tokens and execution-local style defaults, plus an opt-in review
+workflow with targeted comments and reference images. See the
+[style guide](https://github.com/shim9610/figgy-python/blob/main/docs/STYLE_TOKENS.md)
+and [review guide](https://github.com/shim9610/figgy-python/blob/main/docs/REVIEW_FEEDBACK_VIEWS.md).
 
 Install from PyPI:
 

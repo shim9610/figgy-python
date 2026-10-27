@@ -137,9 +137,8 @@ host coverage, materials and draw modes, including the line-only Milkyway restri
 
 ## Install
 
-This checkout documents **figgyplot 0.3.0**. Before that release is published,
-PyPI installs the previous release (0.2.1); use the source-checkout instructions
-below to try the features described here.
+This checkout targets **figgyplot 0.4.0**. Until it is published, PyPI installs
+0.3.0; use the source-checkout instructions below to try the new features.
 
 Install from **PyPI** with **Python 3.8–3.15**:
 
