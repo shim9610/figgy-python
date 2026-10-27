@@ -9,8 +9,6 @@ from . import _style_runtime
 
 
 def colorbar(config, values, cmap, vmin, vmax):
-    from .figure import _colormap
-    from ._native import default_colorbar_json
     finite = np.asarray(values)[np.isfinite(values)]
     if not finite.size:
         raise ValueError('mapped values need at least one finite value')
@@ -18,6 +16,13 @@ def colorbar(config, values, cmap, vmin, vmax):
     high = float(finite.max()) if vmax is None else float(vmax)
     if low == high:
         high = low+max(1., abs(low)*0.01)
+    _set_colorbar(config,cmap,low,high)
+
+
+def _set_colorbar(config,cmap,low,high):
+    """Update the shared scale without resetting accepted colorbar appearance."""
+    from .figure import _colormap
+    from ._native import default_colorbar_json
     if not math.isfinite(low) or not math.isfinite(high) or low >= high:
         raise ValueError('mapped value domain must be finite and increasing')
     bar = copy.deepcopy(config.get('colorbar') or json.loads(default_colorbar_json()))

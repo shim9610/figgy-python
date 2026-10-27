@@ -238,8 +238,12 @@ class Figure:
     def shared_axes(self):
         return copy.deepcopy(self.get_settings()['identity']['groups'])
 
-    def set_layout(self, grid, *, placement=None, row_weights=None, column_weights=None, gap=12):
-        """Place stable subplot IDs into named grid slots (repeated IDs span cells)."""
+    def set_layout(self, grid, *, placement=None, row_weights=None, column_weights=None, gap=None):
+        """Place stable subplot IDs into named grid slots (repeated IDs span cells).
+
+        Omitted gap/weights retain compatible accepted values, then inherit
+        captured style defaults. A new unstyled grid defaults to a 12 px gap.
+        """
         slots = _document.grid_slots(grid)
         placement = dict(placement) if placement is not None else {slot: slot for slot in slots}
         if set(placement) != set(slots):
@@ -275,9 +279,7 @@ class Figure:
             area = self._default_config['chart_area']
             size = previous['size'] if previous else [area['width'], area['height']]
             state['identity']['layout'] = dict(grid=[list(row) for row in grid], placement=placement,
-                row_weights=list(row_weights) if row_weights is not None else [1]*len(grid),
-                column_weights=list(column_weights) if column_weights is not None else [1]*len(grid[0]),
-                gap=float(gap), size=size)
+                size=size,**_style_runtime.layout_options(self,state,grid,row_weights,column_weights,gap))
             _document.validate(state)
             _document.place_grid(state)
             _style_runtime.containers(self,state,panel_ids=created)
@@ -1311,7 +1313,8 @@ class Axes(FeatureMethods, ChartMethods):
                      kind="Pie" if inner_radius is None else {"Donut": {"inner_radius": float(inner_radius)}},
                      start_angle_degrees=-float(startangle), labels=placements[labels_position],
                      label_format=formats[label_format])
-        chart["style"].update(material=_material(material), tilt_degrees=float(tilt), depth=float(depth), **style)
+        chart["style"].update(material=_material(material), tilt_degrees=float(tilt), depth=float(depth))
+        _merge(chart['style'],style)
         chart["slices"] = [dict(label=str(label), value=float(value), color=_color(color),
                                 explode=float(offset), style=None, labels=None, label_format=None, label_color=None)
                            for value, label, color, offset in zip(values, labels, colors, explode)]
@@ -1547,15 +1550,10 @@ class Axes(FeatureMethods, ChartMethods):
             high = low + 1
         if not math.isfinite(low) or not math.isfinite(high) or low >= high:
             raise ValueError("vmin and vmax must be finite and increasing")
-        # Renderer defaults own colorbar layout; obtain them from a native helper.
-        from ._native import default_colorbar_json
-        bar = json.loads(default_colorbar_json())
-        bar["colormap"] = _colormap(cmap)
-        bar["axis"]["min"], bar["axis"]["max"] = low, high
-        bar["axis"]["major_spacing"] = (high - low) / 5
+        from ._features import _set_colorbar
         with self.figure._lock:
             config = self._config(self.figure.get_settings())
-            config["colorbar"] = bar
+            _set_colorbar(config,cmap,low,high)
             for key in ("left_y", "right_y"):
                 config[key]["inverted"] = origin == "upper"
             return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)

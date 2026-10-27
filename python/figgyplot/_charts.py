@@ -240,8 +240,8 @@ class ChartMethods:
         Explicit levels are SSOT values. An integer requests evenly spaced
         interior levels. ``filled=True`` adds upstream banded field rendering.
         """
-        from .figure import _array, _color, _colormap
-        from ._native import default_colorbar_json
+        from .figure import _array, _color
+        from ._features import _set_colorbar
         if len(args) == 1:
             z = np.asarray(args[0])
             if z.ndim != 2:
@@ -279,12 +279,9 @@ class ChartMethods:
                      contour=dict(levels=levels.tolist(), line=dict(line_style='Solid', line_color=_color(color), line_width=float(linewidth)*self.figure.dpi/72)))
         if filled:
             style['fill'] = dict(mode='Bands', shading='Interpolated', opacity=1.0)
-        bar = json.loads(default_colorbar_json())
-        bar['colormap'] = _colormap(cmap)
-        bar['axis'].update(min=low, max=high, major_spacing=(high-low)/5)
         with self.figure._lock:
             config = self._config(self.figure.get_settings())
-            config['colorbar'] = bar
+            _set_colorbar(config,cmap,low,high)
             return self._add(x, y, {'HeatmapContour' if filled else 'Contour': style}, id=id,
                              extra_columns=columns, config=config, bounds=(float(x[0]), float(x[-1]), float(y[0]), float(y[-1])))
 

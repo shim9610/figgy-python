@@ -213,6 +213,13 @@ other.apply_style(style, layout=True, panel_map={0: "right", 1: "left"})
 The token stores numeric panel slots, not source IDs. Figure size, DPI, source
 membership and existing shared-axis groups are retained.
 
+For a new grid under captured style defaults, omitted gap/weights inherit the
+token when their dimensions match. Explicit `set_layout` options take priority;
+later calls with omitted options preserve compatible accepted layout values.
+Grid gaps in tokens are points; explicit `set_layout(gap=...)` uses logical
+document pixels. All panel rectangles are computed from the same accepted
+layout, including after moving or adding panels.
+
 ## Correspondence and incompatible charts
 
 A single captured panel style broadcasts to destination panels. Multiple panels

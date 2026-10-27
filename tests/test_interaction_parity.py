@@ -3244,3 +3244,68 @@ def test_browser_review_images_upload_clipboard_preview_and_targeted_submission(
         assert not obj['comments'][0]['text']
         a=figure['comments'][0]['attachments'][0];b=obj['comments'][0]['attachments'][0]
         assert a['sha256']!=b['sha256'] and os.path.isfile(a['path']) and os.path.isfile(b['path'])
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+def test_style_api_composition_renders_consistent_grid_and_colorbar_in_both_hosts(tmp_path):
+    from PIL import Image
+    source = '''import figgyplot as fg
+fg.use_style('dashboard.operations')
+template=fg.Figure(backend=BACKEND)
+template.set_layout([['left','right']],gap=44,column_weights=[2,1])
+style=template.extract_style();template.close()
+fig=fg.Figure(backend=BACKEND,style=style,grid=[['left','right']])
+fg.use_style(None)
+fig.subplots['left'].plot([0,1],[1,2],color='#64c6ef',id='left-line')
+right=fig.subplots['right'].axes
+right.scatter([0,1],[1,2],c=[0,1],id='right-points')
+state=fig.get_settings()
+bar=state['config']['subplots'][0]['config']['colorbar']
+bar['gap_px']=17;bar['axis']['label_style']['font_size']=16
+fig.apply_settings(state)
+right.imshow([[1,2],[3,4]],cmap='magma',id='field')
+fig.subplots['left'].set_title('Measured')
+right.set_title('Mapped values')
+'''
+    def check(state):
+        layout=state['identity']['layout'];width,height=layout['size']
+        first=round((width-44)*2/3);start=round((width-44)*2/3+44)
+        assert layout['gap']==44 and layout['column_weights']==[2,1]
+        assert state['config']['chart_area']==dict(x=0,y=0,width=first,height=height)
+        panel=state['config']['subplots'][0]['config']
+        assert panel['chart_area']==dict(x=start,y=0,width=width-start,height=height)
+        assert panel['colorbar']['gap_px']==17
+        assert panel['colorbar']['axis']['label_style']['font_size']==16
+        assert panel['colorbar']['colormap']=='Magma'
+        assert [s['series_id'] for s in state['series']]==['left-line','right-points','field']
+    def check_pixels(image):
+        rgb=np.asarray(image.convert('RGB')).astype(int)
+        boundary=round(rgb.shape[1]*.65)
+        left=rgb[:,:boundary];right=rgb[:,boundary:]
+        # These are authored scene colors, independent of the SSOT serializer
+        # and host Ready flag. A blank/black presented canvas must fail.
+        cyan=np.all(np.abs(left-[100,198,239])<=5,axis=2)
+        yellow=(right[:,:,0]>220)&(right[:,:,1]>150)&(right[:,:,2]<220)&(right[:,:,0]-right[:,:,2]>25)
+        assert cyan.sum()>50,'The displayed left-panel signal is missing'
+        assert yellow.sum()>100,'The displayed right-panel scalar field is missing'
+    namespace={};exec(source.replace('BACKEND',repr('native')),namespace)
+    fig=namespace['fig']
+    try:
+        check(fig.get_settings());fig.savefig(tmp_path/'native-style-composition.png')
+        with Image.open(tmp_path/'native-style-composition.png') as image:check_pixels(image)
+        handle=fig.show(block=False)
+        try:
+            inputs=Inputs(handle);inputs.pump()
+            assert inputs.info()['chart_panel'][2]>0
+            assert fig.info['column_uploads']==9
+        finally:handle.close();Inputs.pump()
+    finally:fig.close()
+    with notebook(tmp_path/'browser-style-composition',source.replace('BACKEND',repr('webgpu'))+'\ndisplay(fig.widget())') as (page,execute):
+        check_display_frame_ready(page)
+        check(json.loads(execute('import json;print(json.dumps(fig.get_settings()))')))
+        assert json.loads(execute("print(json.dumps(fig.info['columns']))"))==9
+        screenshot_editor(page,tmp_path/'browser-style-composition.png')
+        canvas=page.locator('.figgy-editor canvas')
+        canvas.screenshot(path=str(tmp_path/'browser-style-canvas.png'))
+        with Image.open(tmp_path/'browser-style-canvas.png') as image:check_pixels(image)
+        assert not page.locator('.figgy-error').inner_text()

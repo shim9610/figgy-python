@@ -76,10 +76,10 @@ def styled(method):
         active=_call.get()
         if active is not None and active['figure'] is fig:
             return method(self,*args,**kwargs)
-        if fig._style_defaults is None:
-            if key is not None:raise ValueError('style_key requires Figure or execution style defaults')
-            return method(self,*args,**kwargs)
         with fig._lock:
+            if fig._style_defaults is None:
+                if key is not None:raise ValueError('style_key requires Figure or execution style defaults')
+                return method(self,*args,**kwargs)
             bound=signature.bind(self,*args,**kwargs)
             explicit=dict(bound.arguments);explicit.pop('self',None)
             for parameter in signature.parameters.values():
@@ -130,7 +130,14 @@ def containers(fig,state,panel_ids=(),overlays=(),initial=False):
         patch.get('label_style',{}).pop('label_visible',None)
         styles._merge(overlay_config(state,pid,oid)['y_axis'],patch)
         overlay_config(state,pid,oid)['y_axis']['label_style']['label_visible']=True
-    candidate=styles._resolve(fig,state,fig._style_defaults)
+    # Grid geometry is resolved once from explicit/accepted/inherited options
+    # in set_layout(). Styling new panels must not place only part of the grid
+    # using a second set of layout defaults.
+    token=fig._style_defaults
+    if 'layout' in token.appearance:
+        appearance=copy.deepcopy(token.appearance);appearance.pop('layout')
+        token=styles.StyleToken(appearance)
+    candidate=styles._resolve(fig,state,token)
     if initial:
         state['config']=candidate['config']
         if 'background' in candidate:state['background']=candidate['background']
@@ -142,6 +149,32 @@ def containers(fig,state,panel_ids=(),overlays=(),initial=False):
         from ._document import overlay_config
         original=overlay_config(state,pid,oid);original.clear();original.update(copy.deepcopy(overlay_config(candidate,pid,oid)))
     return state
+
+
+def layout_options(fig,state,grid,row_weights,column_weights,gap):
+    defaults=fig._style_defaults.appearance.get('layout',{}) if fig._style_defaults is not None else {}
+    previous=state['identity'].get('layout') or {}
+    result={}
+    for key,value,count in [('row_weights',row_weights,len(grid)),
+                            ('column_weights',column_weights,len(grid[0]))]:
+        if value is None:
+            value=next((v for v in (previous.get(key),defaults.get(key)) if v is not None and len(v)==count),[1]*count)
+        result[key]=list(value)
+    if gap is None:
+        if 'gap' in previous:gap=previous['gap']
+        elif 'gap' in defaults:gap=defaults['gap']*fig.dpi/72
+        else:gap=12
+    result['gap']=float(gap)
+    return result
+
+
+def _restore_explicit(target,original,supplied):
+    """Protect supplied leaves without restoring unrelated constructor defaults."""
+    for key,value in supplied.items():
+        if key not in original:continue
+        if isinstance(value,dict) and isinstance(original[key],dict) and isinstance(target.get(key),dict):
+            _restore_explicit(target[key],original[key],value)
+        else:target[key]=copy.deepcopy(original[key])
 
 
 def _copy_path(target,original,path):
@@ -225,17 +258,14 @@ def bounded(fig,state,kind):
                 if key in role.get(part,{}):items[0]['color']=copy.deepcopy(role[part][key]);break
         # Public advanced chart properties and per-family style dictionaries
         # are explicit overrides, including values equal to old defaults.
-        for key in e:
-            if key in original and key not in ('series','slices','categories'):
-                chart[key]=copy.deepcopy(original[key])
+        _restore_explicit(chart,original,{k:v for k,v in e.items() if k not in ('series','slices','categories')})
         if e.get('color') is not None or e.get('colors') is not None:
             for item,before in zip(chart.get('series',chart.get('slices',[])),original.get('series',original.get('slices',[]))):item['color']=copy.deepcopy(before['color'])
         if call['name'] in ('pie','donut'):
             for key in ('material','tilt','depth'):
                 field={'material':'material','tilt':'tilt_degrees','depth':'depth'}[key]
                 if key in e:chart['style'][field]=copy.deepcopy(original['style'][field])
-            for key in e:
-                if key in original.get('style',{}):chart['style'][key]=copy.deepcopy(original['style'][key])
+            _restore_explicit(chart['style'],original['style'],e)
     candidate=styles._resolve(fig,state,fig._style_defaults,finalize)
     state[kind]=candidate[kind]
     palette=fig._style_defaults.appearance.get('palette',[])
