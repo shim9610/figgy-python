@@ -61,6 +61,10 @@ for(let i=0;i<450;i++)__figgyTrace('queue.finished',{index:i});
 assert.equal(figgyBrowserTrace.events.length,400);assert.ok(figgyBrowserTrace.dropped>0);
 assert.equal(figgyBrowserTrace.events.at(-1).index,449);
 assert.equal(figgyBrowserTrace.hostStages.at(-1).requestId,'request-1');
+__figgyTrace('edit.post',{sequence:2,revision:7});
+for(let i=0;i<450;i++)__figgyTrace('queue.finished',{index:i});
+assert.equal(figgyBrowserTrace.hostStages.at(-1).stage,'edit.post');
+assert.equal(figgyBrowserTrace.hostStages.at(-1).revision,7);
 for(let i=0;i<120;i++)__figgyTrace('prepare.completed',{requestId:i});
 assert.equal(figgyBrowserTrace.hostStages.length,100);assert.equal(figgyBrowserTrace.hostStages.at(-1).requestId,119);
 assert.ok(figgyBrowserTrace.events.every(e=>Number.isFinite(e.t)));
@@ -208,4 +212,38 @@ for(const flag of ['busy','queued','dirty','frame_pending','edit_inflight','edit
 canvas.width=699;assert.equal(settled(),false);canvas.width=960;
 state.frame_error='device lost';assert.throws(settled,/device lost/);state.frame_error=null;
 state.disposed=true;assert.throws(settled,/disposed/);
+""")
+
+
+def test_property_draft_rebase_preserves_unrelated_values_and_rejects_conflicts():
+    from pathlib import Path
+    import figgyplot
+    source=Path(figgyplot.__file__).with_name('webgpu.js').read_text()+'\nexport {propertyDraft,rebasePropertyDraft};'
+    run_node("const source="+json.dumps(source)+";\n"+r"""
+import assert from 'node:assert/strict';
+const {propertyDraft,rebasePropertyDraft}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const base={identity:{figure:'figure-a',panels:[{id:'main',overlays:[]}]},config:{digits:7,grid:false},series:[{id:'a',width:1},{id:'b',width:1}],values:[1e-200,1e200]};
+const requested=structuredClone(base);requested.config.digits=2;
+const original=structuredClone(base),draft=propertyDraft(base,requested);
+const accepted=structuredClone(base);accepted.config.grid=true;accepted.values=[2e-200,2e200];
+const saved=structuredClone(accepted),result=rebasePropertyDraft(draft,accepted);
+assert.equal(result.config.digits,2);assert.equal(result.config.grid,true);
+assert.deepEqual(result.values,[2e-200,2e200]);
+assert.deepEqual(base,original);assert.deepEqual(accepted,saved);
+const conflict=structuredClone(accepted);conflict.config.digits=4;
+assert.equal(rebasePropertyDraft(draft,conflict),null);
+const replaced=structuredClone(accepted);replaced.identity.figure='figure-b';
+assert.equal(rebasePropertyDraft(draft,replaced),null);
+const moved=structuredClone(accepted);moved.identity.panels[0].id='other';
+assert.equal(rebasePropertyDraft(draft,moved),null);
+const already=structuredClone(accepted);already.config.digits=2;
+assert.deepEqual(rebasePropertyDraft(draft,already),already);
+const arrayEdit=structuredClone(base);arrayEdit.series[0].width=2;
+const reordered=structuredClone(base);reordered.series.reverse();
+assert.equal(rebasePropertyDraft(propertyDraft(base,arrayEdit),reordered),null);
+const deleted=structuredClone(base);delete deleted.config.digits;
+const deletion=rebasePropertyDraft(propertyDraft(base,deleted),accepted);
+assert.equal(Object.hasOwn(deletion.config,'digits'),false);assert.equal(deletion.config.grid,true);
+const inserted=structuredClone(base);inserted.config.newStyle={alpha:0.25};
+assert.deepEqual(rebasePropertyDraft(propertyDraft(base,inserted),accepted).config.newStyle,{alpha:0.25});
 """)

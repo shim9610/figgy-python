@@ -26,7 +26,7 @@ GPU_TRACE_INIT = r"""(() => {
     };
     window.__figgyTrace=(stage,details={})=>{
         record('host',{stage,...details});
-        if(/^(request|prepare|ready_frame|display_wait|export|response|surface)\./.test(stage)){
+        if(/^(request|prepare|ready_frame|display_wait|export|response|surface|edit|state|property)\./.test(stage)){
             trace.hostStages.push({t:performance.now(),stage,...details});
             if(trace.hostStages.length>100)trace.hostStages.shift();
         }

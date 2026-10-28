@@ -13,6 +13,40 @@ async function loadKernel(model) {
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
 const clone = value => JSON.parse(JSON.stringify(value));
+// Property retries compare actual before/after SSOT leaves, never guessed setter effects.
+const owns=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
+function equalValue(a,b){
+  if(Object.is(a,b))return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;
+  const keys=Object.keys(a);return keys.length===Object.keys(b).length&&keys.every(key=>owns(b,key)&&equalValue(a[key],b[key]));
+}
+function propertyChanges(before,after,path=[],changes=[]){
+  if(equalValue(before,after))return changes;
+  // Arrays are atomic: an external insertion/reordering must never redirect an index edit.
+  if(before&&after&&typeof before==='object'&&typeof after==='object'&&!Array.isArray(before)&&!Array.isArray(after)){
+    for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
+      if(owns(before,key)&&owns(after,key))propertyChanges(before[key],after[key],[...path,key],changes);
+      else changes.push({path:[...path,key],before:before[key],after:after[key],had:owns(before,key),has:owns(after,key)});
+    }
+  }else changes.push({path,before,after,had:true,has:true});
+  return changes;
+}
+function propertyDraft(before,after){return {base:clone(before),changes:propertyChanges(before,after),attempts:0};}
+function rebasePropertyDraft(draft,accepted){
+  if(!equalValue(draft.base.identity?.figure,accepted.identity?.figure)||!equalValue(draft.base.identity?.panels,accepted.identity?.panels))return null;
+  const state=clone(accepted);
+  for(const change of draft.changes){
+    let parent=state;
+    for(const key of change.path.slice(0,-1)){if(!parent||typeof parent!=='object'||!owns(parent,key))return null;parent=parent[key];}
+    const key=change.path.at(-1);if(key===undefined||!parent||typeof parent!=='object')return null;
+    const found=owns(parent,key),value=parent[key];
+    const original=found===change.had&&(!found||equalValue(value,change.before));
+    const applied=found===change.has&&(!found||equalValue(value,change.after));
+    if(!original&&!applied)return null;
+    if(change.has)Object.defineProperty(parent,key,{value:clone(change.after),enumerable:true,configurable:true,writable:true});else delete parent[key];
+  }
+  return state;
+}
 const rendererVersion = '0.18.1';
 const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0',rendererVersion].includes(settings.renderer_version);
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
@@ -51,7 +85,7 @@ export function render({model,el}) {
   controls.forEach(control=>control.disabled=true);
   const client=crypto.randomUUID();
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
-  let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
+  let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,pendingDraft=null,barriers=[],local=clone(model.get('state').settings);
   let editHistory=model.get('state').edit_history??{},historyBusy=false;
   let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
   // Session metadata is separate from chart SSOT and ordinary inspector fields.
@@ -482,7 +516,7 @@ export function render({model,el}) {
   // Optional CI diagnostics. Never read the WASM chart or wait on GPU work.
   function diagnostics(){return {kind:kind??'cartesian',busy,queued:queuedOperations,
     dirty,frame_pending:!!pendingFrame,frame_error:frameError?String(frameError):null,
-    edit_inflight:inflight?.sequence??null,edit_pending:!!pending,
+    edit_inflight:inflight?.sequence??null,edit_pending:!!pending,accepted_revision:model.get('state').revision,local_revision:revision,
     canvas:[canvas.width,canvas.height],disposed};}
   function trace(stage,details={}){try{globalThis.__figgyTrace?.(stage,{client,...diagnostics(),...details});}catch{}}
   const requested=new Promise(resolve=>{startInit=resolve;});
@@ -550,8 +584,8 @@ export function render({model,el}) {
     catch(e){chart.set_series('[]');chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));clearColor(old.background);local=old;throw e;}
     local={...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};dirty=true;error.textContent='';
   }
-  function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending};pending=null;historyControls();stats.kernel_edit_messages++;model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
-  function commit(){local=snapshot();pending=clone(local);post();properties();}
+  function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending,draft:pendingDraft};pending=null;pendingDraft=null;historyControls();stats.kernel_edit_messages++;trace('edit.post',{sequence,revision});model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
+  function commit(draft=null){local=snapshot();pending=clone(local);pendingDraft=draft;post();properties();}
   function idle(){if(!inflight && !pending){for(const resolve of barriers.splice(0))resolve();}}
   function flush(){post();return !inflight&&!pending ? Promise.resolve() : new Promise(resolve=>barriers.push(resolve));}
   let exportedCode=model.get('state').code ?? '';
@@ -726,17 +760,29 @@ export function render({model,el}) {
     if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
     if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
+    const propertyLayer=clone(layerOf(local)),propertyOwners=JSON.stringify(local.identity?.panels);
     function applyProperty(apply,value){
-      const before=snapshot(),state=clone(before);
+      const base=snapshot(),before=clone(base),state=clone(base);
+      if(JSON.stringify(before.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
+      const owner=s=>kind?s[kind]:s.config,visibleLayer=clone(owner(state).active_layer??'Base');
+      owner(before).active_layer=clone(propertyLayer);owner(state).active_layer=clone(propertyLayer);
       apply(state,value);
       const secondary=before.config.active_layer?.Overlay??before.config.active_layer?.SubplotOverlay?.[1];
       if(!kind&&!(secondary!==undefined&&/^(axis|tick_labels)_right$/.test(target)))reconcilePairedAxisEdit({config:configOf(before)},{config:configOf(state)},target);
       if(/^axis_(bottom|top|left|right)$/.test(target))for(const key of ['bottom_x','left_y'])syncTickSpacing(state,key);
-      install(state);commit();
+      owner(state).active_layer=visibleLayer;
+      install(state);commit(propertyDraft(base,snapshot()));
+    }
+    function submitProperty(apply,value,onError=()=>{}){
+      // A draft is not an optimistic full-document edit. Wait outside the
+      // renderer queue for earlier acknowledgements, then apply only its field
+      // to the newest accepted state. ACK processing needs that queue itself.
+      const operation=controlQueue.then(async()=>{await queue;await flush();return enqueue(()=>applyProperty(apply,value),true);});
+      controlQueue=operation.catch(e=>{onError();fail(e);});
     }
     function field(label,value,type,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;enqueue(()=>{applyProperty(apply,value);});});row.append(input);fields.append(row);return input;
+      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;trace('property.changed',{field:label,type});submitProperty(apply,value);});row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
@@ -745,7 +791,7 @@ export function render({model,el}) {
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
       for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>{const next=input.value;enqueue(()=>{try{applyProperty(apply,next);}catch(e){input.value=value;throw e;}});});row.append(input);fields.append(row);
+      input.addEventListener('change',()=>submitProperty(apply,input.value,()=>{input.value=value;}));row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
       choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
@@ -764,7 +810,7 @@ export function render({model,el}) {
         find(s).significant_digits=v;
       });digits.min='1';digits.max='15';digits.step='1';
     }
-    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{applyProperty(apply,input.checked);}));row.append(input);fields.append(row);}
+    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>submitProperty(apply,input.checked));row.append(input);fields.append(row);}
     function legendSeries(state){
       const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
       const index=layer?.Subplot??layer?.SubplotOverlay?.[0],children=state.config.subplots??[];
@@ -1032,8 +1078,8 @@ export function render({model,el}) {
   }
   async function exporting(scale=1){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-  function onState(){enqueue(()=>{const state=model.get('state');propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
-    revision=state.revision;pending=null;
+  function onState(){enqueue(()=>{const state=model.get('state');trace('state.received',{incoming_revision:state.revision});propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
+    revision=state.revision;pending=null;pendingDraft=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
     catch(e){fail(e);model.send({action:'rejected',revision,settings:snapshot(),error:String(e)});}
@@ -1041,11 +1087,22 @@ export function render({model,el}) {
   function onMessage(message){
     if(message.client && message.client!==client)return;
     if(message.action==='ack')enqueue(()=>{
-      if(message.sequence!==inflight?.sequence)return;
-      outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
-      if(message.error){pending=null;install(message.state.settings);fail(message.error);}
-      else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
-      propertyColumns=clone(message.state.property_columns??propertyColumns);propertyCatalog=clone(message.state.property_catalog??propertyCatalog);editHistory=message.state.edit_history??{};historyControls();properties();idle();
+      trace('edit.ack',{sequence:message.sequence,incoming_revision:message.state.revision,error:message.error,has_pending:!!pending});if(message.sequence!==inflight?.sequence)return;
+      // A queued full-document edit keeps its original base and stale guard.
+      // Deferred form drafts have no snapshot to rebase; use the newest accepted head.
+      const current=model.get('state'),accepted=(message.error||!pending)&&current.revision>message.state.revision?current:message.state;
+      outlineNodes=clone(accepted.outline??outlineNodes);boundedView=clone(accepted.bounded_view??boundedView);const latest=pending,draft=inflight.draft;inflight=null;revision=accepted.revision;exportedCode=accepted.code ?? exportedCode;
+      let retryError=null;
+      if(message.error?.startsWith('stale edit:')&&draft&&draft.attempts<1&&!latest){
+        const rebased=rebasePropertyDraft(draft,accepted.settings);
+        if(rebased){
+          try{install(rebased);pending=snapshot();pendingDraft={...propertyDraft(accepted.settings,pending),attempts:draft.attempts+1};trace('property.retry',{sequence:message.sequence,revision});post();properties();return;}
+          catch(e){retryError=e;}
+        }
+      }
+      if(message.error){pending=null;pendingDraft=null;install(accepted.settings);fail(retryError??message.error);}
+      else if(latest){pending=latest;install(latest);post();}else{install(accepted.settings);}
+      propertyColumns=clone(accepted.property_columns??propertyColumns);propertyCatalog=clone(accepted.property_catalog??propertyCatalog);editHistory=accepted.edit_history??{};historyControls();properties();idle();
     });
     else if(message.action==='history_result')enqueue(()=>{
       try{

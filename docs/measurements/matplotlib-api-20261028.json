@@ -4,7 +4,7 @@
   "reference_matplotlib": "3.11.2",
   "supported_contract": "docs/MATPLOTLIB_API.md",
   "runtime_dependency": "NumPy only; tested in a separate environment without Matplotlib",
-  "wheel_sha256": "c4ab4052e9f463ea799598cd32652ff0f2ee4ffb1947cc6f9a9a62280a235e88",
+  "wheel_sha256": "b5ad585cf96f62917521efefa510d533afbfbac199b4e0b6e4f9b657eba402e4",
   "installed_source_files_checked": [
     "__init__.py",
     "_api_codegen.py",
@@ -42,9 +42,9 @@
   ],
   "matplotlib_contract_cases": 86,
   "initial_installed_regression_cases": 868,
-  "preflight_cases": 134,
+  "preflight_cases": 135,
   "copy_and_native_typing_cases": 9,
-  "ci_collection": 1497,
+  "ci_collection": 1502,
   "public_data_scenes": 20,
   "frozen_png_matches": 20,
   "scene_replays": [
@@ -327,12 +327,25 @@
       }
     ],
     "resumed_after": "A stale radial clipboard syntax assertion was replaced by public API assertions plus real settings/value/pixel replay.",
-    "final_marker_export_ordering_verified_in_final_focused_suite": true
+    "final_marker_export_ordering_verified_in_final_focused_suite": true,
+    "baseline_commit": "547a1ab8a5851bcc2c61878b26bf25983eb7acca",
+    "scope": "Complete baseline collection before the browser ACK follow-up; final browser paths are checked separately below and in the final-head CI."
   },
   "final_focused_suite": {
     "cases": 274,
     "passed": 274,
     "failures": 0,
     "skipped": 0
+  },
+  "browser_ack_followup": {
+    "ci_trigger": "CI75 shard0: a numeric draft displayed 2 but accepted settings remained 7 after an external Python update.",
+    "before": "Both an explicitly delayed selection ACK and a delayed Python state notification reproduce 7 instead of 2 locally.",
+    "cause": "The previous selection ACK installed revision6 after Python accepted revision7. A subsequent full-snapshot edit used revision6 and was rejected.",
+    "fix": "Serialize form drafts after preceding ACKs; choose the latest accepted head; retry once with actual SSOT leaf changes only when unchanged at that head. Arrays are atomic and figure/panel ownership must match.",
+    "conflicts": "A conflicting property value or a stale full snapshot remains rejected. Valid edits recover without losing the unrelated Python change.",
+    "preliminary_paired_property_cases": 18,
+    "final_ack_and_ownership_cases": 10,
+    "diagnostic_and_rebase_unit_cases": 10,
+    "new_regressions": 5
   }
 }
