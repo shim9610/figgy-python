@@ -47,14 +47,14 @@ other branches before building. This does not change main's branch protection.
 | --- | --- | --- |
 | `figgy-model` | 0.12.1 | 0.12.1 |
 | `figgy-renderer` | 0.18.1 | 0.18.1 |
-| `figgyplot` | 0.3.0 | 0.3.0 |
+| `figgyplot` | 0.4.0 | 0.3.0 |
 | `figgy` WASM wrapper | 0.15.1 | Not a crates.io package (`publish = false`) |
 
 Model 0.12.1 and renderer 0.18.1 were published on 2026-10-21. Python 0.3.0 was published on
 2026-10-16 with renderer 0.17.0/model 0.11.0, as verified from its PyPI sdist.
-The migration tree still carries that package version; select a new unused
-version before building publication artifacts. Do not upload the changed source
-as 0.3.0. For future coordinated releases,
+This tree targets Python 0.4.0; its artifacts still require the complete
+TestPyPI build and installation gates before production promotion. Do not upload
+the changed source as 0.3.0. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
 has its own version; the WASM wrapper's 0.15.1 is not the renderer version.
 The native extension consumes crates.io packages with versions and checksums
@@ -85,8 +85,8 @@ wheels contain the compiled extension and need neither Git nor Cargo to install.
    packaged WASM provenance. Publishing a new Rust version does not automatically
    update these pinned dependencies or existing Python installations.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
-3. Select **main**, **target `testpypi`** and the new source version set in step 1
-   (`0.3.0` is already published). Leave the run-ID input empty.
+3. Select **main**, **target `testpypi`** and version **`0.4.0`**, matching the
+   source version set in step 1. Leave the run-ID input empty.
 4. Run it. This is an actual public TestPyPI upload, not a build-only dry run.
 
 The pipeline runs these gates in order:
@@ -219,8 +219,8 @@ also confirms version 0.2.1 with 75 distribution files.
 
 The published 0.3.0 release uses figgy-renderer 0.17.0 and includes the fixes
 reported against 0.2.1; it also carries the installation instructions prepared
-as 0.2.2, which was never uploaded. The renderer 0.18 migration needs a new
-Python package version and its own TestPyPI build/upload and installation
+as 0.2.2, which was never uploaded. The renderer 0.18 migration targets Python
+0.4.0 and needs its own TestPyPI build/upload and installation
 checks before promotion. Follow the coordinated version order above while
 retaining the native/WASM source pins.
 Future description changes are package metadata: committing `PYPI_README.md`

@@ -2,26 +2,147 @@
 from __future__ import annotations
 
 import copy
+import ast
+from collections import Counter
 import json
 import keyword
 import pprint
 
 
-def settings_to_code(settings, defaults, dpi=120, variable="fig"):
+def editor_code_payload(settings, defaults, dpi=120, variable='fig'):
+    """An auxiliary code export must never prevent an accepted chart opening."""
+    try:
+        return dict(code=settings_to_code(settings,defaults,dpi,variable),
+                    code_mode='api',code_error='')
+    except Exception as error:
+        # Keep the error visible in the code panel while preserving a complete,
+        # usable recovery export. Prefix every message line as a Python comment.
+        message=str(error)
+        comment='\n'.join('# '+line for line in message.splitlines())
+        exact=settings_to_code(settings,defaults,dpi,variable,mode='exact')
+        return dict(code='# Public API export unavailable; exact recovery code follows.\n'+comment+'\n'+exact,
+                    code_mode='exact',code_error=message)
+
+
+def editor_settings_to_code(settings, defaults, dpi=120, variable='fig'):
+    """Pure shared entry point for native Copy Python while its lock is held."""
+    return editor_code_payload(settings,defaults,dpi,variable)['code']
+
+
+def _share_colors(code):
+    """Name repeated literal colors without changing values or hiding settings."""
+    tree = ast.parse(code)
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    matches = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        try:
+            value = ast.literal_eval(node)
+        except (ValueError, TypeError):
+            continue
+        if set(value) not in ({'r', 'g', 'b'}, {'r', 'g', 'b', 'a'}):
+            continue
+        if not all(type(v) in (int, float) for v in value.values()):
+            continue
+        key = tuple(sorted(value.items()))
+        matches.append((node, key, value))
+    counts = Counter(key for _, key, _ in matches)
+    shared = {}; definitions = []
+    for _, key, value in matches:
+        if counts[key] < 2 or key in shared:
+            continue
+        index = len(shared) + 1
+        name = f'_color{index}'
+        while name in names:
+            index += 1; name = f'_color{index}'
+        names.add(name); shared[key] = name
+        definitions.append(f'{name} = {value!r}')
+    if not shared:
+        return code
+    # AST columns count UTF-8 bytes. Byte offsets preserve Korean/Greek text on
+    # a line containing a styled run and its color keyword.
+    data = code.encode('utf-8'); offsets = [0]
+    for line in data.splitlines(keepends=True): offsets.append(offsets[-1] + len(line))
+    edits = [(offsets[n.lineno-1]+n.col_offset,
+              offsets[n.end_lineno-1]+n.end_col_offset, shared[key].encode())
+             for n,key,_ in matches if key in shared]
+    for start,end,value in sorted(edits,reverse=True): data = data[:start] + value + data[end:]
+    return '\n'.join(definitions) + '\n\n' + data.decode('utf-8')
+
+
+def compact_config(config, defaults):
+    """Drop only known default leaves; keep topology and every panel rectangle."""
+    from .figure import _diff
+    from ._native import default_colorbar_json
+    patch = _diff(defaults, config)
+    patch['chart_area'] = copy.deepcopy(config['chart_area'])
+    if config.get('colorbar') is not None:
+        patch['colorbar'] = _diff(json.loads(default_colorbar_json()), config['colorbar'])
+    if config.get('subplots'):
+        patch['subplots'] = copy.deepcopy(config['subplots'])
+        for panel in patch['subplots']:
+            panel['config'] = compact_config(panel['config'], defaults)
+    if config.get('overlays'):
+        patch['overlays'] = copy.deepcopy(config['overlays'])
+        for overlay in patch['overlays']:
+            overlay['y_axis'] = _diff(defaults['left_y'], overlay['y_axis'])
+            if overlay.get('legend') is not None:
+                overlay['legend'] = _diff(defaults['legend'], overlay['legend'])
+    return patch
+
+
+def expand_config(patch, defaults):
+    """Resolve compact settings against defaults, never the target's edited state."""
+    from .figure import _merge
+    from ._native import default_colorbar_json
+    config = _merge(copy.deepcopy(defaults), patch)
+    if patch.get('colorbar') is not None:
+        config['colorbar'] = _merge(json.loads(default_colorbar_json()), patch['colorbar'])
+    for panel in config.get('subplots', []):
+        panel['config'] = expand_config(panel['config'], defaults)
+    for overlay in config.get('overlays', []):
+        overlay['y_axis'] = _merge(copy.deepcopy(defaults['left_y']), overlay['y_axis'])
+        if overlay.get('legend') is not None:
+            overlay['legend'] = _merge(copy.deepcopy(defaults['legend']), overlay['legend'])
+    return config
+
+
+def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=True, mode='api'):
+    if type(compact) is not bool:
+        raise ValueError('compact must be boolean')
+    if mode not in ('api','exact'):
+        raise ValueError('mode must be api or exact')
+    if mode=='api' and compact:
+        from ._api_codegen import settings_to_api_code
+        return settings_to_api_code(settings,defaults,dpi,variable)
     from .figure import _code_tree, _diff, _segments, _text
     from ._native import fitted_chart_title_margin, font_family_available
 
     if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
         raise ValueError("variable must be a Python identifier")
+    if type(compact) is not bool:
+        raise ValueError('compact must be boolean')
     if isinstance(settings, str):
         settings = json.loads(settings)
     if isinstance(defaults, str):
         defaults = json.loads(defaults)
+    segments_function = "_text_segments" if variable == "text_segments" else "text_segments"
+    def formatted(value):
+        return pprint.pformat(_code_tree(value, segments_function) if compact else value,
+                              width=96, sort_dicts=False)
+    def finish(code):
+        if compact:
+            code = _share_colors(code)
+        if f'{segments_function}(' in code:
+            alias = '' if segments_function == 'text_segments' else f' as {segments_function}'
+            code = f'from figgyplot import text_segments{alias}\n\n' + code
+        return code
     identity = settings.get('identity')
     def with_identity(code):
         if identity is not None:
-            code += f"{variable}.configure(identity={pprint.pformat(identity, width=96, sort_dicts=False)})\n"
-        return code
+            code += f"{variable}.configure(identity={formatted(identity)})\n"
+        return finish(code)
     config = settings['config']
     advanced = config.get('subplots') or config.get('overlays') or config.get('polar') or config.get('annotations')
     for spec in settings['series']:
@@ -30,9 +151,13 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             style.get('scatter', {}).get(key) is not None for key in ('point_color_map', 'point_size_map'))
         advanced = advanced or style.get('line', {}).get('fill') is not None or style.get('line', {}).get('interpolation', 'Linear') != 'Linear'
     if advanced:
-        return (f"# Apply the complete document to an existing Figure with matching source columns.\n"
+        document = copy.deepcopy(settings)
+        if compact:
+            document['config'] = compact_config(config, defaults)
+        reset = ', reset=True' if compact else ''
+        return finish(f"# Apply the complete document to an existing Figure with matching source columns.\n"
                 f"# Source arrays stay resident; panels, layers and references commit together.\n"
-                f"{variable}.apply_settings({pprint.pformat(settings, width=96, sort_dicts=False)})\n")
+                f"{variable}.apply_settings({formatted(document)}{reset})\n")
     for kind in ('categorical', 'boxplot', 'radar'):
         if settings.get(kind) is not None:
             chart = copy.deepcopy(settings[kind])
@@ -41,8 +166,12 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             chart['expected_categories'] = [c['id'] for c in chart['categories']]
             chart['expected_series'] = [s['id'] for s in chart['series']]
             chart['series'] = {s['id']: {k: v for k, v in s.items() if k not in ('id', 'values')} for s in chart['series']}
-            args = pprint.pformat(chart, width=96, sort_dicts=False)
-            canvas = pprint.pformat({'chart_area': settings['config']['chart_area']})
+            if compact:
+                from ._native import default_bounded_json
+                chart = _diff(json.loads(default_bounded_json(kind)), chart)
+                chart['reset'] = True
+            args = formatted(chart)
+            canvas = formatted({'chart_area': settings['config']['chart_area']})
             return with_identity(f"# Apply to an existing {kind} chart with matching category/series IDs and DPI.\n"
                     f"# Existing data values are preserved.\n"
                     f"{variable}.configure(config={canvas})\n"
@@ -54,13 +183,16 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         slices = {i: {key: value for key, value in item.items() if key != "value"}
                   for i, item in enumerate(chart.pop("slices"))}
         chart["slices"] = slices
-        args = pprint.pformat(chart, width=96, sort_dicts=False)
-        canvas = pprint.pformat({"chart_area": settings["config"]["chart_area"]})
+        if compact:
+            from ._native import default_radial_json
+            chart = _diff(json.loads(default_radial_json()), chart)
+            chart['reset'] = True
+        args = formatted(chart)
+        canvas = formatted({"chart_area": settings["config"]["chart_area"]})
         return with_identity(f"# Apply to an existing pie/donut with the same slice count and DPI.\n"
                 f"# Existing category values are preserved.\n"
                 f"{variable}.configure(config={canvas})\n"
                 f"{variable}.configure_radial(expected_slices={len(slices)}, **{args})\n")
-    segments_function = "_text_segments" if variable == "text_segments" else "text_segments"
     cfg = settings["config"]
     modeled = copy.deepcopy(defaults)
     lines = [f"# Apply to the existing {variable} with the same plotted series.",
@@ -69,7 +201,7 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     # replay resets the rest of the document to defaults.
     if cfg.get("colorbar") is not None:
         modeled["colorbar"] = copy.deepcopy(cfg["colorbar"])
-        reset = pprint.pformat({"colorbar": cfg["colorbar"]}, width=96, sort_dicts=False)
+        reset = formatted({"colorbar": cfg["colorbar"]})
         lines.append(f"{variable}.configure(config={reset}, reset=True)")
     else:
         lines.append(f"{variable}.configure(reset=True)")
@@ -177,8 +309,8 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     def configure(options):
         lines.append(f"{variable}.configure(")
         for key, value in options.items():
-            formatted = pprint.pformat(_code_tree(value, segments_function), width=96, sort_dicts=False)
-            lines.append(f"    {key}=" + formatted.replace("\n", "\n    ") + ",")
+            literal = formatted(value)
+            lines.append(f"    {key}=" + literal.replace("\n", "\n    ") + ",")
         lines.append(")")
 
     # Restore advanced series styling before rebuilding the legend so ordinary
@@ -201,7 +333,4 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
     lines += ["", "# Preserve advanced layout."]
     configure({"config": residual})
     code = "\n".join(lines) + "\n"
-    if f"{segments_function}(" in code:
-        alias = "" if segments_function == "text_segments" else f" as {segments_function}"
-        code = f"from figgyplot import text_segments{alias}\n\n" + code
     return with_identity(code)

@@ -17,11 +17,7 @@ def initial_identity(figure_id=None):
 
 
 def panel_config(state, panel_id):
-    panels = state['identity']['panels']
-    for index, panel in enumerate(panels):
-        if panel['id'] == panel_id:
-            return state['config'] if index == 0 else state['config']['subplots'][index-1]['config']
-    raise ValueError(f'subplot {panel_id!r} no longer exists')
+    return _panel_at(state, panel_index(state, panel_id))
 
 
 def panel_index(state, panel_id):
@@ -31,13 +27,31 @@ def panel_index(state, panel_id):
     raise ValueError(f'subplot {panel_id!r} no longer exists')
 
 
+def _panel_at(state, index):
+    return state['config'] if index == 0 else state['config']['subplots'][index-1]['config']
+
+
+def panel_configs(state):
+    """Build a short-lived ID lookup from this snapshot, never cached across edits."""
+    return {panel['id']: _panel_at(state, index)
+            for index, panel in enumerate(state['identity']['panels'])}
+
+
+def series_panel_id(state, series_id):
+    """Panel owning an existing series; overlays share that panel's color scale."""
+    for index, panel in enumerate(state['config'].get('subplots', []), start=1):
+        if series_id in panel.get('series', []):
+            return state['identity']['panels'][index]['id']
+    return state['identity']['panels'][0]['id']
+
+
 def overlay_config(state, panel_id, overlay_id):
     index = panel_index(state, panel_id)
     try:
         overlay = state['identity']['panels'][index]['overlays'].index(overlay_id)
     except ValueError:
         raise ValueError(f'overlay {overlay_id!r} no longer exists') from None
-    return panel_config(state, panel_id)['overlays'][overlay]
+    return _panel_at(state, index)['overlays'][overlay]
 
 
 def target_layer(state, panel_id, overlay_id=None):
@@ -120,27 +134,62 @@ def object_ids(state):
 
 
 def tick_owners(meta, owner, key):
-    owners={owner};dimension={'bottom_x':'x','left_y':'y'}.get(key)
-    if dimension is None:return owners
-    while True:
-        before=len(owners)
-        for group in meta['groups'].values():
-            if group['axis']==dimension and owners.intersection(group['members']):owners.update(group['members'])
-        if len(owners)==before:return owners
+    """Connected group members in linear membership work, including cycles."""
+    dimension = {'bottom_x': 'x', 'left_y': 'y'}.get(key)
+    if dimension is None:
+        return {owner}
+    membership = {}
+    groups = []
+    for group in meta['groups'].values():
+        if group['axis'] != dimension:
+            continue
+        index = len(groups)
+        members = group['members']
+        groups.append(members)
+        for member in members:
+            membership.setdefault(member, []).append(index)
+    owners, pending, visited = {owner}, [owner], set()
+    while pending:
+        for index in membership.get(pending.pop(), ()):
+            if index in visited:
+                continue
+            visited.add(index)
+            for member in groups[index]:
+                if member not in owners:
+                    owners.add(member)
+                    pending.append(member)
+    return owners
 
 
 def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True, spacing=None):
-    meta=state.get('identity')
-    if meta is None:return
-    owner=overlay_id if overlay_id and side in ('right_y','y_axis') else panel_id
-    key='y_axis' if owner==overlay_id else side
-    for member in tick_owners(meta,owner,key):
-        meta.setdefault('tick_modes',{}).setdefault(member,{})[key]='Auto' if automatic else 'Fixed'
-        if spacing is not None and key in ('bottom_x','left_y'):panel_config(state,member)[key]['major_spacing']=spacing
-    peer={'bottom_x':'top_x','top_x':'bottom_x','left_y':'right_y','right_y':'left_y'}.get(key)
-    cfg=panel_config(state,panel_id)
-    if paired and peer and all(cfg[key].get(k)==cfg[peer].get(k) for k in ('min','max','scale','inverted')):
-        for member in tick_owners(meta,owner,peer):meta['tick_modes'].setdefault(member,{})[peer]='Auto' if automatic else 'Fixed'
+    meta = state.get('identity')
+    if meta is None:
+        return
+    owner = overlay_id if overlay_id and side in ('right_y', 'y_axis') else panel_id
+    key = 'y_axis' if owner == overlay_id else side
+
+    def assign(member, axis):
+        if automatic is not None:
+            meta.setdefault('tick_modes', {}).setdefault(member, {})[axis] = 'Auto' if automatic else 'Fixed'
+        else:
+            modes = meta.get('tick_modes', {})
+            if member in modes:
+                modes[member].pop(axis, None)
+                if not modes[member]:
+                    modes.pop(member)
+            if not modes:
+                meta.pop('tick_modes', None)
+
+    configs = panel_configs(state) if spacing is not None and key in ('bottom_x', 'left_y') else {}
+    for member in tick_owners(meta, owner, key):
+        assign(member, key)
+        if configs:
+            configs[member][key]['major_spacing'] = spacing
+    peer = {'bottom_x': 'top_x', 'top_x': 'bottom_x', 'left_y': 'right_y', 'right_y': 'left_y'}.get(key)
+    cfg = panel_config(state, panel_id)
+    if paired and peer and all(cfg[key].get(k) == cfg[peer].get(k) for k in ('min', 'max', 'scale', 'inverted')):
+        for member in tick_owners(meta, owner, peer):
+            assign(member, peer)
 
 
 def manual_tick_patch(state, patch, panel_id=None, overlay_id=None, _claimed=None):
@@ -168,11 +217,12 @@ def track_identities(before, after):
     if meta is None:
         return
     retired = set(meta['retired'])
+    active = object_ids(after)
     current = before.get('identity')
     if current and current['figure'] == meta['figure']:
         retired.update(current['retired'])
-        retired.update(object_ids(before)-object_ids(after))
-    if retired & object_ids(after):
+        retired.update(object_ids(before)-active)
+    if retired & active:
         raise ValueError('retired object IDs cannot be reused; assign a new ID')
     meta['retired'] = sorted(retired)
 
@@ -268,11 +318,13 @@ def place_grid(state):
         if available <= 0:
             raise ValueError('grid gaps exceed the document size')
         edges = [0.]
+        total = sum(weights)
         for weight in weights:
-            edges.append(edges[-1]+available*weight/sum(weights)+gap)
+            edges.append(edges[-1]+available*weight/total+gap)
         return edges
     xs = positions(layout['column_weights'], width)
     ys = positions(layout['row_weights'], height)
+    configs = panel_configs(state)
     for slot, panel in layout['placement'].items():
         r0, c0, r1, c1 = slots[slot]
         rect = dict(x=round(xs[c0]), y=round(ys[r0]),
@@ -280,7 +332,7 @@ def place_grid(state):
                     height=round(ys[r1]-gap)-round(ys[r0]))
         if min(rect['width'], rect['height']) < 100:
             raise ValueError('grid panels must be at least 100 logical pixels per dimension')
-        panel_config(state, panel)['chart_area'] = rect
+        configs[panel]['chart_area'] = rect
 
 
 class Subplot:

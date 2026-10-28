@@ -29,7 +29,8 @@ def _selector(path, item, index, document):
     return None
 
 
-def resolve(document, path, selectors):
+def locate(document, path, selectors):
+    """Resolve a snapshot path by stable selectors and retain its actual address."""
     parts = path.split('/')[1:]
     value = document
     actual = []
@@ -49,7 +50,11 @@ def resolve(document, path, selectors):
                 key = int(key)
         value = value[key]
         actual.append(escape(key))
-    return value
+    return '/'+'/'.join(actual) if actual else '', value
+
+
+def resolve(document, path, selectors):
+    return locate(document, path, selectors)[1]
 
 
 def changes(before, after):

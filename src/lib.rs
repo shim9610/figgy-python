@@ -22,6 +22,7 @@ use renderer::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+mod review_images;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -202,6 +203,7 @@ struct FigureCore {
     columns: HashMap<String, (usize, f64, f64)>,
     revision: u64,
     history: edit_history::History,
+    host_work: host_work::Profile,
     uploads: u64,
     readbacks: u64,
     png_encodes: u64,
@@ -598,9 +600,12 @@ impl FigureAccess<'_> {
             .ok_or_else(|| invalid(format!("unknown decoration: {target}")))
     }
     fn commit_config(&mut self, config: Config) -> PyResult<()> {
+        let started = self.data.host_work.start();
         let mut state = self.snapshot();
         state.config = config;
-        self.apply_settings(&serde_json::to_string(&state).map_err(runtime)?)
+        let result = self.apply_settings_model(state);
+        self.data.host_work.finish("commit_config", started);
+        result
     }
     fn snapshot(&self) -> Settings {
         Settings {
@@ -1006,6 +1011,7 @@ impl FigureCore {
                 columns: HashMap::new(),
                 revision: 0,
                 history: Default::default(),
+                host_work: Default::default(),
                 uploads: 0,
                 readbacks: 0,
                 png_encodes: 0,
@@ -1197,9 +1203,14 @@ impl FigureAccess<'_> {
         Ok(())
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
+        let started = self.data.host_work.start();
+        let result = parse(json).and_then(|next| self.apply_settings_model(next));
+        self.data.host_work.finish("apply_settings", started);
+        result
+    }
+    fn apply_settings_model(&mut self, mut next: Settings) -> PyResult<()> {
         let before = serde_json::to_value(self.snapshot()).map_err(runtime)?;
         let base_revision = self.data.revision;
-        let mut next: Settings = parse(json)?;
         if !self.data.history.restoring_identities() {
             identity::track_identities(&before, &mut next)?;
         }
@@ -1555,6 +1566,18 @@ impl FigureAccess<'_> {
             .map(|h| format!("{h:?}")))
     }
     fn drag(&mut self, target: &str, dx: f32, dy: f32, handle: Option<&str>) -> PyResult<bool> {
+        let started = self.data.host_work.start();
+        let result = self.drag_inner(target, dx, dy, handle);
+        self.data.host_work.finish("drag", started);
+        result
+    }
+    fn drag_inner(
+        &mut self,
+        target: &str,
+        dx: f32,
+        dy: f32,
+        handle: Option<&str>,
+    ) -> PyResult<bool> {
         if !dx.is_finite() || !dy.is_finite() {
             return Err(invalid("drag must be finite"));
         }
@@ -1563,25 +1586,7 @@ impl FigureAccess<'_> {
         }
         if target.starts_with("annotation:") {
             let view = self.annotation_view()?;
-            let map = view.annotation_map();
-            let id = map
-                .find(self.annotation_index(target)?)
-                .ok_or_else(|| invalid("annotation is not visible"))?;
-            let mut config = self.data.chart.config().clone();
-            let moved = if let Some(handle) = handle {
-                let handle = ALL_HANDLES
-                    .into_iter()
-                    .find(|h| format!("{h:?}") == handle)
-                    .ok_or_else(|| invalid("unknown resize handle"))?;
-                map.resize_by(&mut config.annotations, id, handle, dx, dy)
-            } else {
-                map.drag_by(&mut config.annotations, id, dx, dy)
-            };
-            if moved == Some(renderer::layout::NudgeResult::Moved) {
-                self.commit_config(config)?;
-                return Ok(true);
-            }
-            return Ok(false);
+            return self.drag_annotation_with_map(view.annotation_map(), target, dx, dy, handle);
         }
 
         let id = self.element(target)?;
@@ -1606,6 +1611,55 @@ impl FigureAccess<'_> {
         } else {
             Ok(false)
         }
+    }
+    /// The presented view already owns the renderer's measured anchor space.
+    /// Deltas must be in that map's pixels (surface pixels for a native view).
+    fn drag_annotation_with_map(
+        &mut self,
+        map: &renderer::annotation::AnnotationMap,
+        target: &str,
+        dx: f32,
+        dy: f32,
+        handle: Option<&str>,
+    ) -> PyResult<bool> {
+        let started = self.data.host_work.start();
+        if !dx.is_finite() || !dy.is_finite() {
+            return Err(invalid("drag must be finite"));
+        }
+        let index = self.annotation_index(target)?;
+        if map.layer().items.get(index).map(|item| &item.id)
+            != self
+                .data
+                .chart
+                .config()
+                .annotations
+                .items
+                .get(index)
+                .map(|item| &item.id)
+        {
+            return Err(invalid(
+                "annotation frame must be refreshed after reordering",
+            ));
+        }
+        let id = map
+            .find(index)
+            .ok_or_else(|| invalid("annotation is not visible"))?;
+        let mut config = self.data.chart.config().clone();
+        let moved = if let Some(handle) = handle {
+            let handle = ALL_HANDLES
+                .into_iter()
+                .find(|h| format!("{h:?}") == handle)
+                .ok_or_else(|| invalid("unknown resize handle"))?;
+            map.resize_by(&mut config.annotations, id, handle, dx, dy)
+        } else {
+            map.drag_by(&mut config.annotations, id, dx, dy)
+        };
+        let moved = moved == Some(renderer::layout::NudgeResult::Moved);
+        if moved {
+            self.commit_config(config)?;
+        }
+        self.data.host_work.finish("annotation_move", started);
+        Ok(moved)
     }
     fn pick_json(&mut self, py: Python<'_>, x: f32, y: f32) -> PyResult<String> {
         if self.data.document.is_some() {
@@ -1685,7 +1739,7 @@ impl FigureAccess<'_> {
                 + u64::from(t.row_bytes) * u64::from(t.height)
         });
         json!({"adapter": self.context.adapter_info, "gpu_context_id":self.context.id,"figure_id":self.data.figure_id,"gpu_sharing":"process","active_figures":self.renderer.chart_order().len(),"figure_column_bytes":self.data.columns.values().map(|v|v.0 as u64 * 8).sum::<u64>(), "revision": self.data.revision, "column_uploads": self.data.uploads, "rgba_readbacks": self.data.readbacks, "png_encodes": self.data.png_encodes, "columns": self.data.columns.len(),
-            "selection_value_readbacks":self.data.selection_value_readbacks,"pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
+            "host_work":self.data.host_work.snapshot(),"selection_value_readbacks":self.data.selection_value_readbacks,"pool_capacity_bytes": self.renderer.pool().capacity(), "pool_used_bytes": self.renderer.pool().used_bytes(),
             "known_gpu_bytes": self.renderer.gpu_memory_usage().total_bytes() + host_bytes + self.data.document.as_ref().map_or(0, |r| r.gpu_bytes()), "allocation_mode": if self.data.document.is_some() { "bounded" } else { "resident" }, "preparation": self.data.preparation}).to_string()
     }
 }
@@ -1699,6 +1753,7 @@ mod drawing;
 mod edit_history;
 mod editor;
 mod gpu;
+mod host_work;
 mod identity;
 mod interaction;
 mod navigation;
@@ -1905,17 +1960,25 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(desktop::run_events, m)?)?;
     m.add_function(wrap_pyfunction!(persistent_settings_json, m)?)?;
     m.add_function(wrap_pyfunction!(default_colorbar_json, m)?)?;
+    m.add_function(wrap_pyfunction!(canonical_style_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
     m.add_function(wrap_pyfunction!(bounded::default_radial_json, m)?)?;
     m.add_function(wrap_pyfunction!(bounded::default_bounded_json, m)?)?;
     m.add_function(wrap_pyfunction!(draw_style_specs_json, m)?)?;
     m.add_function(wrap_pyfunction!(font_family_available, m)?)?;
+    m.add_function(wrap_pyfunction!(review_font_data, m)?)?;
     m.add_function(wrap_pyfunction!(text_segments_json, m)?)?;
     m.add_function(wrap_pyfunction!(segments_plain_text, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
+    m.add_function(wrap_pyfunction!(fitted_colorbar_title_margin, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_range_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::object_outline_json, m)?)?;
     m.add_function(wrap_pyfunction!(property_catalog::editor_catalog_json, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        property_catalog::review_object_bindings_json,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(review_images::review_image_json, m)?)?;
     m.add_function(wrap_pyfunction!(property_catalog::editor_property_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::bounded_view_json, m)?)?;
     m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;
@@ -1992,6 +2055,36 @@ fn fitted_chart_title_margin(config: &str) -> PyResult<f32> {
     Ok(config.chart_title.top_margin)
 }
 
+/// Grow the default colourbar label band using the renderer's painted bounds.
+/// Python uses this CPU-only helper for both native and notebook label setters.
+/// Manual title offsets and explicit layout edits stay owned by the caller.
+#[pyfunction]
+fn fitted_colorbar_title_margin(config: &str) -> PyResult<f32> {
+    let config: Config = parse(config)?;
+    let bar = config
+        .colorbar
+        .as_ref()
+        .ok_or_else(|| invalid("no colorbar"))?;
+    let margin = bar.axis.out_margin;
+    let measure = CpuTextMeasure::for_style(&config.draw_style);
+    let (Some(title), Some(ticks)) = (
+        ColorBarTitleElement.bounds(&config, &measure),
+        ColorBarLabelElement.bounds(&config, &measure),
+    ) else {
+        return Ok(margin);
+    };
+    let gap = (bar.axis.title_option.text.font_size * 0.25).max(4.0);
+    let overlap = match bar.side {
+        Side::Right => ticks.x + ticks.width + gap - title.x,
+        Side::Left => title.x + title.width + gap - ticks.x,
+        Side::Bottom => ticks.y + ticks.height + gap - title.y,
+        Side::Top => title.y + title.height + gap - ticks.y,
+    };
+    // The renderer centers the title halfway through out_margin; doubling
+    // the missing separation moves its inner edge past the tick labels.
+    Ok(margin + 2.0 * overlap.max(0.0))
+}
+
 #[pyfunction]
 fn fitted_range_json(config: &str, axis: &str, min: f64, max: f64) -> PyResult<String> {
     if !min.is_finite() || !max.is_finite() || min >= max {
@@ -2006,6 +2099,17 @@ fn fitted_range_json(config: &str, axis: &str, min: f64, max: f64) -> PyResult<S
 #[pyfunction]
 fn default_colorbar_json() -> PyResult<String> {
     serde_json::to_string(&default::default_colorbar_options()).map_err(runtime)
+}
+
+/// Canonical CPU serialization used by the public-setter export compiler.
+/// Apply the same f32/default omission rules as accepted native/browser state;
+/// never fit ranges, inspect columns, acquire a Figure lock, or render here.
+#[pyfunction]
+fn canonical_style_state_json(settings: &str) -> PyResult<String> {
+    // Keep the exact typed serializer used by accepted settings_json.
+    // to_value(f32) would expose promoted binary approximation digits.
+    let state: Settings = parse(settings)?;
+    serde_json::to_string(&state).map_err(invalid)
 }
 
 #[pyfunction]
@@ -2025,4 +2129,10 @@ fn rebuild_legend_json(series: &str, rich: &str, colormap: Option<&str>) -> PyRe
         }
     }
     serde_json::to_string(&rich).map_err(runtime)
+}
+
+#[pyfunction]
+fn review_font_data(py: Python<'_>, family: &str) -> PyResult<(Py<PyBytes>, u32)> {
+    let (bytes, index) = ui_fonts::resolve(family).map_err(invalid)?;
+    Ok((PyBytes::new(py, &bytes).unbind(), index))
 }

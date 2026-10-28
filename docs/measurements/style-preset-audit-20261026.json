@@ -1,0 +1,255 @@
+{
+  "checked_on": "2026-10-26",
+  "source_sha256": "b0c107e930d5d65d3fca76547f4ddce3133eb4561a3b05f19a751eca80c090c3",
+  "method": "WCAG relative sRGB luminance; alpha composite each palette color against its preset solid background. Threshold comparisons use unrounded ratios.",
+  "scope": "Standalone essential thin marks against the background; not a claim that every complete chart fails or passes WCAG. Does not test CVD distinguishability, adjacency between series, or text accessibility.",
+  "source": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+  "presets": {
+    "paper": {
+      "base_font_pt": 11,
+      "tick_directions": {
+        "bottom_x": "Outside",
+        "top_x": "Outside",
+        "left_y": "Outside",
+        "right_y": "Outside"
+      },
+      "palette": [
+        {
+          "color": "#0072B2",
+          "contrast_to_background": 5.185446345779855,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#E69F00",
+          "contrast_to_background": 2.252287600800611,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#009E73",
+          "contrast_to_background": 3.421139939945999,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#CC79A7",
+          "contrast_to_background": 3.06103403764584,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#D55E00",
+          "contrast_to_background": 3.8671837898669135,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#56B4E9",
+          "contrast_to_background": 2.3074822416402463,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#F0E442",
+          "contrast_to_background": 1.3223279112195188,
+          "at_least_3_to_1": false
+        }
+      ]
+    },
+    "report": {
+      "base_font_pt": 11,
+      "tick_directions": {
+        "bottom_x": "Outside",
+        "top_x": "Outside",
+        "left_y": "Outside",
+        "right_y": "Outside"
+      },
+      "palette": [
+        {
+          "color": "#0072B2",
+          "contrast_to_background": 5.185446345779855,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#E69F00",
+          "contrast_to_background": 2.252287600800611,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#009E73",
+          "contrast_to_background": 3.421139939945999,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#CC79A7",
+          "contrast_to_background": 3.06103403764584,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#D55E00",
+          "contrast_to_background": 3.8671837898669135,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#56B4E9",
+          "contrast_to_background": 2.3074822416402463,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#F0E442",
+          "contrast_to_background": 1.3223279112195188,
+          "at_least_3_to_1": false
+        }
+      ]
+    },
+    "presentation": {
+      "base_font_pt": 16,
+      "tick_directions": {
+        "bottom_x": "Outside",
+        "top_x": "Outside",
+        "left_y": "Outside",
+        "right_y": "Outside"
+      },
+      "palette": [
+        {
+          "color": "#0072B2",
+          "contrast_to_background": 5.185446345779855,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#E69F00",
+          "contrast_to_background": 2.252287600800611,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#009E73",
+          "contrast_to_background": 3.421139939945999,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#CC79A7",
+          "contrast_to_background": 3.06103403764584,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#D55E00",
+          "contrast_to_background": 3.8671837898669135,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#56B4E9",
+          "contrast_to_background": 2.3074822416402463,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#F0E442",
+          "contrast_to_background": 1.3223279112195188,
+          "at_least_3_to_1": false
+        }
+      ]
+    },
+    "dark": {
+      "base_font_pt": 11,
+      "tick_directions": {
+        "bottom_x": "Outside",
+        "top_x": "Outside",
+        "left_y": "Outside",
+        "right_y": "Outside"
+      },
+      "palette": [
+        {
+          "color": "#56B4E9",
+          "contrast_to_background": 7.46777632564844,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#F0B45A",
+          "contrast_to_background": 9.338952678722267,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#5AD1A6",
+          "contrast_to_background": 9.112772655562065,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#DF95CB",
+          "contrast_to_background": 7.630332916738434,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#FF9072",
+          "contrast_to_background": 7.782425104682086,
+          "at_least_3_to_1": true
+        }
+      ]
+    },
+    "monochrome": {
+      "base_font_pt": 11,
+      "tick_directions": {
+        "bottom_x": "Outside",
+        "top_x": "Outside",
+        "left_y": "Outside",
+        "right_y": "Outside"
+      },
+      "palette": [
+        {
+          "color": "#161616",
+          "contrast_to_background": 18.096211979655724,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#666666",
+          "contrast_to_background": 5.741836481454148,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#A0A0A0",
+          "contrast_to_background": 2.6149807046958116,
+          "at_least_3_to_1": false
+        }
+      ]
+    },
+    "colorblind": {
+      "base_font_pt": 11,
+      "tick_directions": {
+        "bottom_x": "Outside",
+        "top_x": "Outside",
+        "left_y": "Outside",
+        "right_y": "Outside"
+      },
+      "palette": [
+        {
+          "color": "#0072B2",
+          "contrast_to_background": 5.185446345779855,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#E69F00",
+          "contrast_to_background": 2.252287600800611,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#009E73",
+          "contrast_to_background": 3.421139939945999,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#CC79A7",
+          "contrast_to_background": 3.06103403764584,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#D55E00",
+          "contrast_to_background": 3.8671837898669135,
+          "at_least_3_to_1": true
+        },
+        {
+          "color": "#56B4E9",
+          "contrast_to_background": 2.3074822416402463,
+          "at_least_3_to_1": false
+        },
+        {
+          "color": "#F0E442",
+          "contrast_to_background": 1.3223279112195188,
+          "at_least_3_to_1": false
+        }
+      ]
+    }
+  }
+}

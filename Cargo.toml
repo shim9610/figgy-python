@@ -1,6 +1,6 @@
 [package]
 name = "figgyplot"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
@@ -24,6 +24,11 @@ egui = "0.36.2"
 egui-wgpu = "0.36.2"
 egui-winit = "0.36.2"
 fontdb = "0.24"
+arboard = "3.6.1"
+base64 = "0.22"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+rfd = "0.15.4"
+sha2 = "0.10"
 
 [profile.release]
 lto = "thin"

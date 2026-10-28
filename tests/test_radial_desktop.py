@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import time
 
+import numpy as np
 import pytest
 import figgyplot as figgy
 from figgyplot.desktop import poll_events
@@ -138,6 +139,27 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         assert selected != original and selected != 2
         inputs.key("Escape")
         assert inputs.info()["selected"] is None
+        # Clearing a data selection restores the global form. Layout remains a
+        # separate mode rather than replacing unselected title/style controls.
+        (tmp_path/'cleared-selection.json').write_text(json.dumps(dict(window=inputs.info(),settings=fig.get_settings()),indent=2))
+        assert "radial_title" in inputs.info()["controls"]
+        # Compare mode switches with the same pointer/hover state. Moving from
+        # a slice to the toolbar legitimately clears renderer hover animation.
+        rect=inputs.info()['controls']['layout_mode']
+        inputs.input_frame('mousemove','--window',inputs.wid,round(rect[0]+rect[2]/2),round(rect[1]+rect[3]/2))
+        deadline=time.monotonic()+3
+        while fig.get_settings()['radial']['interaction']['hover_progress']!=0:
+            assert time.monotonic()<deadline
+            inputs.pump()
+        before_layout=fig.get_settings()
+        inputs.click("layout_mode")
+        assert "plot_width" in inputs.info()["controls"]
+        assert "radial_title" not in inputs.info()["controls"]
+        (tmp_path/'layout-mode-settings.json').write_text(json.dumps(dict(before=before_layout,after=fig.get_settings(),window=inputs.info()),indent=2))
+        assert fig.get_settings()==before_layout
+        inputs.click("select_mode")
+        assert "radial_title" in inputs.info()["controls"]
+        assert fig.get_settings()==before_layout
         inputs.click_rect(inputs.info()["controls"]["radial_title"])
         inputs.key("ctrl+a")
         inputs.xdo("type", "--clearmodifiers", "Reviewed donut")
@@ -156,7 +178,8 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
             if result.returncode==0 and copied==expected:break
             assert time.monotonic()<deadline,(result.returncode,result.stderr,copied)
             inputs.pump()
-        assert copied == expected and "configure_radial" in copied
+        assert copied == expected and ".chart.set_material('wood')" in copied
+        assert "configure_radial" not in copied
         assert "'value':" not in copied
         subprocess.run(["wmctrl", "-ir", inputs.wid, "-b", "add,maximized_vert,maximized_horz"], check=True)
         inputs.pump()
@@ -165,6 +188,15 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         subprocess.run(["wmctrl", "-ir", inputs.wid, "-b", "remove,maximized_vert,maximized_horz"], check=True)
         inputs.pump()
         assert fig.info["column_uploads"] == fig.info["rgba_readbacks"] == fig.info["png_encodes"] == 0
+        # Verify the public appearance recipe on the original plotting setup.
+        # Transient hover/selection are view state, covered by exact checkpoints.
+        with figgy.Figure(backend="native") as replay:
+            replay.axes[0].pie([40, 30, 0, 30], labels=["A", "B", "Zero", "C"], material="ceramic")
+            exec(copied, {"fig": replay})
+            source=fig.get_settings()['radial'];restored=replay.get_settings()['radial']
+            assert {k:v for k,v in restored.items() if k!='interaction'} == {k:v for k,v in source.items() if k!='interaction'}
+            np.testing.assert_array_equal(replay.render_rgba(),fig.render_rgba())
+            assert replay.info['column_uploads']==0
         fig.savefig(tmp_path/"reviewed.png")
         assert (tmp_path/"reviewed.png").is_file()
     finally:

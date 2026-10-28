@@ -1,0 +1,25 @@
+{
+  "run": "https://github.com/shim9610/figgy-python/actions/runs/39792868412",
+  "commit": "271a3bdf6ce5c5fb93daf9fdb8299d8a8b40bbd6",
+  "linux_test_summaries": {"0": 207, "1": 207, "2": 207, "3": 206},
+  "windows_storage_passed": 7,
+  "shard0": {
+    "tests_finished_utc": "2026-10-22T14:23:51.9363372Z",
+    "test_seconds": 679.83,
+    "cancelled_utc": "2026-10-22T14:56:49.6116542Z",
+    "artifact_upload_started_utc": "2026-10-22T14:56:50.3033945Z",
+    "artifact_upload_finished_utc": "2026-10-22T14:56:51.5114246Z",
+    "aggregate_rejection": "SHARD_RESULT: cancelled; exit 1"
+  },
+  "cause": "An X11 clipboard selection owner forked by xclip inherited the test logging pipe. Python could exit successfully while tee waited for EOF; the shell could not reach Xvfb cleanup, which would have released the clipboard owner.",
+  "local_control": {
+    "inherited_streams": {"python_returned": true, "pipeline_exited": false, "timeout_seconds": 5, "exit_code": 124},
+    "detached_streams": {"python_returned": true, "pipeline_exited": true, "exit_code": 0},
+    "regression": "Confirm writer.wait() == 0 while communicate() still times out, replace the negative-control selection to release it, then confirm the fixed writer closes its logs and its Unicode clipboard remains readable after its process exits.",
+    "original_shard_with_file_logging": {"passed": 207, "seconds": 616.72, "pytest_returned": true, "interpreter_exit_callback_reached": true, "process_exit_code": 0},
+    "fixed_clipboard_and_settings_through_tee": {"passed": 2, "seconds": 29.69, "pipeline_exited": true},
+    "fixed_clipboard_and_targeted_comments": {"passed": 2, "seconds": 49.59}
+  },
+  "fix": "Use one UTF-8 clipboard writer helper that redirects only the xclip owner's stdout/stderr to DEVNULL. Preserve the clipboard owner for subsequent paste. Record pytest-return, interpreter-exit and pipeline-exit boundaries.",
+  "unchanged": ["test assertions", "SSOT and numeric array verification", "execution audit", "job time budgets", "renderer and product runtime"]
+}

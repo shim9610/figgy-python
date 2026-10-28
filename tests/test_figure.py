@@ -39,7 +39,7 @@ def test_exported_python_replays_layout_and_style(plot):
     artist.set_linewidth(3)
     state = fig.get_settings()
     image = fig.render_rgba().copy()
-    code = fig.to_code("restored")
+    code = fig.to_code("restored", mode='exact')
     with figgy.Figure(figsize=(6, 4), dpi=100, pool_bytes=8 * 1024**2) as restored:
         restored.axes[0].plot(x, np.sin(x), id="signal", label="Signal")
         exec(code, {"restored": restored})

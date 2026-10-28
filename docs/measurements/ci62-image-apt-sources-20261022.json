@@ -1,0 +1,18 @@
+{
+  "run_url": "https://github.com/shim9610/figgy-python/actions/runs/39761069292",
+  "job_id": 119767697511,
+  "head_sha": "879dda6b2105ffcde8df172173b86c1650752f25",
+  "failed_stage": "Install native software-GPU and X11 runtime",
+  "log_evidence": [
+    "2026-10-22T10:16:38.3953142Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]",
+    "2026-10-22T10:16:38.4323427Z Err:6 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease",
+    "2026-10-22T10:16:38.4324404Z   403  Forbidden [IP: 13.107.246.71 443]",
+    "2026-10-22T10:16:38.4434857Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease",
+    "2026-10-22T10:16:43.0397774Z E: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  403  Forbidden [IP: 13.107.246.71 443]",
+    "2026-10-22T10:16:43.0434864Z ##[error]Process completed with exit code 100."
+  ],
+  "tests_executed_in_this_job": false,
+  "diagnosis": "Replacing a host in ubuntu.sources did not override the image mirrorlist, and apt-get update also consulted an unrelated image vendor repository.",
+  "change": "Both jobs invoke install_ci_runtime.sh, passing a temporary signed official Ubuntu source list and sourceparts=- to both update and install. Repository errors are not ignored.",
+  "local_verification": "Actual apt-get --print-uris update includes only official Ubuntu feeds with the scoped arguments. Removing source isolation makes the Microsoft/Azure fixture feeds reappear. An update failure stops before installation."
+}

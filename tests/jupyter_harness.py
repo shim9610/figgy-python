@@ -26,7 +26,7 @@ GPU_TRACE_INIT = r"""(() => {
     };
     window.__figgyTrace=(stage,details={})=>{
         record('host',{stage,...details});
-        if(/^(request|prepare|ready_frame|display_wait|export|response|surface)\./.test(stage)){
+        if(/^(request|prepare|ready_frame|display_wait|export|response|surface|edit|state|property)\./.test(stage)){
             trace.hostStages.push({t:performance.now(),stage,...details});
             if(trace.hostStages.length>100)trace.hostStages.shift();
         }
@@ -277,6 +277,14 @@ def notebook(tmp_path, source, *, allow_closed=False, initial_views=1):
                 page.evaluate('window.jupyterapp.restored')
                 page.wait_for_function('!!window.jupyterapp.shell.currentWidget?.sessionContext')
                 page.evaluate("""async()=>{const app=window.jupyterapp;await app.restored;const panel=app.shell.currentWidget;await panel.context.ready;await panel.sessionContext.ready;await app.commands.execute('notebook:run-all-cells');}""")
+                initial_errors=page.evaluate("""() => {
+                    const cells=window.jupyterapp.shell.currentWidget.content.widgets;
+                    return cells.flatMap(cell=>(cell.model.outputs?.toJSON()??[])
+                        .filter(output=>output.output_type==='error')
+                        .map(output=>({ename:output.ename,evalue:output.evalue,traceback:output.traceback})));
+                }""")
+                kernel_executions.append({'phase':'initial-cells','outcome':'error' if initial_errors else 'ok','errors':initial_errors})
+                assert not initial_errors, 'Initial notebook execution failed: '+json.dumps(initial_errors)
                 # Ready includes async pipeline compilation and GPU completion.
                 # Cold software-GPU startup has its own budget; gesture checks
                 # keep Playwright's normal timeout and strict result assertions.

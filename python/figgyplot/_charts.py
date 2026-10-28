@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import numpy as np
+from . import _style_runtime, _chart_text
 
 
 def family(settings):
@@ -19,7 +20,11 @@ class BoundedArtist:
         return self
 
     def set_style(self, **properties):
-        return self.set(style=properties)
+        self.figure.axes[0].chart.set_style(**properties)
+        return self
+
+    def get_style(self):
+        return self.figure.axes[0].chart.get_style()
 
     def set_values(self, values, *, series=0):
         with self.figure._lock:
@@ -38,22 +43,34 @@ class BoundedArtist:
 
 class ChartMethods:
     def _bounded(self, kind, categories, series, **properties):
-        from .figure import _color, _text, _merge
+        from .figure import _text, _merge
         from ._native import default_bounded_json
         fig = self.figure
+        fig._require_data_edit()
         if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
             raise ValueError('bounded charts require a separate single-panel Figure')
-        chart = json.loads(default_bounded_json(kind))
-        chart.update(categories=categories, series=series,
-                     title=_text(fig.get_settings()['config']['chart_title']['text']),
-                     font_size=11 * fig.dpi / 72)
-        _merge(chart, properties)
         with fig._lock:
             fig._require_open()
+            state = fig.get_settings()
+            config = self._config(state)
+            chart = json.loads(default_bounded_json(kind))
+            chart.update(categories=categories, series=series, font_size=11 * fig.dpi / 72)
+            _chart_text.inherit_title(chart, config)
+            if kind in ('categorical', 'boxplot'):
+                horizontal = properties.get('direction') == 'Horizontal'
+                chart['category_title'] = _text(config['left_y' if horizontal else 'bottom_x']['title_option']['text'])
+                chart['value_title'] = _text(config['bottom_x' if horizontal else 'left_y']['title_option']['text'])
+            _merge(chart, properties)
+            if 'title' in properties and 'chart_title' not in properties:
+                _chart_text.set_title_text(chart, properties['title'])
+            if fig._style_defaults is not None:
+                state[kind]=chart
+                chart=_style_runtime.bounded(fig,state,kind)[kind]
             fig._native.set_bounded(kind, json.dumps(chart, allow_nan=False))
         fig._changed()
         return BoundedArtist(fig, kind)
 
+    @_style_runtime.styled
     def bar(self, x, height, *, label=None, colors=None, color=None,
             mode='grouped', orientation='vertical', **properties):
         """Bounded categorical bars (up to 64 categories / 16 series / 512 bars).
@@ -76,17 +93,19 @@ class ChartMethods:
         palette = list(colors) if colors is not None else [_COLORS[i % len(_COLORS)] if color is None else color for i in range(n)]
         if len(names) != n or len(palette) != n:
             raise ValueError('labels and colors must match the number of series')
-        categories = [dict(id=f'category_{i}', label=str(v)) for i, v in enumerate(labels)]
+        categories = [dict(id=f'category_{i}', label=_chart_text.category_label(v)) for i, v in enumerate(labels)]
         series = [dict(id=f'series_{i}', label=names[i], values=[None if v is None else float(v) for v in row],
                        color=_color(palette[i]), style=None) for i, row in enumerate(values)]
         return self._bounded('categorical', categories, series,
                              mode={'grouped': 'Grouped', 'stacked': 'Stacked', 'percent_stacked': 'PercentStacked'}[mode],
                              direction=orientation.title(), **properties)
 
+    @_style_runtime.styled
     def barh(self, y, width, **kwargs):
         """Horizontal categorical bars; other arguments follow ``bar``."""
         return self.bar(y, width, orientation='horizontal', **kwargs)
 
+    @_style_runtime.styled
     def bxp(self, stats, *, labels=None, color=None, orientation='vertical', **properties):
         """Plot precomputed boxes without recomputing statistics.
 
@@ -116,10 +135,11 @@ class ChartMethods:
                 s.setdefault(key, None)
             s['outliers'] = [float(v) for v in s.get('outliers', [])]
             values.append(s)
-        categories = [dict(id=f'category_{i}', label=str(v)) for i, v in enumerate(names)]
+        categories = [dict(id=f'category_{i}', label=_chart_text.category_label(v)) for i, v in enumerate(names)]
         series = [dict(id='series_0', label='Distribution', values=values, color=_color(_COLORS[0] if color is None else color), style=None)]
         return self._bounded('boxplot', categories, series, direction=orientation.title(), **properties)
 
+    @_style_runtime.styled
     def boxplot(self, x, *, labels=None, whis=1.5, orientation='vertical', **properties):
         """Compute NumPy linear quartiles and actual IQR whiskers, then call bxp.
 
@@ -147,6 +167,7 @@ class ChartMethods:
                               outliers=a[(a < low) | (a > high)].tolist()))
         return self.bxp(stats, labels=labels, orientation=orientation, **properties)
 
+    @_style_runtime.styled
     def errorbar(self, x, y, *, xerr=None, yerr=None, color=None, ecolor=None,
                  linewidth=1.5, elinewidth=1.0, capsize=3, marker='o', markersize=4,
                  linestyle='-', label=None, id=None):
@@ -193,6 +214,7 @@ class ChartMethods:
         suffix = 'XY' if len(errors) == 2 else 'X' if xerr is not None else 'Y'
         return self._add(x, y, {prefix+suffix: style}, label, id, extra_columns=columns)
 
+    @_style_runtime.styled
     def stairs(self, values, edges, *, orientation='vertical', color=None, edgecolor='black',
                linewidth=0.5, baseline=0, gap=1, width=1, label=None, id=None):
         """Render pre-binned histogram bars; one more edge than values."""
@@ -209,6 +231,7 @@ class ChartMethods:
                  baseline=float(baseline), gap_px=float(gap), width_ratio=float(width), orientation=orientation.title())}}
         return self._add(edges if orientation=='vertical' else counts, counts if orientation=='vertical' else edges, style, label, id)
 
+    @_style_runtime.styled
     def hist(self, x, bins=10, *, range=None, weights=None, density=False, **kwargs):
         """Bin one finite sample vector with NumPy; return counts, edges, artist."""
         from .figure import _array
@@ -221,6 +244,7 @@ class ChartMethods:
         counts, edges = np.histogram(x, bins=bins, range=range, weights=weights, density=density)
         return counts, edges, self.stairs(counts, edges, **kwargs)
 
+    @_style_runtime.styled
     def contour(self, *args, levels=7, color='black', linewidth=1, cmap='viridis',
                 vmin=None, vmax=None, filled=False, id=None):
         """Contour(Z) or contour(X,Y,Z), with increasing 1-D sample coordinates.
@@ -228,8 +252,8 @@ class ChartMethods:
         Explicit levels are SSOT values. An integer requests evenly spaced
         interior levels. ``filled=True`` adds upstream banded field rendering.
         """
-        from .figure import _array, _color, _colormap
-        from ._native import default_colorbar_json
+        from .figure import _array, _color
+        from ._color_scale import _set_colorbar
         if len(args) == 1:
             z = np.asarray(args[0])
             if z.ndim != 2:
@@ -267,15 +291,13 @@ class ChartMethods:
                      contour=dict(levels=levels.tolist(), line=dict(line_style='Solid', line_color=_color(color), line_width=float(linewidth)*self.figure.dpi/72)))
         if filled:
             style['fill'] = dict(mode='Bands', shading='Interpolated', opacity=1.0)
-        bar = json.loads(default_colorbar_json())
-        bar['colormap'] = _colormap(cmap)
-        bar['axis'].update(min=low, max=high, major_spacing=(high-low)/5)
         with self.figure._lock:
             config = self._config(self.figure.get_settings())
-            config['colorbar'] = bar
+            _set_colorbar(config,cmap,low,high)
             return self._add(x, y, {'HeatmapContour' if filled else 'Contour': style}, id=id,
                              extra_columns=columns, config=config, bounds=(float(x[0]), float(x[-1]), float(y[0]), float(y[-1])))
 
+    @_style_runtime.styled
     def contourf(self, *args, **kwargs):
         """Banded field plus optional contours; default line width is zero."""
         kwargs.setdefault('linewidth', 0)

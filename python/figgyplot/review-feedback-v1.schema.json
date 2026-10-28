@@ -39,6 +39,12 @@
         "work_id": {
           "type": "string"
         },
+        "intent": {
+          "enum": [
+            "revise",
+            "finish"
+          ]
+        },
         "source": {
           "type": "object"
         },
@@ -95,7 +101,8 @@
               "channel": {
                 "enum": [
                   "api",
-                  "ui"
+                  "ui",
+                  "ui_target"
                 ]
               },
               "text": {
@@ -104,7 +111,13 @@
               "id": {
                 "type": "string"
               },
-              "target": {}
+              "target": {},
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
+              }
             }
           }
         },
@@ -244,6 +257,12 @@
           "type": "string",
           "minLength": 1
         },
+        "intent": {
+          "enum": [
+            "revise",
+            "finish"
+          ]
+        },
         "manifest": {
           "type": "string",
           "minLength": 1
@@ -252,6 +271,595 @@
           "type": "object"
         }
       }
+    },
+    "preview": {
+      "type": "object",
+      "required": [
+        "value",
+        "truncated"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary_property": {
+      "type": "object",
+      "required": [
+        "path",
+        "kind",
+        "before_exists",
+        "after_exists",
+        "before",
+        "after",
+        "operation_ids"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "rich_text",
+            "add",
+            "remove",
+            "replace",
+            "move"
+          ]
+        },
+        "before_exists": {
+          "type": "boolean"
+        },
+        "after_exists": {
+          "type": "boolean"
+        },
+        "before": {
+          "$ref": "#/$defs/preview"
+        },
+        "after": {
+          "$ref": "#/$defs/preview"
+        },
+        "operation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "text_changed": {
+          "type": "boolean"
+        },
+        "formatting_changed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "detail_selector": {
+      "type": "object",
+      "required": [
+        "figure_id"
+      ],
+      "properties": {
+        "figure_id": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary_object": {
+      "type": "object",
+      "required": [
+        "target",
+        "label",
+        "scope",
+        "change_count",
+        "properties",
+        "comments",
+        "details",
+        "label_truncated"
+      ],
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "change_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/summary_property"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "target",
+              "channel"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
+              }
+            }
+          }
+        },
+        "details": {
+          "$ref": "#/$defs/detail_selector"
+        },
+        "label_truncated": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "detail_object": {
+      "type": "object",
+      "required": [
+        "target",
+        "label",
+        "scope",
+        "change_count",
+        "properties",
+        "comments",
+        "details",
+        "snapshots",
+        "label_truncated"
+      ],
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "change_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/summary_property"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "target",
+              "channel"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
+              }
+            }
+          }
+        },
+        "details": {
+          "$ref": "#/$defs/detail_selector"
+        },
+        "snapshots": {
+          "type": "object",
+          "required": [
+            "before",
+            "after"
+          ],
+          "properties": {
+            "before": {
+              "type": "object"
+            },
+            "after": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        "label_truncated": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary_figure": {
+      "type": "object",
+      "required": [
+        "id",
+        "disposition",
+        "intent",
+        "change_count",
+        "comment_count",
+        "comments",
+        "objects",
+        "details",
+        "data_changed"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "disposition": {
+          "enum": [
+            "accept",
+            "request_changes",
+            "skip"
+          ]
+        },
+        "intent": {
+          "enum": [
+            "revise",
+            "finish"
+          ]
+        },
+        "change_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comment_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "target",
+              "channel"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
+              }
+            }
+          }
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/summary_object"
+          }
+        },
+        "details": {
+          "$ref": "#/$defs/detail_selector"
+        },
+        "data_changed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "view",
+        "session_id",
+        "round_id",
+        "work_id",
+        "intent",
+        "source",
+        "figures",
+        "counts"
+      ],
+      "properties": {
+        "protocol": {
+          "const": 1
+        },
+        "view": {
+          "const": "summary"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "round_id": {
+          "type": "string"
+        },
+        "work_id": {
+          "type": "string"
+        },
+        "intent": {
+          "enum": [
+            "revise",
+            "finish"
+          ]
+        },
+        "source": {
+          "type": "object"
+        },
+        "figures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/summary_figure"
+          }
+        },
+        "counts": {
+          "type": "object",
+          "required": [
+            "figures",
+            "objects",
+            "changes",
+            "comments"
+          ],
+          "properties": {
+            "figures": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "objects": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "changes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "comments": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "details": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "view",
+        "session_id",
+        "round_id",
+        "work_id",
+        "figure_id",
+        "comments",
+        "objects",
+        "selection",
+        "changes"
+      ],
+      "properties": {
+        "protocol": {
+          "const": 1
+        },
+        "view": {
+          "const": "details"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "round_id": {
+          "type": "string"
+        },
+        "work_id": {
+          "type": "string"
+        },
+        "figure_id": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "target",
+              "channel"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/image_attachment"
+                }
+              }
+            }
+          }
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/detail_object"
+          }
+        },
+        "selection": {
+          "type": "object",
+          "required": [
+            "target",
+            "change_id"
+          ],
+          "properties": {
+            "target": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "change_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/change"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "image_attachment": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "file",
+        "sha256",
+        "mime_type",
+        "bytes",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^attachments/[0-9a-f]{64}\\.png$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mime_type": {
+          "const": "image/png"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

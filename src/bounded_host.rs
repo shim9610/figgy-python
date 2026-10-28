@@ -160,7 +160,7 @@ impl SurfaceWindow {
                     } else {
                         !modifiers.ctrl || modifiers.shift
                     };
-                    if delta != 0. && allowed {
+                    if delta != 0. && allowed && view["axis"] != "radius" {
                         let [low, high]: [f64; 2] =
                             serde_json::from_value(view["range"].clone()).unwrap();
                         let area = surface
@@ -207,6 +207,22 @@ impl SurfaceWindow {
                         (p.y - image_rect.min.y) * logical_size.1 as f32 / image_rect.height(),
                     ]
                 };
+                if self.editor.review_enabled() && ctx.input(|i|i.pointer.secondary_clicked()) && let Some(p)=ctx.input(|i|i.pointer.interact_pos()).filter(|p|image_rect.contains(*p)) {
+                    let point=to_local(p);
+                    let annotation=surface.annotations.annotations().hit_test(point).and_then(|id|surface.annotations.annotations().element(id)).map(|a|(renderer::LayerRef::Annotations,format!("annotation_{}",a.index)));
+                    let targets=if let Some(hit)=annotation {vec![hit]} else {
+                        let mut candidates=map.entries().filter_map(|(id,e)|map.bounds(id).filter(|r|point[0]>=r.x&&point[0]<=r.x+r.width&&point[1]>=r.y&&point[1]<=r.y+r.height).map(|_|(renderer::LayerRef::Base,e.id.element_id()))).collect::<Vec<_>>();
+                        if candidates.len()>1 {candidates.retain(|(_,t)|t!="data_area");}
+                        if candidates.iter().all(|(_,t)|t=="data_area") {
+                            let mut probe=c.data.document.as_ref().unwrap().chart.clone();probe.select_at(&surface.frame,point,false);
+                            let hit=probe.selected_json();
+                            if let Some(id)=hit["series_id"].as_str().map(str::to_owned).or_else(||hit["index"].as_u64().map(|i|format!("slice_{}_{i}",hit["group"].as_u64().unwrap_or(0)))) {candidates=vec![(renderer::LayerRef::Base,id)];}
+                        }
+                        if candidates.is_empty() {candidates.push((renderer::LayerRef::Base,"data_area".into()));}
+                        candidates
+                    };
+                    self.editor.review_target(p,&c,targets);
+                }
                 if self.editor.drawing.tool != crate::drawing::Tool::Select {
                     // press_origin is cleared when egui processes a release.
                     // A short press/release can arrive in the same frame.
@@ -473,6 +489,7 @@ impl SurfaceWindow {
             if let Err(e) = prepared {
                 error = Some(e);
             }
+            self.editor.review_context_ui(root);
             if let Some((space, logical_size)) = inline_space {
                 self.editor.inline_text_ui(
                     root,
@@ -622,6 +639,7 @@ impl SurfaceWindow {
             "layout_probe":self.editor.layout_probe,
             "column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,
             "revision":c.data.revision,
+            "property_catalog_builds":self.editor.property_builds,
             "decorations":self.bounded_surface.as_ref().map(|s|s.frame.decorations().entries().filter_map(|(id,e)|s.frame.decorations().bounds(id).map(|r|(e.id.element_id(),json!([r.x,r.y,r.width,r.height])))).collect::<serde_json::Map<_,_>>()),
             "decoration_selected":c.data.document.as_ref().unwrap().chart.decorations().selected,
 

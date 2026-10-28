@@ -71,7 +71,7 @@ def test_native_draw_modes_change_pixels_and_replay_exactly(mode):
             source.set_facecolor("#0b0f17")
         styled = source.render_rgba()
         assert np.count_nonzero(styled != precise) > 1000
-        code = source.to_code()
+        code = source.to_code(mode='exact')
         assert f"set_draw_style('{mode}'" in code
         exec(code, {"fig": replay})
         assert source.get_settings() == replay.get_settings()
@@ -86,7 +86,7 @@ def test_background_is_validated_replayed_and_reset(backend):
         source.axes[0].plot([0, 1], [0, 1])
         replay.axes[0].plot([0, 1], [0, 1])
         source.set_facecolor("#0b0f17")
-        exec(source.to_code(), {"fig": replay})
+        exec(source.to_code(mode='exact'), {"fig": replay})
         assert source.get_settings() == replay.get_settings()
         if backend == "native":
             np.testing.assert_array_equal(source.render_rgba(), replay.render_rgba())

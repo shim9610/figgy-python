@@ -1,0 +1,151 @@
+{
+  "baseline_commit": "d3ec3dc785fdecc7eb3c69fab7bd8f71e3f3bafd",
+  "scope": "Python wrapper edits: ticks, shared color scales, series ownership, snapshot transactions, linked-axis traversal and grid placement",
+  "changes": [
+    "Plot/overlay/colorbar ticks use one node translator; ordinary edits no longer construct a code-generation Figure.",
+    "Tick arguments are converted once per operation and mutable colors remain independent between axes.",
+    "Colorbar text layout runs before the one snapshot commit, without a nested batch and second edit.",
+    "Constructors, resident color bindings and artist/scale edits share complete-domain validation and label fitting; palette-only updates skip geometry fitting.",
+    "Panel ownership resolution is shared by Figure.update, colorbar lookup and marker/vector color binding; no snapshot-per-axis search.",
+    "One detached copy is retained at apply_settings boundaries; redundant reset/staging copies and duplicate reads are removed while isolation and nested rollback remain.",
+    "Linked groups use linear membership traversal; grid weight sums and panel lookup are computed once per placement.",
+    "Numeric argument validation no longer depends on the plotting-object module.",
+    "Colorbar grid options now raise before committing instead of silently discarding the request."
+  ],
+  "validation": {
+    "new_regression_cases": 29,
+    "installed_wheel_targeted_passed": 839,
+    "preflight_passed": 135,
+    "frozen_baseline_negative_control": {
+      "failed_as_expected": 23,
+      "preservation_cases_passed": 6
+    },
+    "wheel_python_files": 37,
+    "wheel_source_mismatches": [],
+    "commands": [
+      "python -m pytest -q tests/test_wrapper_edit_paths.py tests/test_matplotlib_api.py tests/test_round3_api_regressions.py tests/test_public_appearance.py tests/test_renderer_018_features.py tests/test_compact_codegen.py tests/test_styles.py tests/test_style_inheritance.py tests/test_invalid_state.py tests/test_linked_axis_edits.py",
+      "bash scripts/ci-preflight.sh"
+    ],
+    "actual_native_and_jupyter_cases_passed": 10
+  },
+  "benchmark": {
+    "command": "python scripts/benchmark_wrapper_edits.py",
+    "script_sha256": "b5238446756409d4b0916bdf50b49509ef292cfa61eae11790eb9dafea48bb33",
+    "method": "Same script and CPU notebook backend, nine warmed samples (three for linked groups); allocation peaks and operation counts measured separately. 25-panel edits and synthetic 100/1000-element layout/group inputs.",
+    "limitations": "Diagnostic wall-clock measurements, not FPS or physical-GPU performance. Concurrent local UI checks can affect timings. Linear membership lookup uses extra temporary memory, shown in the allocation peaks. No thresholds were relaxed.",
+    "before": {
+      "colorbar_ticks_25_panels": {
+        "median_ms": 37.40328699495876,
+        "peak_python_bytes": 2624639,
+        "snapshots": 2,
+        "full_document_deepcopies": 2,
+        "temporary_figures": 1
+      },
+      "colorbar_label_25_panels": {
+        "median_ms": 71.47265700041316,
+        "peak_python_bytes": 2450576,
+        "snapshots": 6,
+        "full_document_deepcopies": 9,
+        "temporary_figures": 0
+      },
+      "colorbar_lookup_25_panels": {
+        "median_ms": 80.60446199669968,
+        "peak_python_bytes": 2453747,
+        "snapshots": 30,
+        "full_document_deepcopies": 5,
+        "temporary_figures": 0
+      },
+      "mapped_artist_update_25_panels": {
+        "median_ms": 19.979158998467028,
+        "peak_python_bytes": 2095869,
+        "snapshots": 3,
+        "full_document_deepcopies": 1,
+        "temporary_figures": 0
+      },
+      "batch_snapshot_25_panels": {
+        "median_ms": 32.472538005094975,
+        "peak_python_bytes": 1912702,
+        "snapshots": 3,
+        "full_document_deepcopies": 4,
+        "temporary_figures": 0
+      },
+      "linked_chain_100": {
+        "median_ms": 2.094479998049792,
+        "peak_python_bytes": 10576
+      },
+      "linked_chain_1000": {
+        "median_ms": 205.04405999963637,
+        "peak_python_bytes": 41324
+      },
+      "grid_place_100": {
+        "median_ms": 0.43729799654101953,
+        "peak_python_bytes": 15272
+      },
+      "grid_place_1000": {
+        "median_ms": 29.864856995118316,
+        "peak_python_bytes": 202000
+      }
+    },
+    "after": {
+      "colorbar_ticks_25_panels": {
+        "median_ms": 26.3473370068823,
+        "peak_python_bytes": 2071359,
+        "snapshots": 2,
+        "full_document_deepcopies": 1,
+        "temporary_figures": 0
+      },
+      "colorbar_label_25_panels": {
+        "median_ms": 23.439022006641608,
+        "peak_python_bytes": 2073064,
+        "snapshots": 2,
+        "full_document_deepcopies": 1,
+        "temporary_figures": 0
+      },
+      "colorbar_lookup_25_panels": {
+        "median_ms": 32.636536001518834,
+        "peak_python_bytes": 2445347,
+        "snapshots": 4,
+        "full_document_deepcopies": 4,
+        "temporary_figures": 0
+      },
+      "mapped_artist_update_25_panels": {
+        "median_ms": 21.002118002797943,
+        "peak_python_bytes": 2071227,
+        "snapshots": 2,
+        "full_document_deepcopies": 1,
+        "temporary_figures": 0
+      },
+      "batch_snapshot_25_panels": {
+        "median_ms": 27.743155995267443,
+        "peak_python_bytes": 1917606,
+        "snapshots": 3,
+        "full_document_deepcopies": 3,
+        "temporary_figures": 0
+      },
+      "linked_chain_100": {
+        "median_ms": 0.05948000034550205,
+        "peak_python_bytes": 27560
+      },
+      "linked_chain_1000": {
+        "median_ms": 0.5637880021822639,
+        "peak_python_bytes": 213500
+      },
+      "grid_place_100": {
+        "median_ms": 0.2006619979511015,
+        "peak_python_bytes": 18488
+      },
+      "grid_place_1000": {
+        "median_ms": 2.0814099989365786,
+        "peak_python_bytes": 227860
+      }
+    }
+  },
+  "regression_guards": [
+    "Complete snapshots on failed edits and nested rollback",
+    "Direct expected tick lengths/colors and unchanged other panels",
+    "Same scale owner in subplots and overlays",
+    "One measurement of complete color domain; none on palette-only change",
+    "Snapshot read count independent of panel count",
+    "Linear member/weight/panel visits rather than timing thresholds"
+  ]
+}

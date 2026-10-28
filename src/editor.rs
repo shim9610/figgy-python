@@ -1,5 +1,6 @@
 //! Native editing controls. Chart validation/rendering remain renderer APIs.
 use super::*;
+mod review;
 use egui::{Color32, RichText, Stroke};
 
 pub const INSPECTOR_WIDTH: f32 = 320.;
@@ -7,6 +8,17 @@ pub const INSPECTOR_WIDTH: f32 = 320.;
 pub(crate) struct Editor {
     pub(crate) review: Option<Arc<Mutex<Value>>>,
     pub inspector_open: bool,
+    pub inspector_width: f32,
+    review_font: String,
+    review_context: review::Context,
+    pub(super) property_cache: Option<(
+        String,
+        renderer::LayerRef,
+        Option<String>,
+        u64,
+        crate::property_catalog::Object,
+    )>,
+    pub(crate) property_builds: u64,
     pub selection_hint: String,
     pub panel_focused: bool,
     pub(super) drawing: crate::drawing::Drawing,
@@ -17,6 +29,7 @@ pub(crate) struct Editor {
     pub advanced_requested: bool,
     pub picked: Option<Value>,
     pub(super) navigator: navigation::Navigator,
+    navigation_cache: Option<(u64, Vec<navigation::Node>)>,
     save_path: String,
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
@@ -36,6 +49,11 @@ impl Default for Editor {
         Self {
             review: None,
             inspector_open: false,
+            inspector_width: INSPECTOR_WIDTH,
+            review_font: String::new(),
+            review_context: Default::default(),
+            property_cache: None,
+            property_builds: 0,
             selection_hint: String::new(),
             panel_focused: true,
             drawing: Default::default(),
@@ -46,6 +64,7 @@ impl Default for Editor {
             advanced_requested: false,
             picked: None,
             navigator: navigation::Navigator::default(),
+            navigation_cache: None,
             save_path: "figure.png".into(),
             raw: String::new(),
             text_ranges: HashMap::new(),
@@ -71,17 +90,40 @@ impl Editor {
         if state.is_null() {
             return;
         }
+        let family = state["font_family"].as_str().unwrap_or("");
+        if !family.is_empty() && family != self.review_font {
+            match crate::ui_fonts::install_review(root.ctx(), family) {
+                Ok(()) => self.review_font = family.into(),
+                Err(e) => self.error = e,
+            }
+            root.ctx().request_repaint();
+            return;
+        }
+        let font = egui::FontId::new(
+            state["font_size"].as_f64().unwrap_or(14.) as f32,
+            if self.review_font.is_empty() {
+                egui::FontFamily::Proportional
+            } else {
+                egui::FontFamily::Name("figgy-review".into())
+            },
+        );
         let pending = !state["request"].is_null();
+        let mut attachments = state["attachments"].as_array().cloned().unwrap_or_default();
         let mut comments = state["comments"].as_str().unwrap_or("").to_owned();
         egui::Panel::bottom("review_comments")
-            .exact_size(148.)
+            .exact_size(if attachments.is_empty(){180.}else{262.})
             .frame(
                 egui::Frame::NONE
                     .fill(Color32::from_rgb(245, 248, 252))
                     .inner_margin(12),
             )
             .show(root, |ui| {
-                ui.label(RichText::new("Review comments").strong());
+                ui.horizontal(|ui|{
+                    ui.label(RichText::new("Review comments").strong());
+                    let button=ui.button(format!("Element comments ({})",state["target_comments"].as_array().map_or(0,Vec::len)));
+                    self.controls.insert("review_target_list".into(),button.rect);
+                    if button.clicked(){self.review_context.list=true;}
+                });
                 ui.add_enabled_ui(!pending, |ui| {
                     let input = egui::ScrollArea::vertical()
                         .id_salt("review_comment_scroll")
@@ -90,7 +132,7 @@ impl Editor {
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             ui.add(
-                                egui::TextEdit::multiline(&mut comments)
+                                egui::TextEdit::multiline(&mut comments).font(font.clone())
                                     .desired_width(f32::INFINITY)
                                     .desired_rows(2)
                                     .hint_text("Describe changes for the next version…"),
@@ -100,17 +142,20 @@ impl Editor {
                         "review_comments".into(),
                         input.inner.rect.intersect(input.inner_rect),
                     );
+                    self.review_context.general_focused=input.inner.has_focus();
+                    self.review_context.images.editor(ui,&mut attachments,state["cache_dir"].as_str().unwrap_or(""),"review",&mut self.controls);
                     ui.horizontal(|ui| {
-                        for (key, label, disposition) in [
-                            ("review_changes", "Request changes", "request_changes"),
-                            ("review_accept", "Accept", "accept"),
+                        for (key, label, disposition, intent) in [
+                            ("review_changes", "Request changes", "request_changes", "revise"),
+                            ("review_accept", "Accept", "accept", "revise"),
+                            ("review_finish", "Save and finish", "accept", "finish"),
                         ] {
                             let button = ui.button(label);
                             self.controls.insert(key.into(), button.rect);
                             if button.clicked() {
                                 c.end_edit();
-                                state["request"] = json!({"disposition":disposition,
-                                    "comments":comments,"revision":c.data.revision,"finalized":false});
+                                state["request"] = json!({"disposition":disposition,"intent":intent,
+                                    "comments":comments,"attachments":attachments,"target_comments":state["target_comments"],"revision":c.data.revision,"finalized":false});
                                 state["error"] = json!("");
                             }
                         }
@@ -127,6 +172,7 @@ impl Editor {
                 });
             });
         state["comments"] = json!(comments);
+        state["attachments"] = json!(attachments);
     }
 
     pub(crate) fn finalize_review(&self, revision: u64) {
@@ -548,7 +594,7 @@ impl Editor {
                                     .map_err(runtime)?;
                                 Python::attach(|py| {
                                     py.import("figgyplot._codegen")?
-                                        .getattr("settings_to_code")?
+                                        .getattr("editor_settings_to_code")?
                                         .call1((settings, defaults, c.data.code_dpi))?
                                         .extract::<String>()
                                 })
@@ -585,7 +631,9 @@ impl Editor {
                 .inner_margin(egui::Margin::symmetric(18, 3)))
             .show(root, |ui| {
                 let help = ui.label(RichText::new(
-                    "Ctrl + wheel: Zoom X  ·  Shift + wheel: Zoom Y  ·  Wheel: Zoom XY  ·  Drag plot: Pan  ·  Click: Edit")
+                    if interaction::panel(c.data.chart.config(),interaction::panel_index(c.data.chart.config().active_layer())).polar.is_some() {
+                        "Polar coordinates · Wheel zoom disabled · Set ranges in Properties · Click: Edit"
+                    } else {"Ctrl + wheel: Zoom X  ·  Shift + wheel: Zoom Y  ·  Wheel: Zoom XY  ·  Drag plot: Pan  ·  Click: Edit"})
                     .size(12.).color(Color32::from_rgb(105, 116, 131)));
                 self.controls.insert("navigation_help".into(), help.rect);
             });
@@ -623,14 +671,26 @@ impl Editor {
                 // Menus use Foreground. Keep the panel below them so reopening
                 // a menu cannot let its parent panel intercept the item click.
                 .order(egui::Order::Middle)
-                .fixed_pos(egui::pos2(area.right() - INSPECTOR_WIDTH, area.top()))
+                .fixed_pos(egui::pos2(area.right() - self.inspector_width, area.top()))
                 .movable(false)
                 .show(root.ctx(), |ui| {
+                    let left =
+                        egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(7., area.height()));
+                    let resize = ui
+                        .interact(left, egui::Id::new("inspector_resize"), egui::Sense::drag())
+                        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+                    self.controls.insert("inspector_resize".into(), resize.rect);
+                    if resize.dragged() {
+                        self.inspector_width = (self.inspector_width
+                            - ui.input(|i| i.pointer.delta().x))
+                        .clamp(280., 640.);
+                    }
                     egui::Frame::NONE
                         .fill(Color32::from_rgb(248, 249, 251))
                         .inner_margin(18)
                         .show(ui, |ui| {
-                            ui.set_width(INSPECTOR_WIDTH - 36.);
+                            ui.set_width(self.inspector_width - 36.);
+                            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                             ui.set_height((area.height() - 36.).max(100.));
                             self.inspector(ui, c, selected);
                         });
@@ -659,10 +719,20 @@ impl Editor {
                 }
             });
         });
-        let nodes = navigation::nodes(&c.snapshot());
+        self.navigator.review_enabled = self.review_enabled();
+        if self
+            .navigation_cache
+            .as_ref()
+            .is_none_or(|(revision, _)| *revision != c.data.revision)
+        {
+            let started = c.data.host_work.start();
+            self.navigation_cache = Some((c.data.revision, navigation::nodes(&c.snapshot())));
+            c.data.host_work.finish("native_navigation", started);
+        }
+        let nodes = &self.navigation_cache.as_ref().unwrap().1;
         if let Some(node) = self.navigator.show(
             ui,
-            &nodes,
+            nodes,
             c.data.chart.config().active_layer(),
             selected.as_deref(),
             &mut self.controls,
@@ -678,6 +748,7 @@ impl Editor {
             *selected = node.target;
             self.picked = None;
         }
+        self.take_tree_review_target();
         ui.add_space(6.);
         let context = format!("{:?}/{:?}", c.data.chart.config().active_layer(), selected);
         let context_changed = context != self.inspector_context;
@@ -1126,16 +1197,19 @@ impl Editor {
     }
 
     fn properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
-        let snapshot = c.snapshot();
-        let object = crate::property_catalog::selected(
-            &snapshot,
-            target,
-            c.data.chart.config().active_layer(),
-            self.inspector_owner.as_deref(),
-        );
+        if target.starts_with("annotation:") && c.data.document.is_none() {
+            // The basic form may accept a text edit. Describe its resulting
+            // revision once, rather than building the full catalog on both
+            // sides of each keystroke.
+            self.basic_properties(ui, c, target);
+            self.catalog_properties(ui, c, target, false);
+            return;
+        }
+        let object = self.inspector_object(ui, c, target);
         let primary = object.as_ref().is_some_and(|v| {
             v.id.starts_with("series/")
                 || v.id.starts_with("figure/")
+                || target.ends_with("data_area")
                 || target
                     .rsplit(':')
                     .next()
@@ -1150,21 +1224,30 @@ impl Editor {
         self.catalog_properties(ui, c, target, false);
     }
     fn basic_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>, target: &str) {
-        let mut state = serde_json::to_value(c.snapshot()).unwrap();
         if let Some(id) = target.strip_prefix("annotation:") {
-            if let Some(item) = state["config"]["annotations"]["items"]
-                .as_array_mut()
-                .and_then(|items| items.iter_mut().find(|v| v["id"] == id))
+            if let Some(index) = c
+                .data
+                .chart
+                .config()
+                .annotations
+                .items
+                .iter()
+                .position(|v| v.id == id)
             {
-                let changed = self.annotation_properties(ui, item);
-                if self.delete_annotation {
-                    state["config"]["annotations"]["items"]
-                        .as_array_mut()
-                        .unwrap()
-                        .retain(|v| v["id"] != id);
-                }
+                let mut item =
+                    serde_json::to_value(&c.data.chart.config().annotations.items[index]).unwrap();
+                let changed = self.annotation_properties(ui, &mut item);
                 if changed || self.delete_annotation {
-                    match c.apply_settings(&state.to_string()) {
+                    let result = (|| {
+                        let mut config = c.data.chart.config().clone();
+                        if self.delete_annotation {
+                            config.annotations.items.remove(index);
+                        } else {
+                            config.annotations.items[index] = parse(&item.to_string())?;
+                        }
+                        c.commit_config(config)
+                    })();
+                    match result {
                         Ok(_) => self.error.clear(),
                         Err(error) => self.error = error.to_string(),
                     }
@@ -1172,6 +1255,7 @@ impl Editor {
             }
             return;
         }
+        let mut state = serde_json::to_value(c.snapshot()).unwrap();
         let scoped_path = match c.data.chart.config().active_layer() {
             renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
                 format!("/config/subplots/{i}/config")
@@ -1577,10 +1661,9 @@ fn text_field(
         return false;
     };
     ui.label(label);
-    let response = ui.add(
-        egui::TextEdit::singleline(&mut value)
-            .hint_text(hint)
-            .desired_width(f32::INFINITY),
+    let response = ui.add_sized(
+        [ui.available_width(), ui.spacing().interact_size.y],
+        egui::TextEdit::singleline(&mut value).hint_text(hint),
     );
     controls.insert(key.into(), response.rect);
     if response.changed() {

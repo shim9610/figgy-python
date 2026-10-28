@@ -1,4 +1,4 @@
-"""Native review controller; an external agent polls the printed cache path."""
+"""Native review controller; an external agent subscribes to the printed cache path."""
 import argparse
 from pathlib import Path
 
@@ -19,12 +19,13 @@ def build(session):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cache',help='Resume an existing session cache')
+    parser.add_argument('--review-font',help='Installed family supporting the reviewer language, e.g. Noto Sans CJK KR')
     args=parser.parse_args()
-    session=Session.open(args.cache) if args.cache else Session(source={'entrypoint':str(Path(__file__).resolve())})
+    session=Session.open(args.cache) if args.cache else Session(source={'entrypoint':str(Path(__file__).resolve())},review_font=args.review_font)
     with session:
         if not args.cache:build(session)
         print('Review cache:',session.cache_dir,flush=True)
-        print('Agent command: python -m figgyplot.review events '+str(session.cache_dir),flush=True)
+        print('Agent command: python -m figgyplot.review subscribe '+str(session.cache_dir)+' --timeout 50',flush=True)
         session.present();session.run_events(on_status=lambda status:print(status,flush=True))
 
 
