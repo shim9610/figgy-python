@@ -22,7 +22,7 @@ from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 _NAMED = dict(CSS4_COLORS, b="#0000ff", r="#ff0000", g="#008000", k="#000000", w="#ffffff")
-_MARKERS = {"o": "CircleFilled", "s": "SquareFilled", "^": "TriangleFilled", "v": "TriangleDownFilled", "D": "DiamondFilled", "+": "Plus", "x": "Cross", "*": "StarFilled"}
+_MARKERS = {"o": "CircleFilled", "s": "SquareFilled", "^": "TriangleFilled", "v": "TriangleDownFilled", "D": "DiamondFilled", "+": "Plus", "x": "Cross", "*": "StarFilled", "<": "TriangleLeftFilled", ">": "TriangleRightFilled", "p": "PentagonFilled", "h": "HexagonFilled", "8": "OctagonFilled", "P": "PlusFilled", "X": "CrossFilled"}
 _LINES = {"-": "Solid", "--": "Dash", ":": "Dot", "-.": "DashDot"}
 _LEGEND_LOCATIONS = {'upper left': 'TopLeft', 'upper right': 'TopRight',
                      'lower left': 'BottomLeft', 'lower right': 'BottomRight'}
@@ -95,9 +95,14 @@ def _warn_external(message, category):
 _ALIGN = {"left": "Left", "center": "Center", "right": "Right"}
 
 
-def _segments(text):
+def _segments(text, *, dpi=120):
     # The renderer's own plain-text segments, including its mapping of
     # Unicode superscript/subscript characters (e.g. "10⁻³") to styled ones.
+    from ._richtext import TextRun
+    if isinstance(text, TextRun):
+        return text._segments(dpi)
+    if isinstance(text, (list, tuple)) and any(isinstance(s, TextRun) for s in text):
+        return [part for run in text for part in _segments(run, dpi=dpi)]
     if isinstance(text,list):
         if not all(isinstance(s,dict) and isinstance(s.get('text'),str) for s in text):
             raise ValueError('rich text must contain text segment mappings')
@@ -177,8 +182,11 @@ class RadialArtist:
         self.figure = figure
 
     def set_style(self, **properties):
-        self.figure.set_radial_style(**properties)
+        self.figure.axes[0].chart.set_style(**properties)
         return self
+
+    def get_style(self):
+        return self.figure.axes[0].chart.get_style()
 
     def set_slice(self, index, **properties):
         if "color" in properties:
@@ -623,7 +631,7 @@ class Figure(FigureMethods):
                 title = _chart_text.title_options(chart)
                 for key, value in properties.items():
                     if key == 'text':
-                        _chart_text.set_title_text(chart, value)
+                        _chart_text.set_title_text(chart, segments=_segments(value, dpi=self.dpi))
                     elif key == 'fontsize': title['text']['font_size'] = float(value)*self.dpi/72
                     elif key == 'font': title['text']['font'] = self._check_font(value)
                     elif key == 'color': title['text']['color'] = _color(value)
@@ -681,14 +689,11 @@ class Figure(FigureMethods):
                         style["line"]["line_style"] = _LINES.get(value, value)
                     elif key == "label":
                         label = copy.deepcopy(cfg["legend"]["content"])
-                        label["segments"] = _segments(value)
+                        label["segments"] = _segments(value, dpi=self.dpi)
                         series["label"] = label
                     elif key in ("cmap", "vmin", "vmax") and ('matrix' in style or style.get('scatter', {}).get('point_color_map') or style.get('style', {}).get('color_map')):
-                        bar = cfg["colorbar"]
-                        if key == "cmap":
-                            bar["colormap"] = _colormap(value)
-                        else:
-                            bar["axis"]["min" if key == "vmin" else "max"] = float(value)
+                        from ._features import update_color_scale
+                        update_color_scale(cfg, **{key:value})
                     else:
                         raise ValueError(f"unsupported series property: {key}")
             else:
@@ -711,7 +716,7 @@ class Figure(FigureMethods):
                     _document.set_tick_mode(state,_axes.subplot_id if _axes else state['identity']['panels'][0]['id'],_axes.overlay_id if _axes else None,_axis_key(target[len('axis_'):]),False,spacing=properties['major_spacing'])
                 for key, value in properties.items():
                     if key == "text" and rich is not None:
-                        rich["segments"] = _segments(value)
+                        rich["segments"] = _segments(value, dpi=self.dpi)
                     elif key == "align" and rich is not None:
                         if not isinstance(value, str) or value.lower() not in _ALIGN:
                             raise ValueError("align must be 'left', 'center' or 'right'")
@@ -1492,7 +1497,7 @@ class Axes(AxesMethods, FeatureMethods, ChartMethods):
             spec = {"series_id": sid, "label": None, "x_column": names[0], "y_column": names[1], "render_type": render_type}
             if label is not None:
                 rich = copy.deepcopy(fig.get_settings()["config"]["legend"]["content"])
-                rich["segments"] = _segments(label)
+                rich["segments"] = _segments(label, dpi=fig.dpi)
                 spec["label"] = rich
             spec,document=_style_runtime.series(fig,document,spec,self.subplot_id)
             try:
@@ -1530,7 +1535,7 @@ class Axes(AxesMethods, FeatureMethods, ChartMethods):
             rich = None
             if label is not None:
                 rich = copy.deepcopy(self._config(state)['legend']['content'])
-                rich['segments'] = _segments(label)
+                rich['segments'] = _segments(label, dpi=fig.dpi)
             specs = [dict(series_id=sid+'/lower', label=None, x_column=names[0], y_column=names[1],
                           render_type={'Line': dict(line=lower_style)}),
                      dict(series_id=sid, label=rich, x_column=names[0], y_column=names[2],

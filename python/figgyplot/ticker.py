@@ -60,7 +60,86 @@ class SignificantFormatter:
             "plain",
             "scientific",
             "power",
+            "degrees",
+            "radians",
         ):
             raise ValueError(
-                "precision must be 1..15; style plain, scientific or power"
+                "precision must be 1..15; style plain, scientific, power, degrees or radians"
             )
+
+    def _format(self):
+        return dict(
+            plain="Decimal",
+            scientific="Scientific",
+            power="Power",
+            degrees="Degrees",
+            radians="Radians",
+        )[self.style]
+
+
+class TimestampFormatter(SignificantFormatter):
+    """Unix timestamp labels without changing source values or axis limits.
+
+    Units are s/ms/us/ns; timezone is a fixed UTC offset in minutes. Pattern
+    supports %Y %m %d %H %M %S %f and %%. None uses calendar-aware labels.
+    """
+
+    def __init__(
+        self,
+        pattern=None,
+        *,
+        unit="s",
+        timezone=0,
+        fractional_digits=None,
+        calendar=True,
+        precision=3,
+    ):
+        super().__init__(precision)
+        if unit not in ("s", "ms", "us", "ns"):
+            raise ValueError("timestamp unit must be s, ms, us or ns")
+        if (
+            not isinstance(timezone, (int, np.integer))
+            or not -(2**31) <= timezone < 2**31
+        ):
+            raise ValueError("timezone must be a signed integer UTC offset in minutes")
+        if fractional_digits is not None and (
+            not isinstance(fractional_digits, (int, np.integer))
+            or not 0 <= fractional_digits <= 9
+        ):
+            raise ValueError("fractional_digits must be None or an integer from 0 to 9")
+        if pattern is not None:
+            if not isinstance(pattern, str):
+                raise TypeError("timestamp pattern must be a string")
+            import re
+
+            if any(
+                not token or token not in "YmdHMSf%"
+                for token in re.findall(r"%(.)?", pattern)
+            ):
+                raise ValueError(
+                    "supported timestamp patterns are %Y %m %d %H %M %S %f and %%"
+                )
+        if not isinstance(calendar, bool):
+            raise TypeError("calendar must be bool")
+        self.pattern, self.unit, self.timezone = pattern, unit, int(timezone)
+        self.fractional_digits, self.calendar = fractional_digits, bool(calendar)
+
+    def _format(self):
+        return {
+            "Timestamp": dict(
+                unit={
+                    "s": "Seconds",
+                    "ms": "Milliseconds",
+                    "us": "Microseconds",
+                    "ns": "Nanoseconds",
+                }[self.unit],
+                timezone="Utc"
+                if self.timezone == 0
+                else {"FixedOffsetMinutes": self.timezone},
+                label="Auto" if self.pattern is None else {"Pattern": self.pattern},
+                fractional="Auto"
+                if self.fractional_digits is None
+                else {"Fixed": self.fractional_digits},
+                tick_policy="AutoCalendar" if self.calendar else "NumericSpacing",
+            )
+        }

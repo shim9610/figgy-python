@@ -24,6 +24,28 @@ Bounded charts expose named `ax.chart` controls for shared labels, materials,
 series colors and category names. Check the installed supported API before
 assuming that every Matplotlib option exists.
 
+Use the scoped appearance objects for the rest of the supported renderer surface:
+`artist.markers`/`.errors`/`.bins` for per-element edits and typed palettes,
+`.vectors` for arrow scaling/color mapping, `.contours` for levels and labels,
+`artist.set_field_fill(...)` and `.set_grid(...)` for scalar fields,
+`artist.legend_label` for one legend entry, `ax.legend_handle.content` for custom
+rich keys, `ax.get_overlay(id)` for an existing secondary Y layer, and
+`ax.get_colorbar()` for scale placement/formatting. `fig.data.column(name)` and
+`fig.data.grid(...)` reference resident data without reuploading. Use
+`MarkerStyle`, `ErrorBarStyle`, `BinStyle`, `ContourLabel` and `TextRun` rather
+than serialized renderer variants. Mapped/explicit point-color precedence is
+intentional: a final point override stays fixed while the colormap changes.
+
+Bounded charts expose `chart.get_style()`/`set_style`, `series(id)`,
+`cell(category_id, series_id)`, `slice(index, detail=True)` for split children,
+`get_series()`/`get_categories()` for stable ID discovery,
+`set_value_labels`, `decoration(name, ...).set_offset(...)` and `set_plot_bounds`.
+Annotation handles expose `set_style`, `set_bbox`, `set_endpoints`, `set_label`,
+`set_value` and `set_bounds` as appropriate. Prefer these controls to raw
+`configure` trees. The source recipe requires matching IDs, registered columns,
+panel ownership, DPI and bounded data topology; it preserves scientific arrays.
+Exact recovery remains the full SSOT oracle, including editor/identity records.
+
 For scalar coloring, keep the numeric values connected with `scatter(c=values,
 cmap=...)`, `imshow`, or the corresponding mapped constructor, and edit the
 returned mappable with `set_cmap`/`set_clim`. Do not precompute point-color

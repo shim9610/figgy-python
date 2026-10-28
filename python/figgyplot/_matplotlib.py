@@ -240,9 +240,11 @@ class Text:
                 if family(state):
                     from ._chart_text import set_title_text
 
-                    set_title_text(state[family(state)], value)
+                    set_title_text(
+                        state[family(state)], segments=_segments(value, dpi=fig.dpi)
+                    )
                 else:
-                    rich["segments"] = _segments(value)
+                    rich["segments"] = _segments(value, dpi=fig.dpi)
             elif key in ("fontweight", "fontstyle"):
                 if key == "fontweight":
                     if value not in ("normal", "bold", 400, 700):
@@ -331,6 +333,38 @@ class Text:
             raise ValueError("title band height must be nonnegative")
         node["top_margin"] = value
         fig.apply_settings(state)
+
+
+class ArtistLabel(Text):
+    """Typography of one legend entry, addressed by its artist's stable ID."""
+
+    def __init__(self, artist):
+        self.artist, self.axes, self.role = (
+            artist,
+            artist.figure.axes[0],
+            "legend_label",
+        )
+
+    def _node(self, state):
+        label = self.artist._spec(state).get("label")
+        if label is None:
+            raise AttributeError("set the artist label before editing its typography")
+        return {"text": label, "visible": True}
+
+    def set(self, **properties):
+        if "visible" in properties:
+            raise NotImplementedError(
+                "use artist.set_label(None) to remove a legend entry"
+            )
+        return super().set(**properties)
+
+    def set_offset(self, *args):
+        raise NotImplementedError("individual legend-entry offsets are not supported")
+
+    def set_layout_height(self, *args):
+        raise NotImplementedError(
+            "individual legend-entry layout bands are not supported"
+        )
 
 
 class Spine:
@@ -430,6 +464,10 @@ class Axis:
                 self.side, "xlabel" if self.dimension == "x" else "ylabel"
             ),
         )
+
+    @property
+    def line(self):
+        return AxisLine(self)
 
     def set_label_text(self, label, **kwargs):
         self.label.set(text=label, **kwargs)
@@ -601,8 +639,46 @@ class Axis:
             node["minor_count"] = locator.n - 1
         fig.apply_settings(state)
 
+    def set_inverted(self, inverted):
+        state = self.axes.figure.get_settings()
+        for node in self._nodes(state):
+            node["inverted"] = bool(inverted)
+        self.axes.figure.apply_settings(state)
+
+    def get_inverted(self):
+        return self._nodes(self.axes.figure.get_settings())[0]["inverted"]
+
+    def set_ticklabels_enabled(self, enabled):
+        """Enable the renderer's numeric-label style independently of side visibility."""
+        state = self.axes.figure.get_settings()
+        for node in self._nodes(state):
+            node["label_style"]["visible"] = bool(enabled)
+        self.axes.figure.apply_settings(state)
+
+    def set_scale(self, value):
+        """Set this axis scale, preserving independent boundaries and formatting."""
+        if value not in ("linear", "log"):
+            raise ValueError("scale must be linear or log")
+        fig = self.axes.figure
+        state = fig.get_settings()
+        nodes = self._nodes(state)
+        if value == "log" and any(node["min"] <= 0 for node in nodes):
+            raise ValueError(
+                "set positive view limits before choosing a logarithmic boundary"
+            )
+        for node in nodes:
+            node["scale"] = "Logarithmic" if value == "log" else "Linear"
+        fig.apply_settings(state)
+
+    def get_scale(self):
+        return (
+            "log"
+            if self._nodes(self.axes.figure.get_settings())[0]["scale"] == "Logarithmic"
+            else "linear"
+        )
+
     def set_major_formatter(self, formatter):
-        from .ticker import SignificantFormatter
+        from .ticker import SignificantFormatter, TimestampFormatter
 
         if not isinstance(formatter, SignificantFormatter):
             raise NotImplementedError(
@@ -612,14 +688,28 @@ class Axis:
         state = fig.get_settings()
         for node in self._nodes(state):
             node["label_style"].update(
-                format={
+                format=formatter._format()
+                if isinstance(formatter, TimestampFormatter)
+                else {
                     "plain": "Decimal",
                     "scientific": "Scientific",
                     "power": "Power",
+                    "degrees": "Degrees",
+                    "radians": "Radians",
                 }[formatter.style],
                 significant_digits=formatter.precision,
             )
         fig.apply_settings(state)
+
+
+class AxisLine(Spine):
+    """The selected boundary's line and tick stroke."""
+
+    def __init__(self, axis):
+        self.axis, self.axes = axis, axis.axes
+
+    def _node(self, state):
+        return self.axis._nodes(state)[0]
 
 
 class LegendFrame:
@@ -686,6 +776,19 @@ class Legend:
             return owner["legend"]
         return self.axes._config(state)["legend"]
 
+    def get_texts(self):
+        state = self.axes.figure.get_settings()
+        return [
+            ArtistLabel(self.axes.figure.artist(spec["series_id"]))
+            for spec in self.axes._owned_series(state)
+            if spec.get("label") is not None
+        ]
+
+    @property
+    def content(self):
+        """The complete rich legend text, including deliberate custom keys."""
+        return LegendText(self)
+
     def get_frame(self):
         return LegendFrame(self)
 
@@ -735,7 +838,50 @@ class Legend:
         fig.apply_settings(state)
 
 
+class LegendText(Text):
+    def __init__(self, legend):
+        self.legend = legend
+        super().__init__(legend.axes, "legend")
+
+    def _node(self, state):
+        node = self.legend._node(state)
+        return dict(text=node["content"], visible=node["visible"])
+
+    def set(self, **properties):
+        visible = properties.pop("visible", None)
+        with self.axes.figure.batch_update():
+            if visible is not None:
+                self.legend.set_visible(visible)
+            if properties:
+                super().set(**properties)
+        return self
+
+
 class ArtistMethods:
+    def set_fillstyle(self, value):
+        """Set marker fill to full/none without changing the marker's symbol."""
+        from ._markers import decode_marker, encode_marker
+
+        state = self.figure.get_settings()
+        node = self._body(state).get("scatter")
+        if node is None:
+            raise AttributeError("this artist has no markers")
+        marker, _ = decode_marker(node["point_shape"])
+        node["point_shape"] = encode_marker(marker, value)
+        self.figure.apply_settings(state)
+        return self
+
+    @property
+    def contours(self):
+        from ._field_api import ContourAppearance
+
+        return ContourAppearance(self)
+
+    def set_grid(self, source):
+        from ._field_api import set_grid
+
+        return set_grid(self, source)
+
     def _spec(self, state):
         try:
             return next(s for s in state["series"] if s["series_id"] == self.id)
@@ -744,6 +890,88 @@ class ArtistMethods:
 
     def _body(self, state):
         return next(iter(self._spec(state)["render_type"].values()))
+
+    @property
+    def data(self):
+        from ._artist_appearance import ArtistData
+
+        return ArtistData(self)
+
+    @property
+    def vectors(self):
+        from ._artist_appearance import VectorAppearance
+
+        return VectorAppearance(self)
+
+    @property
+    def markers(self):
+        from ._artist_appearance import ElementAppearance
+
+        return ElementAppearance(self, "markers")
+
+    @property
+    def errors(self):
+        from ._artist_appearance import ElementAppearance
+
+        return ElementAppearance(self, "errors")
+
+    @property
+    def bins(self):
+        from ._artist_appearance import ElementAppearance
+
+        return ElementAppearance(self, "bins")
+
+    @property
+    def legend_label(self):
+        return ArtistLabel(self)
+
+    def set_fill(self, target=None, *, color=...):
+        """Fill to a data baseline or another resident line's stable ID."""
+        from .figure import _color
+
+        state = self.figure.get_settings()
+        line = self._body(state).get("line")
+        if line is None:
+            raise AttributeError("this artist has no line fill")
+        if target is None:
+            line.pop("fill", None)
+        elif isinstance(target, str):
+            line["fill"] = {"ToSeries": target}
+        elif hasattr(target, "id"):
+            if target.figure is not self.figure:
+                raise ValueError("fill target belongs to another Figure")
+            line["fill"] = {"ToSeries": target.id}
+        else:
+            line["fill"] = {"ToBaseline": _number(target, "fill baseline")}
+        if color is not ...:
+            if color is None:
+                line.pop("fill_color", None)
+            else:
+                line["fill_color"] = _color(color)
+        self.figure.apply_settings(state)
+        return self
+
+    def set_field_fill(self, *, mode="continuous", shading="flat", alpha=1.0):
+        """Set heatmap/filled-contour painting without changing matrix bindings."""
+        if mode not in ("continuous", "bands") or shading not in (
+            "flat",
+            "interpolated",
+        ):
+            raise ValueError(
+                "field fill requires continuous/bands and flat/interpolated"
+            )
+        alpha = _number(alpha, "alpha")
+        if not 0 <= alpha <= 1:
+            raise ValueError("alpha must be in [0,1]")
+        state = self.figure.get_settings()
+        body = self._body(state)
+        if "matrix" not in body:
+            raise AttributeError("this artist is not a scalar field")
+        if "fill" not in body:
+            raise AttributeError("this field has no filled surface")
+        body["fill"] = dict(mode=mode.title(), shading=shading.title(), opacity=alpha)
+        self.figure.apply_settings(state)
+        return self
 
     def get_gid(self):
         return self.id
@@ -993,6 +1221,107 @@ class ArtistMethods:
 
 
 class AxesMethods:
+    def activate_annotations(self):
+        """Route pointer editing to the document's annotation layer."""
+        from ._charts import family
+
+        state = self.figure.get_settings()
+        owner = state[family(state)] if family(state) else state["config"]
+        owner["active_layer"] = "Annotations"
+        self.figure.apply_settings(state)
+        return self
+
+    @property
+    def legend_handle(self):
+        """Edit the legend even while hidden (an absent overlay legend still raises)."""
+        return Legend(self)
+
+    def get_overlay(self, id):
+        """Look up an existing secondary Y layer by its stable ID."""
+        from ._document import overlay_config
+
+        overlay_config(self.figure.get_settings(), self.subplot_id, id)
+        return self.figure._axes_for(self.subplot_id, id)
+
+    def clear_legend(self):
+        """Remove an optional secondary legend; hide a primary legend."""
+        if not self.overlay_id:
+            return self.legend_handle.set_visible(False)
+        state = self.figure.get_settings()
+        self._overlay(state).pop("legend", None)
+        self.figure.apply_settings(state)
+
+    def set_polar_options(
+        self,
+        *,
+        unit="degrees",
+        zero=0,
+        clockwise=False,
+        sector=None,
+        inner_radius=0,
+        interpolation="chord",
+        pieces=8,
+        label_angle=90,
+    ):
+        """Figgy polar projection; angles zero/label_angle use degrees.
+
+        Sector endpoints use unit. Arc interpolation uses 1..64 chords per
+        sample segment. Original numerical coordinates are retained.
+        """
+        if unit not in ("degrees", "radians") or interpolation not in ("chord", "arc"):
+            raise ValueError("unit is degrees/radians; interpolation is chord/arc")
+        if not isinstance(clockwise, bool):
+            raise TypeError("clockwise must be bool")
+        if (
+            isinstance(pieces, bool)
+            or not isinstance(pieces, int)
+            or not 1 <= pieces <= 64
+        ):
+            raise ValueError("arc pieces must be an integer in 1..64")
+        bounds = None if sector is None else [_number(v, "sector") for v in sector]
+        if bounds is not None and len(bounds) != 2:
+            raise ValueError("sector requires two endpoints")
+        return self.set_polar(
+            angle_unit=unit.title(),
+            zero_angle_degrees=_number(zero, "zero"),
+            clockwise=clockwise,
+            sector=bounds,
+            inner_radius_fraction=_number(inner_radius, "inner radius"),
+            interpolation="Chord"
+            if interpolation == "chord"
+            else {"Arc": {"pieces": pieces}},
+            radial_label_angle_degrees=_number(label_angle, "label angle"),
+        )
+
+    def clear_polar(self):
+        state = self.figure.get_settings()
+        self._config(state)["polar"] = None
+        self.figure.apply_settings(state)
+        return self
+
+    def get_colorbar(self):
+        if not self._config(self.figure.get_settings()).get("colorbar"):
+            return None
+        return Colorbar(None, self)
+
+    def add_colorbar(self, *, cmap="viridis", vmin=0, vmax=1, label=None):
+        """Add an explicit standalone scale; existing data colors are retained."""
+        from ._features import _set_colorbar
+
+        with self.figure.batch_update():
+            state = self.figure.get_settings()
+            _set_colorbar(self._config(state), cmap, vmin, vmax)
+            self.figure.apply_settings(state)
+            bar = Colorbar(None, self)
+            if label is not None:
+                bar.set_label(label)
+        return bar
+
+    def clear_colorbar(self):
+        state = self.figure.get_settings()
+        self._config(state).pop("colorbar", None)
+        self.figure.apply_settings(state)
+
     @property
     def chart(self):
         """Figgy's named appearance controls for bounded chart families."""
@@ -1524,14 +1853,105 @@ class Colorbar:
         handle.set(text=label, **kwargs)
         return handle
 
-    def set_clim(self, *args, **kwargs):
-        self.mappable.set_clim(*args, **kwargs)
-
-    def remove(self):
+    def _edit(self, operation):
         fig = self.axes.figure
         state = fig.get_settings()
-        self.axes._config(state)["colorbar"]["visible"] = False
+        operation(self.axes._config(state)["colorbar"])
         fig.apply_settings(state)
+        return self
+
+    def set_clim(self, vmin=None, vmax=None):
+        if vmax is None and vmin is not None and not np.isscalar(vmin):
+            vmin, vmax = vmin
+        from ._features import update_color_scale
+
+        fig = self.axes.figure
+        state = fig.get_settings()
+        update_color_scale(self.axes._config(state), vmin=vmin, vmax=vmax)
+        fig.apply_settings(state)
+
+    def set_cmap(self, cmap):
+        from ._features import update_color_scale
+
+        fig = self.axes.figure
+        state = fig.get_settings()
+        update_color_scale(self.axes._config(state), cmap=cmap)
+        fig.apply_settings(state)
+
+    def get_layout(self):
+        bar = self.axes._config(self.axes.figure.get_settings())["colorbar"]
+        unit = 72 / self.axes.figure.dpi
+        return dict(
+            side=bar["side"].lower(),
+            align=bar["align"].lower(),
+            fraction=bar["length_frac"],
+            thickness=bar["thickness_px"] * unit,
+            gap=bar["gap_px"] * unit,
+            offset=(bar["offset_x"] * unit, bar["offset_y"] * unit),
+        )
+
+    def set_layout(
+        self,
+        *,
+        side=None,
+        align=None,
+        fraction=None,
+        thickness=None,
+        gap=None,
+        offset=None,
+    ):
+        def edit(bar):
+            if side is not None:
+                if side not in ("left", "right", "top", "bottom"):
+                    raise ValueError("colorbar side must be left, right, top or bottom")
+                bar["side"] = side.title()
+            if align is not None:
+                if align not in ("start", "center", "end"):
+                    raise ValueError("colorbar align must be start, center or end")
+                bar["align"] = align.title()
+            if fraction is not None:
+                bar["length_frac"] = _number(fraction, "colorbar fraction")
+            unit = self.axes.figure.dpi / 72
+            if thickness is not None:
+                if thickness < 0:
+                    raise ValueError("colorbar thickness must be nonnegative")
+                bar["thickness_px"] = _number(thickness, "thickness") * unit
+            if gap is not None:
+                bar["gap_px"] = _number(gap, "gap") * unit
+            if offset is not None:
+                x, y = offset
+                bar["offset_x"] = _number(x, "offset x") * unit
+                bar["offset_y"] = _number(y, "offset y") * unit
+
+        return self._edit(edit)
+
+    def set_nan_color(self, color):
+        from .figure import _color
+
+        return self._edit(lambda bar: bar.update(nan_color=_color(color)))
+
+    def set_outline(self, *, color=None, linewidth=None):
+        from .figure import _color
+
+        def edit(bar):
+            if color is not None:
+                bar["border_color"] = _color(color)
+            if linewidth is not None:
+                width = _number(linewidth, "outline width")
+                if width < 0:
+                    raise ValueError("outline width must be nonnegative")
+                bar["border_width"] = width * self.axes.figure.dpi / 72
+
+        return self._edit(edit)
+
+    def set_visible(self, visible):
+        return self._edit(lambda bar: bar.update(visible=bool(visible)))
+
+    def get_visible(self):
+        return self.axes._config(self.axes.figure.get_settings())["colorbar"]["visible"]
+
+    def remove(self):
+        return self.set_visible(False)
 
 
 class ColorbarAxis(Axis):
@@ -1599,6 +2019,30 @@ class ColorbarAxes:
 
 
 class FigureMethods:
+    @property
+    def data(self):
+        from ._artist_appearance import DataRegistry
+
+        return DataRegistry(self)
+
+    def annotation(self, id):
+        """Look up an existing annotation by its stable ID."""
+        from ._features import Annotation
+
+        handle = Annotation(self, id)
+        handle._find(self.get_settings())
+        return handle
+
+    def set_annotations_visible(self, visible):
+        from ._charts import family
+
+        state = self.get_settings()
+        owner = state[family(state)] if family(state) else state["config"]
+        owner.setdefault("annotations", dict(visible=True, items=[]))["visible"] = bool(
+            visible
+        )
+        self.apply_settings(state)
+
     def clear_annotations(self):
         """Remove the document annotation layer; resident chart data is untouched."""
         from ._charts import family

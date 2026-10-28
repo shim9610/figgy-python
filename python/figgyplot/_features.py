@@ -19,6 +19,19 @@ def colorbar(config, values, cmap, vmin, vmax):
     _set_colorbar(config,cmap,low,high)
 
 
+_COLOR_UNSET = object()
+
+
+def update_color_scale(config, *, cmap=_COLOR_UNSET, vmin=None, vmax=None):
+    """Shared mutation for mapped artists and standalone color-scale objects."""
+    from .figure import _colormap
+    from ._matplotlib import _number
+    bar=config['colorbar']
+    if cmap is not _COLOR_UNSET:bar['colormap']=_colormap(cmap)
+    if vmin is not None:bar['axis']['min']=_number(vmin,'vmin')
+    if vmax is not None:bar['axis']['max']=_number(vmax,'vmax')
+
+
 def _set_colorbar(config,cmap,low,high):
     """Update the shared scale without resetting accepted colorbar appearance."""
     from .figure import _colormap
@@ -31,7 +44,10 @@ def _set_colorbar(config,cmap,low,high):
     config['colorbar'] = bar
 
 
-class Annotation:
+from ._annotation_api import AnnotationEditing
+
+
+class Annotation(AnnotationEditing):
     def __init__(self, figure, id):
         self.figure, self.id = figure, id
 
@@ -86,19 +102,21 @@ class Annotation:
     def get_text(self):
         from .figure import _text
         body=next(iter(self._find(self.figure.get_settings())[2]['kind'].values()))
-        return _text(body['text']) if body.get('text') else ''
+        rich=body.get('label',body.get('text'))
+        return _text(rich) if rich else ''
     def _set_text_property(self,key,value):
         state=self.figure.get_settings();body=next(iter(self._find(state)[2]['kind'].values()))
-        if body.get('text') is None:raise AttributeError('this annotation has no text')
-        body['text'][key]=value;self.figure.apply_settings(state)
+        rich=body.get('label',body.get('text'))
+        if rich is None:raise AttributeError('this annotation has no text')
+        rich[key]=value;self.figure.apply_settings(state)
     def set_text(self,value):
         from .figure import _segments
-        self._set_text_property('segments',_segments(value))
+        self._set_text_property('segments',_segments(value, dpi=self.figure.dpi))
     def set_fontsize(self,value):
         from ._matplotlib import _number
         self._set_text_property('font_size',_number(value,'fontsize',positive=True)*self.figure.dpi/72)
     def get_fontsize(self):
-        return next(iter(self._find(self.figure.get_settings())[2]['kind'].values()))['text']['font_size']*72/self.figure.dpi
+        return self._rich_text()['font_size']*72/self.figure.dpi
     def set_fontfamily(self,value):self._set_text_property('font',self.figure._check_font(value))
     def set_color(self,value):
         from .figure import _color
@@ -316,7 +334,7 @@ class FeatureMethods:
         if fontweight not in ('normal','bold',400,700) or fontstyle not in ('normal','italic'):
             raise NotImplementedError('supported text styles are normal/bold and normal/italic')
         rich = copy.deepcopy(self.figure._default_config['legend']['content'])
-        rich.update(segments=_segments(text), font_size=_number(fontsize,'fontsize',positive=True)*self.figure.dpi/72, color=_color(color))
+        rich.update(segments=_segments(text, dpi=self.figure.dpi), font_size=_number(fontsize,'fontsize',positive=True)*self.figure.dpi/72, color=_color(color))
         if fontfamily is not None:rich['font']=self.figure._check_font(fontfamily)
         for segment in rich['segments']:
             if fontweight in ('bold',700):segment['bold']=True

@@ -9,3 +9,10 @@ from ._style_runtime import use_style, style_context
 
 __all__ = ["Subplot", "Annotation", "Figure", "Axes", "Artist", "RadialArtist", "RenderWarning", "figure", "subplots", "text_segments", "release_gpu", "styles", "StyleToken", "StyleReport", "StyleWarning"]
 __all__ += ['use_style', 'style_context']
+
+from ._artist_appearance import MarkerStyle, ErrorBarStyle, BinStyle, ColumnReference, GridReference
+__all__ += ["MarkerStyle", "ErrorBarStyle", "BinStyle", "ColumnReference", "GridReference"]
+from ._field_api import ContourLabel
+__all__ += ["ContourLabel"]
+from ._richtext import TextRun
+__all__ += ["TextRun"]

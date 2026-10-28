@@ -294,7 +294,7 @@ Use `fig.to_code(mode="exact")` for complete SSOT recovery, including stable
 identities, tick policies, rich text and advanced layout. This compact form
 restores omitted defaults and preserves resident arrays without uploading them
 again. `compact=False` expands the diagnostic form. See the
-[Matplotlib-shaped API and supported subset](docs/MATPLOTLIB_API.md) for object
+[Matplotlib-shaped API, scoped appearance controls and supported subset](docs/MATPLOTLIB_API.md) for object
 handles, units, coordinate conventions and explicit limitations.
 
 Ranges, ticks and titles:
@@ -378,8 +378,10 @@ for run in range(3):
 You can also obtain the code directly with `edited_fig.to_code()`. An export
 contains settings, not NumPy arrays: recreate the plotted series with the same
 IDs, kinds and DPI before applying it. Axis ranges and titles are included;
-override them afterward when a dataset needs different values. Advanced settings
-use `fig.configure(...)` with ordinary Python dictionaries.
+override them afterward when a dataset needs different values. Scoped appearance
+objects cover palettes, vectors, contours, annotations, colorbars and bounded
+materials; see the [API guide](docs/MATPLOTLIB_API.md#complete-appearance-controls).
+`to_code(mode="exact")` provides full document recovery.
 
 ## Multiple windows
 

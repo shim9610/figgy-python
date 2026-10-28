@@ -20,7 +20,11 @@ class BoundedArtist:
         return self
 
     def set_style(self, **properties):
-        return self.set(style=properties)
+        self.figure.axes[0].chart.set_style(**properties)
+        return self
+
+    def get_style(self):
+        return self.figure.axes[0].chart.get_style()
 
     def set_values(self, values, *, series=0):
         with self.figure._lock:

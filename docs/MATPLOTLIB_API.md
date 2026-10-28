@@ -119,10 +119,10 @@ outside this block. Concurrent accepted native edits are detected at commit.
 `fig.to_code()` and Copy Python prefer public object calls for Cartesian and
 bounded appearance. Replay targets an existing Figure with matching panel
 ownership, stable artist IDs, source bindings and DPI; the destination Figure
-identity is retained. Renderer-only
-materials, decorations and per-element overrides that lack public setters are
-kept in a clearly marked advanced block. This boundary is explicit; the library
-does not claim full Matplotlib API coverage. Style constants are shortened only
+identity is retained. Named Figgy objects cover materials, decorations, palettes, sparse overrides,
+fields, vectors, contours, polar projections, annotations and colorbar axes.
+The library does not claim full Matplotlib API coverage; exact internal state
+that lacks a visual authoring API retains a clearly marked recovery block. Style constants are shortened only
 when they round-trip to the same renderer f32 value. Scientific values and arrays
 are never rounded by export.
 
@@ -135,5 +135,143 @@ Matplotlib properties and source/destination native pixels.
 Editor startup is independent of public-code export: an export failure keeps the
 chart available and provides a complete exact recovery recipe with its diagnostic.
 The PNG editor waits for pending edits to be accepted before copying code.
-Independent opposite-axis scales and angle/time tick formats remain explicit
-advanced settings when they cannot be expressed by the public subset.
+Independent opposite-axis scales and angle/time tick formats use scoped Axis
+setters and SignificantFormatter/TimestampFormatter.
+
+## Complete appearance controls
+
+Features outside Matplotlib's plotting subset have named Figgy objects. They
+accept ordinary colors, marker symbols, point sizes and stable IDs. Passing a
+renderer `render_type`, `matrix`, `color_map` or style-enum tree is not necessary.
+These APIs use the same accepted document edits as the native and notebook UI.
+
+| Object | Controls |
+| --- | --- |
+| `artist.markers` | Shared marker style, color/size mappings, palettes, individual overrides |
+| `artist.errors` | Error strokes/caps, palettes and individual overrides |
+| `artist.bins` | Bin fills/outlines, width, gap and individual overrides |
+| `artist.vectors` | Stroke, arrowhead, pivot, data/pixel scaling and scalar coloring |
+| `artist.contours` | Levels, strokes, per-level colors and inline labels |
+| `artist.set_field_fill(...)` | Continuous/banded fields, flat/interpolated shading, opacity |
+| `artist.set_grid(...)` | Registered scalar matrix, orientation and center/edge coordinates |
+| `artist.legend_label` | One series' legend typography |
+| `ax.legend_handle.content` | Custom rich legend keys, including hidden legends |
+| `ax.get_overlay(id)` | Existing secondary Y axis and its independent legend |
+| `ax.get_colorbar()` | Shared color scale, placement, outline, NaN color and independent axis |
+| `ax.chart` | Materials, camera, labels, series/cell/slice styles and decoration placement |
+| `fig.annotation(id)` | Existing text, line, span or arrow, retaining its ID |
+
+```python
+from figgyplot import MarkerStyle, ErrorBarStyle, TextRun, ContourLabel
+from figgyplot.ticker import SignificantFormatter, TimestampFormatter
+
+points.markers[2].set(color="red", marker="s", markersize=8)
+points.markers.set_palette([
+    MarkerStyle(color="C0", marker="o"),
+    MarkerStyle(color="C1", marker="s", fillstyle="none"),
+], source=fig.data.column("class_index"))
+points.markers.map_color(fig.data.column("temperature"), clim=(250, 400), cmap="magma")
+points.markers.map_size(fig.data.column("population"), domain=(0, 1e6),
+                        markersizes=(4, 16), scale="area")
+points.set_fillstyle("none")
+```
+
+`fig.data.add(name, values)` explicitly registers a new column outside a batch;
+`fig.data.column(name)` references an existing column without copying data.
+Constructors register their own columns. `artist.data.x`, `.y`, `.values`, `.u`,
+`.v`, `.color`, `.size` and the applicable palette-index roles return resident
+references. Rebinding a map does not replace scientific coordinates or values.
+`fig.data.grid(columns, axis="y", coordinates="centers")` describes matrix
+storage; it does not transpose, interpolate or resample the arrays.
+
+Palette slots inherit missing properties. `markers.palette[i].set(...)` edits a
+slot; `markers[i].set(...)` edits one point. Error bars have the same interfaces.
+`set_overrides([(index, MarkerStyle(...)), ...])` preserves declaration order,
+including repeated partial records. `set_palette(None)`, `set_overrides(None)`,
+`map_color(None)` and `map_size(None)` explicitly clear those optional policies.
+Native precedence remains shared style → palette → scalar mapping → point
+override. An explicit point color therefore remains fixed when its colormap
+changes. Filled/hollow markers use normal symbols and `fillstyle="full"/"none"`.
+Bin overrides use `BinStyle`, with no palette because the renderer has none.
+
+```python
+field.contours.set_levels([1, 2, 5])
+field.contours.set_style(linewidth=1, linestyle="--", colors=["C0", "C1", "C2"])
+field.contours.set_labels(fontsize=9, formatter=SignificantFormatter(3),
+    positions=[ContourLabel(1, x=2, y=3, tangent=(1, 0))],
+    spacing=80, background="white", padding=2)
+field.set_field_fill(mode="bands", shading="interpolated", alpha=0.7)
+```
+
+Contour labels use explicit data positions/tangents; an empty positions list
+restores automatic placement. `set_labels(None)` removes the optional label
+configuration. Vector scaling has Figgy semantics: `units="data"` multiplies
+components in data units, while `units="pixels"` specifies logical pixels per
+component unit. It is not Matplotlib's reciprocal `quiver(scale=...)` convention.
+Polar projection uses `ax.set_polar_options(unit="radians", zero=90,
+clockwise=True, interpolation="arc", pieces=8)`; zero/label angles are degrees,
+sector endpoints use the selected unit. Unsupported polar plot combinations
+remain rejected.
+
+```python
+bar = ax.get_colorbar()
+bar.set_layout(side="bottom", align="center", fraction=0.8,
+               thickness=12, gap=8, offset=(0, 4))
+bar.set_nan_color("gray")
+bar.set_outline(color="black", linewidth=0.5)
+bar.ax.yaxis.set_major_formatter(SignificantFormatter(4, style="scientific"))
+bar.set_cmap("magma")
+bar.set_clim(250, 400)
+```
+
+Both orientations use the same colorbar axis object (`bar.ax.xaxis` aliases
+`bar.ax.yaxis`). `ax.add_colorbar(...)` can explicitly create a standalone scale;
+it does not turn arbitrary per-point colors into a scalar mapping. Colors and
+limits edited through an artist or colorbar share one update path.
+`TimestampFormatter(unit="ms", timezone=540, pattern="%Y-%m-%d")` formats numeric
+Unix timestamps, without converting their data. Degrees/radians are additional
+`SignificantFormatter` styles. `Axis.set_scale` and `.line` edit just that
+boundary, including independent secondary/colorbar axes.
+
+```python
+note = ax.text(.1, .2, [TextRun("Temperature ", bold=True),
+                      TextRun("T", italic=True), TextRun("max", script="sub")],
+               coords="ratio", id="peak-note")
+note.set_bbox(facecolor="#ffffffe6", edgecolor="gray", linewidth=0.5, pad=4)
+arrow = ax.arrow(0, 0, 1, 1, id="peak-arrow")
+arrow.set_endpoints((.2, .2), (3, 10), coords="ratio", endcoords="data")
+arrow.set_style(linestyle="--", head_length=8, head_width=6)
+arrow.set_label("Maximum", fontsize=10)
+```
+
+`TextRun` works in titles, axis labels, legend entries and annotations. It also
+supports per-span color/size, underline, superscript/subscript and rule marks.
+`note.set_multialignment(...)` aligns multiline content. Reference lines expose
+`set_value`, `set_style` and `set_label`; spans expose `set_bounds` and fill
+`set_style`. Annotation frame padding uses points. Subplot-local annotation
+spaces, curved arrows and unsupported transforms remain guarded.
+
+For bounded charts, `ax.chart.get_style()` returns supported reusable keywords.
+`set_style` covers every chart-global material/style leaf, including box
+statistics/outliers, radial camera/light/corners/outlines and radar grid/fill.
+Returned bounded/radial artists use the same named `get_style`/`set_style` API.
+`chart.get_series()` and `get_categories()` expose IDs with display labels;
+`get_slice_count(detail=True)` inspects detail slices without reading raw SSOT.
+`chart.series(id)`, `chart.cell(category_id, series_id)` and
+`chart.slice(index, detail=False)` expose scoped styles. `reset_style()` on an
+element restores inheritance. Full per-element bar/box/pie styles snapshot the
+chart defaults; the renderer's partial radar styles continue to inherit unset
+fields. Value-label choices depend on the chart family: bars use
+none/inside/outside/auto, boxes none/median/median_and_count, pies
+none/inside/outside, and radar none/values/emphasized.
+
+`chart.set_split(index, values, labels=..., colors=..., inner_radius=...)` creates
+a pie detail chart whose child values must sum to the parent. Existing detail
+slices are edited with `slice(i, detail=True)`. Appearance export retains those
+resident child values. `chart.decoration("title").set_offset((x, y))`, named
+axis/value/spoke/slice labels and `chart.set_plot_bounds((left, top, width,
+height))` use points; `set_plot_bounds(None)` restores automatic layout.
+
+Exact checkpoint/recovery APIs remain available for identities, interaction
+records, diagnostic snapshots and renderer fields outside these visual
+controls. They are separate from ordinary chart authoring.
