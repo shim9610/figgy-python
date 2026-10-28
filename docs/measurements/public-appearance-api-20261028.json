@@ -19,24 +19,29 @@
     "All annotation geometries, labels, frames and mixed coordinates"
   ],
   "validation": {
-    "public_appearance_cases": 119,
+    "public_appearance_cases": 131,
     "matplotlib_api_cases": 86,
-    "installed_focused_passed": 934,
+    "installed_focused_passed": 948,
     "installed_focused_ui_skips": 5,
     "clean_preflight_passed": 135,
     "native_jupyter_clipboard_and_typing_passed": 9,
-    "full_ci_collection": 1621,
+    "full_ci_collection": 1633,
     "relaxed_threshold_or_recovery_oracles": 0,
     "numpy_only_runtime_without_matplotlib": true,
     "paired_wheel_source_files": 41,
-    "final_public_and_matplotlib_passed": 205,
-    "additional_fillstyle_cases": 2
+    "final_public_and_matplotlib_passed": 217,
+    "additional_fillstyle_cases": 2,
+    "ci_failure_ui_reproductions_passed": 3
   },
   "independent_checks": [
     "Changed destination palettes/maps/vector/bin/error/overlay styles",
     "Remove contour labels, polar and standalone scale absent from source",
     "Line-fill ink independent from marker ink",
-    "Every panel must contain expected red/blue data ink before and after public/exact replay"
+    "Every panel must contain expected red/blue data ink before and after public/exact replay",
+    "Preserve an actual editor data selection on a fresh destination",
+    "Restore linear/log colorbar and plot scales across different initial scales",
+    "Restore wide log spacing and formatting without dependence on the old scale",
+    "Single-slot panel geometry and per-entry rich alignment"
   ],
   "backend_calibration": {
     "native_binary_sha256": "28b342055240f95649487486bfa6f9738e55899606370f41f5a288884c7d402d",
@@ -89,7 +94,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 85
+      "api_lines": 87
     },
     {
       "domain": "acoustics",
@@ -100,7 +105,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 57
+      "api_lines": 58
     },
     {
       "domain": "acoustics",
@@ -122,7 +127,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 32
+      "api_lines": 33
     },
     {
       "domain": "education",
@@ -133,7 +138,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 37
+      "api_lines": 39
     },
     {
       "domain": "education",
@@ -155,7 +160,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 29
+      "api_lines": 30
     },
     {
       "domain": "energy",
@@ -177,7 +182,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 57
+      "api_lines": 58
     },
     {
       "domain": "materials",
@@ -188,7 +193,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 37
+      "api_lines": 38
     },
     {
       "domain": "materials",
@@ -210,7 +215,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 50
+      "api_lines": 51
     },
     {
       "domain": "materials",
@@ -221,7 +226,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 32
+      "api_lines": 39
     },
     {
       "domain": "nutrition",
@@ -254,7 +259,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 91
+      "api_lines": 92
     },
     {
       "domain": "sports",
@@ -265,7 +270,7 @@
       "exact_full_ssot_pixels_equal": true,
       "no_source_uploads": true,
       "raw_settings_calls": 0,
-      "api_lines": 34
+      "api_lines": 43
     },
     {
       "domain": "sports",
@@ -289,5 +294,17 @@
       "raw_settings_calls": 0,
       "api_lines": 16
     }
-  ]
+  ],
+  "ci78_followup": {
+    "failures": [
+      "Native heatmap test asserted the renderer enum spelling in public Python code",
+      "Fresh linear destination received LogLocator before its missing log-scale setter"
+    ],
+    "changes": [
+      "Replace spelling assertion with full accepted config/series comparison, no-reupload check and RGBA equality, after retaining the zero-image-transport UI assertion",
+      "Always emit the colorbar scale and normalize plot scaling before restoring bounds/formatting",
+      "Preserve explicit picked_points/picked_data diagnostics that the source-based compiler previously considered unchanged"
+    ],
+    "local_reproduction": "Both failed UI scenarios and native/Jupyter clipboard replay passed on the updated installed wheel"
+  }
 }

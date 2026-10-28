@@ -8,7 +8,7 @@ import time
 import numpy as np
 import pytest
 from native_input import click as send_native_click
-from figgyplot import subplots, release_gpu
+from figgyplot import Figure, subplots, release_gpu
 from figgyplot.desktop import poll_events
 from object_navigation import ensure_native_control_visible
 
@@ -239,9 +239,25 @@ def test_surface_heatmap_edits_sync_without_image_transport():
         click_rect(info()["controls"]["colormap_Magma"])
         bar = fig.get_settings()["config"]["colorbar"]
         assert bar["axis"]["min"] == -2 and bar["axis"]["max"] == 4
-        assert bar["colormap"] == "Magma" and "Magma" in fig.to_code()
+        assert bar["colormap"] == "Magma"
         assert info()["column_uploads"] == 4
         assert info()["rgba_readbacks"] == info()["png_encodes"] == 0
+        # The UI transport above must not read images back. Explicitly verify
+        # exported behavior afterwards; public cmap names need not use the
+        # renderer enum's spelling in the generated source text.
+        state = fig.get_settings()
+        code = fig.to_code()
+        with Figure(backend="native") as restored:
+            restored.axes[0].imshow(
+                np.array([[-1.0, 0.0], [1.0, 2.0]], dtype=np.float32),
+                id="Temperature",
+            )
+            uploads = restored.info["column_uploads"]
+            exec(code, {"fig": restored})
+            assert restored.get_settings()["config"] == state["config"]
+            assert restored.get_settings()["series"] == state["series"]
+            assert restored.info["column_uploads"] == uploads
+            np.testing.assert_array_equal(fig.render_rgba(), restored.render_rgba())
     finally:
         handle.close()
         pump()

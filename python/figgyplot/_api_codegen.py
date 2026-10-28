@@ -261,14 +261,13 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         else:
             emit(f"{ax} = {variable}.axes[0]")
         area = cfg["chart_area"]
-        if len(panels) > 1:
-            bounds = (
-                area["x"] / width,
-                1 - (area["y"] + area["height"]) / height,
-                area["width"] / width,
-                area["height"] / height,
-            )
-            emit(f"{ax}.set_panel_position({bounds!r})", force=True)
+        bounds = (
+            area["x"] / width,
+            1 - (area["y"] + area["height"]) / height,
+            area["width"] / width,
+            area["height"] / height,
+        )
+        emit(f"{ax}.set_panel_position({bounds!r})", force=True)
         if cfg.get("draw_style"):
             options = dict(cfg["draw_style"])
             mode = options.pop("mode")
@@ -280,20 +279,23 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
             low, high = node["min"], node["max"]
             if node["inverted"]:
                 low, high = high, low
+            # Normalize the same scale before fitting bounds on both source
+            # and destination, so auto formatting cannot depend on old scale.
+            emit(f"{ax}.set_{dim}scale('linear')", force=True)
             emit(f"{ax}.set_{dim}lim({low!r}, {high!r})", force=True)
-            emit(
-                f"{ax}.set_{dim}scale({'log' if node['scale'] == 'Logarithmic' else 'linear'!r})",
-                force=True,
-            )
+            if node["scale"] == "Logarithmic":
+                emit(f"{ax}.set_{dim}scale('log')", force=True)
         for dim, key in [("x", "bottom_x"), ("y", "left_y")]:
             node = cfg[key]
             if node["scale"] == "Linear":
                 emit(
-                    f"{ax}.{dim}axis.set_major_locator({ticker_names['MultipleLocator']}({node['major_spacing']!r}))"
+                    f"{ax}.{dim}axis.set_major_locator({ticker_names['MultipleLocator']}({node['major_spacing']!r}))",
+                    force=True,
                 )
             elif node["scale"] == "Logarithmic":
                 emit(
-                    f"{ax}.{dim}axis.set_major_locator({ticker_names['LogLocator']}(base={10 ** node['major_spacing']!r}))"
+                    f"{ax}.{dim}axis.set_major_locator({ticker_names['LogLocator']}(base={10 ** node['major_spacing']!r}))",
+                    force=True,
                 )
         text(ax, "set_title", cfg["chart_title"])
         text(ax, "set_xlabel", cfg["bottom_x"]["title_option"])
@@ -593,7 +595,7 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         if spec.get("label") is not None:
             rich = spec["label"]
             emit(
-                f"{artist}.legend_label.set(fontsize={_points(rich['font_size'], dpi)!r}, color={color(rich['color'])!r}, fontfamily={rich['font']!r})",
+                f"{artist}.legend_label.set(fontsize={_points(rich['font_size'], dpi)!r}, color={color(rich['color'])!r}, fontfamily={rich['font']!r}, multialignment={rich.get('align', 'Left').lower()!r})",
                 force=True,
             )
         if body.get("line", {}).get("fill") is not None:
@@ -795,7 +797,8 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         )
         emit(f"{scale}.set_visible({bar['visible']!r})")
         emit(
-            f"{axis}.set_scale({'log' if node['scale'] == 'Logarithmic' else 'linear'!r})"
+            f"{axis}.set_scale({'log' if node['scale'] == 'Logarithmic' else 'linear'!r})",
+            force=True,
         )
         emit(f"{axis}.set_inverted({node['inverted']!r})")
         locator = (
@@ -965,6 +968,13 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
     ]
     for index, (baseline, cfg) in enumerate(zip(restored_panels, panels)):
         patch = config_patch if index == 0 else _prune_empty(_diff(baseline, cfg))
+        # The compiler starts from the source document, so resident editor
+        # records can look unchanged even when absent from the destination.
+        # Retain explicit selections as diagnostic state, independent of the
+        # public visual setters and without copying their scientific values.
+        for key in ("picked_points", "picked_data"):
+            if cfg.get(key) is not None:
+                patch[key] = copy.deepcopy(cfg[key])
         if index and patch:
             panel_patches.append((index, patch))
     if config_patch or series_patch:

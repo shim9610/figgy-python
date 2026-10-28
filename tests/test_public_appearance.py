@@ -731,3 +731,86 @@ def test_sparse_fillstyle_can_restore_shared_shape_inheritance(backend):
         override = points.markers[0].get_override()
         assert override.marker is None and override.fillstyle is None
         assert override.color == (1, 0, 0, 1)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_export_keeps_explicit_editor_selection_on_a_fresh_destination(backend):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].imshow([[0, 1], [2, 3]], id="field")
+        state = source.get_settings()
+        state["config"]["picked_data"] = {
+            "refs": [
+                {
+                    "kind": "matrix_cell",
+                    "series_id": "field",
+                    "x_index": 1,
+                    "y_index": 0,
+                }
+            ]
+        }
+        source.apply_settings(state)
+        expected = source.get_settings()
+        uploads = target.info.get("column_uploads")
+        exec(source.to_code(), {"fig": target})
+        assert target.get_settings()["config"] == expected["config"]
+        assert target.get_settings()["series"] == expected["series"]
+        assert target.info.get("column_uploads") == uploads
+        if backend == "native":
+            np.testing.assert_array_equal(source.render_rgba(), target.render_rgba())
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("scale", ["linear", "log"])
+def test_colorbar_replay_sets_scale_before_its_locator_on_a_different_destination(
+    backend, scale
+):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].imshow([[1, 10], [100, 1000]], vmin=1, vmax=1000, id="field")
+        bar = source.axes[0].get_colorbar()
+        bar.ax.yaxis.set_scale(scale)
+        from figgyplot.ticker import LogLocator, MultipleLocator
+
+        bar.ax.yaxis.set_major_locator(
+            LogLocator(10) if scale == "log" else MultipleLocator(100)
+        )
+        target.axes[0].get_colorbar().ax.yaxis.set_scale(
+            "linear" if scale == "log" else "log"
+        )
+        assert_public_replay(source, target)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_linear_view_replay_can_replace_a_log_view_with_nonpositive_limits(backend):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([0, 1, 2], [1, 2, 3], id="line")
+        target.axes[0].set_xscale("log")
+        assert source.axes[0].get_xlim()[0] < 0
+        assert_public_replay(source, target)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_wide_log_view_replays_explicit_spacing_independent_of_initial_scale(backend):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([1, 1e8, 1e20], [1, 2, 3], id="line")
+        source.axes[0].set_xscale("log")
+        source.axes[0].set_xlim(1, 1e20)
+        from figgyplot.ticker import LogLocator
+
+        source.axes[0].xaxis.set_major_locator(LogLocator(10000))
+        assert_public_replay(source, target)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_single_panel_placement_and_entry_alignment_use_public_replay(backend):
+    with fg.Figure(backend=backend, grid=[["only"]]) as source, fg.Figure(
+        backend=backend, grid=[["only"]]
+    ) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([0, 1, 2], [1, 3, 2], label="Signal", id="line")
+        source.axes[0].set_panel_position((0, 0.2, 0.8, 0.8))
+        source.artist("line").legend_label.set_multialignment("center")
+        assert_public_replay(source, target)
