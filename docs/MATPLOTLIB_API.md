@@ -68,8 +68,10 @@ belong to the parent panel; subplot annotations are rejected.
   supported. Arbitrary positions/labels, tick padding and custom callable
   formatters require renderer capabilities that are not available yet.
 - `MultipleLocator` accepts a regular locator's public `tick_values` protocol,
-  including Matplotlib's locator. Figgy supplies `AutoMinorLocator`,
-  `LogLocator` and `SignificantFormatter` for renderer-supported rules.
+  including Matplotlib's locator. Figgy supplies `AutoLocator`, `AutoMinorLocator`,
+  `LogLocator` and `SignificantFormatter` for renderer-supported rules. Explicit
+  secondary-boundary locators affect only that boundary. Colorbar locators
+  affect the colorbar without changing the main axes or data normalization.
 - The renderer shares tick and spine color, width and line style. Spine edits
   therefore affect that boundary's ticks too. `tick_params` rejects a requested
   independent color/width change that would alter a visible spine implicitly.
@@ -129,3 +131,9 @@ accepted SSOT, including identities, editor metadata and advanced chart state.
 `compact=False` expands that form for diagnostics. Exact recovery tests continue
 to compare complete SSOT and arrays; public-API tests separately compare actual
 Matplotlib properties and source/destination native pixels.
+
+Editor startup is independent of public-code export: an export failure keeps the
+chart available and provides a complete exact recovery recipe with its diagnostic.
+The PNG editor waits for pending edits to be accepted before copying code.
+Independent opposite-axis scales and angle/time tick formats remain explicit
+advanced settings when they cannot be expressed by the public subset.

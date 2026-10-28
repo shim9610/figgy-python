@@ -320,16 +320,15 @@ Ranges, ticks and titles:
   lines, scatter or other Cartesian series uses 5%. Explicit padding overrides
   either default: `fig.fit(padding=0.05)` adds 5%, while `fig.fit(padding=0)` fits
   tightly to the rendered data extent.
-- For selective control, use `fig.configure(config={...})` or read the current
-  state with `fig.get_settings()`, edit only the intended fields, then submit it
-  through `fig.apply_settings(state)`. For example:
+- For a one-sided range edit that preserves ticks and formatting, use the
+  existing boundary's public Axis handle:
 
   ```python
-  fig.configure(config={"bottom_x": {"min": 20.0, "max": 80.0}})
+  ax.secondary_xaxis("bottom").xaxis.set_view_interval(20.0, 80.0)
   ```
 
-  This preserves that axis's tick and label settings and leaves the top axis
-  untouched. Include `top_x` too when the pair should share bounds. In contrast,
+  This leaves the top axis untouched. `get_settings`, `configure` and
+  `apply_settings` remain advanced APIs for exact document state. In contrast,
   `set_xlim` / `set_ylim` choose ticks and label formatting, `fit` also derives
   bounds from data, and title helpers can enlarge the title band. Direct SSOT
   edits do not run these adjustments. Rendering still validates settings and
@@ -339,7 +338,7 @@ Ranges, ticks and titles:
   is capped at 99. Each change is reported once as a `figgy.RenderWarning` by the next
   native PNG/RGBA render (`render_rgba`, `to_png`, `savefig`, the PNG widget). Desktop
   windows and the browser (webgpu) backend do not report it.
-- `fig.update("chart_title", text="Line 1\nLine 2", align="center")` aligns the
+- `ax.set_title("Line 1\nLine 2", multialignment="center")` aligns the
   lines of multi-line text (`left`, `center`, `right`); a title taller than its band
   grows the band instead of being clipped. Unicode super/subscripts such as `10⁻³`
   are drawn as super/subscript text.

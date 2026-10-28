@@ -9,6 +9,26 @@ import keyword
 import pprint
 
 
+def editor_code_payload(settings, defaults, dpi=120, variable='fig'):
+    """An auxiliary code export must never prevent an accepted chart opening."""
+    try:
+        return dict(code=settings_to_code(settings,defaults,dpi,variable),
+                    code_mode='api',code_error='')
+    except Exception as error:
+        # Keep the error visible in the code panel while preserving a complete,
+        # usable recovery export. Prefix every message line as a Python comment.
+        message=str(error)
+        comment='\n'.join('# '+line for line in message.splitlines())
+        exact=settings_to_code(settings,defaults,dpi,variable,mode='exact')
+        return dict(code='# Public API export unavailable; exact recovery code follows.\n'+comment+'\n'+exact,
+                    code_mode='exact',code_error=message)
+
+
+def editor_settings_to_code(settings, defaults, dpi=120, variable='fig'):
+    """Pure shared entry point for native Copy Python while its lock is held."""
+    return editor_code_payload(settings,defaults,dpi,variable)['code']
+
+
 def _share_colors(code):
     """Name repeated literal colors without changing values or hiding settings."""
     tree = ast.parse(code)

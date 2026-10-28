@@ -561,3 +561,217 @@ def test_markers_can_be_added_to_a_resident_line_through_artist_set(backend):
         ] == [s[k] for s in before["series"] for k in ("x_column", "y_column")]
         if backend == "native":
             assert fig.render_rgba().shape == (600, 960, 4)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_secondary_locator_preserves_primary_automatic_tick_policy(backend):
+    from matplotlib.figure import Figure
+    from matplotlib.ticker import MultipleLocator
+
+    reference = Figure().subplots()
+    reference.set_xlim(0, 2)
+    primary = reference.xaxis.get_major_locator()
+    reference.secondary_xaxis("top").xaxis.set_major_locator(MultipleLocator(0.25))
+    assert reference.xaxis.get_major_locator() is primary
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.plot([0, 1, 2], [1, 3, 2])
+        ax.set_xlim(0, 2)
+        before = fig.get_settings()
+        ax.secondary_xaxis("top").xaxis.set_major_locator(MultipleLocator(0.25))
+        after = fig.get_settings()
+        assert after["config"]["bottom_x"] == before["config"]["bottom_x"]
+        assert (
+            after["identity"]["tick_modes"]["main"]["bottom_x"]
+            == before["identity"]["tick_modes"]["main"]["bottom_x"]
+            == "Auto"
+        )
+        assert after["identity"]["tick_modes"]["main"]["top_x"] == "Fixed"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_primary_locator_and_formatter_preserve_an_independent_boundary(backend):
+    from figgyplot.ticker import MultipleLocator, SignificantFormatter
+
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.plot([0, 1, 2], [1, 3, 2])
+        ax.set_ylim(0, 4)
+        ax.configure(
+            right_y={"scale": "Logarithmic", "min": 1, "max": 100, "major_spacing": 1}
+        )
+        before = fig.get_settings()
+        ax.yaxis.set_major_locator(MultipleLocator(2))
+        ax.yaxis.set_major_formatter(SignificantFormatter(4, style="scientific"))
+        after = fig.get_settings()
+        assert after["config"]["right_y"] == before["config"]["right_y"]
+        assert after["config"]["left_y"]["major_spacing"] == 2
+        assert after["config"]["left_y"]["label_style"]["format"] == "Scientific"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_colorbar_locator_preserves_plot_axes_tick_intent_and_norm(backend):
+    from matplotlib.ticker import MultipleLocator
+
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        points = ax.scatter([0, 1], [1, 2], c=[10, 20])
+        ax.set_ylim(0, 3)
+        bar = fig.colorbar(points, ax=ax)
+        before = fig.get_settings()
+        bar.ax.yaxis.set_major_locator(MultipleLocator(0.5))
+        after = fig.get_settings()
+        for side in ("bottom_x", "top_x", "left_y", "right_y"):
+            assert after["config"][side] == before["config"][side]
+        assert after["identity"] == before["identity"]
+        assert after["config"]["colorbar"]["axis"]["major_spacing"] == 0.5
+        assert points.get_clim() == (10, 20)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("cmap", ["viridis", "magma", "turbo", "gray", "RdBu"])
+def test_every_builtin_colormap_exports_and_constructs_widgets(backend, cmap):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].scatter(
+                [0, 1, 2], [1, 3, 2], c=[0, 1, 2], cmap=cmap, id="mapped"
+            )
+        source.artist("mapped").set_cmap(source.artist("mapped").get_cmap())
+        code = source.to_code()
+        exec(code, {"fig": target})
+        assert target.get_settings()["config"] == source.get_settings()["config"]
+        assert target.get_settings()["series"] == source.get_settings()["series"]
+        if backend == "webgpu":
+            widget = source.widget()
+            assert widget.state.get("code_error", "") == ""
+            assert widget.state.get("code_mode", "api") == "api"
+        else:
+            np.testing.assert_array_equal(target.render_rgba(), source.render_rgba())
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("notation", ["Degrees", "Radians", {"Timestamp": {}}])
+def test_angle_and_timestamp_notation_remains_in_explicit_advanced_export(
+    backend, notation
+):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([0, 1, 2], [1, 3, 2], id="signal")
+        source.axes[0].configure(bottom_x={"label_style": {"format": notation}})
+        exec(source.to_code(), {"fig": target})
+        assert target.get_settings()["config"] == source.get_settings()["config"]
+        if backend == "native":
+            np.testing.assert_array_equal(target.render_rgba(), source.render_rgba())
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_editor_export_failure_keeps_chart_and_exact_recovery_available(
+    backend, monkeypatch
+):
+    from figgyplot import _api_codegen
+    from figgyplot.editor import EditorSession
+
+    def unavailable(*args, **kwargs):
+        raise ValueError(
+            "simulated code export failure\nraise RuntimeError('not executable code')"
+        )
+
+    with fg.Figure(backend=backend) as fig, fg.Figure(backend=backend) as target:
+        for item in (fig, target):
+            item.axes[0].plot([0, 1], [1, 2], id="signal")
+        before = fig.get_settings()
+        monkeypatch.setattr(_api_codegen, "settings_to_api_code", unavailable)
+        payload = (
+            fig.widget().state if backend == "webgpu" else EditorSession(fig).snapshot()
+        )
+        assert payload["settings"] == before
+        assert (
+            payload["code_mode"] == "exact"
+            and "simulated code export failure" in payload["code_error"]
+        )
+        exec(payload["code"], {"fig": target})
+        assert target.get_settings() == before
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_auto_and_log_locators_preserve_ranges_and_explicit_formatting(backend):
+    from figgyplot.ticker import AutoLocator, LogLocator, SignificantFormatter
+
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.plot([0, 1, 2], [1, 3, 2])
+        ax.set_yscale("log")
+        ax.set_ylim(1, 100)
+        ax.yaxis.set_major_locator(LogLocator(100))
+        state = fig.get_settings()
+        assert state["config"]["left_y"]["major_spacing"] == 2
+        assert state["identity"]["tick_modes"]["main"]["left_y"] == "Fixed"
+        assert ax.yaxis.get_major_locator().base == 100
+        ax.yaxis.set_major_formatter(SignificantFormatter(4, style="scientific"))
+        label = fig.get_settings()["config"]["left_y"]["label_style"]
+        ax.yaxis.set_major_locator(AutoLocator())
+        assert ax.get_ylim() == (1, 100)
+        assert fig.get_settings()["config"]["left_y"]["label_style"] == label
+        assert fig.get_settings()["identity"]["tick_modes"]["main"]["left_y"] == "Auto"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("primary_log", [False, True])
+def test_independent_boundary_scales_export_without_reinterpreting_locators(
+    backend, primary_log
+):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([0, 1, 2], [1, 3, 2], id="signal")
+        ax = source.axes[0]
+        ax.set_ylim(1, 100)
+        if primary_log:
+            ax.set_yscale("log")
+        ax.configure(
+            right_y={
+                "scale": "Linear" if primary_log else "Logarithmic",
+                "min": 1,
+                "max": 100,
+                "major_spacing": 10 if primary_log else 1,
+            }
+        )
+        code = source.to_code()
+        exec(code, {"fig": target})
+        assert target.get_settings()["config"] == source.get_settings()["config"]
+        assert target.get_settings()["series"] == source.get_settings()["series"]
+        if backend == "native":
+            np.testing.assert_array_equal(target.render_rgba(), source.render_rgba())
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_default_export_omits_proven_native_no_op_style_calls(backend):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([0, 1, 2], [1, 3, 2], id="signal")
+        source.axes[0].set(title="Measured", xlabel="Time", ylabel="Value")
+        source.artist("signal").set(color="C2", lw=2)
+        code = source.to_code()
+        assert ".tick_params(" not in code
+        assert ".grid(" not in code
+        assert ".configure(" not in code
+        exec(code, {"fig": target})
+        assert target.get_settings()["config"] == source.get_settings()["config"]
+        assert target.get_settings()["series"] == source.get_settings()["series"]
+        if backend == "native":
+            np.testing.assert_array_equal(target.render_rgba(), source.render_rgba())
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_export_replays_added_markers_on_the_original_resident_line(backend):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for fig in (source, target):
+            fig.axes[0].plot([0, 1, 2], [1, 3, 2], id="signal")
+        source.artist("signal").set(marker="s", ms=6, color="C2", lw=2)
+        uploads = target.info.get("column_uploads")
+        exec(source.to_code(), {"fig": target})
+        assert target.get_settings()["config"] == source.get_settings()["config"]
+        assert target.get_settings()["series"] == source.get_settings()["series"]
+        assert target.artist("signal") is target.axes[0].lines[0]
+        assert target.info.get("column_uploads") == uploads
+        if backend == "native":
+            np.testing.assert_array_equal(target.render_rgba(), source.render_rgba())

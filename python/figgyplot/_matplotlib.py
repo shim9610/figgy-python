@@ -62,6 +62,48 @@ def _number(value, name, *, positive=False):
     return value
 
 
+def _locator_spacing(locator, node, axes):
+    """Interpret a locator once, independently of plot/colorbar ownership."""
+    from .ticker import AutoLocator, LogLocator, MultipleLocator
+
+    if isinstance(locator, AutoLocator):
+        from ._native import fitted_range_json
+
+        # The renderer's range helper derives 1/2/5 or log-decade spacing.
+        # Use an isolated Config and copy only the spacing, so a locator never
+        # resets another boundary's range, formatter, visibility or tick intent.
+        config = copy.deepcopy(axes.axes.figure._default_config)
+        dimension = axes.dimension
+        key = "bottom_x" if dimension == "x" else "left_y"
+        config[key] = copy.deepcopy(node)
+        return json.loads(
+            fitted_range_json(json.dumps(config), dimension, node["min"], node["max"])
+        )[key]["major_spacing"]
+    if isinstance(locator, LogLocator):
+        if node["scale"] != "Logarithmic":
+            raise ValueError("LogLocator requires a logarithmic axis")
+        return math.log10(locator.base)
+    if not hasattr(locator, "tick_values"):
+        raise TypeError("locator must provide tick_values(vmin,vmax)")
+    if node["scale"] != "Linear":
+        raise NotImplementedError("MultipleLocator requires a linear axis")
+    values = np.asarray(locator.tick_values(node["min"], node["max"]), dtype=float)
+    diffs = np.diff(values)
+    if (
+        len(diffs) < 1
+        or not np.isfinite(values).all()
+        or not np.allclose(diffs, diffs[0])
+        or diffs[0] <= 0
+    ):
+        raise NotImplementedError("the renderer supports regular major tick locators")
+    step = locator.base if isinstance(locator, MultipleLocator) else float(diffs[0])
+    if not np.allclose(values / step, np.round(values / step), rtol=0, atol=1e-7):
+        raise NotImplementedError(
+            "offset or arbitrary-position major ticks need renderer support"
+        )
+    return step
+
+
 class Text:
     """A stable chart/axis title, with sizes in points and ordinary text setters."""
 
@@ -435,53 +477,24 @@ class Axis:
             ]
         if self.dimension == "y" and self.axes.overlay_id:
             return [self.axes._overlay(state)["y_axis"]]
-        return [
-            cfg[k]
-            for k in (
-                ("bottom_x", "top_x")
-                if self.dimension == "x"
-                else ("left_y", "right_y")
-            )
-        ]
+        primary, peer = (
+            (cfg["bottom_x"], cfg["top_x"])
+            if self.dimension == "x"
+            else (cfg["left_y"], cfg["right_y"])
+        )
+        matching = all(
+            primary[k] == peer[k] for k in ("min", "max", "scale", "inverted")
+        )
+        return [primary, peer] if matching else [primary]
 
     def set_major_locator(self, locator):
-        from .ticker import AutoLocator, LogLocator, MultipleLocator
+        from .ticker import AutoLocator
         from . import _document
 
         fig = self.axes.figure
         state = fig.get_settings()
         nodes = self._nodes(state)
-        if isinstance(locator, AutoLocator):
-            low, high = nodes[0]["min"], nodes[0]["max"]
-            return getattr(self.axes, "set_" + self.dimension + "lim")(low, high)
-        if isinstance(locator, LogLocator):
-            if nodes[0]["scale"] != "Logarithmic":
-                raise ValueError("LogLocator requires a logarithmic axis")
-            for node in nodes:
-                node["major_spacing"] = math.log10(locator.base)
-            return fig.apply_settings(state)
-        if not hasattr(locator, "tick_values"):
-            raise TypeError("locator must provide tick_values(vmin,vmax)")
-        if nodes[0]["scale"] != "Linear":
-            raise NotImplementedError("MultipleLocator requires a linear axis")
-        values = np.asarray(
-            locator.tick_values(nodes[0]["min"], nodes[0]["max"]), dtype=float
-        )
-        diffs = np.diff(values)
-        if (
-            len(diffs) < 1
-            or not np.isfinite(values).all()
-            or not np.allclose(diffs, diffs[0])
-            or diffs[0] <= 0
-        ):
-            raise NotImplementedError(
-                "the renderer supports regular major tick locators"
-            )
-        step = locator.base if isinstance(locator, MultipleLocator) else float(diffs[0])
-        if not np.allclose(values / step, np.round(values / step), rtol=0, atol=1e-7):
-            raise NotImplementedError(
-                "offset or arbitrary-position major ticks need renderer support"
-            )
+        step = _locator_spacing(locator, nodes[0], self)
         for node in nodes:
             node["major_spacing"] = step
         key = (
@@ -499,7 +512,13 @@ class Axis:
         if self.axes.overlay_id and self.dimension == "y":
             key = "y_axis"
         _document.set_tick_mode(
-            state, self.axes.subplot_id, self.axes.overlay_id, key, False, spacing=step
+            state,
+            self.axes.subplot_id,
+            self.axes.overlay_id,
+            key,
+            isinstance(locator, AutoLocator),
+            paired=self.side is None,
+            spacing=step,
         )
         fig.apply_settings(state)
 
@@ -526,10 +545,13 @@ class Axis:
         fig.apply_settings(state)
 
     def get_major_locator(self):
-        from .ticker import MultipleLocator
+        from .ticker import MultipleLocator, LogLocator
 
-        return MultipleLocator(
-            self._nodes(self.axes.figure.get_settings())[0]["major_spacing"]
+        node = self._nodes(self.axes.figure.get_settings())[0]
+        return (
+            LogLocator(10 ** node["major_spacing"])
+            if node["scale"] == "Logarithmic"
+            else MultipleLocator(node["major_spacing"])
         )
 
     def set_tick_auto(self, automatic=True):
@@ -1515,6 +1537,23 @@ class Colorbar:
 class ColorbarAxis(Axis):
     def _nodes(self, state):
         return [self.axes._config(state)["colorbar"]["axis"]]
+
+    def set_major_locator(self, locator):
+        fig = self.axes.figure
+        state = fig.get_settings()
+        node = self._nodes(state)[0]
+        node["major_spacing"] = _locator_spacing(locator, node, self)
+        fig.apply_settings(state)
+
+    def set_view_interval(self, *args, **kwargs):
+        raise NotImplementedError(
+            "independent colorbar viewport is unavailable; use mappable.set_clim to change the data norm"
+        )
+
+    def set_tick_auto(self, *args, **kwargs):
+        raise NotImplementedError(
+            "independent colorbar tick intent is unavailable; choose a locator explicitly"
+        )
 
     @property
     def label(self):

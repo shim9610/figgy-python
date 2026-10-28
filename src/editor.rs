@@ -594,7 +594,7 @@ impl Editor {
                                     .map_err(runtime)?;
                                 Python::attach(|py| {
                                     py.import("figgyplot._codegen")?
-                                        .getattr("settings_to_code")?
+                                        .getattr("editor_settings_to_code")?
                                         .call1((settings, defaults, c.data.code_dpi))?
                                         .extract::<String>()
                                 })

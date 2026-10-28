@@ -19,7 +19,8 @@ from figgyplot import Figure
 from figgyplot.editor import EditorSession
 
 
-def test_live_editor_select_drag_copy_and_png(tmp_path):
+@pytest.mark.parametrize("delayed_ack", [False, True])
+def test_live_editor_select_drag_copy_and_png(tmp_path, delayed_ack):
     pytest.importorskip("playwright")
     from playwright.sync_api import sync_playwright
     import figgyplot as figgy
@@ -37,6 +38,11 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
 
         def payload():
             return json.dumps({"state": editor.snapshot(), "image": base64.b64encode(editor.image).decode()}).encode()
+
+        release_ack = threading.Event()
+        release_ack.set()
+        release_started = threading.Event()
+        if delayed_ack:release_ack.clear()
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *args): pass
@@ -64,7 +70,11 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
                 self.send_response(200); self.send_header("Content-Type", mime); self.end_headers(); self.wfile.write(data)
             def do_POST(self):
                 content = self.rfile.read(int(self.headers["Content-Length"]))
-                editor.dispatch(json.loads(content))
+                message=json.loads(content)
+                editor.dispatch(message)
+                if delayed_ack and message['action']=='release':
+                    release_started.set()
+                    if not release_ack.wait(10):raise RuntimeError('release acknowledgement gate was not opened')
                 data = payload()
                 self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(data)
 
@@ -95,11 +105,23 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
                 page.wait_for_function("editorModel.get('state').selection === 'chart_title'")
                 page.mouse.move(x + 15, y + 5, steps=3); page.mouse.up()
                 page.wait_for_function("editorModel.get('state').settings.config.chart_title.offset_x > 0")
+                page.bring_to_front()
+                page.evaluate("""() => {
+                    window.copyAttempts=[];
+                    const write=navigator.clipboard.writeText.bind(navigator.clipboard);
+                    navigator.clipboard.writeText=text=>{window.copyAttempts.push(text);return write(text);};
+                }""")
+                if delayed_ack:assert release_started.wait(5)
                 page.locator("[data-copy]").click()
+                if delayed_ack:
+                    assert page.evaluate('copyAttempts.length')==0, 'copied before the final edit acknowledgement'
+                    release_ack.set()
                 page.wait_for_function("document.querySelector('[data-status]').textContent === 'Python code copied'")
                 copied = page.evaluate("navigator.clipboard.readText()")
                 assert "ax.set_title(" in copied and "Browser edited title" in copied
                 assert "json.loads" not in copied
+                assert copied == fig.to_code()
+                assert page.evaluate('copyAttempts') == [copied]
                 with page.expect_download() as event:
                     page.locator("[data-save]").click()
                 download = event.value
@@ -109,4 +131,5 @@ def test_live_editor_select_drag_copy_and_png(tmp_path):
                 assert not errors
                 browser.close()
         finally:
+            release_ack.set()
             server.shutdown(); server.server_close(); thread.join(timeout=5)

@@ -1258,7 +1258,7 @@ def text_segments(text, **style):
 
 def _colormap(value):
     try:
-        return {"viridis": "Viridis", "magma": "Magma", "turbo": "Turbo", "gray": "GrayScale", "grey": "GrayScale", "rdbu": "RdBu"}[value.lower()]
+        return {"viridis": "Viridis", "magma": "Magma", "turbo": "Turbo", "gray": "GrayScale", "grey": "GrayScale", "grayscale": "GrayScale", "rdbu": "RdBu"}[value.lower()]
     except (KeyError, AttributeError):
         raise ValueError("cmap must be viridis, magma, turbo, gray or RdBu") from None
 

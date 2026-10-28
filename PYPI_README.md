@@ -106,14 +106,24 @@ import figgyplot as plt
 
 x = np.linspace(0, 20, 100_000, dtype=np.float32)
 fig, ax = plt.subplots(backend="native", figsize=(8, 5), dpi=120)
-ax.plot(x, np.sin(x), id="signal")
-ax.set_title("Edit, copy Python, and reuse")
+line, = ax.plot(x, np.sin(x), lw=2, label="Signal", id="signal")
+ax.set(title="Edit, copy Python, and reuse", xlabel="Time (s)", ylabel="Amplitude")
+ax.tick_params(direction="out", labelsize=10)
+ax.spines["top"].set_visible(False)
+ax.legend(loc="upper right")
 try:
     fig.show()                  # Edit; close the window to continue.
     fig.savefig("edited.png")  # Save the edited chart without the UI.
 finally:
     fig.close()
 ```
+
+The supported plotting API follows Matplotlib's object and unit conventions.
+Existing objects remain editable through handles such as `line.set(color="C2")`
+and `ax.title.set_fontsize(14)`. Copy Python generates public setters by default;
+`fig.to_code(mode="exact")` retains full document recovery. See the
+[API subset and limits](https://github.com/shim9610/figgy-python/blob/main/docs/MATPLOTLIB_API.md).
+Matplotlib itself is not a runtime dependency.
 
 In Jupyter, use `plt.subplots(backend="webgpu")` and display `fig.widget()`.
 Selection and editing run in the notebook's browser. Both hosts expose tick

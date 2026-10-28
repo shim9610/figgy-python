@@ -120,9 +120,11 @@ class FigureWidget(anywidget.AnyWidget):
     def refresh(self):
         if not self._handling:
             settings = self.figure.get_settings()
+            from ._codegen import editor_code_payload
             from ._native import object_outline_json, bounded_view_json
             catalog=self.figure._editor_catalog_transport()
-            self.state = {"settings": settings, "revision": self.figure.revision, "code": self.figure.to_code(),
+            self.state = {"settings": settings, "revision": self.figure.revision,
+                          **editor_code_payload(settings,self.figure._default_config,self.figure.dpi),
                           "edit_history": self.figure.edit_history,
                           "property_catalog": catalog['objects'],
                           "property_columns": catalog['columns'],

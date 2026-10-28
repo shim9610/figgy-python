@@ -4,7 +4,7 @@
   "reference_matplotlib": "3.11.2",
   "supported_contract": "docs/MATPLOTLIB_API.md",
   "runtime_dependency": "NumPy only; tested in a separate environment without Matplotlib",
-  "wheel_sha256": "66f798376027d891ef702b16f0c12f2838814fbb3dbba991b7fdc6849e65dfb2",
+  "wheel_sha256": "c4ab4052e9f463ea799598cd32652ff0f2ee4ffb1947cc6f9a9a62280a235e88",
   "installed_source_files_checked": [
     "__init__.py",
     "_api_codegen.py",
@@ -23,7 +23,10 @@
     "_review_summary.py",
     "_style_presets.py",
     "_style_runtime.py",
+    "assets/figgy.js",
     "desktop.py",
+    "editor.css",
+    "editor.js",
     "editor.py",
     "figure.py",
     "notebook.py",
@@ -34,20 +37,21 @@
     "skills/figgyplot-review/SKILL.md",
     "styles.py",
     "ticker.py",
+    "webgpu.js",
     "widget.py"
   ],
-  "matplotlib_contract_cases": 52,
-  "installed_regression_cases": 868,
+  "matplotlib_contract_cases": 86,
+  "initial_installed_regression_cases": 868,
   "preflight_cases": 134,
   "copy_and_native_typing_cases": 9,
-  "ci_collection": 1461,
+  "ci_collection": 1497,
   "public_data_scenes": 20,
   "frozen_png_matches": 20,
   "scene_replays": [
     {
       "path": "figures/01_class_profiles.png",
-      "api_bytes": 9145,
-      "api_lines": 116,
+      "api_bytes": 8777,
+      "api_lines": 112,
       "exact_bytes": 16401,
       "uses_advanced_block": true,
       "api_config_series_pixels_equal": true,
@@ -58,8 +62,8 @@
     },
     {
       "path": "figures/02_record_heatmaps.png",
-      "api_bytes": 12495,
-      "api_lines": 190,
+      "api_bytes": 12127,
+      "api_lines": 186,
       "exact_bytes": 29163,
       "uses_advanced_block": true,
       "api_config_series_pixels_equal": true,
@@ -70,7 +74,7 @@
     },
     {
       "path": "figures/03_pca_overlap.png",
-      "api_bytes": 4536,
+      "api_bytes": 4432,
       "api_lines": 58,
       "exact_bytes": 6740,
       "uses_advanced_block": true,
@@ -94,8 +98,8 @@
     },
     {
       "path": "plots/01_score_distribution.png",
-      "api_bytes": 2558,
-      "api_lines": 36,
+      "api_bytes": 1496,
+      "api_lines": 28,
       "exact_bytes": 2252,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -106,8 +110,8 @@
     },
     {
       "path": "plots/02_lunch_and_score.png",
-      "api_bytes": 2198,
-      "api_lines": 31,
+      "api_bytes": 1224,
+      "api_lines": 25,
       "exact_bytes": 1983,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -130,8 +134,8 @@
     },
     {
       "path": "plots/01_consumption_history.png",
-      "api_bytes": 2400,
-      "api_lines": 33,
+      "api_bytes": 1338,
+      "api_lines": 25,
       "exact_bytes": 1852,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -154,8 +158,8 @@
     },
     {
       "path": "plots/03_level_and_within_year_range.png",
-      "api_bytes": 5350,
-      "api_lines": 73,
+      "api_bytes": 4423,
+      "api_lines": 68,
       "exact_bytes": 6161,
       "uses_advanced_block": true,
       "api_config_series_pixels_equal": true,
@@ -166,8 +170,8 @@
     },
     {
       "path": "artifacts/01_strength_distribution.png",
-      "api_bytes": 2647,
-      "api_lines": 38,
+      "api_bytes": 1585,
+      "api_lines": 30,
       "exact_bytes": 2317,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -190,8 +194,8 @@
     },
     {
       "path": "artifacts/03_cement_strength.png",
-      "api_bytes": 2679,
-      "api_lines": 38,
+      "api_bytes": 1758,
+      "api_lines": 33,
       "exact_bytes": 2458,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -202,8 +206,8 @@
     },
     {
       "path": "artifacts/04_exact_age_summaries.png",
-      "api_bytes": 2227,
-      "api_lines": 30,
+      "api_bytes": 1211,
+      "api_lines": 23,
       "exact_bytes": 2753,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -238,7 +242,7 @@
     },
     {
       "path": "plots/03_calories_sodium.png",
-      "api_bytes": 3041,
+      "api_bytes": 2315,
       "api_lines": 49,
       "exact_bytes": 4067,
       "uses_advanced_block": false,
@@ -250,8 +254,8 @@
     },
     {
       "path": "plots/01_salary_vs_hits.png",
-      "api_bytes": 1982,
-      "api_lines": 28,
+      "api_bytes": 1006,
+      "api_lines": 22,
       "exact_bytes": 2035,
       "uses_advanced_block": false,
       "api_config_series_pixels_equal": true,
@@ -296,5 +300,39 @@
     "Annotations are restricted to the parent panel",
     "Scalar-mapped point opacity is guarded"
   ],
-  "validation_scope": "Linux Mesa software GPU and actual native X11/Jupyter WebGPU; no physical-GPU performance claim"
+  "validation_scope": "Linux Mesa software GPU and actual native X11/Jupyter WebGPU; no physical-GPU performance claim",
+  "wheel_description_matches_source": true,
+  "followup_regressions": {
+    "startup": "All five native colormaps export and construct a widget; angle/time notation and independent boundary scales preserve exact config and pixels.",
+    "export_isolation": "A simulated API export exception leaves the accepted chart visible and supplies complete exact recovery. Diagnostic lines cannot execute as code.",
+    "clipboard": "A real browser clipboard write is held until the final edit acknowledgement; an explicit ACK gate reproduced the old race and verifies the fix.",
+    "axis_scope": "Six pre-fix failures demonstrated locator/formatter changes escaping their primary, secondary or colorbar owner. Selected owners and untouched peer config/identity are asserted.",
+    "marker_replay": "Two host cases replay a newly added marker on the original resident Line; settings and native pixels match with no column uploads.",
+    "short_export": "Only calls proven equal by the native typed serializer are omitted; no rounding of scientific values or source arrays.",
+    "initial_kernel_error": "A deliberately failed real Jupyter cell reports the actual exception before waiting for GPU readiness."
+  },
+  "full_local_suite": {
+    "cases": 1497,
+    "passed": 1497,
+    "failures": 0,
+    "skipped": 0,
+    "execution_chunks": [
+      {
+        "passed": 813,
+        "api_codegen_sha256": "11980462fb46f50eaf021a87eec391b4d96fc725146a4ed249614c7804dc27c5"
+      },
+      {
+        "passed": 684,
+        "final_wheel": true
+      }
+    ],
+    "resumed_after": "A stale radial clipboard syntax assertion was replaced by public API assertions plus real settings/value/pixel replay.",
+    "final_marker_export_ordering_verified_in_final_focused_suite": true
+  },
+  "final_focused_suite": {
+    "cases": 274,
+    "passed": 274,
+    "failures": 0,
+    "skipped": 0
+  }
 }

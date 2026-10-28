@@ -49,7 +49,7 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         SignificantFormatter,
     )
     from ._charts import family
-    from ._native import font_family_available
+    from ._native import font_family_available, canonical_style_state_json
 
     if (
         not isinstance(variable, str)
@@ -91,6 +91,15 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         after = model._state
         keys = ("config", "series", "background")
         changed = any(before.get(k) != after.get(k) for k in keys)
+        if changed and not force and " = " not in statement:
+            # Point conversions can differ in Python's final binary digit while
+            # producing identical typed renderer state. Omit only proven native
+            # no-ops, without rounding scientific data or weakening replay.
+            original = json.loads(canonical_style_state_json(json.dumps(before)))
+            updated = json.loads(canonical_style_state_json(json.dumps(after)))
+            changed = any(original.get(k) != updated.get(k) for k in keys)
+            if not changed:
+                model._state = before
         if force or changed or " = " in statement:
             lines.append(statement)
 
@@ -244,26 +253,35 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
             if node["inverted"]:
                 low, high = high, low
             emit(f"{axis}.set_view_interval({low!r}, {high!r})")
-            if node["scale"] == "Linear":
-                emit(
-                    f"{axis}.set_major_locator({ticker_names['MultipleLocator']}({node['major_spacing']!r}))"
-                )
-            elif node["scale"] == "Logarithmic":
-                emit(
-                    f"{axis}.set_major_locator({ticker_names['LogLocator']}(base={10 ** node['major_spacing']!r}))"
-                )
+            # Independent opposite-axis scales have no public setter yet.
+            # Leave their scale and spacing together in the advanced residual.
+            modeled_scale = eval(axis, namespace)._nodes(model.get_settings())[0][
+                "scale"
+            ]
+            if node["scale"] == modeled_scale:
+                if node["scale"] == "Linear":
+                    emit(
+                        f"{axis}.set_major_locator({ticker_names['MultipleLocator']}({node['major_spacing']!r}))"
+                    )
+                elif node["scale"] == "Logarithmic":
+                    emit(
+                        f"{axis}.set_major_locator({ticker_names['LogLocator']}(base={10 ** node['major_spacing']!r}))"
+                    )
             emit(
                 f"{axis}.set_minor_locator({ticker_names['AutoMinorLocator']}({node['minor_count'] + 1}))"
             )
             label = node["label_style"]
-            notation = {
-                "Decimal": "plain",
-                "Scientific": "scientific",
-                "Power": "power",
-            }[label["format"]]
-            emit(
-                f"{axis}.set_major_formatter({ticker_names['SignificantFormatter']}({label['significant_digits']}, style={notation!r}))"
+            notation = (
+                {"Decimal": "plain", "Scientific": "scientific", "Power": "power"}.get(
+                    label["format"]
+                )
+                if isinstance(label["format"], str)
+                else None
             )
+            if notation is not None:
+                emit(
+                    f"{axis}.set_major_formatter({ticker_names['SignificantFormatter']}({label['significant_digits']}, style={notation!r}))"
+                )
             args = [
                 f"labelsize={_points(label['font_size'], dpi)!r}",
                 f"labelcolor={color(label['color'])!r}",
@@ -326,11 +344,13 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
             marker = {v: k for k, v in _MARKERS.items()}.get(
                 scatter["point_shape"], scatter["point_shape"]
             )
+            # Adding markers is a supported resident-Line transition. Emit it
+            # before size, even when the source model already has that marker.
+            emit(f"{artist}.set_marker({marker!r})", force=True)
             emit(
                 f"{artist}.set_markersize({_points(scatter['point_size'] * 2, dpi)!r})",
                 force=True,
             )
-            emit(f"{artist}.set_marker({marker!r})")
             emit(
                 f"{artist}.set_facecolor({color(scatter['point_color'])!r})", force=True
             )
@@ -371,7 +391,10 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
             )
             bar = owner._config(settings)["colorbar"]
             if isinstance(bar["colormap"], str):
-                emit(f"{artist}.set_cmap({bar['colormap'].lower()!r})", force=True)
+                name = {"GrayScale": "gray", "RdBu": "RdBu"}.get(
+                    bar["colormap"], bar["colormap"].lower()
+                )
+                emit(f"{artist}.set_cmap({name!r})", force=True)
             emit(
                 f"{artist}.set_clim({bar['axis']['min']!r}, {bar['axis']['max']!r})",
                 force=True,

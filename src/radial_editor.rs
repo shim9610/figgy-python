@@ -169,7 +169,7 @@ impl Editor {
                         let code = c.settings_json().and_then(|settings| {
                             Python::attach(|py| {
                                 py.import("figgyplot._codegen")?
-                                    .getattr("settings_to_code")?
+                                    .getattr("editor_settings_to_code")?
                                     .call1((
                                         settings,
                                         serde_json::to_string(&c.data.default_config)

@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import time
 
+import numpy as np
 import pytest
 import figgyplot as figgy
 from figgyplot.desktop import poll_events
@@ -177,7 +178,8 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
             if result.returncode==0 and copied==expected:break
             assert time.monotonic()<deadline,(result.returncode,result.stderr,copied)
             inputs.pump()
-        assert copied == expected and "configure_radial" in copied
+        assert copied == expected and ".chart.set_material('wood')" in copied
+        assert "configure_radial" not in copied
         assert "'value':" not in copied
         subprocess.run(["wmctrl", "-ir", inputs.wid, "-b", "add,maximized_vert,maximized_horz"], check=True)
         inputs.pump()
@@ -186,6 +188,15 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         subprocess.run(["wmctrl", "-ir", inputs.wid, "-b", "remove,maximized_vert,maximized_horz"], check=True)
         inputs.pump()
         assert fig.info["column_uploads"] == fig.info["rgba_readbacks"] == fig.info["png_encodes"] == 0
+        # Verify the public appearance recipe on the original plotting setup.
+        # Transient hover/selection are view state, covered by exact checkpoints.
+        with figgy.Figure(backend="native") as replay:
+            replay.axes[0].pie([40, 30, 0, 30], labels=["A", "B", "Zero", "C"], material="ceramic")
+            exec(copied, {"fig": replay})
+            source=fig.get_settings()['radial'];restored=replay.get_settings()['radial']
+            assert {k:v for k,v in restored.items() if k!='interaction'} == {k:v for k,v in source.items() if k!='interaction'}
+            np.testing.assert_array_equal(replay.render_rgba(),fig.render_rgba())
+            assert replay.info['column_uploads']==0
         fig.savefig(tmp_path/"reviewed.png")
         assert (tmp_path/"reviewed.png").is_file()
     finally:
