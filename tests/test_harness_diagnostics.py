@@ -217,8 +217,7 @@ state.disposed=true;assert.throws(settled,/disposed/);
 
 def test_property_draft_rebase_preserves_unrelated_values_and_rejects_conflicts():
     from pathlib import Path
-    import figgyplot
-    source=Path(figgyplot.__file__).with_name('webgpu.js').read_text()+'\nexport {propertyDraft,rebasePropertyDraft};'
+    source=(Path(__file__).resolve().parents[1]/'python'/'figgyplot'/'webgpu.js').read_text()+'\nexport {propertyDraft,rebasePropertyDraft};'
     run_node("const source="+json.dumps(source)+";\n"+r"""
 import assert from 'node:assert/strict';
 const {propertyDraft,rebasePropertyDraft}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
