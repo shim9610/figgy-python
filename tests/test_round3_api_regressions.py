@@ -108,13 +108,20 @@ def test_public_code_preserves_tick_intent_without_replanning_current_ticks(back
         if policy != 'implicit':
             ax.set_xlim(0, 1000)
             ax.set_ylim(0, 5)
+        # A deliberately retained spacing differs from the fresh 200-unit
+        # plan. Public setters establish this accepted state; no snapshot
+        # fields are fabricated, and AutoLocator cannot reproduce it.
+        ax.xaxis.set_major_locator(MultipleLocator(125))
+        if policy in ('implicit', 'auto'):
+            ax.xaxis.set_tick_auto(None if policy == 'implicit' else True)
         if policy in ('fixed', 'mixed'):
-            ax.xaxis.set_major_locator(MultipleLocator(200))
+            ax.xaxis.set_tick_auto(False)
         if policy == 'mixed':
             ax.secondary_xaxis('top').xaxis.set_tick_auto(True)
         # A previously accepted auto layout need not match a fresh tick plan.
         # Restoring policy must keep this actual SSOT rather than recompute it.
         before = source.get_settings()
+        assert before['config']['bottom_x']['major_spacing'] == 125
         target.axes[0].xaxis.set_major_locator(MultipleLocator(25))
         uploads = target.info.get('column_uploads')
         exec(source.to_code(), {'fig': target})
@@ -155,9 +162,11 @@ def test_public_log_axis_replay_preserves_policy_and_current_decade_layout(backe
         ax = fig.axes[0]
         ax.plot([1, 10, 1000], [1, 2, 4], id='signal')
         ax.set_xlim(1, 1000); ax.set_xscale('log')
-        if fixed:
-            ax.xaxis.set_major_locator(LogLocator(100))
+        ax.xaxis.set_major_locator(LogLocator(100))
+        if not fixed:
+            ax.xaxis.set_tick_auto(True)
         before = fig.get_settings()
+        assert before['config']['bottom_x']['major_spacing'] == 2
         exec(fig.to_code(), {'fig': fig})
         assert fig.get_settings() == before
 

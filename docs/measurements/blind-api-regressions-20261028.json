@@ -27,7 +27,11 @@
     },
     "preflight_cases_passed": 135,
     "full_ci_collection_count": 1683,
-    "full_ci_result": "Reported separately by the required PR checks for the exact pushed commit."
+    "full_ci_result": "Reported separately by the required PR checks for the exact pushed commit.",
+    "replanning_exporter_negative_control": {
+      "cases": 2,
+      "expected_failures": 2
+    }
   },
   "wheel": {
     "sha256": "2424c3ded63f8d5b727bb71e43ac99a22afa6f72aec37088b38f9b8ce9fabce4",
@@ -46,7 +50,7 @@
     "no_column_reuploads": true
   },
   "oracles": {
-    "state": "Entire accepted snapshots including tick modes and explicit backgrounds; no ignored snapshot fields.",
+    "state": "Entire accepted snapshots including tick modes and explicit backgrounds; no ignored snapshot fields. Retained automatic spacings (125 linear units and two log decades) differ from a fresh plan; a deliberately replanning exporter is rejected.",
     "pixels": "Independent title/tick ink masks and canvas containment for four sides at 72/144 DPI, plus native replay equality.",
     "interaction": "Real native and Jupyter wheel input after API/exact replay; automatic ticks adjust and fixed ticks remain fixed.",
     "arrays": "Independent destination arrays checked against native GPU selection readback and browser transfer bytes in both export modes."
