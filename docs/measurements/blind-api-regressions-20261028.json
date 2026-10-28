@@ -1,0 +1,59 @@
+{
+  "base_commit": "d0bb35cd0f9eda18ae6bd7be98a9bd440b5c58de",
+  "renderer_version": "0.18.1",
+  "environment": {
+    "python": "3.12",
+    "os": "Linux",
+    "native": "Vulkan llvmpipe",
+    "notebook": "Chromium SwiftShader WebGPU"
+  },
+  "fixes": [
+    "Requested colorbar labels enable visibility through the common colorbar axis setter; explicit hiding is respected.",
+    "Default label spacing uses renderer painted text bounds in a shared CPU helper; manual title offsets are preserved.",
+    "Public code restores automatic/fixed/implicit tick policy after numerical locators without replanning current ticks.",
+    "Categorical manual ranges are explicitly guarded, and getters do not index nonexistent schema fields.",
+    "Explicit white backgrounds remain accepted SSOT and replay exactly."
+  ],
+  "limits": [
+    "Renderer 0.18.1 has no manual categorical axis range; no range implementation is claimed.",
+    "Windows GUI and physical-GPU performance are outside this validation."
+  ],
+  "local_validation": {
+    "new_regressions_passed": 40,
+    "new_native_and_jupyter_cases_passed": 10,
+    "frozen_unfixed_wheel_negative_control": {
+      "cases": 32,
+      "expected_failures": 32
+    },
+    "preflight_cases_passed": 135,
+    "full_ci_collection_count": 1683,
+    "full_ci_result": "Reported separately by the required PR checks for the exact pushed commit."
+  },
+  "wheel": {
+    "sha256": "2424c3ded63f8d5b727bb71e43ac99a22afa6f72aec37088b38f9b8ce9fabce4",
+    "package_files_compared": 51,
+    "source_and_install_mismatches": 0
+  },
+  "public_data": {
+    "domains": 6,
+    "observations": 2603,
+    "final_scenes": 22,
+    "numerical_checks_passed": 22,
+    "public_replay_complete_ssot_equal": 22,
+    "public_replay_pixels_equal": 22,
+    "exact_replay_complete_ssot_equal": 22,
+    "exact_replay_pixels_equal": 22,
+    "no_column_reuploads": true
+  },
+  "oracles": {
+    "state": "Entire accepted snapshots including tick modes and explicit backgrounds; no ignored snapshot fields.",
+    "pixels": "Independent title/tick ink masks and canvas containment for four sides at 72/144 DPI, plus native replay equality.",
+    "interaction": "Real native and Jupyter wheel input after API/exact replay; automatic ticks adjust and fixed ticks remain fixed.",
+    "arrays": "Independent destination arrays checked against native GPU selection readback and browser transfer bytes in both export modes."
+  },
+  "coverage": [
+    "tests/test_round3_api_regressions.py",
+    "tests/test_interaction_parity.py",
+    "tests/test_matplotlib_api.py"
+  ]
+}

@@ -138,7 +138,7 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         before = model._state
         exec(statement, namespace)
         after = model._state
-        keys = ("config", "series", "background")
+        keys = ("config", "series", "background", "identity")
         changed = any(before.get(k) != after.get(k) for k in keys)
         if changed and not force and " = " not in statement:
             # Point conversions can differ in Python's final binary digit while
@@ -990,6 +990,22 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         lines.append(
             f"{variable}.subplots[{panel_id!r}].axes.configure(**{fmt(patch)})"
         )
+    # Numeric locators above reproduce the accepted layout, but also select
+    # fixed future ticks. Restore the source policy last, after residual
+    # spacing patches, using the public policy setter that does not re-fit.
+    modes = settings['identity'].get('tick_modes', {})
+    for panel in settings['identity']['panels']:
+        owner = panel['id']
+        target = f"{variable}.subplots[{owner!r}].axes"
+        for side, key, dimension in [('bottom', 'bottom_x', 'x'), ('top', 'top_x', 'x'),
+                                     ('left', 'left_y', 'y'), ('right', 'right_y', 'y')]:
+            policy = modes.get(owner, {}).get(key)
+            value = None if policy is None else policy == 'Auto'
+            emit(f"{target}.secondary_{dimension}axis({side!r}).{dimension}axis.set_tick_auto({value!r})")
+        for overlay in panel['overlays']:
+            policy = modes.get(overlay, {}).get('y_axis')
+            value = None if policy is None else policy == 'Auto'
+            emit(f"{target}.get_overlay({overlay!r}).yaxis.set_tick_auto({value!r})")
     used = [
         name + (" as " + ticker_names[name] if ticker_names[name] != name else "")
         for name in ticker_classes

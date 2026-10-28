@@ -22,6 +22,18 @@ def colorbar(config, values, cmap, vmin, vmax):
 _COLOR_UNSET = object()
 
 
+def fit_colorbar_title(config):
+    """Fit an unpositioned label with renderer metrics; preserve manual offsets."""
+    bar = config.get('colorbar')
+    if not bar or not bar['visible']:
+        return
+    title = bar['axis']['title_option']
+    if not title['visible'] or title['offset_x'] or title['offset_y']:
+        return
+    from ._native import fitted_colorbar_title_margin
+    bar['axis']['out_margin'] = fitted_colorbar_title_margin(json.dumps(config))
+
+
 def update_color_scale(config, *, cmap=_COLOR_UNSET, vmin=None, vmax=None):
     """Shared mutation for mapped artists and standalone color-scale objects."""
     from .figure import _colormap
@@ -30,6 +42,7 @@ def update_color_scale(config, *, cmap=_COLOR_UNSET, vmin=None, vmax=None):
     if cmap is not _COLOR_UNSET:bar['colormap']=_colormap(cmap)
     if vmin is not None:bar['axis']['min']=_number(vmin,'vmin')
     if vmax is not None:bar['axis']['max']=_number(vmax,'vmax')
+    fit_colorbar_title(config)
 
 
 def _set_colorbar(config,cmap,low,high):

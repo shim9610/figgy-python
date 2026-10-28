@@ -859,11 +859,11 @@ class Figure(FigureMethods):
             if _family(state) is not None:
                 state[_family(state)]["background"] = _color(color)
             else:
-                rgba = _color(color)
-                if rgba == _color("white"):
-                    state.pop("background", None)
-                else:
-                    state["background"] = rgba
+                # An explicit white background is still accepted document state.
+                # Dropping it here makes exact code replay silently normalize a
+                # style token's snapshot. Resetting to defaults is reset_style's
+                # job, independently of which color a caller explicitly sets.
+                state["background"] = _color(color)
             return self.apply_settings(state)
 
     def set_draw_style(self, mode="precise", **options):
@@ -1379,8 +1379,13 @@ class Axes(AxesMethods, FeatureMethods, ChartMethods):
         state = self.figure.get_settings()
         kind = _family(state)
         if kind:
-            value_axis = 'x' if kind in ('categorical','boxplot') and state[kind]['direction'] == 'Horizontal' else 'y'
-            if kind not in ('categorical','boxplot','radar') or dimension != value_axis:
+            if kind == 'categorical':
+                raise NotImplementedError(
+                    'categorical bars use an automatic value range; renderer 0.18 '
+                    'does not support manual axis limits'
+                )
+            value_axis = 'x' if kind == 'boxplot' and state[kind]['direction'] == 'Horizontal' else 'y'
+            if kind not in ('boxplot','radar') or dimension != value_axis:
                 raise ValueError(f'{kind} does not support an adjustable {dimension} value axis')
             state[kind]['value_range'] = [low, high]
             self.figure.apply_settings(state)

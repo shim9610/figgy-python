@@ -3406,3 +3406,110 @@ right.set_title('Mapped values')
         canvas.screenshot(path=str(tmp_path/'browser-style-canvas.png'))
         with Image.open(tmp_path/'browser-style-canvas.png') as image:check_pixels(image)
         assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter wheel input')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('mode', ['api', 'exact'])
+@pytest.mark.parametrize('fixed', [False, True])
+def test_export_replay_preserves_future_wheel_tick_behavior(tmp_path, backend, mode, fixed):
+    """Equal pre-gesture SSOT must retain the user's auto/fixed tick behavior."""
+    setup = f'''
+import figgyplot as fg
+from figgyplot.ticker import MultipleLocator
+fig = fg.Figure(backend={backend!r})
+ax = fig.axes[0]
+ax.plot([0, 1000], [1, 4], id='signal')
+ax.set_xlim(0, 1000)
+ax.set_ylim(0, 5)
+fig.apply_style('report')
+if {fixed!r}: ax.xaxis.set_major_locator(MultipleLocator(200))
+before = fig.get_settings()
+exec(fig.to_code(mode={mode!r}), {{'fig': fig}})
+assert fig.get_settings() == before
+'''
+    def check(before, after):
+        a, b = before['config']['bottom_x'], after['config']['bottom_x']
+        assert b['max']-b['min'] < (a['max']-a['min'])/2
+        if fixed:
+            assert b['major_spacing'] == a['major_spacing']
+        else:
+            assert b['major_spacing'] < a['major_spacing']
+        assert after['identity'].get('tick_modes') == before['identity'].get('tick_modes')
+        assert after['series'] == before['series']
+        (tmp_path/'wheel-before-after.json').write_text(json.dumps(dict(before=before, after=after), indent=2))
+    if backend == 'native':
+        scope = {}; exec(setup, scope); fig = scope['fig']
+        with fig:
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle); before = fig.get_settings(); uploads = fig.info['column_uploads']
+                x, y, w, h = inputs.info()['decorations']['data_area']
+                inputs.xdo('mousemove', '--window', inputs.wid, round(x+w/2), round(y+h/2)); inputs.pump()
+                inputs.xdo('keydown', 'ctrl')
+                try:
+                    inputs.xdo('click', '--repeat', 8, '--delay', 20, 4)
+                finally:
+                    inputs.xdo('keyup', 'ctrl')
+                inputs.pump()
+                check(before, fig.get_settings())
+                assert fig.info['column_uploads'] == uploads
+                assert not inputs.info()['error']
+            finally:
+                handle.close(); Inputs.pump()
+    else:
+        with notebook(tmp_path/'notebook', setup+'\ndisplay(fig.widget())') as (page, execute):
+            before = page.evaluate(ROOT+'.snapshot()')
+            uploads = page.evaluate(ROOT+'.stats.column_uploads')
+            upload_bytes = page.evaluate(ROOT+'.stats.binary_upload_bytes')
+            rect = page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+            x, y = browser_point(page, (rect[0]+rect[2]/2, rect[1]+rect[3]/2))
+            page.mouse.move(x, y); page.keyboard.down('Control')
+            try:
+                page.mouse.wheel(0, -640)
+            finally:
+                page.keyboard.up('Control')
+            page.wait_for_function(
+                f"() => {{ const a={ROOT}.snapshot().config.bottom_x; return a.max-a.min < {(before['config']['bottom_x']['max']-before['config']['bottom_x']['min'])/2!r}; }}"
+            )
+            page.evaluate(ROOT+'.flush()')
+            after = page.evaluate(ROOT+'.snapshot()')
+            check(before, after)
+            execute('await fig.sync()')
+            assert page.evaluate(ROOT+'.stats.column_uploads') == uploads
+            assert page.evaluate(ROOT+'.stats.binary_upload_bytes') == upload_bytes
+            assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires actual native and notebook label geometry')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_colorbar_requested_label_is_visible_and_separate_in_both_hosts(tmp_path, backend):
+    setup = f'''
+import figgyplot as fg
+fig = fg.Figure(backend={backend!r})
+points = fig.axes[0].scatter([1,2],[3,4],c=[10,20])
+bar = fig.colorbar(points, label='Temperature (K)')
+bar.ax.yaxis.label.set_fontsize(18)
+bar.ax.tick_params(labelsize=12)
+'''
+    def check(title, ticks):
+        assert title[2] > 0 and title[3] > 0
+        assert ticks[2] > 0 and ticks[3] > 0
+        assert title[0] > ticks[0]+ticks[2]
+    if backend == 'native':
+        scope = {}; exec(setup, scope); fig = scope['fig']
+        with fig:
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle); decorations = inputs.info()['decorations']
+                assert scope['bar'].ax.yaxis.label.get_visible()
+                check(decorations['colorbar_title'], decorations['colorbar_tick_labels'])
+                assert not inputs.info()['error']
+            finally:
+                handle.close(); Inputs.pump()
+    else:
+        with notebook(tmp_path/'colorbar', setup+'\ndisplay(fig.widget())') as (page, execute):
+            decorations = page.evaluate(ROOT+'.decorations()')
+            assert page.evaluate(ROOT+'.snapshot().config.colorbar.axis.title_option.visible')
+            check(decorations['colorbar_title']['rect'], decorations['colorbar_tick_labels']['rect'])
+            assert not page.locator('.figgy-error').inner_text()

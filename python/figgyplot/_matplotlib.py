@@ -593,7 +593,11 @@ class Axis:
         )
 
     def set_tick_auto(self, automatic=True):
-        """Figgy extension: keep the current spacing but choose future auto/fixed ticks."""
+        """Choose future auto/fixed ticks without replanning the current spacing.
+
+        ``None`` removes an explicit policy and restores the implicit automatic
+        default. It also removes the override from the document snapshot.
+        """
         from . import _document
 
         fig = self.axes.figure
@@ -619,7 +623,7 @@ class Axis:
                 self.axes.subplot_id,
                 self.axes.overlay_id,
                 key,
-                bool(automatic),
+                None if automatic is None else bool(automatic),
                 paired=False,
             )
         fig.apply_settings(state)
@@ -1551,7 +1555,7 @@ class AxesMethods:
         kind = family(state)
         if kind:
             if (
-                kind in ("categorical", "boxplot")
+                kind == "boxplot"
                 and state[kind]["direction"] == "Horizontal"
                 and state[kind]["value_range"] is not None
             ):
@@ -1570,7 +1574,7 @@ class AxesMethods:
         kind = family(state)
         if kind:
             if (
-                kind in ("categorical", "boxplot", "radar")
+                kind in ("boxplot", "radar")
                 and state[kind].get("direction", "Vertical") == "Vertical"
                 and state[kind]["value_range"] is not None
             ):
@@ -1837,6 +1841,16 @@ class ColorbarText(Text):
     def _node(self, state):
         return self.axes._config(state)["colorbar"]["axis"]["title_option"]
 
+    def set(self, **properties):
+        from ._features import fit_colorbar_title
+
+        fig = self.axes.figure
+        with fig.batch_update():
+            super().set(**properties)
+            state = fig.get_settings()
+            fit_colorbar_title(self.axes._config(state))
+            fig.apply_settings(state)
+
 
 class Colorbar:
     """The shared color scale of scalar-mapped artists on one panel."""
@@ -1849,14 +1863,16 @@ class Colorbar:
         return ColorbarAxes(self.axes)
 
     def set_label(self, label, **kwargs):
-        handle = ColorbarText(self.axes, "colorbar")
-        handle.set(text=label, **kwargs)
-        return handle
+        return self.ax.yaxis.set_label_text(label, **kwargs)
 
     def _edit(self, operation):
+        from ._features import fit_colorbar_title
+
         fig = self.axes.figure
         state = fig.get_settings()
-        operation(self.axes._config(state)["colorbar"])
+        config = self.axes._config(state)
+        operation(config["colorbar"])
+        fit_colorbar_title(config)
         fig.apply_settings(state)
         return self
 
@@ -1955,14 +1971,21 @@ class Colorbar:
 
 
 class ColorbarAxis(Axis):
+    def set_label_text(self, label, **kwargs):
+        kwargs.setdefault('visible', True)
+        return super().set_label_text(label, **kwargs)
+
     def _nodes(self, state):
         return [self.axes._config(state)["colorbar"]["axis"]]
 
     def set_major_locator(self, locator):
+        from ._features import fit_colorbar_title
+
         fig = self.axes.figure
         state = fig.get_settings()
         node = self._nodes(state)[0]
         node["major_spacing"] = _locator_spacing(locator, node, self)
+        fit_colorbar_title(self.axes._config(state))
         fig.apply_settings(state)
 
     def set_view_interval(self, *args, **kwargs):
@@ -1999,6 +2022,8 @@ class ColorbarAxis(Axis):
             **kwargs,
         )
         cfg["colorbar"]["axis"] = ax._config(proxy._state)[key]
+        from ._features import fit_colorbar_title
+        fit_colorbar_title(cfg)
         fig.apply_settings(state)
 
 

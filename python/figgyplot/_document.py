@@ -134,13 +134,22 @@ def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True, 
     if meta is None:return
     owner=overlay_id if overlay_id and side in ('right_y','y_axis') else panel_id
     key='y_axis' if owner==overlay_id else side
+    def assign(member, key):
+        if automatic is not None:
+            meta.setdefault('tick_modes',{}).setdefault(member,{})[key]='Auto' if automatic else 'Fixed'
+        else:
+            modes=meta.get('tick_modes',{})
+            if member in modes:
+                modes[member].pop(key,None)
+                if not modes[member]:modes.pop(member)
+            if not modes:meta.pop('tick_modes',None)
     for member in tick_owners(meta,owner,key):
-        meta.setdefault('tick_modes',{}).setdefault(member,{})[key]='Auto' if automatic else 'Fixed'
+        assign(member,key)
         if spacing is not None and key in ('bottom_x','left_y'):panel_config(state,member)[key]['major_spacing']=spacing
     peer={'bottom_x':'top_x','top_x':'bottom_x','left_y':'right_y','right_y':'left_y'}.get(key)
     cfg=panel_config(state,panel_id)
     if paired and peer and all(cfg[key].get(k)==cfg[peer].get(k) for k in ('min','max','scale','inverted')):
-        for member in tick_owners(meta,owner,peer):meta['tick_modes'].setdefault(member,{})[peer]='Auto' if automatic else 'Fixed'
+        for member in tick_owners(meta,owner,peer):assign(member,peer)
 
 
 def manual_tick_patch(state, patch, panel_id=None, overlay_id=None, _claimed=None):

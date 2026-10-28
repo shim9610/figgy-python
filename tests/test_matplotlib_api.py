@@ -282,6 +282,7 @@ def test_colorbar_public_handle_keeps_mappable_and_scale_connected(backend):
         bar.ax.tick_params(labelsize=11)
         assert points.get_cmap() == "Magma" and points.get_clim() == (5, 25)
         assert bar.ax.yaxis.label.get_text() == "Temperature"
+        assert bar.ax.yaxis.label.get_visible()
         assert fig.get_settings()["config"]["colorbar"]["axis"]["label_style"][
             "font_size"
         ] == pytest.approx(11 * fig.dpi / 72)
@@ -324,6 +325,7 @@ def test_default_export_uses_public_calls_and_replays_styles_and_pixels(
         accepted = target.get_settings()
         assert accepted["config"] == source_state["config"]
         assert accepted["series"] == source_state["series"]
+        assert accepted['identity'].get('tick_modes') == source_state['identity'].get('tick_modes')
         assert target.id == target_id
         assert source.get_settings() == source_state
         assert target.info.get("column_uploads") == uploads

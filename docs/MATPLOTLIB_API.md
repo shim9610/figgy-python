@@ -60,9 +60,11 @@ belong to the parent panel; subplot annotations are rejected.
 
 ## Supported subset and extensions
 
-- Tuple, partial and descending Cartesian limits are accepted. Bounded charts
-  accept an explicit increasing value range. Their automatic ranges are not
-  exposed by the current renderer, so getters do not invent limits.
+- Tuple, partial and descending Cartesian limits are accepted. Boxplots and radar
+  accept an explicit increasing value range. Categorical bars use the renderer's
+  automatic range and reject manual limits with `NotImplementedError`; pie/donut
+  charts have no adjustable numeric axis. Automatic bounded ranges are not exposed
+  by the current renderer, so getters do not invent limits.
 - `tick_params` supports direction, lengths, label sizes/colors/font family,
   boundary visibility and grid styling. Regular, zero-aligned ticks are
   supported. Arbitrary positions/labels, tick padding and custom callable
@@ -130,7 +132,17 @@ are never rounded by export.
 accepted SSOT, including identities, editor metadata and advanced chart state.
 `compact=False` expands that form for diagnostics. Exact recovery tests continue
 to compare complete SSOT and arrays; public-API tests separately compare actual
-Matplotlib properties and source/destination native pixels.
+Matplotlib properties, current native pixels and future automatic/fixed tick
+behavior. Public replay preserves accepted tick spacing and the policy used by
+subsequent zooms; it does not re-fit the source layout. `axis.set_tick_auto(True)`
+selects future automatic ticks without changing the current spacing, `False`
+selects fixed ticks, and `None` removes the explicit policy override.
+
+An explicit colorbar `label=` or `bar.set_label(...)` shows the label by default;
+`visible=False` keeps it hidden. The wrapper uses the renderer's text bounds to
+reserve space between unpositioned labels and tick text. Explicit label offsets
+and layout margins remain available for manual placement. Explicit face colors,
+including white, remain part of the accepted document until style reset.
 
 Editor startup is independent of public-code export: an export failure keeps the
 chart available and provides a complete exact recovery recipe with its diagnostic.

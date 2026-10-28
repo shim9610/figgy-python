@@ -1970,6 +1970,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(text_segments_json, m)?)?;
     m.add_function(wrap_pyfunction!(segments_plain_text, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_chart_title_margin, m)?)?;
+    m.add_function(wrap_pyfunction!(fitted_colorbar_title_margin, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_range_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::object_outline_json, m)?)?;
     m.add_function(wrap_pyfunction!(property_catalog::editor_catalog_json, m)?)?;
@@ -2052,6 +2053,36 @@ fn fitted_chart_title_margin(config: &str) -> PyResult<f32> {
     let measure = renderer::CpuTextMeasure::for_style(&config.draw_style);
     renderer::layout::fit_chart_title_margin(&mut config, &measure);
     Ok(config.chart_title.top_margin)
+}
+
+/// Grow the default colourbar label band using the renderer's painted bounds.
+/// Python uses this CPU-only helper for both native and notebook label setters.
+/// Manual title offsets and explicit layout edits stay owned by the caller.
+#[pyfunction]
+fn fitted_colorbar_title_margin(config: &str) -> PyResult<f32> {
+    let config: Config = parse(config)?;
+    let bar = config
+        .colorbar
+        .as_ref()
+        .ok_or_else(|| invalid("no colorbar"))?;
+    let margin = bar.axis.out_margin;
+    let measure = CpuTextMeasure::for_style(&config.draw_style);
+    let (Some(title), Some(ticks)) = (
+        ColorBarTitleElement.bounds(&config, &measure),
+        ColorBarLabelElement.bounds(&config, &measure),
+    ) else {
+        return Ok(margin);
+    };
+    let gap = (bar.axis.title_option.text.font_size * 0.25).max(4.0);
+    let overlap = match bar.side {
+        Side::Right => ticks.x + ticks.width + gap - title.x,
+        Side::Left => title.x + title.width + gap - ticks.x,
+        Side::Bottom => ticks.y + ticks.height + gap - title.y,
+        Side::Top => title.y + title.height + gap - ticks.y,
+    };
+    // The renderer centers the title halfway through out_margin; doubling
+    // the missing separation moves its inner edge past the tick labels.
+    Ok(margin + 2.0 * overlap.max(0.0))
 }
 
 #[pyfunction]
