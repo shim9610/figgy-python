@@ -16,10 +16,12 @@ import numpy as np
 from . import _document
 from . import _style_runtime
 from . import _chart_text
+from ._colors import CSS4_COLORS
+from ._matplotlib import ArtistMethods, AxesMethods, FigureMethods, Legend, Text
 from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
-_NAMED = {"blue": "#0000ff", "red": "#ff0000", "green": "#008000", "black": "#000000", "white": "#ffffff", "orange": "#ffa500", "purple": "#800080", "gray": "#808080", "grey": "#808080", "b": "#0000ff", "r": "#ff0000", "g": "#008000", "k": "#000000", "w": "#ffffff"}
+_NAMED = dict(CSS4_COLORS, b="#0000ff", r="#ff0000", g="#008000", k="#000000", w="#ffffff")
 _MARKERS = {"o": "CircleFilled", "s": "SquareFilled", "^": "TriangleFilled", "v": "TriangleDownFilled", "D": "DiamondFilled", "+": "Plus", "x": "Cross", "*": "StarFilled"}
 _LINES = {"-": "Solid", "--": "Dash", ":": "Dot", "-.": "DashDot"}
 _LEGEND_LOCATIONS = {'upper left': 'TopLeft', 'upper right': 'TopRight',
@@ -37,7 +39,19 @@ def _legend_corner(value):
 
 def _color(value):
     if isinstance(value, str):
+        short={'g':(0.,.5,0.),'c':(0.,.75,.75),'m':(.75,0.,.75),'y':(.75,.75,0.)}
+        if value in short:return dict(zip('rgba',(*short[value],1.)))
+        tab10=['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
+        if value.lower() in ('none','transparent'):
+            return dict(r=0.,g=0.,b=0.,a=0.)
+        if re.fullmatch(r'C\d+',value):value=tab10[int(value[1:])%len(tab10)]
+        tabs=dict(zip(['blue','orange','green','red','purple','brown','pink','gray','olive','cyan'],tab10))
+        if value.startswith('tab:') and value[4:] in tabs:value=tabs[value[4:]]
         value = _NAMED.get(value.lower(), value)
+        if not value.startswith('#'):
+            try:shade=float(value)
+            except ValueError:shade=float('nan')
+            if math.isfinite(shade) and 0<=shade<=1:return dict(r=shade,g=shade,b=shade,a=1.)
         if re.fullmatch(r"#[0-9a-fA-F]{3}", value):
             value = "#" + "".join(c * 2 for c in value[1:])
         if not re.fullmatch(r"#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?", value):
@@ -84,6 +98,10 @@ _ALIGN = {"left": "Left", "center": "Center", "right": "Right"}
 def _segments(text):
     # The renderer's own plain-text segments, including its mapping of
     # Unicode superscript/subscript characters (e.g. "10⁻³") to styled ones.
+    if isinstance(text,list):
+        if not all(isinstance(s,dict) and isinstance(s.get('text'),str) for s in text):
+            raise ValueError('rich text must contain text segment mappings')
+        return copy.deepcopy(text)
     return json.loads(text_segments_json(str(text)))
 
 
@@ -123,7 +141,7 @@ def _text(value):
     return "".join(s["text"] for s in value["segments"]) if text is None else text
 
 
-class Artist:
+class Artist(ArtistMethods):
     """A stable series handle. Data lives in the Rust renderer's column pool."""
 
     def __init__(self, fig, series_id):
@@ -137,10 +155,19 @@ class Artist:
         return self.figure.update(self.id, linewidth=value)
 
     def set_label(self, value):
+        if value is None:
+            state=self.figure.get_settings();self._spec(state)['label']=None
+            return self.figure.apply_settings(state)
         return self.figure.update(self.id, label=value)
 
     def set(self, **kwargs):
-        return self.figure.update(self.id, **kwargs)
+        aliases={'c':'color','lw':'linewidth','ls':'linestyle','ms':'markersize'}
+        kwargs={aliases.get(k,k):v for k,v in kwargs.items()}
+        with self.figure.batch_update():
+            for key in ('marker','alpha','drawstyle','facecolor','edgecolor'):
+                if key in kwargs:getattr(self,'set_'+key)(kwargs.pop(key))
+            self.figure.update(self.id, **kwargs)
+        return self.figure
 
 
 class RadialArtist:
@@ -181,7 +208,7 @@ class RadialArtist:
         return self
 
 
-class Figure:
+class Figure(FigureMethods):
     """One editable chart document, with a persistent native renderer.
 
     ``figsize`` is inches, ``dpi`` defines the logical canvas size. Arrays are
@@ -199,6 +226,7 @@ class Figure:
         width, height = (round(v * float(dpi)) for v in figsize)
         self.dpi = float(dpi)
         self._lock = threading.RLock()
+        self._style_batch = None
         if backend == "auto":
             try:
                 from IPython import get_ipython
@@ -223,6 +251,7 @@ class Figure:
         self._selection = None
         self._next_series = 0
         self._axes_handles = {}
+        self._artist_handles = {}
         self.axes = [Axes(self, 'main')]
         self.subplots = _document.Subplots(self)
         state = self.get_settings()
@@ -241,6 +270,11 @@ class Figure:
         if key not in self._axes_handles:
             self._axes_handles[key] = Axes(self, panel_id, overlay_id)
         return self._axes_handles[key]
+
+    def _artist_for(self, series_id):
+        if series_id not in self._artist_handles:
+            self._artist_handles[series_id] = Artist(self,series_id)
+        return self._artist_handles[series_id]
 
     @property
     def id(self):
@@ -358,7 +392,13 @@ class Figure:
     def get_settings(self):
         with self._lock:
             self._require_open()
+            if self._style_batch is not None:
+                return copy.deepcopy(self._style_batch)
             return json.loads(self._native.settings_json())
+
+    def _require_data_edit(self):
+        if self._style_batch is not None:
+            raise RuntimeError('create or replace plot data outside batch_update; this block edits existing artists')
 
     def extract_style(self, *, scales=False, text=False):
         """Extract a portable StyleToken; domains and wording are opt-in.
@@ -524,9 +564,13 @@ class Figure:
             try:
                 _document.prune_tick_modes(previous,settings)
                 _document.validate(settings)
-                _document.track_identities(previous, settings)
+                if self._style_batch is None:
+                    _document.track_identities(previous, settings)
             except (AttributeError, KeyError, IndexError, StopIteration) as exc:
                 raise ValueError('invalid settings document structure') from exc
+            if self._style_batch is not None:
+                self._style_batch = copy.deepcopy(settings)
+                return self
             self._native.apply_settings(json.dumps(settings, allow_nan=False))
             accepted = json.loads(self._native.settings_json())
             if 'identity' in accepted:
@@ -536,6 +580,8 @@ class Figure:
         return self
 
     def _changed(self):
+        if self._style_batch is not None:
+            return
         for widget in list(self._widgets):
             widget.refresh()
         for window in list(self._windows):
@@ -627,6 +673,8 @@ class Figure:
                         style["line"]["line_width"] = float(value) * self.dpi / 72
                     elif key == 'linewidth' and 'Vector' in series['render_type']:
                         style['style']['width_px'] = float(value)*self.dpi/72
+                    elif key == 'linewidth' and 'bar' in style:
+                        style['bar']['border_width'] = float(value)*self.dpi/72
                     elif key == "markersize" and "scatter" in style:
                         style["scatter"]["point_size"] = float(value) * self.dpi / 144
                     elif key == "linestyle" and "line" in style:
@@ -729,9 +777,7 @@ class Figure:
                     for kind, field in [("line", "line_width"), ("scatter", "point_size")]:
                         if kind in style and (not math.isfinite(style[kind][field]) or style[kind][field] < 0):
                             raise ValueError(f"{field} must be nonnegative and finite")
-            self._native.apply_settings(json.dumps(state, allow_nan=False))
-        self._changed()
-        return self
+            return self.apply_settings(state)
 
     def render_rgba(self, *, scale=1.0):
         """Synchronously render and read back a (height, width, 4) uint8 array."""
@@ -921,17 +967,19 @@ class Figure:
             properties["material"] = _material(material)
         return self.configure_radial(style=properties)
 
-    def to_code(self, variable="fig", *, compact=True):
+    def to_code(self, variable="fig", *, mode='api', compact=True):
         """Readable Python setters for an existing Figure with the same series.
 
         Font sizes are exported in points, using this Figure's DPI. Recreate the
         original plot at the same DPI before replaying its settings.
-        The default omits renderer defaults and groups rich-text runs, restoring
-        defaults before replay so unrelated target edits do not leak through.
-        ``compact=False`` emits expanded dictionaries for diagnostics.
+        The default emits public Figure/Axes/Axis/Artist setters. Figgy-only
+        state without a corresponding object setter remains an explicit advanced
+        block; nothing is silently omitted. ``mode='exact'`` restores the complete
+        document, including identities. ``compact=False`` expands that diagnostic
+        form. Replay requires the same panels, source columns, and DPI.
         """
         from ._codegen import settings_to_code
-        return settings_to_code(self.get_settings(), self._default_config, self.dpi, variable, compact=compact)
+        return settings_to_code(self.get_settings(), self._default_config, self.dpi, variable, compact=compact,mode=mode)
 
     def select(self, x, y, *, edit_area=False):
         with self._lock:
@@ -987,6 +1035,7 @@ class Figure:
         to zero padding. Other Cartesian figures use 5%. Pass an explicit
         padding fraction to override either default.
         """
+        self._require_data_edit()
         with self._lock:
             self._require_open()
             kind = _family(self.get_settings())
@@ -1092,10 +1141,12 @@ class Figure:
         return self.widget()._repr_mimebundle_(**kwargs)
 
     def show(self, *, block=True):
+        self._require_data_edit()
         from .desktop import show
         return show(self, block=block)
 
     def close(self):
+        self._require_data_edit()
         with self._lock:
             for widget in list(self._widgets):
                 widget.close()
@@ -1228,7 +1279,7 @@ from ._charts import ChartMethods, family as _family
 from ._features import FeatureMethods
 
 
-class Axes(FeatureMethods, ChartMethods):
+class Axes(AxesMethods, FeatureMethods, ChartMethods):
     def __init__(self, figure, panel_id='main', overlay_id=None):
         self.figure = figure
         self.subplot_id, self.overlay_id = panel_id, overlay_id
@@ -1295,6 +1346,7 @@ class Axes(FeatureMethods, ChartMethods):
         return self.configure(polar=defaults)
 
     def fit(self, padding=0.05):
+        self.figure._require_data_edit()
         with self.figure._lock:
             self.activate()
             if _family(self.figure.get_settings()):
@@ -1322,8 +1374,8 @@ class Axes(FeatureMethods, ChartMethods):
         state = self.figure.get_settings()
         kind = _family(state)
         if kind:
-            value_axis = 'x' if kind == 'boxplot' and state[kind]['direction'] == 'Horizontal' else 'y'
-            if kind not in ('boxplot', 'radar') or dimension != value_axis:
+            value_axis = 'x' if kind in ('categorical','boxplot') and state[kind]['direction'] == 'Horizontal' else 'y'
+            if kind not in ('categorical','boxplot','radar') or dimension != value_axis:
                 raise ValueError(f'{kind} does not support an adjustable {dimension} value axis')
             state[kind]['value_range'] = [low, high]
             self.figure.apply_settings(state)
@@ -1358,6 +1410,7 @@ class Axes(FeatureMethods, ChartMethods):
         ``startangle=90`` starts at the top; slices proceed clockwise.
         """
         fig = self.figure
+        fig._require_data_edit()
         if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
             raise ValueError('bounded charts require a separate single-panel Figure')
         values = _array(values)
@@ -1402,6 +1455,7 @@ class Axes(FeatureMethods, ChartMethods):
 
     def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None):
         fig = self.figure
+        fig._require_data_edit()
         with fig._lock:
             fig._require_open()
             if _family(fig.get_settings()) is not None:
@@ -1457,9 +1511,10 @@ class Axes(FeatureMethods, ChartMethods):
             fig._next_series += 1
             _style_runtime._mark_used(fig)
         fig._changed()
-        return Artist(fig, sid)
+        return fig._artist_for(sid)
 
     def _add_fill_pair(self, x, lower, upper, line, label, sid):
+        self.figure._require_data_edit()
         fig = self.figure
         with fig._lock:
             state = fig.get_settings()
@@ -1501,10 +1556,10 @@ class Axes(FeatureMethods, ChartMethods):
             fig._next_series += 2
             _style_runtime._mark_used(fig)
         fig._changed()
-        return Artist(fig, sid)
+        return fig._artist_for(sid)
 
     @_style_runtime.styled
-    def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None):
+    def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None, **kwargs):
         """Plot a line, or a line with markers, from equal-length numeric arrays.
 
         With y omitted, use sample indices for X. linewidth/markersize are in
@@ -1513,6 +1568,19 @@ class Axes(FeatureMethods, ChartMethods):
         for placement and Figure.update('axis_bottom', major_spacing=...) for
         regular ticks. This is a plotting subset, not the full matplotlib API.
         """
+        aliases={'lw':'linewidth','ls':'linestyle','ms':'markersize','c':'color'}
+        if set(kwargs)-set(aliases)-{'alpha','drawstyle','gid'}:raise TypeError('unsupported plot arguments: '+', '.join(sorted(set(kwargs)-set(aliases)-{'alpha','drawstyle','gid'})))
+        linewidth=kwargs.get('lw',linewidth);linestyle=kwargs.get('ls',linestyle)
+        markersize=kwargs.get('ms',markersize);color=kwargs.get('c',color)
+        if 'gid' in kwargs:
+            if id is not None:raise TypeError('supply id or gid, not both')
+            id=kwargs['gid']
+        if 'drawstyle' in kwargs:
+            modes={'default':'Linear','steps-pre':'StepPre','steps-post':'StepPost','steps-mid':'StepMid'}
+            if kwargs['drawstyle'] not in modes:raise ValueError('unsupported drawstyle')
+            interpolation=modes[kwargs['drawstyle']]
+        alpha=kwargs.get('alpha')
+        if alpha is not None and (not math.isfinite(float(alpha)) or not 0<=float(alpha)<=1):raise ValueError('alpha must be in 0..1')
         marker_only_format = False
         if isinstance(y, str):
             if fmt is not None:
@@ -1528,7 +1596,7 @@ class Axes(FeatureMethods, ChartMethods):
                     remaining = remaining.replace(candidate, "", 1)
                     break
             for c in remaining:
-                if c in "bgrkw" and color is None:
+                if c in "bgrkwcmy" and color is None:
                     color = c
                 elif c in _MARKERS and marker is None:
                     marker = c
@@ -1543,8 +1611,9 @@ class Axes(FeatureMethods, ChartMethods):
         if x.size != y.size:
             raise ValueError("x and y must have the same length")
         color = _color(color if color is not None else _COLORS[self.figure._next_series % len(_COLORS)])
-        if not math.isfinite(float(linewidth)) or linewidth <= 0 or not math.isfinite(float(markersize)) or markersize <= 0:
-            raise ValueError("line and marker sizes must be positive and finite")
+        if alpha is not None:color['a']=float(alpha)
+        if not math.isfinite(float(linewidth)) or linewidth < 0 or not math.isfinite(float(markersize)) or markersize < 0:
+            raise ValueError("line and marker sizes must be nonnegative and finite")
         # Python API uses points; renderer uses pixel widths and marker radii.
         line = {"line_style": _LINES.get(linestyle, linestyle), "line_color": color, "line_width": float(linewidth) * self.figure.dpi / 72}
         if interpolation not in ('Linear', 'StepPre', 'StepPost', 'StepMid'):
@@ -1561,11 +1630,12 @@ class Axes(FeatureMethods, ChartMethods):
 
     @_style_runtime.styled
     def scatter(self, x, y, *, s=16, color=None, c=None, cmap='viridis', vmin=None, vmax=None,
-                size_domain=None, size_range=(2., 12.), size_scale='area', marker="o", label=None, id=None):
+                size_domain=None, size_range=None, size_scale='area', marker="o", alpha=None, label=None, id=None):
         """Plot numeric X/Y points; return an Artist with a stable id.
 
-        Scalar s is marker area in points squared. An array s maps values through
-        size_domain/size_range (diameters in points), using area or radius scale.
+        Scalar and array s are marker areas in points squared. Explicit
+        size_domain/size_range opt into Figgy's data-driven size mapping
+        extension (diameters in points), using area or radius scale.
         color fixes the marker color; numeric c maps through cmap/vmin/vmax and
         creates a shared color scale. label adds a legend entry. set_xlim/ylim
         choose automatic ticks; Figure.update('axis_bottom', major_spacing=...)
@@ -1575,11 +1645,30 @@ class Axes(FeatureMethods, ChartMethods):
         x, y = _array(x), _array(y)
         if x.size != y.size or not x.size:
             raise ValueError('scatter requires equal nonempty x/y vectors')
+        explicit_colors=None
+        if c is not None:
+            if color is not None:raise ValueError('supply color or c, not both')
+            if isinstance(c,str):color,c=c,None
+            else:
+                colors=np.asarray(c)
+                if colors.dtype.kind in 'US' or (colors.ndim==2 and colors.shape[1] in (3,4)):
+                    explicit_colors=[_color(v) for v in c]
+                    if len(explicit_colors) not in (1,x.size):raise ValueError('explicit colors must have one color or one per point')
+                    color=tuple(explicit_colors[0][k] for k in 'rgba')
+                    c=None
+        if alpha is not None:
+            if not math.isfinite(float(alpha)) or not 0<=float(alpha)<=1:raise ValueError('alpha must be in 0..1')
+            if c is not None:raise NotImplementedError('independent scalar-mapped scatter opacity requires renderer support')
         sid = id or f'series_{self.figure._next_series}'
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
         style = dict(point_color=_color(color if color is not None else _COLORS[self.figure._next_series % len(_COLORS)]),
                      point_shape=_MARKERS.get(marker, marker), point_size=math.sqrt(float(s))*self.figure.dpi/144 if np.isscalar(s) else 4.)
         columns = []
+        if alpha is not None:style['point_color']['a']=float(alpha)
+        if explicit_colors is not None and len(explicit_colors)>1:
+            if alpha is not None:
+                for value in explicit_colors:value['a']=float(alpha)
+            style['point_style_overrides']=[dict(index=i,point_color=value) for i,value in enumerate(explicit_colors)]
         if c is not None:
             values = _array(c)
             if values.size != x.size:
@@ -1588,13 +1677,19 @@ class Axes(FeatureMethods, ChartMethods):
             columns.append((f'{sid}/color', values))
             style['point_color_map'] = dict(column=f'{sid}/color')
         if np.isscalar(s):
-            if not math.isfinite(float(s)) or float(s) <= 0:
-                raise ValueError('s must be positive and finite')
+            if not math.isfinite(float(s)) or float(s) < 0:
+                raise ValueError('s must be nonnegative and finite')
         else:
             values = _array(s)
-            if values.size != x.size or not np.isfinite(values).all():
-                raise ValueError('scatter size values must be finite and match x/y')
-            low, high = (float(values.min()), float(values.max())) if size_domain is None else map(float, size_domain)
+            if values.size != x.size or not np.isfinite(values).all() or (values<0).any():
+                raise ValueError('scatter size values must be nonnegative, finite and match x/y')
+            direct_area=size_domain is None and size_range is None and size_scale=='area'
+            if direct_area:
+                low,high=0.,max(1.,float(values.max()))
+                size_range=(0.,math.sqrt(high))
+            else:
+                low, high = (float(values.min()), float(values.max())) if size_domain is None else map(float, size_domain)
+                size_range=(2.,12.) if size_range is None else size_range
             if low == high and size_domain is None:
                 high = low+max(1., abs(low)*0.01)
             if not math.isfinite(low) or not math.isfinite(high) or low >= high:
@@ -1658,7 +1753,7 @@ class Axes(FeatureMethods, ChartMethods):
         support up to 512 rich characters / eight lines, independently of their
         category and value labels. Text set before construction is preserved.
         """
-        return self.figure.update("chart_title", _axes=self, text=text, **kwargs)
+        return self._set_label('title', text, kwargs)
 
     def set_xlabel(self, text, **kwargs):
         """Name the horizontal axis, before or after adding the first chart.
@@ -1667,7 +1762,7 @@ class Axes(FeatureMethods, ChartMethods):
         single-line and share the model's label font; Cartesian titles also
         accept fontsize, color and font. Use Figure.update for exact styling.
         """
-        return self.figure.update("axis_title_bottom", _axes=self, text=text, **kwargs)
+        return self._set_label('xlabel', text, kwargs)
 
     def set_ylabel(self, text, **kwargs):
         """Name the vertical axis (the category axis on horizontal bars/boxes).
@@ -1676,16 +1771,27 @@ class Axes(FeatureMethods, ChartMethods):
         single-line and share label typography; Cartesian titles support
         fontsize, color and font. On twinx this edits only the overlay's title.
         """
-        if self.overlay_id:
-            state = self.figure.get_settings()
-            axis = self._overlay(state)['y_axis']
-            axis['title_option']['text']['segments'] = _segments(text)
-            for key, value in kwargs.items():
-                if key == 'fontsize': axis['title_option']['text']['font_size'] = float(value)*self.figure.dpi/72
-                elif key == 'color': axis['title_option']['text']['color'] = _color(value)
-                else: raise ValueError(f'unsupported title property: {key}')
-            return self.figure.apply_settings(state)
-        return self.figure.update("axis_title_left", _axes=self, text=text, **kwargs)
+        return self._set_label('ylabel', text, kwargs)
+
+    def _set_label(self, role, text, properties):
+        properties = dict(properties)
+        # Legacy Figgy aliases remain accepted; ordinary calls use Matplotlib names.
+        for old, new in [('font','fontfamily'), ('align','multialignment')]:
+            if old in properties: properties[new] = properties.pop(old)
+        offset = properties.pop('offset', None)
+        handle = Text(self, role)
+        with self.figure.batch_update():
+            if _family(self.figure.get_settings()) and role != 'title':
+                allowed = {'fontsize','fontfamily'}
+                if set(properties)-allowed:
+                    raise NotImplementedError('bounded axis labels share chart typography')
+                legacy = {'font' if k=='fontfamily' else k:v for k,v in properties.items()}
+                self.figure.update('axis_title_bottom' if role=='xlabel' else 'axis_title_left', _axes=self, text=text, **legacy)
+            else: handle.set(text=text, **properties)
+            if offset is not None:
+                # Existing offset= uses pixels; the new Text.set_offset uses points.
+                handle.set_offset(tuple(float(v)*72/self.figure.dpi for v in offset))
+        return handle
 
     def _set_scale(self, axis, scale):
         self.figure._require_cartesian()
@@ -1719,21 +1825,19 @@ class Axes(FeatureMethods, ChartMethods):
         self.figure._require_cartesian()
         return "log" if (self._overlay(self.figure.get_settings())["y_axis"] if self.overlay_id else self._config(self.figure.get_settings())["left_y"])["scale"] == "Logarithmic" else "linear"
 
-    def set_xlim(self, left, right):
+    def set_xlim(self, left=None, right=None, *, emit=True, auto=False, xmin=None, xmax=None):
         """Set both X bounds and derive ticks/labels for the new range.
 
         Use ``set_xlim_without_tick_auto`` or an SSOT config patch to keep
         existing tick and label settings.
         """
-        with self.figure._lock:
-            self.figure._require_open()
-            return self._set_bounds("x", left, right)
+        if auto:raise NotImplementedError('use fit() to recompute limits from resident data')
+        return self._limits('x',left,right,xmin,xmax)
 
-    def set_ylim(self, bottom, top):
+    def set_ylim(self, bottom=None, top=None, *, emit=True, auto=False, ymin=None, ymax=None):
         """Set both Y bounds and derive ticks/labels, as ``set_xlim`` does."""
-        with self.figure._lock:
-            self.figure._require_open()
-            return self._set_bounds("y", bottom, top)
+        if auto:raise NotImplementedError('use fit() to recompute limits from resident data')
+        return self._limits('y',bottom,top,ymin,ymax)
 
     def _set_lim_keeping_ticks(self, keys, low, high):
         low, high = float(low), float(high)
@@ -1799,17 +1903,31 @@ class Axes(FeatureMethods, ChartMethods):
         """
         return self._invert_axis('y')
 
-    def grid(self, visible=True):
+    def grid(self, visible=None, which='major', axis='both', **kwargs):
         kind = _family(self.figure.get_settings())
         if kind in ('categorical', 'boxplot', 'radar'):
-            return self.figure.configure_bounded(kind, grid=bool(visible))
+            if kwargs or which!='major' or axis!='both':
+                raise NotImplementedError('bounded charts support a shared major grid only')
+            state=self.figure.get_settings()
+            return self.figure.configure_bounded(kind, grid=not state[kind]['grid'] if visible is None else bool(visible))
+        if which not in ('major','minor','both') or axis not in ('x','y','both'):
+            raise ValueError('invalid grid axis or which')
+        aliases={'lw':'linewidth','ls':'linestyle','c':'color'}
+        kwargs={aliases.get(k,k):v for k,v in kwargs.items()}
+        if set(kwargs)-{'color','alpha','linewidth','linestyle'}:raise ValueError('unsupported grid properties')
         self.figure._require_cartesian()
-        state = self.figure.get_settings()
-        self._config(state)["grid"]["show_major_x"] = bool(visible)
-        self._config(state)["grid"]["show_major_y"] = bool(visible)
-        self.figure.apply_settings(state)
+        with self.figure.batch_update():
+            state = self.figure.get_settings();grid=self._config(state)['grid']
+            for dim in ('x','y'):
+                for level in ('major','minor'):
+                    if axis not in (dim,'both') or which not in (level,'both'):continue
+                    key='show_'+level+'_'+dim
+                    grid[key]=(True if kwargs else not grid[key]) if visible is None else bool(visible)
+            self.figure.apply_settings(state)
+            if kwargs:self.tick_params(axis=axis,which=which,**{'grid_'+k:v for k,v in kwargs.items()})
 
-    def legend(self, visible=True, *, loc=None):
+    def legend(self, visible=True, *, loc=None, fontsize=None, prop=None, labelcolor=None,
+               borderpad=None, framealpha=None, facecolor=None, edgecolor=None, frameon=None):
         """Show/hide the legend; Cartesian loc accepts upper/lower left/right.
 
         Renderer names TopLeft/TopRight/BottomLeft/BottomRight are also accepted.
@@ -1819,9 +1937,11 @@ class Axes(FeatureMethods, ChartMethods):
         """
         kind = _family(self.figure.get_settings())
         if kind in ('categorical', 'boxplot', 'radar'):
-            if loc is not None:
+            if loc is not None or any(v is not None for v in [prop,labelcolor,borderpad,framealpha,facecolor,edgecolor,frameon]):
                 raise ValueError('bounded legends support visibility only; loc is available on Cartesian charts')
-            return self.figure.configure_bounded(kind, legend=bool(visible))
+            if fontsize is not None:raise NotImplementedError('bounded legend fontsize is shared with other chart labels')
+            self.figure.configure_bounded(kind, legend=bool(visible))
+            return Legend(self)
         self.figure._require_cartesian()
         corner = None if loc is None else _legend_corner(loc)
         from ._native import rebuild_legend_json
@@ -1836,9 +1956,33 @@ class Axes(FeatureMethods, ChartMethods):
             json.dumps(self._owned_series(state)), json.dumps(legend["content"]),
             json.dumps(colorbar["colormap"]) if colorbar else None))
         legend["visible"] = bool(visible)
+        if prop is not None:
+            if not isinstance(prop,dict) or set(prop)-{'family','size'}:raise NotImplementedError('legend prop supports family and size')
+            if 'family' in prop:legend['content']['font']=self.figure._check_font(prop['family'])
+            if 'size' in prop:fontsize=prop['size']
         if corner is not None:
             legend['corner'] = corner
+        if fontsize is not None:
+            size=float(fontsize)
+            if not math.isfinite(size) or size<=0:raise ValueError('fontsize must be positive and finite')
+            legend['content']['font_size']=size*self.figure.dpi/72
+        if facecolor is not None:legend['bg_color']=_color(facecolor)
+        if edgecolor is not None:legend['border_color']=_color(edgecolor)
+        if labelcolor is not None:legend['content']['color']=_color(labelcolor)
+        if borderpad is not None:
+            pad=float(borderpad)
+            if not math.isfinite(pad) or pad<0:raise ValueError('borderpad must be nonnegative and finite')
+            legend['padding']=pad*legend['content']['font_size']
+        if framealpha is not None:
+            alpha=float(framealpha)
+            if not math.isfinite(alpha) or not 0<=alpha<=1:raise ValueError('framealpha must be in 0..1')
+            legend['bg_color']['a']=legend['border_color']['a']=alpha
+        if frameon is False:legend['bg_color']['a']=legend['border_color']['a']=0.
+        elif frameon is True and framealpha is None:
+            for key in ['bg_color','border_color']:
+                if legend[key]['a']==0:legend[key]['a']=self.figure._default_config['legend'][key]['a']
         self.figure.apply_settings(state)
+        return Legend(self)
 
 
 def figure(*args, **kwargs):

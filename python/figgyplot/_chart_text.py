@@ -21,7 +21,7 @@ def title_options(chart):
 def set_title_text(chart, text=None, *, segments=None):
     from .figure import _segments, _text
     title = title_options(chart)
-    title['text']['segments'] = _segments(str(text)) if segments is None else copy.deepcopy(segments)
+    title['text']['segments'] = _segments(text) if segments is None else copy.deepcopy(segments)
     # Unicode super/subscripts retain their original spelling where recoverable.
     plain = _text(title['text'])
     chart['title'] = plain.replace('\n', ' ').replace('\r', ' ')[:160]

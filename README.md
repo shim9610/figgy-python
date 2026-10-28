@@ -285,14 +285,17 @@ ax.set_ylim(0.0, 2.7)
 # The complete export also preserves legend placement and advanced styling.
 ```
 
-`fig.to_code()` and both editors' **Copy Python** use compact output by default.
-Unchanged renderer defaults are omitted, rich text is written as strings or
-styled runs, and repeated colors are named once. Replay restores omitted fields
-from renderer defaults before applying the export, so unrelated target edits do
-not leak through. Panel geometry, stable IDs, explicit tick policies and rich
-formatting are preserved; resident arrays are not uploaded again. Recreate the
-plotted series at the same DPI with a compatible renderer version before replay.
-Use `fig.to_code(compact=False)` to inspect expanded settings dictionaries.
+`fig.to_code()` and both editors' **Copy Python** prefer public Figure, Axes,
+Axis and Artist setters for Cartesian appearance. The code targets matching
+panels and source columns, retaining the destination Figure identity. Renderer
+features without public setters remain in an explicit advanced block. Common bounded appearance uses named `ax.chart` controls.
+
+Use `fig.to_code(mode="exact")` for complete SSOT recovery, including stable
+identities, tick policies, rich text and advanced layout. This compact form
+restores omitted defaults and preserves resident arrays without uploading them
+again. `compact=False` expands the diagnostic form. See the
+[Matplotlib-shaped API and supported subset](docs/MATPLOTLIB_API.md) for object
+handles, units, coordinate conventions and explicit limitations.
 
 Ranges, ticks and titles:
 

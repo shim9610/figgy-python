@@ -88,7 +88,14 @@ def expand_config(patch, defaults):
     return config
 
 
-def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=True):
+def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=True, mode='api'):
+    if type(compact) is not bool:
+        raise ValueError('compact must be boolean')
+    if mode not in ('api','exact'):
+        raise ValueError('mode must be api or exact')
+    if mode=='api' and compact:
+        from ._api_codegen import settings_to_api_code
+        return settings_to_api_code(settings,defaults,dpi,variable)
     from .figure import _code_tree, _diff, _segments, _text
     from ._native import fitted_chart_title_margin, font_family_available
 

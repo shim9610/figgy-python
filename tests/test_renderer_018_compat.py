@@ -52,7 +52,7 @@ def test_heatmap_legend_updates_colormap_and_replays_without_losing_text(backend
         after = source.get_settings()['config']['legend']['content']['segments']
         assert before != after
         assert 'Temperature' in ''.join(segment['text'] for segment in after)
-        exec(source.to_code(), {'fig': target})
+        exec(source.to_code(mode='exact'), {'fig': target})
         assert target.get_settings() == source.get_settings()
         if backend == 'native':
             assert np.array_equal(source.render_rgba(), target.render_rgba())

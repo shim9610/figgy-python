@@ -39,7 +39,7 @@ def test_compact_document_replay_replaces_dirty_defaults_exactly(backend, scene)
             for overlay in config.get('overlays', []):
                 overlay['y_axis']['line_width'] = 9
         target.apply_settings(dirty)
-        code = source.to_code()
+        code = source.to_code(mode='exact')
         assert len(code) < len(pprint.pformat(source_state, width=96, sort_dicts=False)) * .55
         expanded = source.to_code(compact=False)
         assert len(code) < len(expanded) * .55
@@ -72,7 +72,7 @@ def test_bounded_compact_reset_preserves_destination_values_and_restores_default
         dirty[family]['background'] = dict(r=.1, g=.1, b=.1, a=1.)
         target.apply_settings(dirty)
         before = copy.deepcopy(target.get_settings()[family])
-        code = source.to_code()
+        code = source.to_code(mode='exact')
         assert len(code) < len(pprint.pformat(source.get_settings()[family], width=96, sort_dicts=False)) * .55
         assert len(code) < len(source.to_code(compact=False)) * .55
         exec(code, {'fig': target})
@@ -92,7 +92,7 @@ def test_styled_text_runs_and_unicode_replay_without_character_dictionary_dumps(
         segments += fg.text_segments('한글 red', color={'r': .5, 'g': .25, 'b': .75, 'a': 1.}) * 2
         state['config']['chart_title']['text']['segments'] = segments
         source.apply_settings(state)
-        code = source.to_code(variable)
+        code = source.to_code(variable, mode='exact')
         assert "bold=True" in code and "'bold':" not in code
         exec(code, {variable: target})
         assert target.get_settings() == source.get_settings()

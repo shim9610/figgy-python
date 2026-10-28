@@ -38,7 +38,7 @@ def test_contextual_styles_have_real_commands_and_replay(backend,kind):
         assert fig.edit_history['undo_count']==count+1
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
-        exec(fig.to_code(),{'fig':fig})
+        exec(fig.to_code(mode='exact'),{'fig':fig})
         assert fig.get_settings()==after
 
 
@@ -443,7 +443,7 @@ def test_colorbar_title_command_preserves_character_style_and_replays(backend):
         assert rich['font_size']==text['font_size']
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
-        exec(fig.to_code(),{'fig':fig});assert fig.get_settings()==after
+        exec(fig.to_code(mode='exact'),{'fig':fig});assert fig.get_settings()==after
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])

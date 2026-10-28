@@ -14,6 +14,32 @@ Discover these paths once at startup and reuse the same installed Python
 interpreter throughout the session. The commands and export recipe below use
 public APIs; routine feedback handling does not require searching package source.
 
+For ordinary source edits, prefer the Matplotlib-shaped object API:
+`ax.set_title`, `ax.set_xlabel`, `ax.set_ylabel`, `ax.tick_params`,
+`ax.spines[side]`, `ax.xaxis`/`ax.yaxis`, returned Text/Legend handles, and
+`fig.artist(stable_id).set(...)`. Sizes use points; `scatter(s=...)` uses areas
+in points squared for both scalars and arrays. Use `fig.batch_update()` for one
+atomic group of existing style/layout edits; construct data outside that block.
+Bounded charts expose named `ax.chart` controls for shared labels, materials,
+series colors and category names. Check the installed supported API before
+assuming that every Matplotlib option exists.
+
+For scalar coloring, keep the numeric values connected with `scatter(c=values,
+cmap=...)`, `imshow`, or the corresponding mapped constructor, and edit the
+returned mappable with `set_cmap`/`set_clim`. Do not precompute point-color
+overrides and draw a disconnected colorbar as a substitute for a scalar map.
+Explicit per-point colors are appropriate when the requested colors are the
+data or deliberate individual overrides.
+
+`fig.to_code()` produces a readable appearance recipe and retains the
+destination Figure identity. It is not the exact-checkpoint oracle for this
+review protocol. `fig.to_code(mode="exact")` and the accepted checkpoint retain
+complete SSOT identities, tick policies and renderer-only state. Reconcile
+review details against those exact values; do not waive a retained edit because
+an appearance recipe looks similar. Use advanced SSOT patches only for a
+documented capability without a public setter, and preserve the recorded data
+and stable object ownership.
+
 1. Initialize the controller with a review font that supports the user's primary
    language. Inspect installed fonts and glyph coverage; do not assume the default
    Latin UI face can display the user's text. For Korean, an installed

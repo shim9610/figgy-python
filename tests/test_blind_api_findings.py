@@ -116,7 +116,7 @@ def test_title_text_tokens_and_code_replay_preserve_rich_text(backend, method):
         target.apply_style(legacy, text={'titles'})
         assert wording(target.get_settings()[kind]['chart_title']) == 'Heading\nDetail'
         target.axes[0].set_title('Other')
-        exec(source.to_code(), {'fig': target})
+        exec(source.to_code(mode='exact'), {'fig': target})
         assert target.get_settings()[kind] == source.get_settings()[kind]
         if backend == 'native':
             np.testing.assert_array_equal(source.render_rgba(), target.render_rgba())

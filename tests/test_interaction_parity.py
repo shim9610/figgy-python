@@ -63,12 +63,13 @@ fig.subplots['second'].imshow([[1,2],[3,4]],id='field')
             inputs = Inputs(handle)
             inputs.click('copy')
             code = subprocess.check_output(['xclip','-selection','clipboard','-o'],text=True,timeout=3)
-            assert code == fig.to_code() and 'reset=True' in code
+            assert code == fig.to_code() and 'batch_update' in code
             assert len(code) < len(fig.to_code(compact=False)) * .55
             with figgy.Figure(backend='native') as other:
                 exec(scene, {'fig':other})
                 exec(code, {'fig':other})
-                assert other.get_settings() == fig.get_settings()
+                assert other.get_settings()['config'] == fig.get_settings()['config']
+                assert other.get_settings()['series'] == fig.get_settings()['series']
                 np.testing.assert_array_equal(other.render_rgba(), fig.render_rgba())
             (tmp_path/'native-copy.py').write_text(code)
         finally:
@@ -80,10 +81,10 @@ fig.subplots['second'].imshow([[1,2],[3,4]],id='field')
         page.evaluate(ROOT+'.flush()')
         execute('await fig.sync()')
         code=page.locator('textarea[data-code]').input_value()
-        assert code and 'reset=True' in code
+        assert code and 'batch_update' in code
         (tmp_path/'browser-copy.py').write_text(code)
         execute(f"code={code!r}\nassert code==fig.to_code()\nother=fg.Figure(backend='webgpu')\n"+
-                f"exec({scene!r},{{'fig':other}})\nexec(code,{{'fig':other}})\nassert other.get_settings()==fig.get_settings()\nother.close()")
+                f"exec({scene!r},{{'fig':other}})\nexec(code,{{'fig':other}})\nassert other.get_settings()['config']==fig.get_settings()['config']\nassert other.get_settings()['series']==fig.get_settings()['series']\nother.close()")
 
 
 def assert_blind_trial_title_pixels(image):

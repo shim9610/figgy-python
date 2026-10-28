@@ -42,6 +42,7 @@ class ChartMethods:
         from .figure import _text, _merge
         from ._native import default_bounded_json
         fig = self.figure
+        fig._require_data_edit()
         if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
             raise ValueError('bounded charts require a separate single-panel Figure')
         with fig._lock:

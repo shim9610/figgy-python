@@ -1960,6 +1960,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(desktop::run_events, m)?)?;
     m.add_function(wrap_pyfunction!(persistent_settings_json, m)?)?;
     m.add_function(wrap_pyfunction!(default_colorbar_json, m)?)?;
+    m.add_function(wrap_pyfunction!(canonical_style_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(rebuild_legend_json, m)?)?;
     m.add_function(wrap_pyfunction!(bounded::default_radial_json, m)?)?;
     m.add_function(wrap_pyfunction!(bounded::default_bounded_json, m)?)?;
@@ -2067,6 +2068,17 @@ fn fitted_range_json(config: &str, axis: &str, min: f64, max: f64) -> PyResult<S
 #[pyfunction]
 fn default_colorbar_json() -> PyResult<String> {
     serde_json::to_string(&default::default_colorbar_options()).map_err(runtime)
+}
+
+/// Canonical CPU serialization used by the public-setter export compiler.
+/// Apply the same f32/default omission rules as accepted native/browser state;
+/// never fit ranges, inspect columns, acquire a Figure lock, or render here.
+#[pyfunction]
+fn canonical_style_state_json(settings: &str) -> PyResult<String> {
+    // Keep the exact typed serializer used by accepted settings_json.
+    // to_value(f32) would expose promoted binary approximation digits.
+    let state: Settings = parse(settings)?;
+    serde_json::to_string(&state).map_err(invalid)
 }
 
 #[pyfunction]

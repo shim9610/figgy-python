@@ -27,7 +27,7 @@ def test_readable_setters_replay_rich_layout_and_styles(variable, dpi):
         source.apply_settings(state)
         state = source.get_settings()
         target.axes[0].set_title("Unrelated", fontsize=40, color="orange")
-        code = source.to_code(variable)
+        code = source.to_code(variable, mode='exact')
         ast.parse(code)
         assert ".set_title(" in code and "fontsize=18.0" in code
         assert ".set_xlabel('Time (s)'" in code and ".set_ylabel('Amplitude'" in code
@@ -46,7 +46,7 @@ def test_invalid_export_variable_and_configure_are_atomic():
         before = figure.get_settings()
         for variable in ("fig.axes[0]", "class", 1):
             with pytest.raises(ValueError, match="identifier"):
-                figure.to_code(variable)
+                figure.to_code(variable, mode='exact')
         with pytest.raises(ValueError, match="unknown series"):
             figure.configure(config={"chart_title": {"visible": False}}, series={"missing": {}})
         with pytest.raises(ValueError, match="source columns"):

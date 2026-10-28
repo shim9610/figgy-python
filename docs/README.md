@@ -6,6 +6,7 @@
 | --- | --- |
 | [Project README](../README.md) | Installation, quick start, interactive demo and chart gallery |
 | [Example index](../examples/README.md) | Runnable chart recipes, image links and commands |
+| [Matplotlib-shaped API](MATPLOTLIB_API.md) | Public plotting objects, argument conventions, export modes and supported subset |
 | [Chart and style API](CHART_TYPES.md) | All chart constructors, host coverage, procedural materials and draw modes |
 | [Style tokens](STYLE_TOKENS.md) | Appearance presets, extraction, JSON reuse, DPI scaling and opt-in axes/text |
 | [Style profiles](STYLE_PROFILES.md) | Execution-local defaults, publication targets and dashboard task catalog with actual renders |
