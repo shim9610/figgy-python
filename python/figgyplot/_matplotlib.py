@@ -8,6 +8,8 @@ from contextlib import contextmanager
 
 import numpy as np
 
+from ._validation import number as _number
+
 
 @dataclass(frozen=True)
 class Bbox:
@@ -51,15 +53,6 @@ def canvas_size(state):
     return max(p["x"] + p["width"] for p in areas), max(
         p["y"] + p["height"] for p in areas
     )
-
-
-def _number(value, name, *, positive=False):
-    value = float(value)
-    if not math.isfinite(value) or (positive and value <= 0):
-        raise ValueError(
-            f"{name} must be finite" + (" and positive" if positive else "")
-        )
-    return value
 
 
 def _locator_spacing(locator, node, axes):
@@ -283,8 +276,12 @@ class Text:
                 cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(
                     json.dumps(cfg, allow_nan=False)
                 )
+        self._finish_edit(state)
         fig.apply_settings(state)
         return self
+
+    def _finish_edit(self, state):
+        """Specialized text layout, before the single document commit."""
 
     def set_fontsize(self, value):
         self.set(fontsize=value)
@@ -895,6 +892,11 @@ class ArtistMethods:
     def _body(self, state):
         return next(iter(self._spec(state)["render_type"].values()))
 
+    def _panel_axes(self, state):
+        from ._document import series_panel_id
+
+        return self.figure._axes_for(series_panel_id(state, self.id))
+
     @property
     def data(self):
         from ._artist_appearance import ArtistData
@@ -1173,6 +1175,9 @@ class ArtistMethods:
 
     def _colorbar(self):
         state = self.figure.get_settings()
+        return self._colorbar_owner(state)._config(state)["colorbar"]
+
+    def _colorbar_owner(self, state):
         body = self._body(state)
         if not (
             "matrix" in body
@@ -1180,10 +1185,7 @@ class ArtistMethods:
             or body.get("style", {}).get("color_map")
         ):
             raise AttributeError("artist is not scalar-mapped")
-        for ax in self.figure.axes:
-            if any(s["series_id"] == self.id for s in ax._owned_series(state)):
-                return ax._config(state)["colorbar"]
-        raise ValueError("artist has no owning Axes")
+        return self._panel_axes(state)
 
     def set_alpha(self, value):
         alpha = _number(value, "alpha")
@@ -1310,7 +1312,7 @@ class AxesMethods:
 
     def add_colorbar(self, *, cmap="viridis", vmin=0, vmax=1, label=None):
         """Add an explicit standalone scale; existing data colors are retained."""
-        from ._features import _set_colorbar
+        from ._color_scale import _set_colorbar
 
         with self.figure.batch_update():
             state = self.figure.get_settings()
@@ -1662,150 +1664,27 @@ class AxesMethods:
     def _tick_params(
         self, axis="both", which="major", reset=False, sides=None, **kwargs
     ):
-        """Style ticks in points using Matplotlib names; reject unsupported options."""
-        from .figure import _color, _LINES
+        """Style ticks in points using the shared axis option translator."""
+        from ._charts import family
+        from ._ticks import apply_tick_params
 
-        if axis not in ("x", "y", "both") or which not in ("major", "minor", "both"):
-            raise ValueError("invalid axis or which")
-        allowed = {
-            "direction",
-            "length",
-            "width",
-            "color",
-            "pad",
-            "labelsize",
-            "labelcolor",
-            "colors",
-            "labelfontfamily",
-            "bottom",
-            "top",
-            "left",
-            "right",
-            "labelbottom",
-            "labeltop",
-            "labelleft",
-            "labelright",
-            "grid_color",
-            "grid_alpha",
-            "grid_linewidth",
-            "grid_linestyle",
-        }
-        if set(kwargs) - allowed:
-            raise ValueError(
-                "unsupported tick parameters: "
-                + ", ".join(sorted(set(kwargs) - allowed))
-            )
         fig = self.figure
-        fig._require_cartesian()
         state = fig.get_settings()
+        if family(state) is not None:
+            raise ValueError("bounded charts have no Cartesian axes; use their chart properties or data selection")
         cfg = self._config(state)
-        unit = fig.dpi / 72
         sides = sides or [
-            s
-            for s in ("bottom", "top", "left", "right")
-            if axis == "both" or (axis == "x") == (s in ("bottom", "top"))
+            side for side in ("bottom", "top", "left", "right")
+            if axis == "both" or (axis == "x") == (side in ("bottom", "top"))
         ]
+        targets = []
         for side in sides:
-            key = {
-                "bottom": "bottom_x",
-                "top": "top_x",
-                "left": "left_y",
-                "right": "right_y",
-            }[side]
-            node = (
-                self._overlay(state)["y_axis"]
-                if self.overlay_id and side == "right"
-                else cfg[key]
-            )
             if self.overlay_id and axis == "y" and side == "left":
                 continue
-            label = node["label_style"]
-            if reset:
-                base = fig._default_config[key]
-                for field in ("tick", "major_tick_length", "minor_tick_length"):
-                    node[field] = copy.deepcopy(base[field])
-                node["label_style"] = label = copy.deepcopy(base["label_style"])
-            for name, value in kwargs.items():
-                if name == "direction":
-                    if value not in ("in", "out", "inout"):
-                        raise ValueError("direction must be in, out or inout")
-                    node["tick"] = {"in": "Inside", "out": "Outside", "inout": "Both"}[
-                        value
-                    ]
-                elif name == "length":
-                    length = _number(value, "length") * unit
-                    if length < 0:
-                        raise ValueError("length must be nonnegative")
-                    if which in ("major", "both"):
-                        node["major_tick_length"] = length
-                    if which in ("minor", "both"):
-                        node["minor_tick_length"] = length
-                elif name in ("color", "colors"):
-                    color = _color(value)
-                    if node["line_visible"] and color != node["line_color"]:
-                        raise NotImplementedError(
-                            "renderer shares tick and spine colors; set spine color explicitly first"
-                        )
-                    node["line_color"] = color
-                elif name == "labelcolor":
-                    label["color"] = _color(value)
-                elif name == "width":
-                    width = _number(value, "width") * unit
-                    if node["line_visible"] and not math.isclose(
-                        width, node["line_width"], rel_tol=1e-6
-                    ):
-                        raise NotImplementedError(
-                            "renderer shares tick and spine widths; set spine linewidth explicitly first"
-                        )
-                    node["line_width"] = width
-                elif name == "labelsize":
-                    label["font_size"] = (
-                        _number(value, "labelsize", positive=True) * unit
-                    )
-                elif name == "labelfontfamily":
-                    label["label_font"] = fig._check_font(value)
-                elif name == "pad":
-                    raise NotImplementedError(
-                        "independent tick padding is not supported by this renderer"
-                    )
-                elif name == "label" + side:
-                    label["label_visible"] = bool(value)
-                    if value:
-                        label["visible"] = True
-            if side in kwargs:
-                if not kwargs[side]:
-                    node["tick"] = "None"
-                elif node["tick"] == "None":
-                    node["tick"] = fig._default_config[key]["tick"]
-            if "colors" in kwargs:
-                label["color"] = _color(kwargs["colors"])
-        for dimension in ("x", "y"):
-            if axis not in (dimension, "both"):
-                continue
-            for kind in ("major", "minor"):
-                if which not in (kind, "both"):
-                    continue
-                grid = cfg["grid"]
-                prefix = kind + "_" + dimension
-                for name, field in [
-                    ("grid_color", "color"),
-                    ("grid_alpha", "alpha"),
-                    ("grid_linewidth", "width"),
-                    ("grid_linestyle", "style"),
-                ]:
-                    if name not in kwargs:
-                        continue
-                    value = kwargs[name]
-                    if field == "color":
-                        grid[prefix + "_color"] = _color(value)
-                    elif field == "alpha":
-                        grid[prefix + "_color"]["a"] = _number(value, "grid_alpha")
-                    elif field == "width":
-                        grid[prefix + "_width"] = (
-                            _number(value, "grid_linewidth") * unit
-                        )
-                    else:
-                        grid[prefix + "_style"] = _LINES.get(value, value)
+            key = {"bottom": "bottom_x", "top": "top_x", "left": "left_y", "right": "right_y"}[side]
+            node = self._overlay(state)["y_axis"] if self.overlay_id and side == "right" else cfg[key]
+            targets.append((side, node, fig._default_config[key]))
+        apply_tick_params(fig, targets, grid=cfg["grid"], axis=axis, which=which, reset=reset, **kwargs)
         fig.apply_settings(state)
 
 
@@ -1841,15 +1720,10 @@ class ColorbarText(Text):
     def _node(self, state):
         return self.axes._config(state)["colorbar"]["axis"]["title_option"]
 
-    def set(self, **properties):
-        from ._features import fit_colorbar_title
+    def _finish_edit(self, state):
+        from ._color_scale import fit_colorbar_title
 
-        fig = self.axes.figure
-        with fig.batch_update():
-            super().set(**properties)
-            state = fig.get_settings()
-            fit_colorbar_title(self.axes._config(state))
-            fig.apply_settings(state)
+        fit_colorbar_title(self.axes._config(state))
 
 
 class Colorbar:
@@ -1866,7 +1740,7 @@ class Colorbar:
         return self.ax.yaxis.set_label_text(label, **kwargs)
 
     def _edit(self, operation):
-        from ._features import fit_colorbar_title
+        from ._color_scale import fit_colorbar_title
 
         fig = self.axes.figure
         state = fig.get_settings()
@@ -1879,7 +1753,7 @@ class Colorbar:
     def set_clim(self, vmin=None, vmax=None):
         if vmax is None and vmin is not None and not np.isscalar(vmin):
             vmin, vmax = vmin
-        from ._features import update_color_scale
+        from ._color_scale import update_color_scale
 
         fig = self.axes.figure
         state = fig.get_settings()
@@ -1887,7 +1761,7 @@ class Colorbar:
         fig.apply_settings(state)
 
     def set_cmap(self, cmap):
-        from ._features import update_color_scale
+        from ._color_scale import update_color_scale
 
         fig = self.axes.figure
         state = fig.get_settings()
@@ -1979,7 +1853,7 @@ class ColorbarAxis(Axis):
         return [self.axes._config(state)["colorbar"]["axis"]]
 
     def set_major_locator(self, locator):
-        from ._features import fit_colorbar_title
+        from ._color_scale import fit_colorbar_title
 
         fig = self.axes.figure
         state = fig.get_settings()
@@ -2003,26 +1877,18 @@ class ColorbarAxis(Axis):
         return ColorbarText(self.axes, "colorbar")
 
     def set_tick_params(self, which="major", reset=False, **kwargs):
+        from ._ticks import apply_tick_params
+        from ._color_scale import fit_colorbar_title
+
         fig = self.axes.figure
         state = fig.get_settings()
         cfg = self.axes._config(state)
-        axis = cfg["colorbar"]["axis"]
-        side = cfg["colorbar"]["side"]
-        # Reuse the same public tick argument translator on an isolated model
-        # view; the transaction changes only the actual shared colorbar axis.
-        key = "right_y" if side in ("Left", "Right") else "bottom_x"
-        proxy = _StateFigure(state, fig._default_config, fig.dpi)
-        ax = proxy._axes_for(self.axes.subplot_id)
-        ax._config(proxy._state)[key] = copy.deepcopy(axis)
-        ax._tick_params(
-            axis="y" if key == "right_y" else "x",
-            which=which,
-            reset=reset,
-            sides=["right" if key == "right_y" else "bottom"],
-            **kwargs,
+        vertical = cfg["colorbar"]["side"] in ("Left", "Right")
+        key, side = ("right_y", "right") if vertical else ("bottom_x", "bottom")
+        apply_tick_params(
+            fig, [(side, cfg["colorbar"]["axis"], fig._default_config[key])],
+            axis="y" if vertical else "x", which=which, reset=reset, **kwargs,
         )
-        cfg["colorbar"]["axis"] = ax._config(proxy._state)[key]
-        from ._features import fit_colorbar_title
         fit_colorbar_title(cfg)
         fig.apply_settings(state)
 
@@ -2152,22 +2018,13 @@ class FigureMethods:
             )
         if mappable.figure is not self:
             raise ValueError("mappable belongs to another Figure")
-        mappable._colorbar()
-        owners = [
-            a
-            for a in self.axes
-            if any(
-                s["series_id"] == mappable.id
-                for s in a._owned_series(self.get_settings())
-            )
-        ]
-        owner = owners[0]
-        if ax is not None and (
-            ax.figure is not self or ax.subplot_id != owner.subplot_id
-        ):
-            raise ValueError("colorbar must belong to the mappable panel")
         with self.batch_update():
             state = self.get_settings()
+            owner = mappable._colorbar_owner(state)
+            if ax is not None and (
+                ax.figure is not self or ax.subplot_id != owner.subplot_id
+            ):
+                raise ValueError("colorbar must belong to the mappable panel")
             owner._config(state)["colorbar"]["visible"] = True
             self.apply_settings(state)
             bar = Colorbar(mappable, owner)

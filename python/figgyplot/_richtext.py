@@ -26,7 +26,7 @@ class TextRun:
 
     def _segments(self, dpi):
         from .figure import _color
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         if not isinstance(self.text, str) or self.script not in (
             "normal",

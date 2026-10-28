@@ -239,7 +239,10 @@ bar.set_clim(250, 400)
 Both orientations use the same colorbar axis object (`bar.ax.xaxis` aliases
 `bar.ax.yaxis`). `ax.add_colorbar(...)` can explicitly create a standalone scale;
 it does not turn arbitrary per-point colors into a scalar mapping. Colors and
-limits edited through an artist or colorbar share one update path.
+limits edited through an artist or colorbar share one update path. A combined
+palette/domain edit validates the complete domain and fits its label once.
+Colorbar `tick_params` uses the same option translator as plot axes; grid options
+are rejected because colorbars have no grid, leaving the entire edit unapplied.
 `TimestampFormatter(unit="ms", timezone=540, pattern="%Y-%m-%d")` formats numeric
 Unix timestamps, without converting their data. Degrees/radians are additional
 `SignificantFormatter` styles. `Axis.set_scale` and `.line` edit just that

@@ -253,7 +253,7 @@ class ChartMethods:
         interior levels. ``filled=True`` adds upstream banded field rendering.
         """
         from .figure import _array, _color
-        from ._features import _set_colorbar
+        from ._color_scale import _set_colorbar
         if len(args) == 1:
             z = np.asarray(args[0])
             if z.ndim != 2:

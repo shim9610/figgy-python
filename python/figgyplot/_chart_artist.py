@@ -3,7 +3,7 @@
 import copy
 import json
 
-from ._matplotlib import _number
+from ._validation import number as _number
 
 _FORMATS = dict(
     value="Value",

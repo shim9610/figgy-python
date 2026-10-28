@@ -33,7 +33,7 @@ class ContourAppearance:
         return self
 
     def set_levels(self, levels):
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         values = [_number(v, "contour level") for v in levels]
         return self._edit(lambda node: node.update(levels=values))
@@ -43,7 +43,7 @@ class ContourAppearance:
 
     def set_style(self, *, color=None, linewidth=None, linestyle=None, colors=...):
         from .figure import _color, _LINES
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         def edit(node):
             if color is not None:
@@ -81,7 +81,7 @@ class ContourAppearance:
         visible=None removes label configuration. Lengths use points.
         """
         from .figure import _color
-        from ._matplotlib import _number
+        from ._validation import number as _number
         from .ticker import SignificantFormatter
 
         def edit(node):

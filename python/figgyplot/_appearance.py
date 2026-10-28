@@ -88,7 +88,7 @@ _SHAPES = {
 
 def convert(value, kind, dpi, *, decode=False):
     from .figure import _color, _material
-    from ._matplotlib import _number
+    from ._validation import number as _number
 
     if decode:
         if kind == "color":

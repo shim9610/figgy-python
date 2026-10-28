@@ -69,7 +69,7 @@ _PARTS = {
 
 def _style(value, part, dpi, decode=False):
     from .figure import _color, _MARKERS
-    from ._matplotlib import _number
+    from ._validation import number as _number
 
     _, cls, fields, _ = _PARTS[part]
     if not decode and not isinstance(value, cls):
@@ -229,7 +229,7 @@ class ArtistData:
 
 
 def _domain(figure, column, domain):
-    from ._matplotlib import _number
+    from ._validation import number as _number
 
     if domain is None:
         bounds = json.loads(figure._native.column_extents_json()).get(column)
@@ -364,7 +364,7 @@ class ElementAppearance:
     def map_color(self, source, *, clim=None, cmap=None):
         if self.part != "markers":
             raise AttributeError("color-value mapping requires point markers")
-        from ._features import _set_colorbar
+        from ._color_scale import _set_colorbar
 
         fig = self.artist.figure
         state = fig.get_settings()
@@ -374,13 +374,7 @@ class ElementAppearance:
         else:
             column = _column(source, fig)
             low, high = _domain(fig, column, clim)
-            owner = next(
-                ax
-                for ax in fig.axes
-                if any(
-                    s["series_id"] == self.artist.id for s in ax._owned_series(state)
-                )
-            )
+            owner = self.artist._panel_axes(state)
             config = owner._config(state)
             current = config.get("colorbar", {}).get("colormap", "Viridis")
             _set_colorbar(config, current if cmap is None else cmap, low, high)
@@ -391,7 +385,7 @@ class ElementAppearance:
     def map_size(self, source, *, domain=None, markersizes=(4, 16), scale="area"):
         if self.part != "markers":
             raise AttributeError("size-value mapping requires point markers")
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         fig = self.artist.figure
         state = fig.get_settings()
@@ -540,7 +534,7 @@ class VectorAppearance:
         units=None,
     ):
         from .figure import _color
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         fig = self.artist.figure
         state = fig.get_settings()
@@ -580,7 +574,7 @@ class VectorAppearance:
         return self
 
     def map_color(self, source, *, clim=None, cmap=None):
-        from ._features import _set_colorbar
+        from ._color_scale import _set_colorbar
 
         fig = self.artist.figure
         state = fig.get_settings()
@@ -609,13 +603,7 @@ class VectorAppearance:
                 name = _column(source, fig)
                 style["color_map"] = {"Column": name}
                 low, high = _domain(fig, name, clim)
-            owner = next(
-                ax
-                for ax in fig.axes
-                if any(
-                    s["series_id"] == self.artist.id for s in ax._owned_series(state)
-                )
-            )
+            owner = self.artist._panel_axes(state)
             config = owner._config(state)
             current = config.get("colorbar", {}).get("colormap", "Viridis")
             _set_colorbar(config, current if cmap is None else cmap, low, high)

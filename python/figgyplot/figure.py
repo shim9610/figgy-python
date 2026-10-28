@@ -558,14 +558,14 @@ class Figure(FigureMethods):
                 raise ValueError("stale edit: the Figure changed; refresh and retry")
             if not isinstance(settings, dict):
                 raise ValueError('settings must be a document mapping')
+            # Detach exactly once; validation and batch staging own this copy.
+            settings = copy.deepcopy(settings)
             if reset:
-                settings = copy.deepcopy(settings)
                 from ._codegen import expand_config
                 settings['config'] = expand_config(settings['config'], self._default_config)
-            settings = copy.deepcopy(settings)
             previous = self.get_settings()
             if settings.get('schema_version') == 1 and 'identity' not in settings:
-                current = self.get_settings().get('identity')
+                current = previous.get('identity')
                 if current is not None:
                     settings['identity'] = copy.deepcopy(current)
                     settings['schema_version'] = 2
@@ -577,7 +577,7 @@ class Figure(FigureMethods):
             except (AttributeError, KeyError, IndexError, StopIteration) as exc:
                 raise ValueError('invalid settings document structure') from exc
             if self._style_batch is not None:
-                self._style_batch = copy.deepcopy(settings)
+                self._style_batch = settings
                 return self
             self._native.apply_settings(json.dumps(settings, allow_nan=False))
             accepted = json.loads(self._native.settings_json())
@@ -623,48 +623,43 @@ class Figure(FigureMethods):
         """
         if not isinstance(target, str) or not target:
             raise ValueError("editable target must be a non-empty string")
-        kind = _family(self.get_settings())
-        if kind is not None:
-            if target == 'chart_title':
-                state = self.get_settings()
-                chart = state[kind]
-                title = _chart_text.title_options(chart)
-                for key, value in properties.items():
-                    if key == 'text':
-                        _chart_text.set_title_text(chart, segments=_segments(value, dpi=self.dpi))
-                    elif key == 'fontsize': title['text']['font_size'] = float(value)*self.dpi/72
-                    elif key == 'font': title['text']['font'] = self._check_font(value)
-                    elif key == 'color': title['text']['color'] = _color(value)
-                    elif key == 'align': title['text']['align'] = str(value).title()
-                    elif key == 'visible': title['visible'] = bool(value)
-                    else: raise ValueError(f'unsupported bounded title property: {key}')
-                chart['chart_title'] = title
-                return self.apply_settings(state)
-            patch = {}
-            titles = {'chart_title': 'title', 'axis_title_bottom': 'category_title', 'axis_title_left': 'value_title'}
-            if kind not in ('radial', 'radar') and self.get_settings()[kind]['direction'] == 'Horizontal':
-                titles.update(axis_title_bottom='value_title', axis_title_left='category_title')
-            if target not in titles or (kind in ('radial', 'radar') and target != 'chart_title'):
-                raise ValueError('use the chart artist or configure_bounded/configure_radial for data properties')
-            for key, value in properties.items():
-                if key == 'text': patch[titles[target]] = str(value)
-                elif key == 'fontsize': patch['font_size'] = float(value)*self.dpi/72
-                elif key == 'font': patch['font_family'] = self._check_font(value)
-                else: raise ValueError(f'unsupported bounded title property: {key}')
-            return self.configure_radial(**patch) if kind == 'radial' else self.configure_bounded(kind, **patch)
         with self._lock:
-            self._require_open()
             state = self.get_settings()
+            kind = _family(state)
+            if kind is not None:
+                if target == 'chart_title':
+                    chart = state[kind]
+                    title = _chart_text.title_options(chart)
+                    for key, value in properties.items():
+                        if key == 'text':
+                            _chart_text.set_title_text(chart, segments=_segments(value, dpi=self.dpi))
+                        elif key == 'fontsize': title['text']['font_size'] = float(value)*self.dpi/72
+                        elif key == 'font': title['text']['font'] = self._check_font(value)
+                        elif key == 'color': title['text']['color'] = _color(value)
+                        elif key == 'align': title['text']['align'] = str(value).title()
+                        elif key == 'visible': title['visible'] = bool(value)
+                        else: raise ValueError(f'unsupported bounded title property: {key}')
+                    chart['chart_title'] = title
+                    return self.apply_settings(state)
+                patch = {}
+                titles = {'chart_title': 'title', 'axis_title_bottom': 'category_title', 'axis_title_left': 'value_title'}
+                if kind not in ('radial', 'radar') and state[kind]['direction'] == 'Horizontal':
+                    titles.update(axis_title_bottom='value_title', axis_title_left='category_title')
+                if target not in titles or (kind in ('radial', 'radar') and target != 'chart_title'):
+                    raise ValueError('use the chart artist or configure_bounded/configure_radial for data properties')
+                for key, value in properties.items():
+                    if key == 'text': patch[titles[target]] = str(value)
+                    elif key == 'fontsize': patch['font_size'] = float(value)*self.dpi/72
+                    elif key == 'font': patch['font_family'] = self._check_font(value)
+                    else: raise ValueError(f'unsupported bounded title property: {key}')
+                return self.configure_radial(**patch) if kind == 'radial' else self.configure_bounded(kind, **patch)
             if _axes is None:
-                for index, panel in enumerate(state['config'].get('subplots', [])):
-                    if target in panel.get('series', []):
-                        _axes = self._axes_for(state['identity']['panels'][index+1]['id'])
-                        break
+                _axes = self._axes_for(_document.series_panel_id(state, target))
             cfg = state["config"] if _axes is None else _axes._config(state)
-            before_config = copy.deepcopy(cfg)
             series = next((s for s in state["series"] if s["series_id"] == target), None)
             if series is not None:
                 style = next(iter(series["render_type"].values()))
+                scale_changes = {}
                 for key, value in properties.items():
                     if key == "color":
                         matched = False
@@ -692,11 +687,14 @@ class Figure(FigureMethods):
                         label["segments"] = _segments(value, dpi=self.dpi)
                         series["label"] = label
                     elif key in ("cmap", "vmin", "vmax") and ('matrix' in style or style.get('scatter', {}).get('point_color_map') or style.get('style', {}).get('color_map')):
-                        from ._features import update_color_scale
-                        update_color_scale(cfg, **{key:value})
+                        scale_changes[key] = value
                     else:
                         raise ValueError(f"unsupported series property: {key}")
+                if scale_changes:
+                    from ._color_scale import update_color_scale
+                    update_color_scale(cfg, **scale_changes)
             else:
+                before_config = copy.deepcopy(cfg)
                 if target == "chart_title":
                     node, rich = cfg["chart_title"], cfg["chart_title"]["text"]
                 elif target == "legend":
@@ -777,7 +775,7 @@ class Figure(FigureMethods):
                 cfg.clear()
                 cfg.update(reconciled)
             # Reject bad sizes before they reach GPU geometry creation.
-            for spec in state["series"]:
+            for spec in ([series] if series is not None else []):
                 for style in spec["render_type"].values():
                     for kind, field in [("line", "line_width"), ("scatter", "point_size")]:
                         if kind in style and (not math.isfinite(style[kind][field]) or style[kind][field] < 0):
@@ -1651,7 +1649,7 @@ class Axes(AxesMethods, FeatureMethods, ChartMethods):
         choose automatic ticks; Figure.update('axis_bottom', major_spacing=...)
         sets regular spacing. Arbitrary set_xticks/set_yticks are not provided.
         """
-        from ._features import colorbar
+        from ._color_scale import colorbar
         x, y = _array(x), _array(y)
         if x.size != y.size or not x.size:
             raise ValueError('scatter requires equal nonempty x/y vectors')
@@ -1748,7 +1746,7 @@ class Axes(AxesMethods, FeatureMethods, ChartMethods):
             high = low + 1
         if not math.isfinite(low) or not math.isfinite(high) or low >= high:
             raise ValueError("vmin and vmax must be finite and increasing")
-        from ._features import _set_colorbar
+        from ._color_scale import _set_colorbar
         with self.figure._lock:
             config = self._config(self.figure.get_settings())
             _set_colorbar(config,cmap,low,high)

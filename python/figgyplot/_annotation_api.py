@@ -4,7 +4,7 @@ import copy
 
 
 def anchor(xy, coords):
-    from ._matplotlib import _number
+    from ._validation import number as _number
 
     x, y = (_number(v, "coordinate") for v in xy)
     if coords == "axes fraction":
@@ -52,7 +52,7 @@ class AnnotationEditing:
     ):
         """Edit a reference-line/arrow stroke or a span fill; lengths are points."""
         from .figure import _color, _LINES
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         def edit(name, body):
             if name == "Span":
@@ -92,7 +92,7 @@ class AnnotationEditing:
     ):
         """Set/remove a text frame. Padding is in points, independent of font size."""
         from .figure import _color
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         def edit(name, body):
             if name != "Text":
@@ -122,7 +122,7 @@ class AnnotationEditing:
         return self._edit(edit)
 
     def set_value(self, value):
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         def edit(name, body):
             if name != "ReferenceLine":
@@ -132,7 +132,7 @@ class AnnotationEditing:
         return self._edit(edit)
 
     def set_bounds(self, low, high):
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         def edit(name, body):
             if name != "Span":
@@ -152,7 +152,7 @@ class AnnotationEditing:
     ):
         """Set optional text on a reference line or arrow; None removes it."""
         from .figure import _color, _segments
-        from ._matplotlib import _number
+        from ._validation import number as _number
 
         def edit(name, body):
             if name not in ("Arrow", "ReferenceLine"):

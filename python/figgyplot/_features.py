@@ -8,53 +8,7 @@ from . import _document
 from . import _style_runtime
 
 
-def colorbar(config, values, cmap, vmin, vmax):
-    finite = np.asarray(values)[np.isfinite(values)]
-    if not finite.size:
-        raise ValueError('mapped values need at least one finite value')
-    low = float(finite.min()) if vmin is None else float(vmin)
-    high = float(finite.max()) if vmax is None else float(vmax)
-    if low == high:
-        high = low+max(1., abs(low)*0.01)
-    _set_colorbar(config,cmap,low,high)
-
-
-_COLOR_UNSET = object()
-
-
-def fit_colorbar_title(config):
-    """Fit an unpositioned label with renderer metrics; preserve manual offsets."""
-    bar = config.get('colorbar')
-    if not bar or not bar['visible']:
-        return
-    title = bar['axis']['title_option']
-    if not title['visible'] or title['offset_x'] or title['offset_y']:
-        return
-    from ._native import fitted_colorbar_title_margin
-    bar['axis']['out_margin'] = fitted_colorbar_title_margin(json.dumps(config))
-
-
-def update_color_scale(config, *, cmap=_COLOR_UNSET, vmin=None, vmax=None):
-    """Shared mutation for mapped artists and standalone color-scale objects."""
-    from .figure import _colormap
-    from ._matplotlib import _number
-    bar=config['colorbar']
-    if cmap is not _COLOR_UNSET:bar['colormap']=_colormap(cmap)
-    if vmin is not None:bar['axis']['min']=_number(vmin,'vmin')
-    if vmax is not None:bar['axis']['max']=_number(vmax,'vmax')
-    fit_colorbar_title(config)
-
-
-def _set_colorbar(config,cmap,low,high):
-    """Update the shared scale without resetting accepted colorbar appearance."""
-    from .figure import _colormap
-    from ._native import default_colorbar_json
-    if not math.isfinite(low) or not math.isfinite(high) or low >= high:
-        raise ValueError('mapped value domain must be finite and increasing')
-    bar = copy.deepcopy(config.get('colorbar') or json.loads(default_colorbar_json()))
-    bar['colormap'] = _colormap(cmap)
-    bar['axis'].update(min=low, max=high, major_spacing=(high-low)/5)
-    config['colorbar'] = bar
+from ._color_scale import colorbar
 
 
 from ._annotation_api import AnnotationEditing
@@ -126,7 +80,7 @@ class Annotation(AnnotationEditing):
         from .figure import _segments
         self._set_text_property('segments',_segments(value, dpi=self.figure.dpi))
     def set_fontsize(self,value):
-        from ._matplotlib import _number
+        from ._validation import number as _number
         self._set_text_property('font_size',_number(value,'fontsize',positive=True)*self.figure.dpi/72)
     def get_fontsize(self):
         return self._rich_text()['font_size']*72/self.figure.dpi
@@ -140,7 +94,7 @@ class Annotation(AnnotationEditing):
         kind,point=next(iter(body['anchor'].items()))
         return point['x'],1-point['y'] if kind=='Ratio' and getattr(self,'_axes_fraction',False) else point['y']
     def set_position(self,xy):
-        from ._matplotlib import _number
+        from ._validation import number as _number
         x,y=map(lambda v:_number(v,'position'),xy)
         with self.figure.batch_update():
             state=self.figure.get_settings();body=next(iter(self._find(state)[2]['kind'].values()))
@@ -315,7 +269,8 @@ class FeatureMethods:
         return note
 
     def _annotation_anchor(self,xy,coords):
-        from ._matplotlib import _number,Transform
+        from ._matplotlib import Transform
+        from ._validation import number as _number
         x,y=(_number(v,'annotation coordinate') for v in xy)
         if isinstance(coords,Transform):
             if coords.axes is not self:raise ValueError('transform belongs to another Axes')
@@ -343,7 +298,8 @@ class FeatureMethods:
         from .figure import _color, _segments
         if coords not in ('data', 'ratio'):
             raise ValueError('coords must be data or ratio')
-        from ._matplotlib import _number,Transform
+        from ._matplotlib import Transform
+        from ._validation import number as _number
         if fontweight not in ('normal','bold',400,700) or fontstyle not in ('normal','italic'):
             raise NotImplementedError('supported text styles are normal/bold and normal/italic')
         rich = copy.deepcopy(self.figure._default_config['legend']['content'])
