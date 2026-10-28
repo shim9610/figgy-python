@@ -237,6 +237,14 @@ these setters do not perform automatic layout or adjust ticks. Constructors and
 layout. Copy Python replays style/configuration against matching category and
 series IDs, preserving the destination's data values.
 
+Copy Python omits unchanged renderer defaults and writes rich text in compact
+runs. It resets chart-level defaults before replaying its bounded patch, so a
+destination's previous material or label styling cannot survive an omitted
+default field. Existing category/series values are preserved. For manual edits,
+`configure_bounded` and `configure_radial` keep their selective-patch behavior
+unless `reset=True` is explicitly supplied. `fig.to_code(compact=False)` exposes
+expanded dictionaries for diagnostics; `get_settings()` always returns full SSOT.
+
 `ax.set_title("Comparison\nObserved sample", fontsize=18)` uses the independent
 rich title, with up to 512 characters and eight lines. It does not change the
 category/data-label font. Titles set before construction keep their text and

@@ -498,6 +498,11 @@ class Figure:
         Read the current SSOT with ``get_settings``, edit only the desired
         fields, then submit it here for precise control. This does not choose
         tick spacing, fit data ranges or enlarge the title band.
+
+        ``reset=True`` expands omitted Config fields from this Figure's renderer
+        defaults, including subplot/overlay axes and colorbars. The resolved
+        complete document is validated and committed once. It never merges
+        omitted fields from the target's current edits.
         """
         with self._lock:
             self._require_open()
@@ -507,7 +512,8 @@ class Figure:
                 raise ValueError('settings must be a document mapping')
             if reset:
                 settings = copy.deepcopy(settings)
-                settings["config"] = _merge(copy.deepcopy(self._default_config), settings["config"])
+                from ._codegen import expand_config
+                settings['config'] = expand_config(settings['config'], self._default_config)
             settings = copy.deepcopy(settings)
             previous = self.get_settings()
             if settings.get('schema_version') == 1 and 'identity' not in settings:
@@ -832,13 +838,18 @@ class Figure:
                 self.apply_settings(state)
         return self
 
-    def configure_radial(self, *, style=None, slices=None, expected_slices=None, **properties):
+    def configure_radial(self, *, style=None, slices=None, expected_slices=None, reset=False, **properties):
         """Patch an existing pie/donut, preserving its values unless explicitly set.
 
         ``slices`` maps existing zero-based indices to appearance/label patches.
         Use the radial artist's ``set_values`` to replace category values.
         Advanced fields follow the upstream serialized radial model.
+        ``reset=True`` restores chart-level renderer defaults before patching;
+        existing slice properties/values remain unless explicitly patched.
+        The default keeps accepted edits.
         """
+        if type(reset) is not bool:
+            raise ValueError('reset must be boolean')
         with self._lock:
             state = self.get_settings()
             if state.get("radial") is None:
@@ -848,6 +859,11 @@ class Figure:
                 raise ValueError("radial style replay requires the same slice count")
             if "slices" in properties or "value" in properties:
                 raise ValueError("use set_values to change radial data")
+            if reset:
+                from ._native import default_radial_json
+                baseline = json.loads(default_radial_json())
+                baseline['slices'] = chart['slices']
+                chart = state['radial'] = baseline
             _merge(chart, properties)
             if style is not None:
                 _merge(chart["style"], style)
@@ -862,12 +878,17 @@ class Figure:
                     _merge(chart["slices"][index], patch)
             return self.apply_settings(state)
 
-    def configure_bounded(self, kind=None, *, style=None, series=None, expected_categories=None, expected_series=None, **properties):
+    def configure_bounded(self, kind=None, *, style=None, series=None, expected_categories=None, expected_series=None, reset=False, **properties):
         """Patch a categorical/box chart SSOT without changing unspecified fields.
 
         ``series`` maps stable series IDs to patches. Values are only replaced
         when explicitly supplied; Copy Python preserves the destination data.
+        ``reset=True`` restores renderer defaults before applying this patch,
+        retaining existing categories/series and their values. Otherwise only
+        supplied fields change.
         """
+        if type(reset) is not bool:
+            raise ValueError('reset must be boolean')
         with self._lock:
             state = self.get_settings()
             kind = kind or _family(state)
@@ -878,6 +899,11 @@ class Figure:
                 raise ValueError('style replay requires matching category IDs')
             if expected_series is not None and [s['id'] for s in chart['series']] != expected_series:
                 raise ValueError('style replay requires matching series IDs')
+            if reset:
+                from ._native import default_bounded_json
+                baseline = json.loads(default_bounded_json(kind))
+                baseline.update(categories=chart['categories'], series=chart['series'])
+                chart = state[kind] = baseline
             _merge(chart, properties)
             if style is not None:
                 _merge(chart['style'], style)
@@ -895,14 +921,17 @@ class Figure:
             properties["material"] = _material(material)
         return self.configure_radial(style=properties)
 
-    def to_code(self, variable="fig"):
+    def to_code(self, variable="fig", *, compact=True):
         """Readable Python setters for an existing Figure with the same series.
 
         Font sizes are exported in points, using this Figure's DPI. Recreate the
         original plot at the same DPI before replaying its settings.
+        The default omits renderer defaults and groups rich-text runs, restoring
+        defaults before replay so unrelated target edits do not leak through.
+        ``compact=False`` emits expanded dictionaries for diagnostics.
         """
         from ._codegen import settings_to_code
-        return settings_to_code(self.get_settings(), self._default_config, self.dpi, variable)
+        return settings_to_code(self.get_settings(), self._default_config, self.dpi, variable, compact=compact)
 
     def select(self, x, y, *, edit_area=False):
         with self._lock:
@@ -1131,6 +1160,29 @@ def _code_tree(value, segments_function="text_segments"):
                 if text is not None:
                     result[key] = _CodeExpression(f"{segments_function}({text!r})")
                     continue
+                # Consecutive equal styles are readable runs, not a dictionary
+                # for every glyph. Fall back to raw values unless reconstruction
+                # is exact, including renderer-specific legend rule fields.
+                runs = []
+                for segment in current:
+                    style = {k: v for k, v in segment.items() if k != 'text'}
+                    if runs and runs[-1][0] == style:
+                        runs[-1][1].append(segment)
+                    else:
+                        runs.append((style, [segment]))
+                expressions = []
+                for style, segments in runs:
+                    plain = ''.join(s['text'] for s in segments)
+                    base = _segments(plain)
+                    overrides = {k: v for k, v in style.items() if any(s.get(k) != v for s in base)}
+                    rebuilt = [dict(s, **overrides) for s in base]
+                    if rebuilt != segments:
+                        break
+                    args = ', '.join(f'{k}={v!r}' for k, v in overrides.items())
+                    expressions.append(f"{segments_function}({plain!r}" + (f', {args}' if args else '') + ')')
+                else:
+                    result[key] = _CodeExpression(' + '.join(expressions))
+                    continue
             result[key] = _code_tree(current, segments_function)
         return result
     if isinstance(value, list):
@@ -1138,13 +1190,19 @@ def _code_tree(value, segments_function="text_segments"):
     return value
 
 
-def text_segments(text):
+def text_segments(text, **style):
     """Build renderer RichSegment values for ``text``.
 
     Unicode superscript/subscript characters such as ``"10⁻³"`` become
     superscript/subscript segments, exactly as the renderer maps them.
+    Optional renderer segment fields (bold, italic, color, font_size, etc.) apply
+    to the whole run. Text remains ordinary Python, including Unicode/newlines.
     """
-    return _segments(text)
+    allowed = {'bold', 'italic', 'underline', 'superscript', 'subscript', 'greek',
+               'color', 'font_size', 'field_em', 'rule', 'rule_dash', 'rule_band'}
+    if set(style) - allowed:
+        raise ValueError('unknown rich-text segment style')
+    return [dict(segment, **copy.deepcopy(style)) for segment in _segments(text)]
 
 
 def _colormap(value):

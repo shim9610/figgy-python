@@ -123,6 +123,27 @@ samples, with no whole-array or display-image readback.
 
 ## Settings and Copy Python
 
+Copy Python and `to_code()` share the compact exporter. A grid, overlay, mapped
+series or annotation no longer forces a fully expanded Config/text dump. The
+export stores nondefault Config leaves and each panel rectangle, while keeping
+the complete topology, series references, identity and tick intent. Its one
+`apply_settings(..., reset=True)` call expands root/subplot/overlay/colorbar
+defaults and validates the complete result before committing; it does not merge
+with the target's edited defaults or upload source arrays.
+
+Categorical/box/radar and radial exports use `configure_bounded(reset=True, ...)`
+or `configure_radial(reset=True, ...)`: chart-level appearance defaults are
+restored, exported per-item properties are applied, and destination data values
+are retained. Omit `reset` for the ordinary selective-patch behavior. Expanded
+diagnostic output remains available as `fig.to_code(compact=False)`.
+
+Plain rich text becomes `text_segments('Text')`; adjacent equal formatting is a
+run, such as `text_segments('Note', bold=True)`. Renderer legend rule/field
+segments, superscripts, colors and per-character overrides remain exact. A run
+is abbreviated only when reconstructing it produces identical segment values.
+Unsupported segment shapes fall back to explicit dictionaries. Repeated literal
+colors use local bindings without rounding their channel values.
+
 `get_settings` / `apply_settings` now use schema 2, adding `identity` metadata:
 Figure ID, panel/overlay IDs, grid placement and shared-axis membership. Visual
 values and source references remain in the upstream Config/series/family model.

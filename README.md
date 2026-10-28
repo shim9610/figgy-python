@@ -285,6 +285,15 @@ ax.set_ylim(0.0, 2.7)
 # The complete export also preserves legend placement and advanced styling.
 ```
 
+`fig.to_code()` and both editors' **Copy Python** use compact output by default.
+Unchanged renderer defaults are omitted, rich text is written as strings or
+styled runs, and repeated colors are named once. Replay restores omitted fields
+from renderer defaults before applying the export, so unrelated target edits do
+not leak through. Panel geometry, stable IDs, explicit tick policies and rich
+formatting are preserved; resident arrays are not uploaded again. Recreate the
+plotted series at the same DPI with a compatible renderer version before replay.
+Use `fig.to_code(compact=False)` to inspect expanded settings dictionaries.
+
 Ranges, ticks and titles:
 
 - Property-panel edits and `fig.update("axis_bottom", major_spacing=2)` share

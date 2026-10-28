@@ -47,6 +47,45 @@ def test_legacy_settings_and_heatmap_legend_preserve_shared_host_model(backend):
 NEEDS_UI = not os.environ.get('DISPLAY') or not all(shutil.which(p) for p in ['xdotool','xclip','wmctrl']) or os.environ.get('FIGGY_TEST_JUPYTER') != '1'
 
 
+@pytest.mark.skipif(NEEDS_UI, reason='requires actual native/Jupyter copy controls')
+def test_compact_python_copy_in_both_hosts_replays_the_complete_document(tmp_path):
+    scene = '''
+fig.set_layout([['first','second']])
+fig.subplots['first'].plot([0,1],[1,2],id='signal',label='Signal')
+fig.subplots['first'].set_title('Comparison\\nTwo lines')
+fig.subplots['first'].text(.2,.3,'한글 note',coords='ratio',id='note')
+fig.subplots['second'].imshow([[1,2],[3,4]],id='field')
+'''
+    with figgy.Figure(backend='native') as fig:
+        exec(scene, {'fig':fig})
+        handle = fig.show(block=False)
+        try:
+            inputs = Inputs(handle)
+            inputs.click('copy')
+            code = subprocess.check_output(['xclip','-selection','clipboard','-o'],text=True,timeout=3)
+            assert code == fig.to_code() and 'reset=True' in code
+            assert len(code) < len(fig.to_code(compact=False)) * .55
+            with figgy.Figure(backend='native') as other:
+                exec(scene, {'fig':other})
+                exec(code, {'fig':other})
+                assert other.get_settings() == fig.get_settings()
+                np.testing.assert_array_equal(other.render_rgba(), fig.render_rgba())
+            (tmp_path/'native-copy.py').write_text(code)
+        finally:
+            handle.close(); Inputs.pump()
+    source = (f'import figgyplot as fg\nassert fg.__file__ == {figgy.__file__!r}\n'
+              "fig=fg.Figure(backend='webgpu')\n"+scene+'\ndisplay(fig.widget())')
+    with notebook(tmp_path/'browser',source) as (page,execute):
+        click_button(page,'[data-copy]')
+        page.evaluate(ROOT+'.flush()')
+        execute('await fig.sync()')
+        code=page.locator('textarea[data-code]').input_value()
+        assert code and 'reset=True' in code
+        (tmp_path/'browser-copy.py').write_text(code)
+        execute(f"code={code!r}\nassert code==fig.to_code()\nother=fg.Figure(backend='webgpu')\n"+
+                f"exec({scene!r},{{'fig':other}})\nexec(code,{{'fig':other}})\nassert other.get_settings()==fig.get_settings()\nother.close()")
+
+
 def assert_blind_trial_title_pixels(image):
     assert image.shape == (500,700,4)
     rgb = image[..., :3].astype(int)
