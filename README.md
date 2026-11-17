@@ -137,9 +137,8 @@ host coverage, materials and draw modes, including the line-only Milkyway restri
 
 ## Install
 
-This checkout documents **figgyplot 0.3.0**. Before that release is published,
-PyPI installs the previous release (0.2.1); use the source-checkout instructions
-below to try the features described here.
+This checkout targets **figgyplot 0.4.0**. Until it is published, PyPI installs
+0.3.0; use the source-checkout instructions below to try the new features.
 
 Install from **PyPI** with **Python 3.8–3.15**:
 
@@ -212,6 +211,25 @@ finally:
 A small `figgy.pyplot` interface is also available. The API is familiar to
 matplotlib users, but does not implement the full matplotlib API.
 
+For a shared-X comparison, construct both panels in one Figure:
+
+```python
+fig, axes = figgy.subplots(2, 1, sharex=True, backend="native")
+try:
+    axes[0].plot(x, np.sin(x), label="Signal")
+    axes[1].plot(x, np.cos(x), label="Reference")
+    axes[1].set_xlabel("Time (s)")
+    axes[0].legend(loc="upper left")
+    fig.savefig("comparison.png")
+finally:
+    fig.close()
+```
+
+Cartesian and supported polar panels can use grids and shared axes. Categorical
+bars, boxplots, radar charts and pies/donuts require separate Figures; they cannot
+be placed in that grid. See the [capability matrix](docs/RENDERER_018_FEATURES.md#construction-and-capability-matrix)
+for polar-root and mixed-chart restrictions.
+
 | Native editor input | Action |
 | --- | --- |
 | Ctrl + wheel | Zoom X around the pointer |
@@ -267,6 +285,18 @@ ax.set_ylim(0.0, 2.7)
 # The complete export also preserves legend placement and advanced styling.
 ```
 
+`fig.to_code()` and both editors' **Copy Python** prefer public Figure, Axes,
+Axis and Artist setters for Cartesian appearance. The code targets matching
+panels and source columns, retaining the destination Figure identity. Renderer
+features without public setters remain in an explicit advanced block. Common bounded appearance uses named `ax.chart` controls.
+
+Use `fig.to_code(mode="exact")` for complete SSOT recovery, including stable
+identities, tick policies, rich text and advanced layout. This compact form
+restores omitted defaults and preserves resident arrays without uploading them
+again. `compact=False` expands the diagnostic form. See the
+[Matplotlib-shaped API, scoped appearance controls and supported subset](docs/MATPLOTLIB_API.md) for object
+handles, units, coordinate conventions and explicit limitations.
+
 Ranges, ticks and titles:
 
 - Property-panel edits and `fig.update("axis_bottom", major_spacing=2)` share
@@ -290,16 +320,15 @@ Ranges, ticks and titles:
   lines, scatter or other Cartesian series uses 5%. Explicit padding overrides
   either default: `fig.fit(padding=0.05)` adds 5%, while `fig.fit(padding=0)` fits
   tightly to the rendered data extent.
-- For selective control, use `fig.configure(config={...})` or read the current
-  state with `fig.get_settings()`, edit only the intended fields, then submit it
-  through `fig.apply_settings(state)`. For example:
+- For a one-sided range edit that preserves ticks and formatting, use the
+  existing boundary's public Axis handle:
 
   ```python
-  fig.configure(config={"bottom_x": {"min": 20.0, "max": 80.0}})
+  ax.secondary_xaxis("bottom").xaxis.set_view_interval(20.0, 80.0)
   ```
 
-  This preserves that axis's tick and label settings and leaves the top axis
-  untouched. Include `top_x` too when the pair should share bounds. In contrast,
+  This leaves the top axis untouched. `get_settings`, `configure` and
+  `apply_settings` remain advanced APIs for exact document state. In contrast,
   `set_xlim` / `set_ylim` choose ticks and label formatting, `fit` also derives
   bounds from data, and title helpers can enlarge the title band. Direct SSOT
   edits do not run these adjustments. Rendering still validates settings and
@@ -309,10 +338,23 @@ Ranges, ticks and titles:
   is capped at 99. Each change is reported once as a `figgy.RenderWarning` by the next
   native PNG/RGBA render (`render_rgba`, `to_png`, `savefig`, the PNG widget). Desktop
   windows and the browser (webgpu) backend do not report it.
-- `fig.update("chart_title", text="Line 1\nLine 2", align="center")` aligns the
+- `ax.set_title("Line 1\nLine 2", multialignment="center")` aligns the
   lines of multi-line text (`left`, `center`, `right`); a title taller than its band
   grows the band instead of being clipped. Unicode super/subscripts such as `10⁻³`
   are drawn as super/subscript text.
+- Bounded chart titles accept up to 512 rich characters / eight lines. The rich
+  title holds the full wording; the legacy `title` field is a single-line,
+  160-character compatibility fallback. Category labels and category/value axis
+  names remain single-line. Axis names set before `bar`/`barh`/`boxplot`/`bxp`
+  construction survive; explicit constructor axis names, including `""`, win.
+- `ax.legend(loc="upper left")` places a Cartesian legend; the four supported
+  locations are upper/lower left/right. `fig.update("legend", corner="TopLeft")`
+  edits placement without rebuilding labels. Bounded legends support visibility
+  only; a location request raises an error.
+- `ax.invert_xaxis()` / `ax.invert_yaxis()` toggle Cartesian direction while
+  keeping increasing limits and existing ticks. On `twinx`, Y inversion affects
+  only that secondary axis. Use `fig.update("axis_bottom", major_spacing=2)` for
+  regular ticks; arbitrary `set_xticks`/`set_yticks` positions are not provided.
 - `font=` must name an installed family or `"Liberation Sans"` (or `""` for the
   default); an unknown name raises `ValueError` on the native backend. The browser
   backend cannot see installed fonts and draws an unknown family with the bundled font.
@@ -336,8 +378,10 @@ for run in range(3):
 You can also obtain the code directly with `edited_fig.to_code()`. An export
 contains settings, not NumPy arrays: recreate the plotted series with the same
 IDs, kinds and DPI before applying it. Axis ranges and titles are included;
-override them afterward when a dataset needs different values. Advanced settings
-use `fig.configure(...)` with ordinary Python dictionaries.
+override them afterward when a dataset needs different values. Scoped appearance
+objects cover palettes, vectors, contours, annotations, colorbars and bounded
+materials; see the [API guide](docs/MATPLOTLIB_API.md#complete-appearance-controls).
+`to_code(mode="exact")` provides full document recovery.
 
 ## Multiple windows
 
@@ -355,6 +399,38 @@ Each window can close independently. Run window creation and event processing on
 the Python main thread. For an external main-thread loop, call
 `figgy.desktop.poll_events()` regularly. See the complete
 [multiple-window example](examples/multiple_windows.py).
+
+## Reusable style tokens
+
+Apply appearance without replacing the destination data, axis ranges or wording:
+
+```python
+fig.apply_style("paper")
+style = fig.extract_style()
+style.save("my-style.json")
+other.apply_style(figgy.StyleToken.load("my-style.json"), size_scale=1.25)
+```
+
+Declare defaults once within a script; new Figures and later additions inherit
+them, while explicit constructor arguments take precedence:
+
+```python
+figgy.use_style("dashboard.operations")
+fig, ax = figgy.subplots()
+ax.plot(time, latency, style_key="service-a", label="Service A")
+ax.plot([0, 10], [150, 150], style_key="warning", label="Supplied limit")
+
+with figgy.style_context("publication.nature"):
+    paper, paper_ax = figgy.subplots(figsize=(89 / 25.4, 62 / 25.4), dpi=300)
+figgy.use_style(None)
+```
+
+Twenty presets include fourteen task profiles for publication, measurement,
+print, teaching, presentations and seven dashboard purposes. Screen profiles
+offer light/dark and compact/comfortable variants. See the
+[catalog with actual renders](docs/STYLE_PROFILES.md) and
+[style token guide](docs/STYLE_TOKENS.md). Scale and wording changes require
+explicit opt-in; declarations are local to the current execution context.
 
 ## Jupyter
 
@@ -420,7 +496,8 @@ corners, textures and slice editing. Their bounded model contains up to 64
 categories and uses the upstream radial renderer on the shared GPU device.
 All chart families support native desktop and Jupyter WebGPU editing and PNG export.
 Categorical bars and boxplots use their upstream bounded models; histograms and
-contours use resident Cartesian columns. Multi-panel figures remain unsupported.
+contours use resident Cartesian columns. Cartesian/polar panels support one-level
+grids and shared axes; bounded families require their own single-panel Figures.
 
 `figsize` is in inches; `fontsize`, `linewidth` and `markersize` use points.
 Native Cartesian arrays are uploaded to a resident GPU column pool and reused during edits.

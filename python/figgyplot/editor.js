@@ -20,6 +20,8 @@ export function render({ model, el }) {
   let request = 0, pending = null, queue = [], decode = 0, frame = null;
   let pointer = null, dragTimer = null, dragDelta = [0, 0], handle = null;
   let localTarget = null;
+  let notice = null;
+  const idleWaiters = [];
   const finite = value => Number.isFinite(Number(value));
   // Kernel-provided text for a rich node (keeps "10⁻³" as typed); the joined
   // characters only when the kernel sent none for it.
@@ -28,7 +30,16 @@ export function render({ model, el }) {
   const sideKey = {bottom: "bottom_x", top: "top_x", left: "left_y", right: "right_y"};
 
   function dispatch(message) {
+    notice = null;
     queue.push(message); pump();
+  }
+  const commandsIdle = () => !pending && !queue.length && !dragTimer;
+  function idle() {
+    if (commandsIdle()) return Promise.resolve();
+    return new Promise((resolve, reject) => idleWaiters.push({resolve, reject}));
+  }
+  function settleIdle() {
+    if (commandsIdle()) for (const waiter of idleWaiters.splice(0)) waiter.resolve();
   }
   function pump() {
     if (disposed || pending || !current || !queue.length) return;
@@ -85,15 +96,17 @@ export function render({ model, el }) {
   }
   function refresh() {
     if (disposed) return;
+    const previousRevision = current?.revision;
     current = model.get("state");
     if (!current?.settings) return;
+    if (previousRevision !== undefined && previousRevision !== current.revision) notice = null;
     for(const action of ['undo','redo'])root.querySelector(`[data-${action}]`).disabled=!!pending||!current.edit_history?.[`can_${action}`]||current.edit_history.gesture_active;
     if (pending === current.last_request) {
       pending = null; handle = current.handle;
       if (pointer) pointer.target = current.selection;
       pump();
     }
-    status.textContent = pending ? "Rendering…" : `Revision ${current.revision}`;
+    status.textContent = pending ? "Rendering…" : notice ?? `Revision ${current.revision}`;
     error.textContent = current.error || "";
     const choices = ["chart_title", "axis_title_bottom", "axis_title_left", "axis_bottom", "axis_left", "tick_labels_bottom", "tick_labels_left", "legend", "data_area", ...current.settings.series.map(s => s.series_id)];
     localTarget = current.selection || localTarget || choices[0];
@@ -113,6 +126,7 @@ export function render({ model, el }) {
         bitmap?.close(); bitmap = next; draw();
       }).catch(e => { error.textContent = e.message; });
     } else draw();
+    settleIdle();
   }
   function schedule() { if (frame === null) frame = requestAnimationFrame(() => { frame = null; refresh(); }); }
   function xy(event) {
@@ -126,6 +140,7 @@ export function render({ model, el }) {
       dispatch({action: "drag", target: current.selection, dx: dragDelta[0], dy: dragDelta[1], handle});
     }
     dragDelta = [0, 0];
+    settleIdle();
   }
   canvas.addEventListener("pointerdown", event => {
     if (!current || pending || current.image_revision !== current.revision) return;
@@ -151,12 +166,21 @@ export function render({ model, el }) {
   root.querySelector("[data-copy]").addEventListener("click", async () => {
     const code = root.querySelector("[data-code]");
     try {
+      notice = null;
+      await idle();
+      if (disposed) return;
+      const copiedRevision = current.revision;
       if (globalThis.figgyDesktopCopy) globalThis.figgyDesktopCopy(code.value);
       else await navigator.clipboard.writeText(code.value);
-      status.textContent = "Python code copied";
+      if (commandsIdle() && current.revision === copiedRevision) {
+        notice = "Python code copied";
+        status.textContent = notice;
+      }
     } catch {
+      if (disposed) return;
       root.querySelector("[data-code-panel]").open = true; code.focus(); code.select();
-      status.textContent = "Press Ctrl/Cmd+C to copy Python code";
+      notice = "Press Ctrl/Cmd+C to copy Python code";
+      status.textContent = notice;
     }
   });
   root.querySelector("[data-save]").addEventListener("click", () => {
@@ -166,6 +190,7 @@ export function render({ model, el }) {
   model.on("change:state", schedule); model.on("change:image", schedule); refresh();
   return () => {
     disposed = true; ++decode; if (frame !== null) cancelAnimationFrame(frame);
+    for (const waiter of idleWaiters.splice(0)) waiter.reject(new Error("Editor closed"));
     if (dragTimer) clearTimeout(dragTimer); bitmap?.close(); if (imageURL) URL.revokeObjectURL(imageURL);
     model.off("change:state", schedule); model.off("change:image", schedule); root.remove();
   };

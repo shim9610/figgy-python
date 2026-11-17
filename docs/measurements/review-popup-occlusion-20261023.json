@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-23",
+  "host": "Linux X11, Vulkan lavapipe",
+  "cause": "Native host appended panel focus outline after egui popup shapes; outline painted over opaque dialog backgrounds and text inputs.",
+  "fix": "Insert chart-stage focus outline before egui UI shapes.",
+  "regression": "tests/test_review_popup_desktop.py::test_review_popup_occludes_chart_focus_outline",
+  "old_wheel_result": "failed: focus outline visible inside popup white padding",
+  "old_pixels": [
+    [
+      [
+        38,
+        99,
+        173
+      ],
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ]
+    ],
+    [
+      [
+        38,
+        99,
+        173
+      ],
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ]
+    ],
+    [
+      [
+        38,
+        99,
+        173
+      ],
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ]
+    ]
+  ],
+  "fixed_wheel_result": "passed; white popup padding occludes outline; outline remains visible outside popup",
+  "fixed_pixels": [
+    [
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ]
+    ],
+    [
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ]
+    ],
+    [
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ],
+      [
+        255,
+        255,
+        255
+      ]
+    ]
+  ],
+  "related_validation": "9 passed (popup regression + 8 native typing/image modes), then strengthened popup visibility check passed",
+  "wheel_sha256": "241bb82c2527159b2720380ea8e350ef0ec9ba6abbcf280328f5da994f17f5c6",
+  "ci_run": false
+}

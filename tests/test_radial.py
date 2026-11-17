@@ -84,20 +84,20 @@ def test_radial_code_replay_preserves_new_values_and_shared_device():
     with make(inner_radius=0.5, material="pearl", tilt=55, depth=0.16) as source, make() as replay:
         source.configure_radial(slices={0: {"explode": 0.08}})
         source.set_radial_style(texture_strength=0.8)
-        code = source.to_code()
+        code = source.to_code(mode='exact')
         assert "configure_radial" in code and "'value':" not in code
         exec(code, {"fig": replay})
         assert source.get_settings()["radial"] == replay.get_settings()["radial"]
         np.testing.assert_array_equal(source.render_rgba(), replay.render_rgba())
     with make(inner_radius=0.5, material="pearl") as source, make((10, 20, 30, 40)) as replay:
-        exec(source.to_code(), {"fig": replay})
+        exec(source.to_code(mode='exact'), {"fig": replay})
         assert [s["value"] for s in replay.get_settings()["radial"]["slices"]] == [10, 20, 30, 40]
         assert replay.get_settings()["radial"]["style"]["material"] == "Pearl"
     with figgy.Figure(backend="native") as source, figgy.Figure(backend="native") as replay:
         source.axes[0].pie([1, 1])
         replay.axes[0].pie([0, 2])
         assert source.select(600, 300)["index"] == 0
-        exec(source.to_code(), {"fig": replay})
+        exec(source.to_code(mode='exact'), {"fig": replay})
         assert [s["value"] for s in replay.get_settings()["radial"]["slices"]] == [0, 2]
         assert replay.get_settings()["radial"]["interaction"]["selected"] is None
 
@@ -123,5 +123,5 @@ def test_radial_style_replay_rejects_a_different_slice_count():
         destination.axes[0].pie([1, 2, 3])
         before = destination.get_settings()
         with pytest.raises(ValueError, match="same slice count"):
-            exec(source.to_code(), {"fig": destination})
+            exec(source.to_code(mode='exact'), {"fig": destination})
         assert destination.get_settings() == before

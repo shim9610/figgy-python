@@ -1,5 +1,6 @@
 """A small stateful interface familiar to matplotlib.pyplot users."""
 from .figure import Figure, subplots as _subplots
+from ._style_runtime import use_style, style_context
 
 _current = None
 
@@ -123,3 +124,6 @@ def twiny(*args, **kwargs): return gca().twiny(*args, **kwargs)
 
 def tricontour(*args, **kwargs): return gca().tricontour(*args, **kwargs)
 def tricontourf(*args, **kwargs): return gca().tricontourf(*args, **kwargs)
+def tick_params(*args, **kwargs): return gca().tick_params(*args, **kwargs)
+def annotate(*args, **kwargs): return gca().annotate(*args, **kwargs)
+def colorbar(mappable, **kwargs): return gcf().colorbar(mappable, **kwargs)

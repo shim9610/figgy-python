@@ -52,7 +52,7 @@ def test_features_round_trip_and_replay_without_reupload(backend, feature):
         source.apply_settings(state)
         assert source.revision == revision
         uploads = target.info.get('column_uploads')
-        exec(source.to_code(), {'fig': target})
+        exec(source.to_code(mode='exact'), {'fig': target})
         assert target.get_settings() == state
         assert target.info.get('column_uploads') == uploads
         if backend == 'native':
@@ -267,7 +267,7 @@ def test_mixed_panel_styles_replay_identically_at_multiple_export_scales(order):
             ax = figure.subplots['line'].axes
             ax.plot([0, 1, 2], [1, 2, 1], id='signal')
             ax.set_draw_style('sketch')
-        exec(source.to_code(), {'fig': target})
+        exec(source.to_code(mode='exact'), {'fig': target})
         assert source.get_settings() == target.get_settings()
         for scale in (1, 1.25, 2):
             first, second = source.render_rgba(scale=scale), target.render_rgba(scale=scale)
@@ -330,7 +330,7 @@ def test_tick_intent_replays_by_owner_and_rejects_invalid_metadata(backend):
         state=fig.get_settings()
         assert state['identity']['tick_modes']['second']=={'bottom_x':'Fixed'}
         assert state['identity']['tick_modes']['pressure']=={'y_axis':'Fixed'}
-        namespace={'fig':fig};exec(fig.to_code(),namespace)
+        namespace={'fig':fig};exec(fig.to_code(mode='exact'),namespace)
         assert fig.get_settings()==state
         for owner,key,mode in [('missing','bottom_x','Auto'),('second','y_axis','Auto'),('pressure','y_axis','Unknown')]:
             bad=copy.deepcopy(state)

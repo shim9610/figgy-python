@@ -96,6 +96,9 @@ impl FigureAccess<'_> {
         self.data.history.begin(state, self.data.revision, label);
     }
     pub(crate) fn end_edit(&mut self) {
+        if self.data.history.gesture.is_none() {
+            return;
+        }
         let state = serde_json::to_value(self.snapshot()).unwrap();
         self.data.history.finish(state, self.data.revision);
     }

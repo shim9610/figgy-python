@@ -20,6 +20,14 @@ Ordinary commands resolve the object and property again against the current
 document. An invalid choice, removed object, stale revision or failed renderer
 validation preserves the accepted document and its history.
 
+Notebook form drafts wait for earlier selection/edit acknowledgements before
+submission. If a newer Python revision arrives later, a form can retry once
+using the actual before/after SSOT field changes. Retry requires unchanged
+figure/panel ownership and no conflicting changes to those fields. Arrays are
+compared atomically, so insertion or reordering cannot redirect an index edit.
+Unrelated accepted changes are retained; conflicting fields and stale full
+snapshots remain explicit errors. A subsequent valid edit clears the error.
+
 The source arrays stay resident. Mapping controls choose registered columns;
 they do not infer numbers from rendered colors or upload replacement data.
 The panel colorbar owns the colormap and value domain. Explicit point-color

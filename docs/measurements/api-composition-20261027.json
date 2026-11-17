@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-27",
+  "base_commit": "664f92031922c37f618a49036cf607399edc5b11",
+  "scope": "Public API composition, existing accepted edits, grid geometry, lifecycle and actual native/Jupyter presentation",
+  "renderer_version": "0.18.1",
+  "package_version": "0.4.0",
+  "findings": [
+    {
+      "trigger": "Provide a partial nested bounded/radial style during construction",
+      "before": "Unspecified themed properties reverted to renderer defaults; partial radial outline dictionaries failed parsing.",
+      "after": "Restore explicit leaves and merge nested radial defaults; unrelated accepted style and chart data remain unchanged."
+    },
+    {
+      "trigger": "Add an image or contour after editing a mapped scatter colorbar",
+      "before": "Existing colorbar font, gap and thickness were reset.",
+      "after": "All mapped constructors use a common colorbar update path preserving appearance while updating the requested map/domain."
+    },
+    {
+      "trigger": "Create a named grid under an extracted weighted-grid style",
+      "before": "Identity retained uniform weights/default gap while some panel rectangles used the captured layout.",
+      "after": "Resolve explicit, accepted and inherited layout options once; derive every panel rectangle from that layout."
+    },
+    {
+      "trigger": "Disable Figure style defaults while a constructor waits for the Figure lock",
+      "before": "The series committed, then the call raised AttributeError.",
+      "after": "Style selection and construction serialize under the same Figure lock."
+    }
+  ],
+  "regression_cases": {
+    "before": {
+      "failed": 25,
+      "passed": 8
+    },
+    "after": {
+      "failed": 0,
+      "passed": 33
+    },
+    "test_file": "tests/test_api_composition.py",
+    "baseline_artifact": {
+      "wheel": "figgyplot-0.4.0-cp312-cp312-linux_x86_64.whl",
+      "sha256": "9d8bc49a43c662cee82940d355178b0851b9c6acb533fdc708f5f71ef32bdbb6",
+      "source_commit": "664f92031922c37f618a49036cf607399edc5b11",
+      "import_mode": "Installed wheel with PYTHONPATH unset"
+    }
+  },
+  "validation": {
+    "installed_wheel_api_chart_cases": 785,
+    "review_recovery_history_selection_cases": 244,
+    "actual_native_and_jupyter_cases": 12,
+    "software_gpu": "Mesa lavapipe native, Chromium 154 SwiftShader browser",
+    "strict_twine": "passed",
+    "packaged_source_matching_files": 34,
+    "release_workflow_cases": 134
+  },
+  "presentation_oracle": {
+    "authored_expectations": "Cyan left-panel signal and high-valued yellow magma field must be present on the displayed canvas, in addition to exact model/geometry checks.",
+    "negative_control": "Without the browser-specific ICD selection, the local browser reported Ready and completed GPU work but captured a black canvas. The content assertion failed.",
+    "positive_control": "With the existing CI SwiftShader ICD selection, the same scene and nine analytic displayed-feature scenes pass.",
+    "negative_canvas": {
+      "sha256": "69c64ee2e92282db400315b4788b656411555ad1fd91d4fea2c881acd98f5a45",
+      "bytes": 3562
+    },
+    "positive_canvas": {
+      "sha256": "0aeefe689ba7d2be2342d6c246a1efaed8f08fdd0e1ddef85706e761be7d6a09",
+      "bytes": 35707
+    },
+    "native_export": {
+      "sha256": "f033a6a9d1257f6e6e921328cab4e5f7f56cd74c1771e5dc270bf3a1fc1a8f0c",
+      "bytes": 39692
+    }
+  },
+  "distribution_artifacts": {
+    "figgyplot-0.4.0-cp312-cp312-linux_x86_64.whl": {
+      "sha256": "2afe3efa2ed5696430397b4a1e9368e7050b89da548ff475c90a0b0438943dcd",
+      "bytes": 16705405
+    },
+    "figgyplot-0.4.0.tar.gz": {
+      "sha256": "9c79dc66fcb0c021d5f33e1aaa5b2fe403e8338111046bae7a974bb10523e51c",
+      "bytes": 11176186
+    }
+  },
+  "limits": [
+    "This is not proof of defect-free behavior for every API combination.",
+    "Physical Windows/macOS GUI, physical GPU performance and the 74-platform/interpreter release matrix are not established by these local checks."
+  ]
+}

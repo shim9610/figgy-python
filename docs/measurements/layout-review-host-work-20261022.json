@@ -1,0 +1,33 @@
+{
+  "native": {
+    "moves": 6,
+    "inspector_rebuilds_during": 0,
+    "elapsed": 1.1460669020016212,
+    "last_input_to_submit_ms": 15.458193999999999,
+    "changed_ssot_paths": [
+      "/config/annotations/items/0/kind/Arrow/from/Ratio/x",
+      "/config/annotations/items/0/kind/Arrow/from/Ratio/y",
+      "/config/annotations/items/0/kind/Arrow/to/Ratio/x",
+      "/config/annotations/items/0/kind/Arrow/to/Ratio/y"
+    ],
+    "additional_column_uploads": 0,
+    "before_ssot_sha256": "891f834495a93d874ad5f71d490c7fcdd2bb24c1d356df512a0b79960f3e546b",
+    "after_ssot_sha256": "76eac254fd9b6fb06ba52acc4ecb38877c9714be237ad5cfe97103ee9315ed12"
+  },
+  "browser": {
+    "moves": 8,
+    "inspector_rebuilds_during": 1,
+    "elapsed": 0.8355179329810198,
+    "changed_ssot_paths": [
+      "/config/annotations/items/0/kind/Arrow/from/Ratio/x",
+      "/config/annotations/items/0/kind/Arrow/from/Ratio/y",
+      "/config/annotations/items/0/kind/Arrow/to/Ratio/x",
+      "/config/annotations/items/0/kind/Arrow/to/Ratio/y"
+    ],
+    "additional_column_uploads": 0,
+    "before_ssot_sha256": "f4bb02cee80a9d9fd1b50d26e82557f02fc6299a0c8004042e5b5c1433f084ff",
+    "after_ssot_sha256": "b315ccdcc5d6bbf1e018168b627baa3f25b691111474090c240085337dc45252"
+  },
+  "scope": "Host property reconstruction during synthetic input; elapsed includes test-driver waits. This is not a physical-GPU FPS benchmark. Renderer drawing and caching are unchanged.",
+  "wheel_sha256": "c9cbe07af2f5ec504e78dd4ec6a2cdb8645d36561be9fd6e8f5b2185f0243f58"
+}

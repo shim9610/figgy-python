@@ -74,7 +74,7 @@ def test_bounded_replay_preserves_data_and_rejects_other_category_layout(kind):
             else: fig.axes[0].boxplot([[1+offset, 2+offset], [3+offset, 4+offset]])
         original = copy.deepcopy(b._native.columns)
         a.configure_bounded(style={'outline': True})
-        exec(a.to_code(), {'fig': b})
+        exec(a.to_code(mode='exact'), {'fig': b})
         assert b._native.columns == original
         before, revision = b.get_settings(), b.revision
         bad = copy.deepcopy(before)

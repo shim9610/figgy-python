@@ -4,7 +4,7 @@ import copy
 import json
 import math
 import numpy as np
-from . import _document
+from . import _document, _style_runtime
 from ._native import series_template_json, coordinate_defaults_json
 
 
@@ -38,6 +38,7 @@ class AdvancedMethods:
         from .figure import _array, Artist
 
         fig = self.figure
+        fig._require_data_edit()
         with fig._lock:
             fig._require_open()
             state = fig.get_settings()
@@ -69,6 +70,11 @@ class AdvancedMethods:
             state["config"]["active_layer"] = _document.target_layer(
                 state, self.subplot_id, self.overlay_id
             )
+            styled_specs = []
+            for spec in specs:
+                spec, state = _style_runtime.series(fig, state, spec, self.subplot_id)
+                styled_specs.append(spec)
+            specs = styled_specs
             _document.validate_features(dict(state, series=[*state["series"], *specs]))
             uploaded = []
             try:
@@ -102,8 +108,9 @@ class AdvancedMethods:
                     fig._native.remove_column(name)
                 raise
             fig._next_series += len(specs)
+            _style_runtime._mark_used(fig)
         fig._changed()
-        artists = [Artist(fig, sid) for sid in ids]
+        artists = [fig._artist_for(sid) for sid in ids]
         return artists[0] if len(artists) == 1 else artists
 
     def _projection_config(self, projection):
@@ -1516,3 +1523,41 @@ class AdvancedMethods:
             if axis == "y" and not o.get("link_y", False):
                 return o["y_axis"]
         return cfg["bottom_x" if axis == "x" else "left_y"]
+
+
+# Preserve the same execution-local style and explicit-argument handling as the
+# existing plotting constructors when this mixin takes precedence in Axes.
+for _method_name in (
+    "stem",
+    "streamlines",
+    "streamplot",
+    "range_bars",
+    "broken_barh",
+    "waterfall",
+    "candlestick",
+    "ternary",
+    "parallel_coordinates",
+    "tripcolor",
+    "tricontour",
+    "tricontourf",
+    "plot_trisurf",
+    "energy_levels",
+    "feynman",
+    "bar",
+    "radar",
+    "rose",
+    "violinplot",
+    "raincloud",
+    "imshow_rgb",
+    "hexbin",
+    "plot_surface",
+    "plot3D",
+    "scatter3D",
+    "quiver3D",
+    "sunburst",
+):
+    setattr(
+        AdvancedMethods,
+        _method_name,
+        _style_runtime.styled(getattr(AdvancedMethods, _method_name)),
+    )
