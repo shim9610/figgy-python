@@ -70,7 +70,7 @@ still requires the official upstream release and matching final package pins.
 Release this Python update after upstream renderer 0.19 and its matching model
 are officially available. At that point:
 
-1. Include the final upstream fixes (including figgy issues #308, #309 and #318),
+1. Include the final upstream fixes (including figgy issues #308, #309, #318, #321 and #322),
    replace the development Git dependency with the exact published renderer
    version, and regenerate the registry lockfile.
 2. Rebuild WASM from the matching clean release revision. Check native/model
@@ -248,5 +248,12 @@ and WASM pins. EnergyLevels/Ternary/Parallel must work in a subplot beside a
 Cartesian root. The three strict xfails in `test_renderer_019_features.py` must be
 removed after verifying the upstream fix; standalone chart success is insufficient.
 Energy stroke/transition selection details are tracked in
-[figgy #321](https://github.com/shim9610/figgy/issues/321); the Python inspector
-currently uses accepted record metadata for those identities.
+[figgy #321](https://github.com/shim9610/figgy/issues/321) is fixed in the paired
+`f5f611c4532b037f8c3b3087fab22a9f47852343` source pin. The browser calls public
+`selection_details()` directly; native resolves record sources with public
+`energy_level_records`, without retaining numerical arrays.
+
+Re-run the real browser radar pointer scenario after resolving
+[figgy #327](https://github.com/shim9610/figgy/issues/327), related to #299.
+The current software-WebGPU first-pick run exceeds 300 seconds while unrelated
+pick kernels compile; do not describe the full actual-host collection as passing.

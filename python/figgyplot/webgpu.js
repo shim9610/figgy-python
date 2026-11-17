@@ -599,14 +599,6 @@ export function render({model,el}) {
   root.querySelector('[data-advanced]').before(selectedData);
   let selectedDataKey=null;
   async function selectionDetails(){
-    const state=snapshot(),ref=state.config.picked_data?.refs?.[0];
-    const body=ref&&state.series.find(s=>s.series_id===ref.series_id)?.render_type.EnergyLevels;
-    if(body&&(ref.kind==='histogram_bin'||ref.kind==='point')){
-      const level=ref.kind==='histogram_bin',index=level?ref.bin_index:ref.point_index;
-      const row=body[level?'levels':'transitions']?.[index];
-      if(!row)throw Error('Selected diagram record no longer exists');
-      return {kind:ref.kind,series_id:ref.series_id,index,part:level?'level':'transition',record:clone(row)};
-    }
     return JSON.parse(await chart.selection_details());
   }
   function valueLabelSignature(state){

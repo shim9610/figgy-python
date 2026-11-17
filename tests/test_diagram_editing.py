@@ -412,3 +412,31 @@ def test_cell_label_handles_edit_one_category_and_preserve_other_values(backend,
         assert after[1:] == before[1:]
         assert handle.set_label(None).get_label() == ""
         assert ax.chart.series(sid).get_label() == f.artist(sid).get_label()
+
+
+@pytest.mark.parametrize(
+    "reference, record_id",
+    [
+        ({"kind": "histogram_bin", "bin_index": 0}, "g"),
+        ({"kind": "point", "point_index": 0}, "t"),
+        ({"kind": "value_label", "category_index": 0, "part": "level"}, "g"),
+    ],
+)
+def test_native_energy_selection_resolves_public_source_records(reference, record_id):
+    with fg.Figure(backend="native") as f:
+        make(f.axes[0], "energy")
+        source = body(f)
+        f.axes[0].energy_levels(
+            source["levels"], transitions=source["transitions"], id="alias"
+        )
+        state = f.get_settings()
+        alias = state["series"][1]["render_type"]["EnergyLevels"]
+        alias.update(source="diagram", levels=[], transitions=[], limits=[], bands=[])
+        state["config"]["picked_data"] = {"refs": [dict(reference, series_id="alias")]}
+        f.apply_settings(state)
+        import json
+
+        details = json.loads(f._native.selection_details_json())
+        assert details["record"]["id"] == record_id
+        assert details["series_id"] == "alias"
+        assert f.info["column_uploads"] == 0

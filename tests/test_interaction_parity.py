@@ -3688,7 +3688,12 @@ def test_diagram_default_controls_edit_and_undo_in_real_hosts(tmp_path,backend,d
                 inputs.click('redo');assert d.get_linewidth()==pytest.approx(4*72/fig.dpi)
                 if diagram_kind=='feynman':
                     before_options=fig.get_settings()
-                    inputs.click('property:Appearance/vertices/0/marker');inputs.click('marker_Blob')
+                    inputs.click('property:Appearance/vertices/0/marker')
+                    # The sixth choice is clipped by egui's scrollable popup.
+                    # Scroll the visible menu before using its updated row bounds.
+                    r=inputs.info()['controls']['marker_Dot']
+                    inputs.input_frame('mousemove','--window',inputs.wid,round(r[0]+r[2]/2),round(r[1]+r[3]/2))
+                    inputs.input_frame('click',5);inputs.click('marker_Blob')
                     inputs.click('property:Appearance/propagators/0/momentum/enabled')
                     inputs.click('property:Appearance/propagators/0/momentum/side');inputs.click('side_Right')
                     assert 'Blob' in d.vertex('a').get()['marker']
@@ -3727,6 +3732,13 @@ def test_diagram_default_controls_edit_and_undo_in_real_hosts(tmp_path,backend,d
             assert page.evaluate(ROOT+'.details()')['record']['id']=='g'
             execute("d.transition('t').select();await fig.sync()")
             assert page.evaluate(ROOT+'.details()')['record']['id']=='t'
+            execute("source=fig.get_settings()['series'][0]['render_type']['EnergyLevels'];ax.energy_levels(source['levels'],transitions=source['transitions'],id='alias');state=fig.get_settings();state['series'][1]['render_type']['EnergyLevels'].update(source='diagram',levels=[],transitions=[],limits=[],bands=[]);fig.apply_settings(state);await fig.sync()")
+            for reference,record_id in [({'kind':'histogram_bin','bin_index':0},'g'),({'kind':'point','point_index':0},'t'),({'kind':'value_label','category_index':0,'part':'level'},'g')]:
+                execute("state=fig.get_settings();state['config']['picked_data']={'refs':["+repr(dict(reference,series_id='alias'))+"]};fig.apply_settings(state);await fig.sync()")
+                details=page.evaluate(ROOT+'.details()')
+                assert details['series_id']=='alias'
+                if reference['kind']=='value_label':assert details['id']==record_id and details['part']=='level'
+                else:assert details['record']['id']==record_id
         else:
             execute("d.vertex('a').select();await fig.sync()")
             assert page.evaluate(ROOT+'.details()')['id']=='a'

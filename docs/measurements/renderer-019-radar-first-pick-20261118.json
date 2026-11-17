@@ -1,0 +1,85 @@
+{
+  "date": "2026-11-18",
+  "timezone": "Asia/Seoul",
+  "issue": "https://github.com/shim9610/figgy/issues/327",
+  "environment": {
+    "chromium": "154.0.8037.57",
+    "gpu": "Vulkan SwiftShader",
+    "physical_gpu_tested": false,
+    "load": "development/test workload; absolute latency is environment-dependent"
+  },
+  "chart": {
+    "kind": "Radar",
+    "categories": [
+      "A",
+      "B",
+      "C"
+    ],
+    "values": [
+      [
+        4,
+        3,
+        5
+      ],
+      [
+        2,
+        5,
+        3
+      ]
+    ]
+  },
+  "runs": [
+    {
+      "renderer_commit": "c9828223409b8a9253e011572955aa7a729c7efe",
+      "budget_ms": 300000,
+      "result": {
+        "timeout": true
+      },
+      "pick_steps": [
+        {
+          "stage": "pick.begin",
+          "remaining": [
+            "series_0",
+            "series_1"
+          ]
+        }
+      ],
+      "pipeline_compile_calls_observed": 59,
+      "pending_pipelines": [
+        {
+          "name": "createComputePipelineAsync",
+          "label": "figgy violin data pick pipeline",
+          "start": 150999.09999999776
+        }
+      ],
+      "buffer_map_calls": [],
+      "raw_result_sha256": "fe99905aef5f34e2198718d3b03cbfc59be9e92e24516c27571d10f3f64261fa"
+    },
+    {
+      "renderer_commit": "f5f611c4532b037f8c3b3087fab22a9f47852343",
+      "budget_ms": 300000,
+      "result": {
+        "timeout": true
+      },
+      "pick_steps": [
+        {
+          "stage": "pick.begin",
+          "remaining": [
+            "series_0",
+            "series_1"
+          ]
+        }
+      ],
+      "pipeline_compile_calls_observed": 60,
+      "pending_pipelines": [
+        {
+          "name": "createComputePipelineAsync",
+          "label": "figgy value label data pick pipeline",
+          "start": 316926
+        }
+      ],
+      "buffer_map_calls": [],
+      "raw_result_sha256": "29f3017e02b0754b3fab8ab97478c4562cea7d104302cd8247ef7a00b12d7880"
+    }
+  ]
+}

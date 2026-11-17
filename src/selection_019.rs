@@ -41,7 +41,21 @@ impl FigureAccess<'_> {
         series: &SeriesConfig,
         result: &mut Value,
     ) -> PyResult<bool> {
-        let wire = serde_json::to_value(&series.render_type).map_err(runtime)?;
+        let wire = if let Some(levels) = series.render_type.energy_levels() {
+            serde_json::to_value(
+                renderer::energy_level_records(levels, &self.data.series).ok_or_else(|| {
+                    invalid("the energy-level source names no series with records")
+                })?,
+            )
+            .map_err(runtime)?
+        } else {
+            serde_json::to_value(&series.render_type).map_err(runtime)?
+        };
+        let wire = if series.render_type.energy_levels().is_some() {
+            json!({"EnergyLevels": wire})
+        } else {
+            wire
+        };
         let body = wire.as_object().unwrap().values().next().unwrap();
         match reference {
             PickedDataRef::HistogramBin { bin_index, .. }
@@ -53,6 +67,7 @@ impl FigureAccess<'_> {
                     .ok_or_else(|| invalid("selected level no longer exists"))?;
                 result["index"] = json!(bin_index);
                 result["part"] = json!("level");
+                result["id"] = row["id"].clone();
                 result["record"] = row.clone();
             }
             PickedDataRef::Point { point_index, .. }
@@ -64,6 +79,7 @@ impl FigureAccess<'_> {
                     .ok_or_else(|| invalid("selected transition no longer exists"))?;
                 result["index"] = json!(point_index);
                 result["part"] = json!("transition");
+                result["id"] = row["id"].clone();
                 result["record"] = row.clone();
             }
             PickedDataRef::Point { point_index, .. }
