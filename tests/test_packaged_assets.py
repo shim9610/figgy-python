@@ -301,3 +301,11 @@ def test_published_archive_matches_exact_wasm_source(tmp_path, archive_checker, 
     else:
         with pytest.raises(ValueError):
             verify(data, "figgy-model", package, tmp_path, revision)
+
+
+def test_webgpu_host_calls_exist_in_packaged_wasm_api():
+    """A stale method in a conditional UI path must fail before a user clicks it."""
+    import re
+    calls=set(re.findall(r"\bchart\.([A-Za-z_][A-Za-z_0-9]*)\s*\(", (ROOT / "python/figgyplot/webgpu.js").read_text()))
+    exported=set(re.findall(r"^\s*(\w+)\(", (ASSETS / "figgy.d.ts").read_text(), re.M))
+    assert calls <= exported, "Unavailable packaged WASM methods: " + ", ".join(sorted(calls-exported))

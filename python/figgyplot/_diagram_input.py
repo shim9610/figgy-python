@@ -21,7 +21,7 @@ def plain(value):
     return value
 
 
-def records(value, name, rich):
+def records(value, name, rich, *, dpi=120):
     """Accept row records, structured arrays and DataFrame-like tables."""
     if hasattr(value, "to_dict") and not isinstance(value, Mapping):
         value = value.to_dict("records")
@@ -50,23 +50,60 @@ def records(value, name, rich):
     except TypeError:
         raise TypeError(f"{name} must be a table or iterable of records") from None
     for index, row in enumerate(iterator):
+        raw_label = row.get("label") if isinstance(row, Mapping) else None
+        raw_momentum = row.get("momentum") if isinstance(row, Mapping) else None
         row = plain(row)
         if not isinstance(row, dict):
             raise TypeError(f"{name}[{index}] must be a record mapping")
-        if isinstance(row.get("label"), str):
+        if name == "propagators":
+            for alias, canonical in [
+                ("from_", "from"),
+                ("source", "from"),
+                ("target", "to"),
+            ]:
+                if alias in row:
+                    if canonical in row and row[canonical] != row[alias]:
+                        raise ValueError(
+                            "conflicting propagator " + canonical + " aliases"
+                        )
+                    row[canonical] = row.pop(alias)
+            if "particle" in row:
+                row["particle"] = enum_name(row["particle"], PARTICLES)
+        if name == "vertices" and "role" in row:
+            row["role"] = enum_name(row["role"], ("Incoming", "Outgoing", "Internal"))
+        from ._richtext import TextRun
+
+        styled = isinstance(raw_label, TextRun) or (
+            isinstance(raw_label, (list, tuple))
+            and any(isinstance(v, TextRun) for v in raw_label)
+        )
+        if isinstance(row.get("label"), str) or styled:
             from .figure import _segments
 
             label = copy.deepcopy(rich)
-            label["segments"] = _segments(row["label"])
+            label["segments"] = _segments(
+                raw_label if styled else row["label"], dpi=dpi
+            )
             row["label"] = label
-        if isinstance(row.get("momentum"), dict) and isinstance(
-            row["momentum"].get("label"), str
-        ):
-            from .figure import _segments
+        if isinstance(row.get("momentum"), dict):
+            momentum = row["momentum"]
+            raw = (
+                raw_momentum.get("label") if isinstance(raw_momentum, Mapping) else None
+            )
+            styled = isinstance(raw, TextRun) or (
+                isinstance(raw, (list, tuple))
+                and any(isinstance(v, TextRun) for v in raw)
+            )
+            if isinstance(momentum.get("label"), str) or styled:
+                from .figure import _segments
 
-            label = copy.deepcopy(rich)
-            label["segments"] = _segments(row["momentum"]["label"])
-            row["momentum"]["label"] = label
+                label = copy.deepcopy(rich)
+                label["segments"] = _segments(
+                    raw if styled else momentum["label"], dpi=dpi
+                )
+                momentum["label"] = label
+            if "side" in momentum:
+                momentum["side"] = enum_name(momentum["side"], ("Left", "Right"))
         output.append(row)
     return output
 
@@ -85,3 +122,32 @@ def require(records, fields, name):
             raise ValueError(f"duplicate {name} id: {row['id']}")
         seen.add(row["id"])
     return seen
+
+
+PARTICLES = (
+    "Plain",
+    "Fermion",
+    "AntiFermion",
+    "Photon",
+    "ChargedBoson",
+    "Gluon",
+    "Scalar",
+    "ChargedScalar",
+    "Ghost",
+    "Majorana",
+    "Graviton",
+    "DoubleLine",
+)
+
+
+def enum_name(value, names):
+    if not isinstance(value, str):
+        raise TypeError("diagram choice must be a string")
+    key = "".join(c for c in value.casefold() if c.isalnum())
+    match = next(
+        (n for n in names if "".join(c for c in n.casefold() if c.isalnum()) == key),
+        None,
+    )
+    if match is None:
+        raise ValueError("expected one of: " + ", ".join(names))
+    return match

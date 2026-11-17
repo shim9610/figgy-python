@@ -405,3 +405,56 @@ def test_inline_legacy_import_validates_before_publishing_columns(backend):
         )
         if backend == "native":
             assert fig.to_png().startswith(b"\x89PNG")
+
+
+_SUBPLOT_BLOCKED = {
+    "energy": "an energy-level series needs a categorical bottom_x",
+    "ternary": "a ternary series is drawn on a ternary chart",
+    "parallel": "a parallel series is drawn on a parallel chart",
+}
+
+
+@pytest.mark.parametrize(
+    ("backend", "kind"),
+    [
+        pytest.param(
+            backend,
+            kind,
+            marks=(
+                pytest.mark.xfail(
+                    raises=ValueError,
+                    strict=True,
+                    reason="Upstream root-vs-subplot validation: https://github.com/shim9610/figgy/issues/325",
+                )
+                if backend == "native" and kind in _SUBPLOT_BLOCKED
+                else ()
+            ),
+        )
+        for backend in ("native", "webgpu")
+        for kind in KINDS
+        if kind != "sunburst"
+    ],
+)
+def test_common_chart_family_keeps_the_cartesian_root_when_used_in_a_subplot(
+    backend, kind
+):
+    # Sunburst uses a separate radial Figure; these are coordinate-series charts.
+    with fg.Figure(backend=backend, grid=[["main", "right"]]) as fig:
+        fig.axes[0].plot(
+            np.array([0, 1], dtype=np.float32),
+            np.array([0, 1], dtype=np.float32),
+            id="base",
+        )
+        base = fig.get_settings()["series"][0]
+        try:
+            populate(fig.subplots["right"].axes, kind)
+            if backend == "native":
+                assert fig.render_rgba().shape == (600, 960, 4)
+        except ValueError as error:
+            if backend == "native" and kind in _SUBPLOT_BLOCKED:
+                assert _SUBPLOT_BLOCKED[kind] in str(error)
+            raise
+        state = fig.get_settings()
+        assert state["series"][0] == base
+        assert state["config"]["bottom_x"].get("categories") is None
+        assert state["config"]["subplots"][0]["series"]

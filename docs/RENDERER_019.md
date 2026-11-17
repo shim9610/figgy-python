@@ -62,6 +62,39 @@ vertices use the renderer's automatic layout. Use
 orientation. This draws the supplied topology; it does not infer reactions or
 check conservation laws.
 
+Diagram calls return a `DiagramArtist`. Its `level(id)`, `transition(id)`,
+`limit(id)`, `band(id)`, `vertex(id)` and `propagator(id)` handles resolve stable
+record IDs again on each edit. Reordering records does not retarget an existing
+handle. Artist setters return the artist, so styling calls can be chained.
+
+```python
+levels = ax.energy_levels([{"id": "ground", "column": "S", "energy": 0}])
+levels.level("ground").set_label("Ground state").set_label_offset((3, -2))
+
+reaction = ax.feynman(
+    [{"id": "a", "role": "incoming"}, {"id": "b", "role": "outgoing"}],
+    [{"id": "p", "source": "a", "target": "b", "particle": "fermion"}],
+)
+reaction.set_color("navy").set_linewidth(1.5)
+reaction.vertex("a").set_position((0.2, 0.5)).set_label("electron")
+reaction.propagator("p").set_bend(20).set_linewidth(2)
+reaction.propagator("p").set_momentum("q", side="right", label_offset=(2, -1))
+```
+
+`source`/`target` and `from_`/`to` are Python aliases for propagator endpoints.
+Enum names accept lower-case words and underscores; plain strings and `TextRun`
+labels are supported. Energies and vertex positions use data units. Common
+line widths, marker radii, text sizes and label offsets in the handle API use
+points. Advanced fields passed through `set_style(**properties)` retain their
+renderer model units. `vertex.set_position(None)` and `propagator.set_bend(None)`
+restore renderer placement and automatic bends. `set_momentum(None)` clears a
+propagator momentum arrow. `get_position()` returns the
+stored override or `None`; it does not calculate a provisional layout.
+
+Individual propagators support stroke overrides. Energy strokes share the
+series style; use `levels.set_style(level={...}, transition={...})` for those
+public model fields. These methods do not infer atomic or particle physics.
+
 `read_nist` reads NIST Atomic Spectra Database CSV files, CSV text, text streams
 or tables. It preserves the exported energy/wavelength units, qualifiers,
 uncertainties and references, separates ionization limits and links transitions
@@ -180,10 +213,15 @@ cid = next(iter(ax.chart.get_categories()))
 ax.chart.series(sid).set_label("Measured").set_style(linewidth=1.5)
 ax.chart.cell(cid, sid).set_color("red").set_value_labels(position="outside")
 ax.chart.set_value_labels(format="value", decimals=2, suffix=" eV")
+ax.chart.cell(cid, sid).set_label("Reference")  # custom text after number formatting
 ax.chart.decoration("value_label", category=cid, series=sid).set_offset((2, 3))
 ax.chart.set_plot_bounds((70, 45, 300, 200))  # points: left, top, width, height
 ax.chart.set_plot_bounds()                  # measured automatic layout
 ```
+
+`cell.set_label(text)` and `cell.get_label()` edit/read one displayed label;
+`set_label(None)` clears its text. Changing number-format settings regenerates
+the numeric labels, so apply custom text afterwards.
 
 Coordinate-chart decimals are integers from 0 through 6. Bar percentages are
 shares across series within each category. Box labels use median/sample count;

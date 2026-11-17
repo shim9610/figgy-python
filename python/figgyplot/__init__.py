@@ -19,3 +19,6 @@ __all__ += ["TextRun"]
 
 from ._nist import NistData, read_nist
 __all__ += ["NistData", "read_nist"]
+
+from ._diagram_artist import DiagramArtist, DiagramElement
+__all__ += ["DiagramArtist", "DiagramElement"]

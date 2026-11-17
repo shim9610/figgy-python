@@ -154,16 +154,20 @@ class Artist(ArtistMethods):
         self.id = series_id
 
     def set_color(self, value):
-        return self.figure.update(self.id, color=value)
+        self.figure.update(self.id, color=value)
+        return self
 
     def set_linewidth(self, value):
-        return self.figure.update(self.id, linewidth=value)
+        self.figure.update(self.id, linewidth=value)
+        return self
 
     def set_label(self, value):
         if value is None:
             state=self.figure.get_settings();self._spec(state)['label']=None
-            return self.figure.apply_settings(state)
-        return self.figure.update(self.id, label=value)
+            self.figure.apply_settings(state)
+            return self
+        self.figure.update(self.id, label=value)
+        return self
 
     def set(self, **kwargs):
         aliases={'c':'color','lw':'linewidth','ls':'linestyle','ms':'markersize'}
@@ -172,7 +176,7 @@ class Artist(ArtistMethods):
             for key in ('marker','alpha','drawstyle','facecolor','edgecolor'):
                 if key in kwargs:getattr(self,'set_'+key)(kwargs.pop(key))
             self.figure.update(self.id, **kwargs)
-        return self.figure
+        return self
 
 
 class RadialArtist:
@@ -282,7 +286,12 @@ class Figure(FigureMethods):
 
     def _artist_for(self, series_id):
         if series_id not in self._artist_handles:
-            self._artist_handles[series_id] = Artist(self,series_id)
+            spec = next((s for s in self.get_settings()['series'] if s['series_id']==series_id), None)
+            if spec is not None and any(k in spec['render_type'] for k in ('EnergyLevels','Feynman')):
+                from ._diagram_artist import DiagramArtist
+                self._artist_handles[series_id] = DiagramArtist(self, series_id)
+            else:
+                self._artist_handles[series_id] = Artist(self,series_id)
         return self._artist_handles[series_id]
 
     @property

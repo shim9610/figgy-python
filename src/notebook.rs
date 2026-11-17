@@ -451,6 +451,71 @@ impl NotebookFigure {
                             .unwrap_or(renderer::chart::FitExtent::EMPTY),
                     ]
                 });
+            // Category/box fits follow the public chart.rs statistics policy.
+            // Source columns are immutable; retain only their scalar extents.
+            if s.render_type.category_bars().is_some() {
+                use renderer::{CategoryBarDirection, CategoryBarMode};
+                let cfg = self.chart.config();
+                let layer = cfg.layer_of_series(&s.series_id);
+                let groups = cfg.bar_groups_of(layer);
+                let horizontal = groups.direction == CategoryBarDirection::Horizontal;
+                let zero = renderer::chart::FitExtent::point(0.);
+                let mut value = zero;
+                match groups.mode {
+                    CategoryBarMode::PercentStacked => {
+                        value.union(&renderer::chart::FitExtent::point(100.));
+                    }
+                    CategoryBarMode::Grouped => {
+                        let id = if horizontal { &s.x_column } else { &s.y_column };
+                        value.union(
+                            self.columns
+                                .get(id)
+                                .unwrap_or(&renderer::chart::FitExtent::EMPTY),
+                        );
+                    }
+                    CategoryBarMode::Stacked => {
+                        for member in self.series.iter().filter(|v| {
+                            v.render_type.category_bars().is_some()
+                                && cfg.layer_of_series(&v.series_id) == layer
+                        }) {
+                            let id = if horizontal {
+                                &member.x_column
+                            } else {
+                                &member.y_column
+                            };
+                            if let Some(e) = self.columns.get(id) {
+                                if e.min.is_finite() {
+                                    value.min += e.min.min(0.);
+                                }
+                                if e.max.is_finite() {
+                                    value.max += e.max.max(0.);
+                                }
+                                value.min_positive = match (value.min_positive, e.min_positive) {
+                                    (Some(a), Some(b)) => Some(a.min(b)),
+                                    (a, b) => a.or(b),
+                                };
+                            }
+                        }
+                    }
+                }
+                [a, b] = if horizontal {
+                    [value, renderer::chart::FitExtent::EMPTY]
+                } else {
+                    [renderer::chart::FitExtent::EMPTY, value]
+                };
+            } else if s.render_type.box_plot().is_some() {
+                let value = if a.min != 0. || a.max != 0. { a } else { b };
+                let cfg = self.chart.config();
+                let horizontal = cfg
+                    .bar_groups_of(cfg.layer_of_series(&s.series_id))
+                    .direction
+                    == renderer::CategoryBarDirection::Horizontal;
+                [a, b] = if horizontal {
+                    [value, renderer::chart::FitExtent::EMPTY]
+                } else {
+                    [renderer::chart::FitExtent::EMPTY, value]
+                };
+            }
             // Use the renderer's fit-domain classification for every matrix
             // family, including SSOT shading changes after transfer release.
             use renderer::gpu_extent::{GpuFieldExtentMode, GpuSeriesFitMode};

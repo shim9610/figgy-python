@@ -247,3 +247,76 @@ impl FigureAccess<'_> {
         result
     }
 }
+
+impl FigureAccess<'_> {
+    /// Route diagram gestures through the renderer model's public movement API.
+    /// Only configuration is copied; source columns stay resident.
+    pub(super) fn drag_selected_record(
+        &mut self,
+        reference: &renderer::config::PickedDataRef,
+        dx: f32,
+        dy: f32,
+    ) -> PyResult<()> {
+        use renderer::config::PickedDataRef as R;
+        let id = reference.series_id();
+        let mut next = self.snapshot();
+        let Some(series) = next.series.iter_mut().find(|s| s.series_id == id) else {
+            return Ok(());
+        };
+        let moved = if let R::FeynmanLabel { part, index, .. } = reference {
+            let Some(diagram) = series.render_type.feynman_mut() else {
+                return Ok(());
+            };
+            diagram.drag_label(*part, *index, dx, dy)
+        } else if let R::ValueLabel {
+            category_index,
+            part,
+            ..
+        } = reference
+        {
+            if let (Some(part), Some(levels)) = (part, series.render_type.energy_levels_mut()) {
+                levels.drag_label(*part, *category_index, dx, dy)
+            } else {
+                let count = series.value_label_text().map_or(0, <[String]>::len);
+                series.drag_value_label(*category_index, count, dx, dy)
+            }
+        } else {
+            let hit = match reference {
+                R::FeynmanVertex { vertex_index, .. } => {
+                    renderer::FeynmanHit::Vertex(*vertex_index)
+                }
+                R::FeynmanPropagator {
+                    propagator_index, ..
+                } => renderer::FeynmanHit::Propagator(*propagator_index),
+                _ => return Ok(()),
+            };
+            let gpu_id = gpu::column_id(self.data.figure_id, id);
+            let moved = self
+                .renderer
+                .drag_feynman(self.data.chart_id, &gpu_id, hit, dx, dy)
+                .map_err(runtime)?;
+            if moved == renderer::layout::NudgeResult::Moved {
+                let result = self
+                    .renderer
+                    .chart_series(self.data.chart_id)
+                    .map_err(runtime)?
+                    .iter()
+                    .find(|s| s.series_id == gpu_id)
+                    .map(|s| s.render_type.clone());
+                // Commit through the normal SSOT transaction and history below.
+                self.renderer
+                    .set_chart_series(
+                        self.data.chart_id,
+                        gpu::series(self.data.figure_id, &self.data.series),
+                    )
+                    .map_err(runtime)?;
+                series.render_type = result.ok_or_else(|| runtime("dragged series disappeared"))?;
+            }
+            moved
+        };
+        if moved == renderer::layout::NudgeResult::Moved {
+            self.apply_settings_model(next)?;
+        }
+        Ok(())
+    }
+}

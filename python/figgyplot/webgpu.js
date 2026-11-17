@@ -311,12 +311,15 @@ export function render({model,el}) {
     const owner=id=>{for(let i=0;i<=(config.subplots?.length??0);i++){const cfg=i?config.subplots[i-1].config:config;if(i&&!(config.subplots[i-1].series??[]).includes(id))continue;if(!i&&(config.subplots??[]).some(p=>(p.series??[]).includes(id)))continue;const o=(cfg.overlays??[]).findIndex(o=>(o.series??[]).includes(id));return o<0?baseLayer(i):i?{SubplotOverlay:[i-1,o]}:{Overlay:o};}return 'Base';};
     const remaining=()=>series.filter(v=>!excluded.has(v.series_id)).map(v=>{const item=clone(v);for(const style of Object.values(item.render_type))if(style.line)style.line.fill=null;return item;});
     try{
-      chart.set_picked_data('null');chart.set_picked_points('null');
+      chart.set_picked_data('null');
       for(const layer of layersInPanel(index).reverse()){
         chart.set_active_layer(JSON.stringify(layer));
         while(series.some(v=>!excluded.has(v.series_id)&&sameLayer(owner(v.series_id),layer))){
           const value=await chart.pick_data(...point,6);if(!value)break;
-          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px'));
+          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>!['distance_px','label_id','vertex_index'].includes(k)));
+          // Pick answers use `index`; persistent Feynman selections use typed row keys.
+          if(ref.kind==='feynman_vertex'){ref.vertex_index=ref.index;delete ref.index;}
+          else if(ref.kind==='feynman_propagator'){ref.propagator_index=ref.index;delete ref.index;}
           if(excluded.has(ref.series_id))throw Error('Picker repeated an excluded series');
           excluded.add(ref.series_id);hits.push({layer,ref,distance:identity.distance_px});
           chart.set_series(JSON.stringify(remaining()));
@@ -334,13 +337,13 @@ export function render({model,el}) {
   function cancelChooser(){if(!chooser)return;const restoreFocus=choiceBox.contains(document.activeElement);restorePreview();chooser=null;choiceBox.hidden=true;choiceBox.replaceChildren();stats.choice_candidates=null;stats.choice_preview=null;if(restoreFocus)canvas.focus({preventScroll:true});}
   function previewChoice(index){
     if(!chooser)return;restorePreview();chooser.active=index;const choice=chooser.choices[index];if(!choice)return;
-    previewOriginal=JSON.parse(chart.get_config());chart.set_picked_points('null');chart.set_active_layer(JSON.stringify(choice.layer));chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));
+    previewOriginal=JSON.parse(chart.get_config());chart.set_active_layer(JSON.stringify(choice.layer));chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));
     const rect=choice.target?JSON.parse(chart.decoration_bounds(rendererTarget(choice.target)))?.rect:panelRect(panelIndex(choice.layer));
     choicePreview.setAttribute('viewBox',`0 0 ${canvas.width} ${canvas.height}`);
     if(rect){const node=document.createElementNS('http://www.w3.org/2000/svg','rect');for(const [k,v]of Object.entries({x:rect[0],y:rect[1],width:rect[2],height:rect[3],fill:'none',stroke:'#2663ad','stroke-width':2,'stroke-dasharray':'5 3','vector-effect':'non-scaling-stroke'}))node.setAttribute(k,v);choicePreview.append(node);}
     choiceBox.querySelectorAll('[data-choice]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.choice===choice.key)));stats.choice_preview=choice.key;dirty=true;
   }
-  function chooseTarget(choice){cancelChooser();chart.set_picked_points('null');setPointerLayer(choice.layer);chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));selected=choice.target;local=snapshot();focusedPanel=panelId(panelIndex(choice.layer));observedLayer=clone(local.config.active_layer??'Base');if(selected)showProperties();dirty=true;commit();canvas.focus({preventScroll:true});}
+  function chooseTarget(choice){cancelChooser();setPointerLayer(choice.layer);chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));selected=choice.target;local=snapshot();focusedPanel=panelId(panelIndex(choice.layer));observedLayer=clone(local.config.active_layer??'Base');if(selected)showProperties();dirty=true;commit();canvas.focus({preventScroll:true});}
   function renderChooser(){
     if(!chooser)return;const query=chooser.filter.toLowerCase(),visible=chooser.choices.map((c,i)=>({c,i})).filter(({c})=>`${c.label} ${c.detail}`.toLowerCase().includes(query));chooser.visible=visible.map(v=>v.i);
     const rows=choiceBox.querySelector('[data-choices]');rows.replaceChildren();
@@ -596,6 +599,14 @@ export function render({model,el}) {
   root.querySelector('[data-advanced]').before(selectedData);
   let selectedDataKey=null;
   async function selectionDetails(){
+    const state=snapshot(),ref=state.config.picked_data?.refs?.[0];
+    const body=ref&&state.series.find(s=>s.series_id===ref.series_id)?.render_type.EnergyLevels;
+    if(body&&(ref.kind==='histogram_bin'||ref.kind==='point')){
+      const level=ref.kind==='histogram_bin',index=level?ref.bin_index:ref.point_index;
+      const row=body[level?'levels':'transitions']?.[index];
+      if(!row)throw Error('Selected diagram record no longer exists');
+      return {kind:ref.kind,series_id:ref.series_id,index,part:level?'level':'transition',record:clone(row)};
+    }
     return JSON.parse(await chart.selection_details());
   }
   function valueLabelSignature(state){
@@ -701,7 +712,7 @@ export function render({model,el}) {
     treeSelection=entry?.node.key??null;
     const query=search.value.trim().toLowerCase(),focusKey=tree.contains(document.activeElement)?document.activeElement.closest('[data-node]')?.dataset.node:null;
     const scroll=tree.scrollTop;tree.replaceChildren();
-    const matches=node=>!query||`${node.label} ${node.kind} ${node.key.split('/').at(-1)}`.toLowerCase().includes(query)||node.children.some(matches);
+    const matches=node=>!query||`${node.label} ${node.kind} ${node.key} ${node.target??''}`.toLowerCase().includes(query)||node.children.some(matches);
     const visit=(nodes,depth)=>{for(const node of nodes){
       if(!matches(node))continue;
       const open=Boolean(query)||(expanded.get(node.key)??!node.collapsed);
@@ -733,7 +744,7 @@ export function render({model,el}) {
     const context=root.querySelector('[data-context]');context.textContent=entry?entry.path.slice(1).map(n=>n.label).join(' / '):'Click an object in the chart or tree';context.dataset.target=target??'';
   }
   search.addEventListener('input',()=>navigateTree(!search.value));
-  search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key.split('/').at(-1)}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
+  search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key} ${n.target??''}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
   function chooseObject(node){
     const target=node.target,generation=++inspectorGeneration;inspectorOwner=node.key;
     if(node.kind==='panel')expanded.set(node.key,true);
@@ -1175,7 +1186,8 @@ export function render({model,el}) {
             return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
           }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
-        if(message.action==='barrier')await enqueue(async()=>{await waitForFrame();await readyDisplayedFrame();},true);
+        // sync() acknowledges accepted edits; GPU presentation belongs to prepare/export.
+        // Awaiting its fence here deadlocks an editor while a slow frame is held.
         const data=message.action==='export'?await exporting(message.scale,message.format??'png'):null;trace('response.send_started',request);model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);trace('response.sent',{...request,elapsed_ms:performance.now()-requestedAt});}catch(e){trace('request.failed',{...request,error:String(e)});model.send({action:'result',id:message.id,error:String(e)});}})();
     }
   }
@@ -1189,7 +1201,7 @@ export function render({model,el}) {
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>Object.values(s.render_type)[0].line?.fill))){
       try{await queue;await flush();model.send({action:'fit',revision});}catch(e){fail(e);}return;
     }
-    enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
+    enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
       dirty=true;commit();});
   });
   root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
@@ -1291,12 +1303,20 @@ export function render({model,el}) {
       gesture.pan=annotation===null&&hits.every(h=>h.target.endsWith('data_area'))&&inside&&!root.querySelector('[data-area]').checked;
       stats.last_pointer_hit=hits[0]?.target??null;stats.last_pointer_pan=gesture.pan;
       if(gesture.pan){
+        const previousPick=JSON.parse(chart.get_config()).picked_data?.refs?.[0];
         chart.on_press(-100,-100);chart.on_release();const picks=await pickPanelCandidates(point,index);
         if(picks.length>1){gesture.choices=picks.map(dataChoice);return;}
-        const picked=picks[0],old=JSON.parse(chart.get_config()).picked_data?.refs?.[0],same=picked&&JSON.stringify(picked.ref)===JSON.stringify(old);
+        const picked=picks[0],old=previousPick,same=picked&&!picked.ref.kind.startsWith('feynman_')&&picked.ref.kind!=='value_label'&&equalValue({...picked.ref,source_id:picked.ref.source_id??null},{...old,source_id:old?.source_id??null});
         if(picked)setPointerLayer(picked.layer);
         selected=same?null:picked?.ref.series_id??null;
         chart.set_picked_data(JSON.stringify(!same&&picked?{refs:[picked.ref]}:null));
+        if(picked?.ref.kind.startsWith('feynman_')){
+          const ref=picked.ref;
+          gesture.diagram=chart.press_feynman(ref.series_id,ref.kind,ref.vertex_index??ref.propagator_index??ref.index,ref.part);
+        }else if(picked?.ref.kind==='value_label'){
+          const ref=picked.ref;
+          gesture.diagram=ref.part?chart.press_energy_label(ref.series_id,ref.part,ref.category_index):chart.press_value_label(`series:${ref.series_id}:label:${ref.category_index}`);
+        }
       }else if(hits.length>1){gesture.choices=hits.map(elementChoice);return;}
       else{
         const hit=hits[0];chart.set_picked_data('null');if(hit)setPointerLayer(hit.layer);
@@ -1311,6 +1331,7 @@ export function render({model,el}) {
     const distance=Math.hypot(next[0]-gesture.origin[0],next[1]-gesture.origin[1]);if(distance>=3)gesture.moved=true;
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
     if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
+    else if(gesture.diagram){if(gesture.moved)chart.on_move(next[0]-old[0],next[1]-old[1]);}
     else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;navigateDocumentAxis(s,'x',1,.5,-(next[0]-old[0])/r[2]);navigateDocumentAxis(s,'y',1,.5,(next[1]-old[1])/r[3]);install(s);}}
     else if(!gesture.choices)chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
   });});
@@ -1344,7 +1365,7 @@ export function render({model,el}) {
     if(e.key==='Escape'){selected=null;focusedPanel=null;observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}
     else{const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0,dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
       if(kind){if(selected&&!selected.startsWith('slice_')&&!local[kind].series?.some(s=>s.id===selected))chart.drag(selected,dx,dy,undefined);else if(dx!==0)chart.step_selection(dx<0);}
-      else{const cfg=JSON.parse(chart.get_config());if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected?.startsWith('annotation:')){const index=local.config.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)chart.drag_annotation(index,dx,dy,undefined);}else if(selected){const b=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx,dy);chart.on_release();}}}
+      else{const cfg=JSON.parse(chart.get_config()),scale=panelRect(0)[2]/local.config.chart_area.width;if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected?.startsWith('annotation:')){const index=local.config.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)chart.drag_annotation(index,dx*scale,dy*scale,undefined);}else if(selected){const b=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx*scale,dy*scale);chart.on_release();}}}
     }dirty=true;commit();
   });});
   layoutMode(false);

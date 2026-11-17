@@ -592,10 +592,11 @@ impl Navigator {
         fn matches(node: &Node, query: &str) -> bool {
             query.is_empty()
                 || format!(
-                    "{} {} {}",
+                    "{} {} {} {}",
                     node.label,
                     node.kind,
-                    node.key.rsplit('/').next().unwrap_or("")
+                    node.key,
+                    node.target.as_deref().unwrap_or("")
                 )
                 .to_lowercase()
                 .contains(query)

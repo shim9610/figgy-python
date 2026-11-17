@@ -2,6 +2,7 @@
 //! Descriptions are derived from accepted SSOT; they are not a second model.
 use super::*;
 use renderer::annotation::AnnotationSpace;
+mod diagrams;
 mod layout;
 mod links;
 mod optional;
@@ -65,6 +66,28 @@ fn control_key(field: &Field) -> &str {
 fn choices(path: &str, value: &Value) -> Vec<Value> {
     let key = path.rsplit('/').next().unwrap_or("");
     let values: &[&str] = match key {
+        "particle" if path.contains("/Feynman/") => &[
+            "Plain",
+            "Fermion",
+            "AntiFermion",
+            "Photon",
+            "ChargedBoson",
+            "Gluon",
+            "Scalar",
+            "ChargedScalar",
+            "Ghost",
+            "Majorana",
+            "Graviton",
+            "DoubleLine",
+        ],
+        "side" if path.contains("/Feynman/") => &["Left", "Right"],
+        "role" if path.contains("/Feynman/") => &["Internal", "Incoming", "Outgoing"],
+        "direction" if path.contains("/Feynman/layout/") => &["LeftToRight", "BottomToTop"],
+        "direction" if path.contains("/EnergyLevels/style/transition/") => {
+            &["Emission", "Absorption", "None"]
+        }
+        "show" if path.contains("/EnergyLevels/") => &["Main", "Components"],
+        "label_side" if path.contains("/EnergyLevels/") => &["Left", "Right", "Above"],
         "material" if path.starts_with("/radial/") => &[
             "Flat",
             "Matte",
@@ -229,7 +252,15 @@ fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: 
     });
 }
 fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: &str) {
-    if path.contains("/colorbar/") && value.get("segments").is_some_and(Value::is_array) {
+    if diagrams::fields(out, value, path, group, relative) {
+        return;
+    }
+    if (path.contains("/colorbar/")
+        || path.contains("/EnergyLevels/")
+        || path.contains("/Feynman/")
+        || (path.starts_with("/series/") && path.ends_with("/label")))
+        && value.get("segments").is_some_and(Value::is_array)
+    {
         field(
             out,
             json!(crate::editor::display_text(&value["segments"])),
@@ -614,9 +645,29 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
         .filter(|_| node.key.starts_with("series/"))
         .and_then(|v| v.iter().enumerate().find(|(_, s)| s["series_id"] == target))
     {
+        let mut label = series["label"].clone();
+        if label.is_null() {
+            label = state
+                .pointer(&format!("{panel}/legend/content"))
+                .unwrap()
+                .clone();
+            label["segments"] = json!([]);
+        }
+        walk(
+            fields,
+            &label,
+            &format!("/series/{index}/label"),
+            "Series",
+            "label",
+        );
         for (kind, style) in series["render_type"].as_object().unwrap() {
             let root = format!("/series/{index}/render_type/{kind}");
-            for (key, value) in style.as_object().unwrap() {
+            let expanded = diagrams::expanded(
+                kind,
+                style,
+                state.pointer(&format!("{panel}/legend/content")).unwrap(),
+            );
+            for (key, value) in expanded.as_object().unwrap() {
                 if ["components", "err_x", "err_y", "yErr"].contains(&key.as_str()) {
                     continue;
                 }
@@ -1593,6 +1644,22 @@ pub(crate) fn apply(
         crate::annotation_edit::reorder(&mut result, &field.path, index, to)?;
         return Ok(result);
     }
+    let parts: Vec<_> = field.path.split('/').skip(1).collect();
+    if parts.len() >= 4 && parts[0] == "series" && parts[2] == "label" {
+        let path = format!("/series/{}/label", parts[1]);
+        if result.pointer(&path).is_none_or(Value::is_null) {
+            let mut label = result
+                .pointer(&format!("{}/legend/content", panel_path(object.layer)))
+                .unwrap()
+                .clone();
+            label["segments"] = json!([]);
+            *result.pointer_mut(&path).unwrap() = label;
+        }
+    }
+    if diagrams::apply(&mut result, field, &value, object.layer)? {
+        return Ok(result);
+    }
+    diagrams::prepare_edit(&mut result, &field.path, object.layer)?;
     let (parent, key) = field.path.rsplit_once('/').unwrap();
     let value = if field.id.starts_with("Coordinates/") && field.id != "Coordinates/axis" {
         crate::annotation_edit::convert(

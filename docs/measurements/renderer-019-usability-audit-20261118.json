@@ -1,0 +1,64 @@
+{
+  "date": "2026-11-18",
+  "timezone": "Asia/Seoul",
+  "status": "incremental audit; remaining host scenarios pending",
+  "renderer_commit": "c9828223409b8a9253e011572955aa7a729c7efe",
+  "release_ready": false,
+  "results": {
+    "api": {
+      "log": "diagram-api-final-20261118.log",
+      "sha256": "21f0a5d54e6014881a9552d2f85e165d78a64bb5732230d1324ab8903cc81958",
+      "passed": 38,
+      "last_line": "38 passed in 2.60s"
+    },
+    "subplot_families": {
+      "log": "subplot-regressions-20261118.log",
+      "sha256": "358bf207f6b9feef8d36afd1cb5102d9450c86cf127c71867e5e82f107a01cee",
+      "passed": 41,
+      "last_line": "41 passed, 91 deselected, 3 xfailed in 16.35s",
+      "strict_xfailed": 3
+    },
+    "preflight": {
+      "log": "preflight-current-20261118.log",
+      "sha256": "1f5a8e0ee4aaffb6cb4dc6ab42cccb6b1febfe75266084f96b4095bf4f75a021",
+      "passed": 110,
+      "last_line": "110 passed in 11.35s"
+    },
+    "held_frames_and_keyboard": {
+      "log": "coalescing-and-keys-ui-final-20261118.log",
+      "sha256": "0aaae1125fc77cdc7216de0baa99f31d45d01ab225b971b0fc6317cf5ee058ce",
+      "passed": 5,
+      "last_line": "5 passed, 164 deselected in 128.09s (0:02:08)"
+    },
+    "diagram_parts": {
+      "log": "diagram-part-gestures-20261118.log",
+      "sha256": "84ebbf6fe5d3af7da43be3528f4abbca400a69e177bb630c6aae06b28c9452e5",
+      "passed": 10,
+      "last_line": "1 failed, 10 passed, 169 deselected in 335.70s (0:05:35)",
+      "note": "Initial run has ten passing diagram cases and an unsupported cell-label fixture failure; both bar-label cases pass separately after adding cell label API. Counts overlap other suites; do not sum."
+    },
+    "bar_label_gestures": {
+      "log": "bar-label-gestures-fixed-20261118.log",
+      "sha256": "5e2ac236018b6844f3d5d624cc609e74ef40df6e5c8a2eca08b61495a98803db",
+      "passed": 2,
+      "last_line": "2 passed, 179 deselected in 82.25s (0:01:22)"
+    }
+  },
+  "known_renderer_issues": [
+    {
+      "issue": 321,
+      "url": "https://github.com/shim9610/figgy/issues/321",
+      "status": "fixed upstream; pin upgrade pending"
+    },
+    {
+      "issue": 325,
+      "url": "https://github.com/shim9610/figgy/issues/325",
+      "status": "open; three strict xfails; release blocker"
+    }
+  ],
+  "pending": [
+    "remaining property/annotation UI cases",
+    "radar browser picking initialization investigation",
+    "upstream pin refresh and final full regression"
+  ]
+}

@@ -459,9 +459,37 @@ class CoordinateElement:
 
     def set_label(self, text):
         if self.kind == "cell":
-            raise AttributeError("cell labels follow chart value formats")
+            # Text is already a public renderer appearance field. Address it
+            # through the category ID rather than creating a style override.
+            def edit(cfg, members):
+                spec, _ = self._node(cfg, members, False)
+                categories = cfg[self.chart._axis(cfg)]["categories"]
+                index = next(
+                    i for i, c in enumerate(categories) if c["id"] == self.key[0]
+                )
+                labels = self.chart._body(spec)["labels"]
+                values = list(labels.get("text", []))
+                values.extend([""] * max(0, len(categories) - len(values)))
+                values[index] = "" if text is None else str(text)
+                labels["text"] = values
+
+            self.chart._edit(edit)
+            return self
         self.chart.set_series(self.key, label=text)
         return self
+
+    def get_label(self):
+        state = self.chart.figure.get_settings()
+        cfg = self.chart.axes._config(state)
+        spec, _ = self._node(cfg, self.chart._members(state), False)
+        if self.kind == "series":
+            from .figure import _text
+
+            return "" if spec.get("label") is None else _text(spec["label"])
+        categories = cfg[self.chart._axis(cfg)]["categories"]
+        index = next(i for i, c in enumerate(categories) if c["id"] == self.key[0])
+        values = self.chart._body(spec)["labels"].get("text", [])
+        return values[index] if index < len(values) else ""
 
     def set_value_labels(self, *, position=..., format=..., color=...):
         from ._chart_artist import _FORMATS, _placement

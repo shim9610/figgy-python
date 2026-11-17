@@ -130,6 +130,7 @@ struct SurfaceWindow {
     handle: Option<String>,
     dragging: bool,
     panning: bool,
+    diagram_drag: Option<renderer::config::PickedDataRef>,
     pan_moved: bool,
     drag_origin: (f32, f32),
     chart_pressed: bool,
@@ -256,6 +257,7 @@ impl SurfaceWindow {
             handle: None,
             dragging: false,
             panning: false,
+            diagram_drag: None,
             pan_moved: false,
             drag_origin: (0., 0.),
             chart_pressed: false,
@@ -495,6 +497,7 @@ impl SurfaceWindow {
                 .select(c.data.chart.config(), c.data.identity.as_ref(), None);
             self.selected = None;
             self.handle = None;
+            self.diagram_drag = None;
             self.dragging = false;
             self.panning = false;
             c.clear_data_selection()?;
@@ -727,7 +730,20 @@ impl SurfaceWindow {
             WindowEvent::CursorMoved { position, .. } => {
                 let old = self.cursor;
                 self.cursor = (position.x as f32, position.y as f32);
-                if self.panning {
+                if let Some(reference) = self.diagram_drag.as_ref() {
+                    let distance = (self.cursor.0 - self.drag_origin.0)
+                        .hypot(self.cursor.1 - self.drag_origin.1);
+                    if self.pan_moved || distance >= 3. {
+                        self.pan_moved = true;
+                        c.drag_selected_record(
+                            reference,
+                            (self.cursor.0 - old.0) / scale,
+                            (self.cursor.1 - old.1) / scale,
+                        )?;
+                        self.last_input = Some(input_received);
+                        self.window.request_redraw();
+                    }
+                } else if self.panning {
                     let distance = (self.cursor.0 - self.drag_origin.0)
                         .hypot(self.cursor.1 - self.drag_origin.1);
                     if self.pan_moved || distance >= 3. {
@@ -888,6 +904,7 @@ impl SurfaceWindow {
                 self.panning = false;
                 self.pan_moved = false;
                 self.drag_origin = self.cursor;
+                self.diagram_drag = None;
                 let (x, y) = self.cursor;
                 let measure = CpuTextMeasure::for_style(&display.draw_style);
                 self.handle = self
@@ -953,11 +970,21 @@ impl SurfaceWindow {
                         } else {
                             let mut cfg = c.data.chart.config().clone();
                             let picked = picked.into_iter().next();
-                            let same = picked.as_ref().is_some_and(|p| {
-                                cfg.picked_data
-                                    .as_ref()
-                                    .is_some_and(|s| s.refs.first() == Some(&p.reference))
+                            self.diagram_drag = picked.as_ref().and_then(|p| match p.reference {
+                                renderer::config::PickedDataRef::FeynmanVertex { .. }
+                                | renderer::config::PickedDataRef::FeynmanPropagator { .. }
+                                | renderer::config::PickedDataRef::FeynmanLabel { .. }
+                                | renderer::config::PickedDataRef::ValueLabel { .. } => {
+                                    Some(p.reference.clone())
+                                }
+                                _ => None,
                             });
+                            let same = self.diagram_drag.is_none()
+                                && picked.as_ref().is_some_and(|p| {
+                                    cfg.picked_data
+                                        .as_ref()
+                                        .is_some_and(|s| s.refs.first() == Some(&p.reference))
+                                });
                             self.selected = if same {
                                 None
                             } else {
@@ -1040,6 +1067,7 @@ impl SurfaceWindow {
                     }
                     return Ok(());
                 }
+                self.diagram_drag = None;
                 let chart_pressed = std::mem::take(&mut self.chart_pressed);
                 self.dragging = false;
                 self.panning = false;
@@ -1883,6 +1911,7 @@ impl ApplicationHandler for App {
                 w.modifiers = ModifiersState::empty();
                 w.dragging = false;
                 w.panning = false;
+                w.diagram_drag = None;
                 w.chart_pressed = false;
                 // Losing focus cancels an active gesture, not an armed tool.
                 if w.editor.drawing.gesture.is_some() {

@@ -44,6 +44,28 @@ impl FigureAccess<'_> {
         let wire = serde_json::to_value(&series.render_type).map_err(runtime)?;
         let body = wire.as_object().unwrap().values().next().unwrap();
         match reference {
+            PickedDataRef::HistogramBin { bin_index, .. }
+                if series.render_type.energy_levels().is_some() =>
+            {
+                let row = body["levels"]
+                    .get(*bin_index)
+                    .filter(|v| v.is_object())
+                    .ok_or_else(|| invalid("selected level no longer exists"))?;
+                result["index"] = json!(bin_index);
+                result["part"] = json!("level");
+                result["record"] = row.clone();
+            }
+            PickedDataRef::Point { point_index, .. }
+                if series.render_type.energy_levels().is_some() =>
+            {
+                let row = body["transitions"]
+                    .get(*point_index)
+                    .filter(|v| v.is_object())
+                    .ok_or_else(|| invalid("selected transition no longer exists"))?;
+                result["index"] = json!(point_index);
+                result["part"] = json!("transition");
+                result["record"] = row.clone();
+            }
             PickedDataRef::Point { point_index, .. }
                 if series
                     .render_type

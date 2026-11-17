@@ -240,3 +240,13 @@ retaining the native/WASM source pins.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.
+
+
+Renderer 0.19 integration release gate (2026-11-18): recheck
+[figgy #325](https://github.com/shim9610/figgy/issues/325) after updating both native
+and WASM pins. EnergyLevels/Ternary/Parallel must work in a subplot beside a
+Cartesian root. The three strict xfails in `test_renderer_019_features.py` must be
+removed after verifying the upstream fix; standalone chart success is insufficient.
+Energy stroke/transition selection details are tracked in
+[figgy #321](https://github.com/shim9610/figgy/issues/321); the Python inspector
+currently uses accepted record metadata for those identities.

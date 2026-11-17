@@ -1037,7 +1037,8 @@ class ArtistMethods:
         return scatter["point_size"] * 144 / self.figure.dpi
 
     def set_markersize(self, value):
-        return self.figure.update(self.id, markersize=value)
+        self.figure.update(self.id, markersize=value)
+        return self
 
     def get_linestyle(self):
         from .figure import _LINES
@@ -1046,7 +1047,8 @@ class ArtistMethods:
         return {v: k for k, v in _LINES.items()}.get(value, value)
 
     def set_linestyle(self, value):
-        return self.figure.update(self.id, linestyle=value)
+        self.figure.update(self.id, linestyle=value)
+        return self
 
     def get_marker(self):
         from .figure import _MARKERS
@@ -1065,7 +1067,7 @@ class ArtistMethods:
         body = self._body(state)
         if value in (None, "", "None", "none", " "):
             if set(self._spec(state)["render_type"]) == {"Line"}:
-                return
+                return self
             raise NotImplementedError(
                 "removing markers while retaining their hidden style is not supported"
             )
@@ -1083,6 +1085,7 @@ class ArtistMethods:
             spec["render_type"] = {"ScatterLine": body}
         body["scatter"]["point_shape"] = _MARKERS.get(value, value)
         fig.apply_settings(state)
+        return self
 
     def set_facecolor(self, value):
         from .figure import _color
@@ -1096,9 +1099,14 @@ class ArtistMethods:
             body["bar"]["fill_color"] = _color(value)
         elif "scatter" in body:
             body["scatter"]["point_color"] = _color(value)
+        elif any(k in self._spec(state)['render_type'] for k in ('CategoryBars','BoxPlot')):
+            body['color'] = _color(value)
+        elif 'Radar' in self._spec(state)['render_type']:
+            body['style']['fill'] = _color(value)
         else:
             raise NotImplementedError("this artist has no independent face color")
         fig.apply_settings(state)
+        return self
 
     def set_edgecolor(self, value):
         from .figure import _color
@@ -1106,12 +1114,14 @@ class ArtistMethods:
         fig = self.figure
         state = fig.get_settings()
         body = self._body(state)
-        if "bar" not in body:
-            raise NotImplementedError(
-                "this renderer has no independent marker edge color"
-            )
-        body["bar"]["border_color"] = _color(value)
+        if any(k in self._spec(state)['render_type'] for k in ('CategoryBars','BoxPlot')):
+            body['style']['outline_color'] = _color(value)
+        elif 'bar' in body:
+            body["bar"]["border_color"] = _color(value)
+        else:
+            raise NotImplementedError("this artist has no independent edge color")
         fig.apply_settings(state)
+        return self
 
     def set_baseline(self, value):
         """Figgy extension: baseline of an existing histogram."""
@@ -1119,6 +1129,7 @@ class ArtistMethods:
         state = fig.get_settings()
         self._body(state)["bar"]["baseline"] = _number(value, "baseline")
         fig.apply_settings(state)
+        return self
 
     def set_bar_width(self, ratio=1.0, *, gap=0.0):
         """Figgy extension: fraction of each bin and gap in points."""
@@ -1130,6 +1141,7 @@ class ArtistMethods:
         state = fig.get_settings()
         self._body(state)["bar"].update(width_ratio=ratio, gap_px=gap * fig.dpi / 72)
         fig.apply_settings(state)
+        return self
 
     def set_orientation(self, value):
         """Figgy extension: use an existing histogram's horizontal/vertical mapping."""
@@ -1139,6 +1151,7 @@ class ArtistMethods:
         state = fig.get_settings()
         self._body(state)["bar"]["orientation"] = value.title()
         fig.apply_settings(state)
+        return self
 
     def set_errorbar_style(self, *, color, width, capsize, capthick):
         """Figgy extension: restyle existing errors with errorbar argument units."""
@@ -1159,6 +1172,7 @@ class ArtistMethods:
         ):
             node[key] = value * fig.dpi / 72
         fig.apply_settings(state)
+        return self
 
     def set_drawstyle(self, value):
         modes = {
@@ -1173,15 +1187,18 @@ class ArtistMethods:
         state = fig.get_settings()
         self._body(state)["line"]["interpolation"] = modes[value]
         fig.apply_settings(state)
+        return self
 
     def set_cmap(self, value):
         self.figure.update(self.id, cmap=value)
+        return self
 
     def set_clim(self, vmin=None, vmax=None):
         if vmax is None and vmin is not None and not np.isscalar(vmin):
             vmin, vmax = vmin
         props = {k: v for k, v in [("vmin", vmin), ("vmax", vmax)] if v is not None}
         self.figure.update(self.id, **props)
+        return self
 
     def get_clim(self):
         axis = self._colorbar()["axis"]
@@ -1235,12 +1252,13 @@ class ArtistMethods:
                 changed = opacity(value) or changed
             return changed
 
-        found = False
+        found = opacity(body['color']) if 'color' in body else False
         for part in ("line", "scatter", "bar", "style", "err_style"):
             found = opacity(body.get(part, {})) or found
         if not found:
             raise NotImplementedError("scalar-mapped opacity requires renderer support")
         fig.apply_settings(state)
+        return self
 
 
 class AxesMethods:

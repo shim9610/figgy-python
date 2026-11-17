@@ -663,9 +663,9 @@ class AdvancedMethods:
             energy_unit = None
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
         rich = cfg["legend"]["content"]
-        levels = records(levels, "levels", rich)
-        transitions = records(transitions, "transitions", rich)
-        limits = records(limits, "limits", rich)
+        levels = records(levels, "levels", rich, dpi=self.figure.dpi)
+        transitions = records(transitions, "transitions", rich, dpi=self.figure.dpi)
+        limits = records(limits, "limits", rich, dpi=self.figure.dpi)
         level_ids = require(levels, ("id", "column", "energy"), "levels")
         require(limits, ("id", "energy"), "limits")
         require(transitions, ("id", "lower", "upper"), "transitions")
@@ -684,7 +684,7 @@ class AdvancedMethods:
         body = s["render_type"]["EnergyLevels"]
         body.update(levels=levels, transitions=transitions, limits=limits)
         if len(bands):
-            body["bands"] = records(bands, "bands", rich)
+            body["bands"] = records(bands, "bands", rich, dpi=self.figure.dpi)
         body["show"] = {"main": "Main", "components": "Components"}.get(show, show)
         _style_update(body["style"], plain(style))
         ids = list(dict.fromkeys(level["column"] for level in levels))
@@ -718,8 +718,8 @@ class AdvancedMethods:
         from ._diagram_input import records, plain, require
 
         rich = self._config(self.figure.get_settings())["legend"]["content"]
-        vertices = records(vertices, "vertices", rich)
-        propagators = records(propagators, "propagators", rich)
+        vertices = records(vertices, "vertices", rich, dpi=self.figure.dpi)
+        propagators = records(propagators, "propagators", rich, dpi=self.figure.dpi)
         vertex_ids = require(vertices, ("id",), "vertices")
         require(propagators, ("id", "from", "to", "particle"), "propagators")
         for edge in propagators:

@@ -204,46 +204,7 @@ class NotebookData:
                 config,
             )
             direction = local.get("bar_groups", {}).get("direction", "Vertical")
-            if kind == "CategoryBars":
-                group = [
-                    array(s["y_column"] if direction == "Vertical" else s["x_column"])
-                    for s in all_specs
-                    if "CategoryBars" in s["render_type"]
-                    and local
-                    is next(
-                        (
-                            p["config"]
-                            for p in config.get("subplots", [])
-                            if s["series_id"] in p.get("series", [])
-                        ),
-                        config,
-                    )
-                ]
-                mode = local.get("bar_groups", {}).get("mode", "Grouped")
-                if mode == "PercentStacked":
-                    data = np.array(
-                        [-100.0 if any(np.any(v < 0) for v in group) else 0.0, 100.0]
-                    )
-                elif mode == "Stacked":
-                    matrix = np.asarray(group)
-                    data = np.r_[
-                        np.nansum(np.maximum(matrix, 0), axis=0),
-                        np.nansum(np.minimum(matrix, 0), axis=0),
-                        0.0,
-                    ]
-                else:
-                    data = np.r_[np.concatenate(group), 0.0]
-                position = (
-                    0.0,
-                    0.0,
-                    None,
-                )  # The categorical position axis keeps its configured window.
-                pair = (
-                    [position, extent(data)]
-                    if direction == "Vertical"
-                    else [extent(data), position]
-                )
-            elif kind == "BoxPlot":
+            if kind == "BoxPlot":
                 vals = []
                 record = self.composites.get(spec["y_column"])
                 if record:

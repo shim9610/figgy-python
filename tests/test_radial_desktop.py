@@ -164,7 +164,7 @@ def test_radial_native_edit_copy_selection_and_no_readback(tmp_path):
         inputs.key("ctrl+a")
         inputs.xdo("type", "--clearmodifiers", "Reviewed donut")
         inputs.pump()
-        assert fig.get_settings()["radial"]["title"] == "Reviewed donut"
+        assert "".join(v["text"] for v in fig.get_settings()["radial"]["chart_title"]["text"]["segments"]) == "Reviewed donut"
         inputs.click("radial_material")
         inputs.click("radial_material_Wood")
         assert fig.get_settings()["radial"]["style"]["material"] == "Wood"
