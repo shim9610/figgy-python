@@ -125,12 +125,16 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=Tru
             'EnergyLevels', 'Feynman', 'CategoryBars', 'BoxPlot', 'Radar', 'RgbImage', 'Hexbin'))
         for spec in state['series']
     )
+    requires_atomic = requires_atomic or any(
+        body.get('matrix', {}).get('grid_layout') == 'Hexagonal'
+        for spec in state['series'] for body in spec['render_type'].values()
+    )
     radial = state.get('radial')
     requires_atomic = requires_atomic or bool(radial and any(item.get('children') for item in radial['slices']))
     if mode=='api' and compact and not requires_atomic:
         from ._api_codegen import settings_to_api_code
         return settings_to_api_code(settings,defaults,dpi,variable)
-    from .figure import _code_tree, _diff, _segments, _text
+    from .figure import _code_tree, _diff, _segments, _text, _CodeExpression
     from ._native import fitted_chart_title_margin, font_family_available
 
     if not isinstance(variable, str) or not variable.isidentifier() or keyword.iskeyword(variable):
@@ -166,12 +170,15 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=Tru
         advanced = advanced or style.get('line', {}).get('fill') is not None or style.get('line', {}).get('interpolation', 'Linear') != 'Linear'
     if advanced:
         document = copy.deepcopy(settings)
+        if mode == 'api' and document.get('identity') is not None:
+            document['identity']['figure'] = _CodeExpression(f"{variable}.id")
+            document['identity']['retired'] = _CodeExpression(f"{variable}.get_settings()['identity']['retired']")
         if compact:
             document['config'] = compact_config(config, defaults)
         reset = ', reset=True' if compact else ''
         return finish(f"# Apply the complete document to an existing Figure with matching source columns.\n"
                 f"# Source arrays stay resident; panels, layers and references commit together.\n"
-                f"{variable}.apply_settings({formatted(document)}{reset})\n")
+                f"{variable}.apply_settings({formatted(document)}{reset}, preserve_data=True)\n")
     for kind in ('categorical', 'boxplot', 'radar'):
         if settings.get(kind) is not None:
             chart = copy.deepcopy(settings[kind])

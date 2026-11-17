@@ -63,8 +63,11 @@ unreleased Git revision for the native renderer/model and bundled WASM; see
 manifests still report renderer 0.18.1 and model 0.12.1. These are development
 pins, not evidence that 0.19 has been published.
 
+The [integration audit](RENDERER_019_AUDIT.md) records unresolved compatibility
+and export-sizing failures; the current PR is not release-ready.
+
 Release this Python update after upstream renderer 0.19 and its matching model
-are officially available. At that point:
+are officially available and those failures have been resolved. At that point:
 
 1. Include the final upstream fixes (including figgy issues #308 and #309),
    replace the development Git dependency with the exact published renderer

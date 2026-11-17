@@ -16,3 +16,6 @@ from ._field_api import ContourLabel
 __all__ += ["ContourLabel"]
 from ._richtext import TextRun
 __all__ += ["TextRun"]
+
+from ._nist import NistData, read_nist
+__all__ += ["NistData", "read_nist"]

@@ -686,6 +686,30 @@ fn positive_data_bounds(
         return Err(invalid("log bounds axis must be x, y or z"));
     }
     for s in series {
+        if s.is_dataless() {
+            if axis == "y" {
+                if let Some(levels) = s.render_type.energy_levels() {
+                    for energy in levels
+                        .levels
+                        .iter()
+                        .map(|v| v.energy)
+                        .chain(levels.limits.iter().map(|v| v.energy))
+                    {
+                        extent.union(&renderer::chart::FitExtent::point(energy));
+                    }
+                }
+            }
+            if let Some(diagram) = s.render_type.feynman() {
+                if matches!(axis, "x" | "y") {
+                    for at in diagram.positions().map_err(invalid)? {
+                        extent.union(&renderer::chart::FitExtent::point(
+                            at[usize::from(axis == "y")],
+                        ));
+                    }
+                }
+            }
+            continue;
+        }
         match axis {
             "x" => extent.union(&column(&s.x_column)?),
             "y" => extent.union(&column(&s.y_column)?),

@@ -392,13 +392,17 @@ def _axis_apply(axis,patch,limits):
 def _render_patch(body, patch):
     """Appearance defaults can style existing components, never introduce kinds."""
     for key,value in patch.items():
-        if key in body and isinstance(body[key],dict):_merge(body[key],value)
+        if key in body and isinstance(body[key],dict):
+            if key == 'style' and 'width_px' in value and 'width_px' not in body[key]:
+                continue  # Vector defaults do not apply to other families' style records.
+            _merge(body[key],value)
 
 
 def _encode_series(body, appearance, index, role=None):
     palette=appearance.get('palette',[])
     if palette:
         color=palette[index%len(palette)]
+        if 'color' in body:body['color']=copy.deepcopy(color)
         for name,keys in [('line',['line_color']),('scatter',['point_color']),('bar',['fill_color']),('err_style',['error_bar_color']),('style',['color'])]:
             if not isinstance(body.get(name),dict):continue
             if name=='scatter' and body[name].get('point_color_map'):continue

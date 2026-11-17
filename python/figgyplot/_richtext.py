@@ -23,6 +23,7 @@ class TextRun:
     rule: bool = False
     dashes: object = None
     fill: object = None
+    series_id: object = None
 
     def _segments(self, dpi):
         from .figure import _color
@@ -60,6 +61,10 @@ class TextRun:
             style["rule_dash"] = [
                 _number(v, "dash length", positive=True) for v in self.dashes
             ]
+        if self.series_id is not None:
+            if not isinstance(self.series_id, str) or not self.series_id:
+                raise ValueError("series_id must name a nonempty legend series ID")
+            style['series_id'] = self.series_id
         return [dict(text=char, **style) for char in self.text]
 
 
@@ -96,5 +101,7 @@ def run_expression(segments, dpi, name="TextRun"):
         for public, native in (("width", "field_em"), ("dashes", "rule_dash")):
             if style.get(native) is not None:
                 args.append(public + "=" + repr(style[native]))
+        if style.get('series_id') is not None:
+            args.append('series_id=' + repr(style['series_id']))
         expressions.append(name + "(" + ", ".join(args) + ")")
     return "[" + ", ".join(expressions) + "]"

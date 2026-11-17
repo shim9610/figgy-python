@@ -541,7 +541,7 @@ class Figure(FigureMethods):
         self._changed()
         return self
 
-    def apply_settings(self, settings, *, expected_revision=None, reset=False):
+    def apply_settings(self, settings, *, expected_revision=None, reset=False, preserve_data=False):
         """Replace accepted settings for existing series; source arrays are not copied.
 
         Read the current SSOT with ``get_settings``, edit only the desired
@@ -551,7 +551,9 @@ class Figure(FigureMethods):
         ``reset=True`` expands omitted Config fields from this Figure's renderer
         defaults, including subplot/overlay axes and colorbars. The resolved
         complete document is validated and committed once. It never merges
-        omitted fields from the target's current edits.
+        omitted fields from the target's current edits. ``preserve_data=True``
+        validates matching source bindings, categories and diagram topology,
+        keeping destination scientific records during appearance replay.
         """
         with self._lock:
             self._require_open()
@@ -565,6 +567,9 @@ class Figure(FigureMethods):
                 from ._codegen import expand_config
                 settings['config'] = expand_config(settings['config'], self._default_config)
             previous = self.get_settings()
+            if preserve_data:
+                from ._replay_data import preserve_data as protect_data
+                protect_data(settings, previous)
             legacy = next((kind for kind in ('categorical','boxplot','radar') if settings.get(kind) is not None), None)
             if legacy is not None:
                 if previous['series'] or _family(previous):
@@ -699,6 +704,10 @@ class Figure(FigureMethods):
                             raise ValueError("use cmap/vmin/vmax for field colors")
                     elif key == "linewidth" and "line" in style:
                         style["line"]["line_width"] = float(value) * self.dpi / 72
+                    elif key == 'linewidth' and any(kind in series['render_type'] for kind in ('CategoryBars', 'BoxPlot')):
+                        style['style']['outline_width'] = float(value)*self.dpi/72
+                    elif key == 'linewidth' and 'Radar' in series['render_type']:
+                        style['style']['line_width_px'] = float(value)*self.dpi/72
                     elif key == 'linewidth' and 'Vector' in series['render_type']:
                         style['style']['width_px'] = float(value)*self.dpi/72
                     elif key == 'linewidth' and 'bar' in style:
@@ -1336,7 +1345,9 @@ def _code_tree(value, segments_function="text_segments"):
                     base = _segments(plain)
                     overrides = {k: v for k, v in style.items() if any(s.get(k) != v for s in base)}
                     rebuilt = [dict(s, **overrides) for s in base]
-                    if rebuilt != segments:
+                    allowed = {'bold', 'italic', 'underline', 'superscript', 'subscript', 'greek',
+                               'color', 'font_size', 'field_em', 'rule', 'rule_dash', 'rule_band', 'series_id'}
+                    if rebuilt != segments or set(overrides) - allowed:
                         break
                     args = ', '.join(f'{k}={v!r}' for k, v in overrides.items())
                     expressions.append(f"{segments_function}({plain!r}" + (f', {args}' if args else '') + ')')
@@ -1359,7 +1370,7 @@ def text_segments(text, **style):
     to the whole run. Text remains ordinary Python, including Unicode/newlines.
     """
     allowed = {'bold', 'italic', 'underline', 'superscript', 'subscript', 'greek',
-               'color', 'font_size', 'field_em', 'rule', 'rule_dash', 'rule_band'}
+               'color', 'font_size', 'field_em', 'rule', 'rule_dash', 'rule_band', 'series_id'}
     if set(style) - allowed:
         raise ValueError('unknown rich-text segment style')
     return [dict(segment, **copy.deepcopy(style)) for segment in _segments(text)]

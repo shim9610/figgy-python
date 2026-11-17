@@ -188,7 +188,7 @@ def _copy_path(target,original,path):
 def _restore_series(body,original,call):
     e=call['explicit'];name=call['name']
     fields={
-        'color':[('line','line_color'),('scatter','point_color'),('bar','fill_color'),('style','color'),('err_style','error_bar_color'),('line','fill_color'),('contour','line','line_color')],
+        'color':[('color',),('line','line_color'),('scatter','point_color'),('bar','fill_color'),('style','color'),('err_style','error_bar_color'),('line','fill_color'),('contour','line','line_color')],
         'linewidth':[('line','line_width'),('bar','border_width'),('style','width_px'),('contour','line','line_width')],
         'linestyle':[('line','line_style')], 'marker':[('scatter','point_shape')],
         'markersize':[('scatter','point_size')], 's':[('scatter','point_size')],
@@ -207,6 +207,10 @@ def _restore_series(body,original,call):
     if any(c in fmt for c in '-:'):protected.add('linestyle')
     for key in protected:
         for path in fields.get(key,[]):_copy_path(body,original,path)
+    if 'colors' in protected and 'color' in body:
+        body['color'] = copy.deepcopy(original['color'])
+    if 'style' in e and isinstance(e['style'],dict) and 'style' in body:
+        _restore_explicit(body['style'],original['style'],e['style'])
     if name=='fill_between':
         # Both lines are fill geometry, not requested visible strokes.
         _copy_path(body,original,('line','line_width'))

@@ -3005,6 +3005,8 @@ def test_renderer_019_theme_layout_exports_share_host_state(backend, kind):
     ("ax.tripcolor([0,1,0],[0,0,1],[1,2,3],triangles=[[0,1,2]])",dict(kind='mesh_triangle',triangle_index=0),dict(vertices=[0,1,2],values=[1,2,3])),
     ("ax.scatter([0,1],[0,1],[10,20],c=[3,8],s=[2,4],id='points')",dict(kind='point',point_index=1),dict(x=1,y=1,z=20,color_value=8,size_value=4)),
     ("ax.imshow(np.array([[[255,0,0],[0,255,0]],[[0,0,255],[255,255,0]]],dtype=np.uint8))",dict(kind='matrix_cell',x_index=0,y_index=0),dict(red=255,green=0,blue=0)),
+    ("ax.energy_levels([dict(id='a',column='S',energy=np.float32(0),label='ground'),dict(id='b',column='P',energy=np.float32(3),label='excited')])",dict(kind='value_label',category_index=1,part='level'),dict(index=1)),
+    ("ax.feynman([dict(id='a',role='Incoming',at=np.array([0,0],dtype=np.float32),label='electron'),dict(id='b',role='Outgoing',at=[1,1])],[dict(id='p',**{'from':'a','to':'b'},particle='Fermion',label='p')],direction='bottom-to-top')",dict(kind='feynman_vertex',vertex_index=0),dict(position=[0,0])),
 ])
 def test_renderer_019_browser_sources_selection_themes_and_vector_exports(tmp_path,source,reference,expected):
     code="import figgyplot as fg\nimport numpy as np\nfig,ax=fg.subplots(backend='webgpu')\n"+source+"\ndisplay(fig.widget())"
@@ -3550,3 +3552,34 @@ bar.ax.tick_params(labelsize=12)
             assert page.evaluate(ROOT+'.snapshot().config.colorbar.axis.title_option.visible')
             check(decorations['colorbar_title']['rect'], decorations['colorbar_tick_labels']['rect'])
             assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires actual native diagram windows and input')
+@pytest.mark.parametrize('kind', ['energy', 'feynman'])
+def test_renderer_019_native_diagram_layout_and_editor_exports(tmp_path, kind):
+    with figgy.Figure(backend='native') as fig:
+        ax = fig.axes[0]
+        if kind == 'energy':
+            ax.energy_levels([dict(id='a',column='S',energy=np.float32(0),label='ground'),
+                              dict(id='b',column='P',energy=np.float32(3),label='excited')],
+                             transitions=[dict(id='t',lower='a',upper='b')])
+        else:
+            ax.feynman([dict(id='a',role='Incoming',label='electron'),dict(id='b',role='Outgoing')],
+                       [dict(id='p',**{'from':'a','to':'b'},particle='Fermion',label='p')],
+                       direction='bottom-to-top')
+        fig.set_theme('warm-paper')
+        handle = fig.show(block=False)
+        try:
+            inputs = Inputs(handle)
+            assert not inputs.info()['error']
+            inputs.click('auto_layout')
+            for ext in ('svg', 'pdf'):
+                path = tmp_path / ('editor-diagram.' + ext)
+                inputs.click('save');inputs.click('save_path');inputs.key('ctrl+a')
+                inputs.xdo('type','--clearmodifiers',str(path));inputs.pump()
+                inputs.click('save_confirm')
+                assert not inputs.info()['error']
+                assert path.exists()
+                assert '<svg' in path.read_text() if ext == 'svg' else path.read_bytes().startswith(b'%PDF-')
+        finally:
+            handle.close();Inputs.pump()

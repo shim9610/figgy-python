@@ -992,6 +992,8 @@ class ArtistMethods:
 
     def get_color(self):
         body = self._body(self.figure.get_settings())
+        if 'color' in body:
+            return tuple(body['color'][key] for key in 'rgba')
         for part, key in [
             ("line", "line_color"),
             ("scatter", "point_color"),
@@ -1006,6 +1008,12 @@ class ArtistMethods:
 
     def get_linewidth(self):
         body = self._body(self.figure.get_settings())
+        style = body.get('style', {})
+        if 'outline_width' in style:
+            return style['outline_width'] * 72 / self.figure.dpi
+        if 'line_width_px' in style:
+            width = style['line_width_px']
+            return (2.0 if width is None else width) * 72 / self.figure.dpi
         for part, key in [
             ("line", "line_width"),
             ("bar", "border_width"),
@@ -1334,7 +1342,10 @@ class AxesMethods:
     def chart(self):
         """Figgy's named appearance controls for bounded chart families."""
         from ._chart_artist import ChartAppearance
-
+        from ._charts import family
+        if family(self.figure.get_settings()) is None:
+            from ._coordinate_chart import CoordinateChartAppearance
+            return CoordinateChartAppearance(self)
         return ChartAppearance(self)
 
     def get_panel_position(self):

@@ -45,7 +45,14 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                 assert "sunburst" in caps["charts"] and "tricontourf" in caps["charts"]
                 made = await call("figure_create", {"figsize": [4, 3], "dpi": 72})
                 id = made["id"]
-                await call("chart_add", {"id": id, "kind": "stem", "args": [[1, 3, 2]]})
+                await call(
+                    "chart_add",
+                    {
+                        "id": id,
+                        "kind": "stem",
+                        "args": [{"dtype": "float32", "values": [1, 3, 2]}],
+                    },
+                )
                 await call("figure_theme", {"id": id, "name": "midnight"})
                 await call("figure_layout", {"id": id})
                 for format in ("svg", "pdf"):
@@ -55,5 +62,55 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                     )
                     assert result["bytes"] == path.stat().st_size
                 await call("figure_close", {"id": id})
+                for kind, args, options in [
+                    (
+                        "energy_levels",
+                        [
+                            [
+                                dict(id="a", column="S", energy=0, label="Ground"),
+                                dict(id="b", column="P", energy=3, label="Excited"),
+                            ]
+                        ],
+                        {},
+                    ),
+                    (
+                        "feynman",
+                        [
+                            [
+                                dict(
+                                    id="a",
+                                    role="Incoming",
+                                    at={"dtype": "float32", "values": [0, 0]},
+                                    label="electron",
+                                ),
+                                dict(id="b", role="Outgoing", at=[1, 1]),
+                            ],
+                            [
+                                dict(
+                                    id="p",
+                                    **{"from": "a", "to": "b"},
+                                    particle="Fermion",
+                                    label="p",
+                                )
+                            ],
+                        ],
+                        {"direction": "bottom-to-top"},
+                    ),
+                ]:
+                    id = (await call("figure_create", {}))["id"]
+                    result = await call(
+                        "chart_add",
+                        {"id": id, "kind": kind, "args": args, "options": options},
+                    )
+                    assert result["settings"]["series"]
+                    for format in ("svg", "pdf"):
+                        path = tmp_path / (kind + "." + format)
+                        await call("figure_export", {"id": id, "path": str(path)})
+                        assert (
+                            path.read_bytes().startswith(b"%PDF-")
+                            if format == "pdf"
+                            else "<svg" in path.read_text()
+                        )
+                    await call("figure_close", {"id": id})
 
     asyncio.run(scenario())

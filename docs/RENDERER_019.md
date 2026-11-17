@@ -1,5 +1,8 @@
 # Renderer 0.19 Python API
 
+This development integration is not release-ready. See the
+[compatibility audit and remaining failures](RENDERER_019_AUDIT.md).
+
 The native extension and bundled WebAssembly module use the same upstream
 [integration revision](https://github.com/shim9610/figgy/commit/e68922d73ca6bc43c86adcd081355a67e0b98ef3).
 Settings identify this integration as `0.19.0`. The upstream branch still declares
@@ -48,10 +51,38 @@ uses one value per vertex with `shading="gouraud"`, or one value per triangle wi
 for a mesh with arbitrary vertex positions.
 
 `sunburst` accepts nested dictionaries containing `label`, `value` and `children`,
-or parallel labels, parents and values. `energy_levels` and `feynman` accept the
-upstream structured level/transition and vertex/propagator records respectively.
-Use `inspect.signature` or MCP `capabilities` for the supported Python arguments.
+or parallel labels, parents and values. `energy_levels` and `feynman` accept row
+mappings, NumPy structured arrays, column mappings or DataFrame-like tables.
+NumPy scalars/coordinate arrays normalize to document values, and plain string
+labels inherit the panel's rich text style. Energy levels require `id`, `column`
+and `energy`; transitions require `id`, `lower` and `upper`. Feynman vertices
+require `id`, and propagators require `id`, `from`, `to` and `particle`. Unplaced
+vertices use the renderer's automatic layout. Use
+`direction="bottom-to-top"` or `layout={"direction": "BottomToTop"}` for its
+orientation. This draws the supplied topology; it does not infer reactions or
+check conservation laws.
+
+`read_nist` reads NIST Atomic Spectra Database CSV files, CSV text, text streams
+or tables. It preserves the exported energy/wavelength units, qualifiers,
+uncertainties and references, separates ionization limits and links transitions
+by configuration, term and J. Observed wavelengths take priority with Ritz
+fallback; `wavelength="ritz"` reverses that choice. Unknown level references
+raise by default; explicit `unmatched="skip"` records their count in the result.
+It does not fetch a URL, convert units, infer missing transitions or collapse
+fine structure into centroids.
+
+```python
+data = fg.read_nist("levels.csv", "lines.csv")
+fig, ax = fg.subplots(backend="native")
+ax.energy_levels(data)  # also names the Y axis using the exported energy unit
+fig.set_theme("warm-paper").tight_layout()
+fig.savefig("levels.pdf")
+```
+
+Use `inspect.signature` or MCP `capabilities` for supported chart arguments.
 Advanced appearance remains editable through `fig.configure(series={id: patch})`.
+The current integration's compatibility status is recorded in
+[the audit](RENDERER_019_AUDIT.md).
 
 ## Themes, layout and axes
 
@@ -113,9 +144,13 @@ Their former top-level inline chart objects are no longer the current settings
 shape. `fig.apply_settings(old_document)` can import such an inline legacy chart
 into an empty Figure through the upstream conversion helpers.
 
-Copy Python for coordinate charts keeps source columns resident and reapplies
-appearance and layout together. It expects the destination to contain matching
-series and source IDs. Read the current model with `get_settings()` before
+Copy Python for advanced coordinate charts keeps source columns resident and
+reapplies appearance and layout together with `preserve_data=True`. It checks
+matching panel, category, series and source bindings before committing, and
+preserves destination energy-level records and Feynman topology. A mismatched
+structure raises atomically. Value-label format changes currently require
+formatting on the destination before replay; destination formatted text is
+retained rather than copied from a different dataset. Read the current model with `get_settings()` before
 writing direct configuration patches.
 
 ## Local MCP server

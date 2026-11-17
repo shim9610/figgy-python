@@ -635,21 +635,59 @@ class AdvancedMethods:
             config=cfg,
         )
 
-    def energy_levels(self, levels, *, transitions=(), limits=(), id=None, **style):
-        levels = list(levels)
+    def energy_levels(
+        self,
+        levels,
+        *,
+        transitions=(),
+        limits=(),
+        bands=(),
+        show="main",
+        id=None,
+        **style,
+    ):
+        """Draw row records or a read_nist() result, retaining spectroscopic metadata."""
+        from ._diagram_input import records, plain, require
+        from ._nist import NistData
+
+        if isinstance(levels, NistData):
+            if len(transitions) or len(limits):
+                raise ValueError("NIST data already supplies transitions and limits")
+            data = levels
+            levels, transitions, limits = data.levels, data.transitions, data.limits
+            energy_unit = data.energy_unit
+        else:
+            energy_unit = None
+        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
+        rich = cfg["legend"]["content"]
+        levels = records(levels, "levels", rich)
+        transitions = records(transitions, "transitions", rich)
+        limits = records(limits, "limits", rich)
+        level_ids = require(levels, ("id", "column", "energy"), "levels")
+        require(limits, ("id", "energy"), "limits")
+        require(transitions, ("id", "lower", "upper"), "transitions")
+        for transition in transitions:
+            if (
+                transition["lower"] not in level_ids
+                or transition["upper"] not in level_ids
+            ):
+                raise ValueError("transition endpoints must name existing level IDs")
+        for level in levels:
+            if not isinstance(level["column"], str) or not level["column"]:
+                raise ValueError("level.column must be a nonempty string")
         sid = self._sid(id)
         s = template("energy_levels")
         s["series_id"] = sid
-        b = s["render_type"]["EnergyLevels"]
-        b.update(levels=levels, transitions=list(transitions), limits=list(limits))
-        _style_update(b["style"], style)
-        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
+        body = s["render_type"]["EnergyLevels"]
+        body.update(levels=levels, transitions=transitions, limits=limits)
+        if len(bands):
+            body["bands"] = records(bands, "bands", rich)
+        body["show"] = {"main": "Main", "components": "Components"}.get(show, show)
+        _style_update(body["style"], plain(style))
         ids = list(dict.fromkeys(level["column"] for level in levels))
-        cfg["bottom_x"]["categories"] = [
-            dict(id=str(value), label=str(value)) for value in ids
-        ]
+        cfg["bottom_x"]["categories"] = [dict(id=value, label=value) for value in ids]
         energies = np.asarray(
-            [level["energy"] for level in [*levels, *b["limits"]]], dtype=float
+            [level["energy"] for level in [*levels, *limits]], dtype=float
         )
         if not energies.size or not np.isfinite(energies).all():
             raise ValueError("energy levels need finite energies")
@@ -661,15 +699,46 @@ class AdvancedMethods:
                 max=high + padding,
                 major_spacing=(high - low + 2 * padding) / 5,
             )
+            if energy_unit is not None:
+                from .figure import _segments
+
+                cfg[axis]["title_option"]["text"]["segments"] = _segments(
+                    "Energy (" + energy_unit + ")"
+                )
+                cfg[axis]["title_option"]["visible"] = True
         return self._install_series([s], config=cfg)
 
-    def feynman(self, vertices, propagators, *, id=None, **style):
+    def feynman(
+        self, vertices, propagators, *, layout=None, direction=None, id=None, **style
+    ):
+        """Draw a topology; omitted vertex positions use the renderer's automatic layout."""
+        from ._diagram_input import records, plain, require
+
+        rich = self._config(self.figure.get_settings())["legend"]["content"]
+        vertices = records(vertices, "vertices", rich)
+        propagators = records(propagators, "propagators", rich)
+        vertex_ids = require(vertices, ("id",), "vertices")
+        require(propagators, ("id", "from", "to", "particle"), "propagators")
+        for edge in propagators:
+            if edge["from"] not in vertex_ids or edge["to"] not in vertex_ids:
+                raise ValueError("propagator endpoints must name existing vertex IDs")
+        if direction is not None and layout is not None:
+            raise ValueError("supply direction or layout, not both")
+        if direction is not None:
+            layout = dict(
+                direction={
+                    "left-to-right": "LeftToRight",
+                    "bottom-to-top": "BottomToTop",
+                }.get(direction, direction)
+            )
         sid = self._sid(id)
         s = template("feynman")
         s["series_id"] = sid
-        b = s["render_type"]["Feynman"]
-        b.update(vertices=list(vertices), propagators=list(propagators))
-        _style_update(b["style"], style)
+        body = s["render_type"]["Feynman"]
+        body.update(vertices=vertices, propagators=propagators)
+        if layout is not None:
+            body["layout"] = plain(layout)
+        _style_update(body["style"], plain(style))
         return self._install_series([s])
 
     def view_init(self, elev=30, azim=-60, *, projection=None):

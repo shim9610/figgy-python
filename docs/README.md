@@ -8,6 +8,7 @@
 | [Example index](../examples/README.md) | Runnable chart recipes, image links and commands |
 | [Matplotlib-shaped API](MATPLOTLIB_API.md) | Public plotting objects, argument conventions, export modes and supported subset |
 | [Chart and style API](CHART_TYPES.md) | All chart constructors, host coverage, procedural materials and draw modes |
+| [Renderer 0.19 audit](RENDERER_019_AUDIT.md) | Executed checks, corrected data-loss bugs and unresolved release blockers |
 | [Renderer 0.19 API](RENDERER_019.md) | New charts, themes, measured layout, SVG/PDF, dtype handling and MCP |
 | [Style tokens](STYLE_TOKENS.md) | Appearance presets, extraction, JSON reuse, DPI scaling and opt-in axes/text |
 | [Style profiles](STYLE_PROFILES.md) | Execution-local defaults, publication targets and dashboard task catalog with actual renders |

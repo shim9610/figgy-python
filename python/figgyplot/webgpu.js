@@ -593,6 +593,24 @@ export function render({model,el}) {
   const selectedData=document.createElement('section');selectedData.dataset.selectedData='';selectedData.hidden=true;
   root.querySelector('[data-advanced]').before(selectedData);
   let selectedDataKey=null;
+  async function selectionDetails(){
+    // Diagram label records are already document metadata. Upstream's generic
+    // ValueLabel reader currently treats them as categorical labels and cannot
+    // return the EnergyLevels record named by `part`.
+    const settings=snapshot(),reference=settings.config.picked_data?.refs?.[0];
+    if(reference?.kind==='value_label' && reference.part){
+      const series=settings.series.find(item=>item.series_id===reference.series_id);
+      const body=series?.render_type?.EnergyLevels;
+      const list={level:'levels',transition:'transitions',limit:'limits',band:'bands'}[reference.part];
+      if(body && list){
+        const record=body[list]?.[reference.category_index];
+        if(!record)throw new Error('Selected energy-level record no longer exists');
+        return {kind:reference.kind,series_id:reference.series_id,index:reference.category_index,
+                part:reference.part,record:clone(record)};
+      }
+    }
+    return JSON.parse(await chart.selection_details());
+  }
   function selectionProperties(){
     if(kind)return;
     const reference=local.config.picked_data?.refs?.[0]??null,key=JSON.stringify(reference);
@@ -602,7 +620,7 @@ export function render({model,el}) {
     const heading=document.createElement('strong');heading.textContent='SELECTED DATA';selectedData.append(heading);
     enqueue(async()=>{
       if(key!==selectedDataKey)return;
-      const value=JSON.parse(await chart.selection_details());
+      const value=await selectionDetails();
       if(key!==selectedDataKey)return;
       if(!value){selectedData.hidden=true;return;}
       for(const name of ['index','x_index','y_index','color_value','size_value','u','v','bin_start','bin_end','x','y','value','orientation','z','w','c','values','vertices','category_label','position','start','end','low','high','progress','state','total','q1','median','q3','mean','sample_count','whisker_low','whisker_high','red','green','blue','text','offset','role','placed','propagator','record']){
@@ -1355,7 +1373,7 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);historyControls();drawingUI();
-    root.figgy={stats,diagnostics,details:()=>enqueue(async()=>kind?null:JSON.parse(await chart.selection_details()),true),annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
+    root.figgy={stats,diagnostics,details:()=>enqueue(async()=>kind?null:await selectionDetails(),true),annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
