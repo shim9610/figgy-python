@@ -125,6 +125,8 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=Tru
             'EnergyLevels', 'Feynman', 'CategoryBars', 'BoxPlot', 'Radar', 'RgbImage', 'Hexbin'))
         for spec in state['series']
     )
+    radial = state.get('radial')
+    requires_atomic = requires_atomic or bool(radial and any(item.get('children') for item in radial['slices']))
     if mode=='api' and compact and not requires_atomic:
         from ._api_codegen import settings_to_api_code
         return settings_to_api_code(settings,defaults,dpi,variable)
@@ -193,14 +195,14 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig", *, compact=Tru
         chart["interaction"] = {"hovered": None, "selected": None, "hover_progress": 0.0}
         chart["decorations"]["selected"] = None
         from ._native import format_radial_labels_json
-        formatted = json.loads(format_radial_labels_json(json.dumps(chart)))
+        auto_labels = json.loads(format_radial_labels_json(json.dumps(chart)))
         def appearance(item, computed):
             patch = {key:copy.deepcopy(value) for key,value in item.items() if key not in ('value','children')}
             if item.get('text') == computed.get('text'): patch.pop('text',None)
             if item.get('children'):
                 patch['children'] = [appearance(child, auto) for child,auto in zip(item['children'],computed['children'])]
             return patch
-        slices = {i:appearance(item,formatted['slices'][i]) for i,item in enumerate(chart.pop('slices'))}
+        slices = {i:appearance(item,auto_labels['slices'][i]) for i,item in enumerate(chart.pop('slices'))}
         chart["slices"] = slices
         if compact:
             from ._native import default_radial_json
