@@ -13,8 +13,8 @@ async function loadKernel(model) {
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
 const clone = value => JSON.parse(JSON.stringify(value));
-const rendererVersion = '0.18.1';
-const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0',rendererVersion].includes(settings.renderer_version);
+const rendererVersion = '0.19.0';
+const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0','0.18.1',rendererVersion].includes(settings.renderer_version);
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
@@ -462,7 +462,7 @@ export function render({model,el}) {
       const value=JSON.parse(await chart.selection_details());
       if(key!==selectedDataKey)return;
       if(!value){selectedData.hidden=true;return;}
-      for(const name of ['index','x_index','y_index','color_value','size_value','u','v','bin_start','bin_end','x','y','value','orientation']){
+      for(const name of ['index','x_index','y_index','color_value','size_value','u','v','bin_start','bin_end','x','y','value','orientation','z','w','c','values','vertices','category_label','position','start','end','low','high','progress','state','total','q1','median','q3','mean','sample_count','whisker_low','whisker_high','red','green','blue','text','offset','role','placed','propagator','record']){
         if(value[name]===undefined)continue;
         const row=document.createElement('div');row.dataset.selectedValue=name;row.textContent=`${caption(name)}: ${value[name]}`;selectedData.append(row);
       }
@@ -741,8 +741,8 @@ export function render({model,el}) {
         if(c.kind?.Donut)field('inner_radius',c.kind.Donut.inner_radius,'number',(s,v)=>s.radial.kind.Donut.inner_radius=v);
         const selectedSlice=/^slice_(\d+)_(\d+)$/.exec(target);
         const t=selectedSlice?{group:Number(selectedSlice[1]),index:Number(selectedSlice[2])}:c.interaction.selected;
-        if(t){const find=s=>t.group?s.radial.split.children[t.index]:s.radial.slices[t.index];const item=find(local);
-          field('label',item.label,'text',(s,v)=>find(s).label=v);field('value',item.value,'number',(s,v)=>find(s).value=v);field('explode',item.explode,'number',(s,v)=>find(s).explode=v);color('color',item.color,s=>find(s).color);
+        if(t){const find=s=>{let ring=s.radial.slices;if(ring.some(n=>n.children?.length)){for(let g=0;g<t.group;g++)ring=ring.flatMap(n=>n.children??[]);return ring[t.index];}return t.group?s.radial.split.children[t.index]:ring[t.index];};const item=find(local);
+          field('label',item.label,'text',(s,v)=>{find(s).label=v;delete find(s).text;});field('value',item.value,'number',(s,v)=>{find(s).value=v;const clear=nodes=>nodes.forEach(n=>{delete n.text;clear(n.children??[]);});clear(s.radial.slices);});field('explode',item.explode,'number',(s,v)=>find(s).explode=v);color('color',item.color,s=>find(s).color);
         }
       }else{
         for(const name of (kind==='radar'?[]:['category_title','value_title']))field(name,c[name],'text',(s,v)=>s[kind][name]=v);
@@ -889,9 +889,9 @@ export function render({model,el}) {
     // only when the scale changes.
     const nextPixelRatio=devicePixelRatio||1;
     if(nextPixelRatio!==pixelRatio){pixelRatio=nextPixelRatio;resize();positionInline();}
-    if(kind&&chart&&!busy&&!pendingFrame&&!frameError){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
-    if(chart&&dirty&&!busy&&!pendingFrame&&!frameError)enqueue(()=>{
-      if(!dirty||pendingFrame||frameError)return;
+    if(kind&&chart&&!busy&&!pendingFrame&&!frameError)enqueue(async()=>{const decoration=hoverPoint?await chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(await chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;});
+    if(chart&&!busy&&!pendingFrame&&!frameError&&(dirty||(!kind&&!chart.frame_complete())))enqueue(()=>{
+      if((!dirty&&(kind||chart.frame_complete()))||pendingFrame||frameError)return;
       try{
         chart.frame();
         trace('display.submitted');
@@ -909,7 +909,7 @@ export function render({model,el}) {
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
+  async function exporting(scale=1,format='png'){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const raw=format==='svg'?new TextEncoder().encode(await chart.export_svg(scale)):format==='pdf'?await chart.export_pdf(scale):await chart.export_png(scale);const data=bytes(raw);trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;
@@ -954,7 +954,8 @@ export function render({model,el}) {
             return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
           }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
-        const data=message.action==='export'?await exporting(message.scale):null;trace('response.send_started',request);model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);trace('response.sent',{...request,elapsed_ms:performance.now()-requestedAt});}catch(e){trace('request.failed',{...request,error:String(e)});model.send({action:'result',id:message.id,error:String(e)});}})();
+        if(message.action==='barrier')await enqueue(async()=>{await waitForFrame();await readyDisplayedFrame();},true);
+        const data=message.action==='export'?await exporting(message.scale,message.format??'png'):null;trace('response.send_started',request);model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);trace('response.sent',{...request,elapsed_ms:performance.now()-requestedAt});}catch(e){trace('request.failed',{...request,error:String(e)});model.send({action:'result',id:message.id,error:String(e)});}})();
     }
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
@@ -962,7 +963,7 @@ export function render({model,el}) {
   // Apply interaction selection in event order so older keys/picks keep their
   // original target and cannot overwrite a newer pending inspector choice.
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
-  root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
+  root.querySelector('[data-save]').addEventListener('click',()=>{const format=exportFormat.value;exporting(1,format).then(data=>{const url=URL.createObjectURL(new Blob([data],{type:{png:'image/png',svg:'image/svg+xml',pdf:'application/pdf'}[format]}));const a=document.createElement('a');a.href=url;a.download='figure.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',async()=>{
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>Object.values(s.render_type)[0].line?.fill))){
       try{await queue;await flush();model.send({action:'fit',revision});}catch(e){fail(e);}return;
@@ -1014,6 +1015,13 @@ export function render({model,el}) {
   root.querySelector('[data-style]').addEventListener('click',()=>enqueue(()=>openMenu('style')));
   root.querySelector('[data-visibility]').addEventListener('click',()=>enqueue(()=>openMenu('visibility')));
   root.addEventListener('pointerdown',e=>{if(!menu.contains(e.target)&&!e.target.closest('[data-style],[data-visibility]'))menu.hidden=true;});
+  const toolbar=root.querySelector('.figgy-toolbar');
+  const themeSelect=document.createElement('select');themeSelect.dataset.theme='';themeSelect.title='Theme';themeSelect.setAttribute('aria-label','Theme');
+  themeSelect.innerHTML='<option value="">Theme…</option>'+['gallery','cool-slate','midnight','warm-paper'].map(n=>`<option value="${n}">${n}</option>`).join('');toolbar.append(themeSelect);
+  themeSelect.addEventListener('change',()=>{const name=themeSelect.value;if(name)enqueue(()=>{chart.apply_theme(name);local.background=kind?JSON.parse(chart.get_document()).background:(JSON.parse(chart.get_config()).background??null);if(!kind)clearColor(local.background);dirty=true;commit();});});
+  const autoLayout=document.createElement('button');autoLayout.dataset.autoLayout='';autoLayout.textContent='Auto layout';toolbar.append(autoLayout);
+  autoLayout.addEventListener('click',()=>enqueue(()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else chart.fit_layout();dirty=true;commit();}));
+  const exportFormat=document.createElement('select');exportFormat.dataset.exportFormat='';exportFormat.setAttribute('aria-label','Export format');exportFormat.innerHTML=['png','svg','pdf'].map(n=>`<option value="${n}">${n.toUpperCase()}</option>`).join('');toolbar.append(exportFormat);
   const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
   function bounds(){const value=JSON.parse(chart.decoration_bounds(elementName('data_area')));return value?.rect??[0,0,canvas.width,canvas.height];}
   function navigate(a,factor,anchor,shift=0){
@@ -1044,9 +1052,9 @@ export function render({model,el}) {
     if(kind){
       if(await textAnnotationAt(point))chart.set_active_layer(JSON.stringify('Annotations'));
       gesture.handle=selected?chart.resize_handle(selected,x,y):null;
-      gesture.target=gesture.handle?selected:chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
+      gesture.target=gesture.handle?selected:await chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
       selected=gesture.target;
-      if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
+      if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(await chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
     }else{
       // Keep existing resize handles before probing other axis owners.
       if(selectedHandleAt(point)){chart.on_press(x,y);dirty=true;return;}
@@ -1146,15 +1154,19 @@ export function render({model,el}) {
     if(disposed)return;
     const manifest=model.get('manifest'),buffers=model.get('columns');
     if(manifest.length!==buffers.length)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
+    const composites=new Map();
     for(let i=0;i<manifest.length;i++){
       const spec=manifest[i],data=bytes(buffers[i]);
       // wasm-bindgen copies this input into WASM memory; upload creates GPU storage.
       const aligned=data.byteOffset%8===0?data:data.slice();
-      if(spec.dtype==='float32')chart.register_column_f32(spec.id,new Float32Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/4));
-      else if(spec.dtype==='float64')chart.register_column_f64(spec.id,new Float64Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/8));
-      else throw Error(`Unsupported binary dtype: ${spec.dtype}`);
+      const values=spec.dtype==='float32'?new Float32Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/4):spec.dtype==='float64'?new Float64Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/8):spec.dtype==='uint32'?new Uint32Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/4):null;
+      if(!values)throw Error(`Unsupported binary dtype: ${spec.dtype}`);
+      if(spec.resource){let entry=composites.get(spec.resource);if(!entry){entry={kind:spec.kind,fields:{}};composites.set(spec.resource,entry);}entry.fields[spec.field]=values;}
+      else if(spec.dtype==='float32')chart.register_column_f32(spec.id,values);
+      else chart.register_column_f64(spec.id,values);
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
+    for(const [id,entry]of composites){if(entry.kind==='record')chart.register_record(id,entry.fields);else if(entry.kind==='ragged')chart.register_ragged(id,entry.fields.values,entry.fields.offsets);else if(entry.kind==='triangles')chart.register_triangles(id,entry.fields.indices);}
     if(!kind){chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
     clearColor(local.background);}
     properties();
@@ -1164,7 +1176,7 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);historyControls();drawingUI();
-    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
+    root.figgy={stats,diagnostics,details:()=>enqueue(async()=>kind?null:JSON.parse(await chart.selection_details()),true),annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();

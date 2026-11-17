@@ -211,7 +211,7 @@ class FigureWidget(anywidget.AnyWidget):
                 elif expected_action == "prepare":
                     future.set_result(content["result"])
                 elif expected_action == "export" and not buffers:
-                    future.set_exception(RuntimeError("Browser PNG export returned no binary buffer"))
+                    future.set_exception(RuntimeError("Browser export returned no binary buffer"))
                 else:
                     future.set_result(bytes(buffers[0]) if buffers else self.figure.get_settings())
         elif action == "stats":

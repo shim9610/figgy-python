@@ -126,7 +126,7 @@ def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
     provenance = json.loads(path.read_text())
     if change == "bytes":
         patch = registry_pairing / "scripts/wasm-host.patch"
-        patch.write_text(patch.read_text().replace("Observe completion", "Await completion"))
+        patch.write_text(patch.read_text().replace("Host fence", "Host wait"))
     elif change == "missing":
         del provenance["wasm_host_patch"]
     elif change == "hash":
@@ -146,7 +146,7 @@ def test_host_patch_cannot_change_native_sources_or_build_configuration(registry
     data = patch.read_text()
     if change in ("renderer", "model", "manifest"):
         destination = "Cargo.toml" if change == "manifest" else "crates/" + change + "/src/lib.rs"
-        data = data.replace("crates/web/src/lib.rs", destination)
+        data = data.replace("crates/web/src/web/chart.rs", destination)
     elif change == "mode":
         data = data.replace("--- a/", "old mode 100644\nnew mode 100755\n--- a/", 1)
     elif change == "crlf":
@@ -154,8 +154,8 @@ def test_host_patch_cannot_change_native_sources_or_build_configuration(registry
     elif change == "deletion":
         # A syntactically valid patch that removes existing bridge code is
         # outside this deliberately additive host extension's scope.
-        data = data.replace("@@ -5756,6 +5756,20 @@", "@@ -5756,6 +5756,19 @@")
-        data = data.replace("             Ok(())\n", "-            Ok(())\n", 1)
+        data = data.replace("@@ -1753,6 +1753,18 @@", "@@ -1753,6 +1753,17 @@")
+        data = data.replace("     pub fn frame(&mut self) -> Result<(), JsValue> {\n", "-    pub fn frame(&mut self) -> Result<(), JsValue> {\n", 1)
     else:
         data = "not a patch\n"
     patch.write_bytes(data.encode())

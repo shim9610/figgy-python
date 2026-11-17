@@ -41,9 +41,9 @@ def _color(value):
 
 def _array(value):
     value = np.asarray(value)
-    if value.ndim != 1 or not value.size or value.dtype.kind not in "fiu":
+    if value.ndim != 1 or not value.size or value.dtype.kind not in "fiub":
         raise ValueError("data must be a non-empty one-dimensional numeric array")
-    dtype = np.float32 if value.dtype == np.dtype(np.float32) else np.float64
+    dtype = np.float32 if value.dtype.kind in 'fb' and value.dtype.itemsize <= 4 or value.dtype.kind in 'iu' and value.dtype.itemsize <= 2 else np.float64
     return np.ascontiguousarray(value, dtype=dtype)
 
 
@@ -157,6 +157,7 @@ class RadialArtist:
                 raise ValueError("set_values requires the same number of slices")
             for item, value in zip(slices, values):
                 item["value"] = float(value)
+                item.pop("text", None)
             interaction = state["radial"]["interaction"]
             for key in ("selected", "hovered"):
                 target = interaction[key]
@@ -430,6 +431,27 @@ class Figure:
                 settings["config"] = _merge(copy.deepcopy(self._default_config), settings["config"])
             settings = copy.deepcopy(settings)
             previous = self.get_settings()
+            legacy = next((kind for kind in ('categorical','boxplot','radar') if settings.get(kind) is not None), None)
+            if legacy is not None:
+                if previous['series'] or _family(previous):
+                    raise ValueError('load an inline legacy chart into an empty Figure')
+                if settings.get('schema_version') not in (1,2) or settings.get('renderer_version') not in ('0.17.0','0.18.0','0.18.1','0.19.0'):
+                    raise ValueError('unsupported settings/renderer version')
+                allowed={'schema_version','renderer_version','config','series','identity','background','categorical','boxplot','radar','radial'}
+                if set(settings)-allowed or settings.get('series') or sum(settings.get(k) is not None for k in ('categorical','boxplot','radar','radial')) != 1:
+                    raise ValueError('invalid inline legacy document')
+                from ._native import convert_legacy_chart_json
+                # Parse and validate the entire inline chart before changing the canvas.
+                convert_legacy_chart_json(legacy, json.dumps(settings[legacy], allow_nan=False))
+                canvas = copy.deepcopy(previous)
+                canvas['config']['chart_area'] = copy.deepcopy(settings['config']['chart_area'])
+                self._native.apply_settings(json.dumps(canvas, allow_nan=False))
+                try:
+                    self.axes[0]._install_legacy_chart(legacy, settings[legacy])
+                except Exception:
+                    self._native.apply_settings(json.dumps(previous, allow_nan=False))
+                    raise
+                return self
             if settings.get('schema_version') == 1 and 'identity' not in settings:
                 current = self.get_settings().get('identity')
                 if current is not None:
@@ -489,13 +511,14 @@ class Figure:
                 state = self.get_settings()
                 chart = state[kind]
                 title = chart.get('chart_title') or dict(visible=True, text=dict(
-                    segments=_segments(chart['title']), font_size=chart['font_size']*1.5,
+                    segments=_segments(chart.get('title', '')), font_size=chart['font_size']*1.5,
                     font=chart['font_family'], color=copy.deepcopy(chart.get('text_color', chart.get('label_color'))), align='Left'))
                 title = copy.deepcopy(title)
                 for key, value in properties.items():
                     if key == 'text':
                         title['text']['segments'] = _segments(str(value))
-                        chart['title'] = str(value)
+                        title['visible'] = bool(str(value))
+                        if kind != 'radial': chart['title'] = str(value)
                     elif key == 'fontsize': title['text']['font_size'] = float(value)*self.dpi/72
                     elif key == 'font': title['text']['font'] = self._check_font(value)
                     elif key == 'color': title['text']['color'] = _color(value)
@@ -536,6 +559,9 @@ class Figure:
                             if kind in style:
                                 style[kind][field] = _color(value)
                                 matched = True
+                        if 'color' in style:
+                            style['color'] = _color(value)
+                            matched = True
                         if 'Vector' in series['render_type']:
                             style['style']['color'] = _color(value)
                             matched = True
@@ -568,7 +594,8 @@ class Figure:
                     node, rich = cfg["legend"], cfg["legend"]["content"]
                 elif target.startswith("axis_title_"):
                     axis = _axis_key(target[len("axis_title_"): ])
-                    node, rich = cfg[axis]["title_option"], cfg[axis]["title_option"]["text"]
+                    axis_node = _axes._axis_node(state, "x" if axis in ("bottom_x","top_x") else "y") if _axes is not None and _axes.overlay_id else cfg[axis]
+                    node, rich = axis_node["title_option"], axis_node["title_option"]["text"]
                 elif target.startswith("tick_labels_"):
                     node = cfg[_axis_key(target[len("tick_labels_"): ])]["label_style"]
                     rich = None
@@ -668,18 +695,57 @@ class Figure:
             self._report_render_warnings()
             return data
 
-    def savefig(self, filename, *, dpi=None, scale=None):
-        """Write PNG directly, without opening a window or importing a GUI."""
-        if dpi is not None and scale is not None:
-            raise ValueError("choose dpi or scale, not both")
-        data = self.to_png(scale=(float(dpi) / self.dpi if dpi is not None else (1.0 if scale is None else scale)))
-        if hasattr(filename, "write"):
-            filename.write(data)
-        else:
-            path = Path(filename)
-            if path.suffix.lower() != ".png":
-                raise ValueError("savefig currently supports .png")
-            path.write_bytes(data)
+    def export(self, format='png', *, scale=1.0):
+        """Return PNG/PDF bytes or SVG text, using the renderer's document export."""
+        format=str(format).lower().lstrip('.')
+        if format not in ('png','svg','pdf'):raise ValueError('format must be png, svg or pdf')
+        with self._lock:
+            self._require_open()
+            if self.backend!='native':raise RuntimeError('use await fig.export_async(...) with WebGPU')
+            data=self.to_png(scale=scale) if format=='png' else bytes(self._native.export_bytes(format,float(scale)))
+            return data.decode('utf-8') if format=='svg' else data
+
+    def savefig(self, filename, *, dpi=None, scale=None, format=None):
+        if dpi is not None and scale is not None:raise ValueError('choose dpi or scale, not both')
+        format=(format or (Path(filename).suffix.lstrip('.') if not hasattr(filename,'write') else 'png')).lower()
+        if format not in ('png','svg','pdf'):raise ValueError('savefig supports png, svg and pdf')
+        value=float(dpi)/self.dpi if dpi is not None else (1. if scale is None else float(scale))
+        data=self.export(format,scale=value)
+        if hasattr(filename,'write'):
+            try:filename.write(data)
+            except TypeError:filename.write(data.encode('utf-8') if isinstance(data,str) else data.decode('utf-8'))
+        elif isinstance(data,str):Path(filename).write_text(data,encoding='utf-8')
+        else:Path(filename).write_bytes(data)
+
+    def set_theme(self, name='gallery'):
+        from ._native import transform_settings_json
+        with self._lock:
+            state=transform_settings_json(json.dumps(self.get_settings()),'theme',str(name))
+            self.apply_settings(json.loads(state))
+        return self
+
+    @staticmethod
+    def theme_names():
+        return ('gallery','cool-slate','midnight','warm-paper')
+
+    def tight_layout(self, *, pad=None):
+        """Fit bands to actual rendered text, including subplots and overlays."""
+        from ._native import transform_settings_json
+        if pad is not None and (not math.isfinite(float(pad)) or float(pad)<0):
+            raise ValueError('pad must be nonnegative and finite')
+        with self._lock:
+            state=json.loads(transform_settings_json(json.dumps(self.get_settings()),'layout',''))
+            if pad is not None and not state.get('radial'):
+                extra=float(pad)*12*self.dpi/72
+                def padding(config):
+                    for axis in ('bottom_x','top_x','left_y','right_y'):
+                        config[axis]['out_margin'] += extra
+                    for panel in config.get('subplots',[]): padding(panel['config'])
+                padding(state['config'])
+            self.apply_settings(state)
+        return self
+
+    constrained_layout = tight_layout
 
     def configure(self, *, config=None, series=None, identity=None, reset=False):
         """Apply advanced layout/style patches to existing plotted data.
@@ -771,6 +837,12 @@ class Figure:
             if "slices" in properties or "value" in properties:
                 raise ValueError("use set_values to change radial data")
             _merge(chart, properties)
+            if any(k in properties for k in ('label_format','label_decimals','value_suffix')):
+                def clear_text(nodes):
+                    for node in nodes:
+                        node.pop('text', None)
+                        clear_text(node.get('children', []))
+                clear_text(chart['slices'])
             if style is not None:
                 _merge(chart["style"], style)
             if slices is not None:
@@ -781,7 +853,18 @@ class Figure:
                         raise ValueError("use set_values to change radial data")
                     if isinstance(patch.get("style"), dict) and chart["slices"][index]["style"] is None:
                         chart["slices"][index]["style"] = copy.deepcopy(chart["style"])
-                    _merge(chart["slices"][index], patch)
+                    def merge_node(node, changes):
+                        if 'value' in changes: raise ValueError('use apply_settings to change hierarchy data')
+                        changes = copy.deepcopy(changes)
+                        children = changes.pop('children', None)
+                        _merge(node, changes)
+                        if 'text' not in changes:
+                            node.pop('text',None)
+                        if children is not None:
+                            if len(children) != len(node.get('children',[])):
+                                raise ValueError('radial style replay requires the same hierarchy')
+                            for child, update in zip(node['children'],children): merge_node(child,update)
+                    merge_node(chart["slices"][index], patch)
             return self.apply_settings(state)
 
     def configure_bounded(self, kind=None, *, style=None, series=None, expected_categories=None, expected_series=None, **properties):
@@ -792,9 +875,28 @@ class Figure:
         """
         with self._lock:
             state = self.get_settings()
-            kind = kind or _family(state)
-            if kind not in ('categorical', 'boxplot', 'radar') or state.get(kind) is None:
-                raise ValueError('create the corresponding bounded chart first')
+            kind = kind or _family(state) or next((name for name,wire in [('categorical','CategoryBars'),('boxplot','BoxPlot'),('radar','Radar')] if any(wire in s['render_type'] for s in state['series'])), None)
+            if state.get(kind) is None:
+                kinds = {'categorical':'CategoryBars','boxplot':'BoxPlot','radar':'Radar'}
+                candidates = [(item, item['render_type'][kinds[kind]]) for item in state['series'] if kind in kinds and kinds[kind] in item['render_type']]
+                if not candidates: raise ValueError('create the corresponding chart first')
+                if expected_categories is not None:
+                    axis = 'left_y' if state['config'].get('bar_groups',{}).get('direction')=='Horizontal' else 'bottom_x'
+                    if [c['id'] for c in state['config'][axis].get('categories',[])] != expected_categories:
+                        raise ValueError('style replay requires matching category IDs')
+                if expected_series is not None and [item['series_id'] for item,_ in candidates] != expected_series:
+                    raise ValueError('style replay requires matching series IDs')
+                for item,body in candidates:
+                    if style is not None: _merge(body.setdefault('style',{}),style)
+                    if series and item['series_id'] in series: _merge(body,series[item['series_id']])
+                if 'value_range' in properties:
+                    limits = properties.pop('value_range')
+                    if limits is None: raise ValueError('use fig.fit() to restore automatic bounds')
+                    horizontal = state['config'].get('bar_groups',{}).get('direction')=='Horizontal'
+                    for axis in (('bottom_x','top_x') if horizontal else ('left_y','right_y')):
+                        state['config'][axis].update(min=float(limits[0]),max=float(limits[1]))
+                if properties: raise ValueError('use configure(config=...) for migrated chart properties: '+', '.join(properties))
+                return self.apply_settings(state)
             chart = state[kind]
             if expected_categories is not None and [c['id'] for c in chart['categories']] != expected_categories:
                 raise ValueError('style replay requires matching category IDs')
@@ -965,18 +1067,23 @@ class Figure:
             return self.to_png(scale=scale)
         return await self.widget().request("export", scale=float(scale), timeout=timeout)
 
-    async def savefig_async(self, filename, *, dpi=None, scale=None, timeout=60):
-        if dpi is not None and scale is not None:
-            raise ValueError("choose dpi or scale, not both")
-        value = float(dpi) / self.dpi if dpi is not None else (1.0 if scale is None else float(scale))
-        data = await self.to_png_async(scale=value, timeout=timeout)
-        if hasattr(filename, "write"):
-            filename.write(data)
-        else:
-            path = Path(filename)
-            if path.suffix.lower() != ".png":
-                raise ValueError("savefig currently supports .png")
-            path.write_bytes(data)
+    async def export_async(self, format='png', *, scale=1.0, timeout=60):
+        format=str(format).lower().lstrip('.')
+        if format not in ('png','svg','pdf'):raise ValueError('format must be png, svg or pdf')
+        if self.backend=='native':return self.export(format,scale=scale)
+        data=await self.widget().request('export',format=format,scale=float(scale),timeout=_timeout(timeout))
+        return data.decode('utf-8') if format=='svg' else data
+
+    async def savefig_async(self, filename, *, dpi=None, scale=None, format=None, timeout=60):
+        if dpi is not None and scale is not None:raise ValueError('choose dpi or scale, not both')
+        format=(format or (Path(filename).suffix.lstrip('.') if not hasattr(filename,'write') else 'png')).lower()
+        value=float(dpi)/self.dpi if dpi is not None else (1. if scale is None else float(scale))
+        data=await self.export_async(format,scale=value,timeout=timeout)
+        if hasattr(filename,'write'):
+            try:filename.write(data)
+            except TypeError:filename.write(data.encode('utf-8') if isinstance(data,str) else data.decode('utf-8'))
+        elif isinstance(data,str):Path(filename).write_text(data,encoding='utf-8')
+        else:Path(filename).write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
         if self.backend=='native' and _family(self.get_settings()) is not None:
@@ -1092,7 +1199,9 @@ from ._charts import ChartMethods, family as _family
 from ._features import FeatureMethods
 
 
-class Axes(FeatureMethods, ChartMethods):
+from ._advanced import AdvancedMethods
+
+class Axes(AdvancedMethods, FeatureMethods, ChartMethods):
     def __init__(self, figure, panel_id='main', overlay_id=None):
         self.figure = figure
         self.subplot_id, self.overlay_id = panel_id, overlay_id
@@ -1115,8 +1224,8 @@ class Axes(FeatureMethods, ChartMethods):
         state = self.figure.get_settings()
         cfg = self._config(state)
         if self.overlay_id:
-            if set(properties) - {'y_axis', 'legend'}:
-                raise ValueError('secondary axes own y_axis and legend only')
+            if set(properties) - {'x_axis', 'y_axis', 'link_x', 'link_y', 'legend'}:
+                raise ValueError('secondary axes own x_axis, y_axis, link_x, link_y and legend')
             _merge(self._overlay(state), properties)
         else:
             if 'draw_style' in properties:
@@ -1239,7 +1348,7 @@ class Axes(FeatureMethods, ChartMethods):
         from ._native import default_radial_json
         chart = json.loads(default_radial_json())
         title = fig.get_settings()["config"]["chart_title"]["text"]
-        chart.update(title=_text(title), font_size=11 * fig.dpi / 72,
+        chart.update(chart_title={k:copy.deepcopy(fig.get_settings()["config"]["chart_title"][k]) for k in ("text","visible")}, font_size=11 * fig.dpi / 72,
                      kind="Pie" if inner_radius is None else {"Donut": {"inner_radius": float(inner_radius)}},
                      start_angle_degrees=-float(startangle), labels=placements[labels_position],
                      label_format=formats[label_format])
@@ -1257,7 +1366,7 @@ class Axes(FeatureMethods, ChartMethods):
         """Create a donut; accepts the same labels/material/style options as pie."""
         return self.pie(values, inner_radius=inner_radius, **kwargs)
 
-    def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None):
+    def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None, z_column=None):
         fig = self.figure
         with fig._lock:
             fig._require_open()
@@ -1278,10 +1387,6 @@ class Axes(FeatureMethods, ChartMethods):
             names = (f"{sid}/x", f"{sid}/y")
             document = fig.get_settings()
             local = self._config(document)
-            if local.get('polar') is not None and not set(render_type) <= {'Line', 'Scatter', 'ScatterLine'}:
-                raise ValueError('polar supports line, scatter and scatter-line series only')
-            if document['config'].get('polar') is not None and not set(render_type) <= {'Line', 'Scatter', 'ScatterLine'}:
-                raise ValueError('renderer 0.18 requires a Cartesian root panel when other subplots use fields, vectors, histograms or errors')
             if config is not None:
                 local.clear()
                 local.update(copy.deepcopy(config))
@@ -1291,12 +1396,14 @@ class Axes(FeatureMethods, ChartMethods):
                 document['config']['subplots'][index-1].setdefault('series', []).append(sid)
             if self.overlay_id:
                 self._overlay(document).setdefault('series', []).append(sid)
+            _document.validate_features(dict(document, series=[*document['series'], dict(series_id=sid,x_column=names[0],y_column=names[1],render_type=render_type)]))
             uploaded = []
             try:
                 for name, array in [(names[0], x), (names[1], y), *extra_columns]:
                     fig._native.upload_column(name, array)
                     uploaded.append(name)
                 spec = {"series_id": sid, "label": None, "x_column": names[0], "y_column": names[1], "render_type": render_type}
+                if z_column is not None:spec["z_column"]=z_column
                 if label is not None:
                     rich = copy.deepcopy(fig.get_settings()["config"]["legend"]["content"])
                     rich["segments"] = _segments(label)
@@ -1357,6 +1464,8 @@ class Axes(FeatureMethods, ChartMethods):
         return Artist(fig, sid)
 
     def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None):
+        if y is not None and fmt is not None and not isinstance(fmt,str):
+            return [self.plot3D(x,y,fmt,color=color or 'blue',linewidth=linewidth,label=label,id=id)]
         marker_only_format = False
         if isinstance(y, str):
             if fmt is not None:
@@ -1381,7 +1490,7 @@ class Axes(FeatureMethods, ChartMethods):
             marker_only_format = marker is not None and not has_line and linestyle == "-"
         if y is None:
             y = _array(x)
-            x = np.arange(y.size, dtype=np.float64)
+            x = np.arange(y.size, dtype=np.float32 if y.dtype == np.float32 and y.size <= 2**24 else np.float64)
         else:
             x, y = _array(x), _array(y)
         if x.size != y.size:
@@ -1403,14 +1512,14 @@ class Axes(FeatureMethods, ChartMethods):
             style = {"Scatter": {"scatter": scatter}} if marker_only_format else {"ScatterLine": {"line": line, "scatter": scatter}}
         return [self._add(x, y, style, label, id)]
 
-    def scatter(self, x, y, *, s=16, color=None, c=None, cmap='viridis', vmin=None, vmax=None,
+    def scatter(self, x, y, z=None, *, s=16, color=None, c=None, cmap='viridis', vmin=None, vmax=None,
                 size_domain=None, size_range=(2., 12.), size_scale='area', marker="o", label=None, id=None):
         from ._features import colorbar
         x, y = _array(x), _array(y)
         if x.size != y.size or not x.size:
             raise ValueError('scatter requires equal nonempty x/y vectors')
         sid = id or f'series_{self.figure._next_series}'
-        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
+        cfg = self._projection_config('3d') if z is not None else copy.deepcopy(self._config(self.figure.get_settings()))
         style = dict(point_color=_color(color if color is not None else _COLORS[self.figure._next_series % len(_COLORS)]),
                      point_shape=_MARKERS.get(marker, marker), point_size=math.sqrt(float(s))*self.figure.dpi/144 if np.isscalar(s) else 4.)
         columns = []
@@ -1441,10 +1550,16 @@ class Axes(FeatureMethods, ChartMethods):
             style['point_size_map'] = dict(column=f'{sid}/size', domain_min=low, domain_max=high,
                 min_px=float(size_range[0])*self.figure.dpi/144, max_px=float(size_range[1])*self.figure.dpi/144,
                 scale=size_scale.title())
-        return self._add(x, y, {'Scatter': dict(scatter=style)}, label, sid, extra_columns=columns, config=cfg)
+        if z is not None:
+            z=_array(z)
+            if z.size!=x.size:raise ValueError('z must match x/y')
+            columns.append((f'{sid}/z',z))
+        return self._add(x, y, {'Scatter': dict(scatter=style)}, label, sid, extra_columns=columns, config=cfg,z_column=f'{sid}/z' if z is not None else None)
 
     def imshow(self, z, *, extent=None, origin="upper", cmap="viridis", vmin=None, vmax=None, interpolation="nearest", id=None):
         z = np.asarray(z)
+        if z.ndim == 3:
+            return self.imshow_rgb(z,extent=extent,origin=origin,interpolation=interpolation,id=id)
         if z.ndim != 2 or min(z.shape) < 2 or z.dtype.kind not in "fiu":
             raise ValueError("imshow expects a numeric matrix with at least 2 rows and columns")
         if origin not in ("upper", "lower") or interpolation not in ("nearest", "bilinear"):
@@ -1488,15 +1603,6 @@ class Axes(FeatureMethods, ChartMethods):
         return self.figure.update("axis_title_bottom", _axes=self, text=text, **kwargs)
 
     def set_ylabel(self, text, **kwargs):
-        if self.overlay_id:
-            state = self.figure.get_settings()
-            axis = self._overlay(state)['y_axis']
-            axis['title_option']['text']['segments'] = _segments(text)
-            for key, value in kwargs.items():
-                if key == 'fontsize': axis['title_option']['text']['font_size'] = float(value)*self.figure.dpi/72
-                elif key == 'color': axis['title_option']['text']['color'] = _color(value)
-                else: raise ValueError(f'unsupported title property: {key}')
-            return self.figure.apply_settings(state)
         return self.figure.update("axis_title_left", _axes=self, text=text, **kwargs)
 
     def _set_scale(self, axis, scale):
@@ -1506,9 +1612,9 @@ class Axes(FeatureMethods, ChartMethods):
             raise ValueError("scale must be 'linear' or 'log'")
         with self.figure._lock:
             state = self.figure.get_settings()
-            keys = ("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")
+            keys = ("bottom_x", "top_x") if axis == "x" else (("left_y",) if self._config(state).get('view_3d') is not None else ("left_y", "right_y"))
             for key in keys:
-                node = self._overlay(state)["y_axis"] if self.overlay_id and axis == "y" else self._config(state)[key]
+                node = self._axis_node(state,axis) if self.overlay_id else self._config(state)[key]
                 if scale == "log" and node["min"] <= 0:
                     node["min"], node["max"] = self.figure._native.log_bounds_at(axis, json.dumps(_document.target_layer(state, self.subplot_id, self.overlay_id)))
                 node["scale"] = scales[scale]
@@ -1525,11 +1631,11 @@ class Axes(FeatureMethods, ChartMethods):
 
     def get_xscale(self):
         self.figure._require_cartesian()
-        return "log" if self._config(self.figure.get_settings())["bottom_x"]["scale"] == "Logarithmic" else "linear"
+        return "log" if self._axis_node(self.figure.get_settings(),"x")["scale"] == "Logarithmic" else "linear"
 
     def get_yscale(self):
         self.figure._require_cartesian()
-        return "log" if (self._overlay(self.figure.get_settings())["y_axis"] if self.overlay_id else self._config(self.figure.get_settings())["left_y"])["scale"] == "Logarithmic" else "linear"
+        return "log" if self._axis_node(self.figure.get_settings(),"y")["scale"] == "Logarithmic" else "linear"
 
     def set_xlim(self, left, right):
         """Set both X bounds and derive ticks/labels for the new range.
@@ -1554,8 +1660,10 @@ class Axes(FeatureMethods, ChartMethods):
         with self.figure._lock:
             self.figure._require_open()
             state = self.figure.get_settings()
+            if self._config(state).get('view_3d') is not None and keys == ('left_y','right_y'):
+                keys=('left_y',)
             for key in keys:
-                axis = self._overlay(state)["y_axis"] if self.overlay_id and key.endswith("_y") else self._config(state)[key]
+                axis = self._axis_node(state,"y" if key.endswith("_y") else "x") if self.overlay_id else self._config(state)[key]
                 axis["min"], axis["max"] = low, high
             self.figure.apply_settings(state)
         return (low, high)
@@ -1619,11 +1727,11 @@ def subplots(nrows=1, ncols=1, *, sharex=False, sharey=False, squeeze=True, subp
             fig.set_layout(grid)
         axes = np.asarray(fig.axes, dtype=object).reshape(nrows, ncols)
         projection = (subplot_kw or {}).get('projection', 'cartesian')
-        if set(subplot_kw or {}) - {'projection'} or projection not in ('cartesian', 'polar'):
-            raise ValueError('subplot_kw supports Cartesian or polar projection')
-        if projection == 'polar':
+        if set(subplot_kw or {}) - {'projection'} or projection not in ('cartesian', 'polar', '3d', 'ternary'):
+            raise ValueError('unsupported subplot projection')
+        if projection != 'cartesian':
             for ax in axes.flat:
-                ax.set_polar()
+                ax.set_projection(projection)
         for dimension, sharing in [('x', sharex), ('y', sharey)]:
             if sharing not in (False, True, 'all', 'row', 'col'):
                 raise ValueError('shared axes must be bool, all, row or col')

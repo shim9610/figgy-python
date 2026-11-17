@@ -51,7 +51,9 @@ def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backen
         assert session.events()==[signal]
         checkpoint=session.feedback(signal['work_id'])['round']['documents']['plot']
         assert checkpoint['baseline']==baseline and checkpoint['approval']['settings']==approved
-        if family in ('pie','bar','box','radar'):assert checkpoint['bounded_data']
+        if family == 'pie':assert checkpoint['bounded_data']
+        else:assert checkpoint['columns']
+        if family == 'box': assert checkpoint['composites']
         assert 'Keep this title' not in json.dumps(approved)
         assert_cached_columns(tmp_path/'cache',checkpoint,original)
         assert_cached_bounded(tmp_path/'cache',checkpoint,family)

@@ -33,3 +33,9 @@ def test_deleting_or_renaming_a_host_is_still_a_change(tmp_path):
                             cwd=tmp_path, text=True, capture_output=True)
     assert result.returncode != 0
     assert 'Jupyter/WebGPU' in result.stderr
+
+
+def test_new_renderer_019_modules_keep_the_host_pairing_contract():
+    assert guard.check({'src/selection_019.rs','tests/test_interaction_parity.py'})
+    assert guard.check({'python/figgyplot/_advanced.py'})
+    assert not guard.check({'src/composite.rs','src/notebook.rs','python/figgyplot/_advanced.py','tests/test_interaction_parity.py'})

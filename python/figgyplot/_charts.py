@@ -41,18 +41,12 @@ class ChartMethods:
         from .figure import _color, _text, _merge
         from ._native import default_bounded_json
         fig = self.figure
-        if len(fig.subplots) != 1 or self.overlay_id or self._config(fig.get_settings()).get('polar'):
-            raise ValueError('bounded charts require a separate single-panel Figure')
         chart = json.loads(default_bounded_json(kind))
         chart.update(categories=categories, series=series,
                      title=_text(fig.get_settings()['config']['chart_title']['text']),
                      font_size=11 * fig.dpi / 72)
         _merge(chart, properties)
-        with fig._lock:
-            fig._require_open()
-            fig._native.set_bounded(kind, json.dumps(chart, allow_nan=False))
-        fig._changed()
-        return BoundedArtist(fig, kind)
+        return self._install_legacy_chart(kind, chart)
 
     def bar(self, x, height, *, label=None, colors=None, color=None,
             mode='grouped', orientation='vertical', **properties):

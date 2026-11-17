@@ -18,6 +18,7 @@ pub(crate) struct Editor {
     pub picked: Option<Value>,
     pub(super) navigator: navigation::Navigator,
     save_path: String,
+    export_scale: f32,
     raw: String,
     text_ranges: HashMap<String, std::ops::Range<usize>>,
     pub(super) property_text: HashMap<String, (String, Value, u64)>,
@@ -47,6 +48,7 @@ impl Default for Editor {
             picked: None,
             navigator: navigation::Navigator::default(),
             save_path: "figure.png".into(),
+            export_scale: 1.,
             raw: String::new(),
             text_ranges: HashMap::new(),
             property_text: HashMap::new(),
@@ -63,6 +65,37 @@ impl Default for Editor {
 }
 
 impl Editor {
+    pub(super) fn theme_layout_controls(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
+        ui.menu_button("Theme", |ui| {
+            for name in renderer::theme::ThemeFamily::NAMES {
+                let response = ui.button(*name);
+                self.controls.insert(format!("theme_{name}"), response.rect);
+                if response.clicked() {
+                    let result = c
+                        .settings_json()
+                        .and_then(|s| crate::chart_api::transform_settings_json(&s, "theme", name))
+                        .and_then(|s| c.apply_settings(&s));
+                    if let Err(e) = result {
+                        self.error = e.to_string();
+                    } else {
+                        self.notice = format!("Applied {name}");
+                        ui.close();
+                    }
+                }
+            }
+        });
+        let response = ui.button("Auto layout");
+        self.controls.insert("auto_layout".into(), response.rect);
+        if response.clicked() {
+            let result = c
+                .settings_json()
+                .and_then(|s| crate::chart_api::transform_settings_json(&s, "layout", ""))
+                .and_then(|s| c.apply_settings(&s));
+            if let Err(e) = result {
+                self.error = e.to_string();
+            }
+        }
+    }
     pub(crate) fn review_ui(&mut self, root: &mut egui::Ui, c: &mut FigureAccess<'_>) {
         let Some(shared) = self.review.clone() else {
             return;
@@ -357,12 +390,7 @@ impl Editor {
                     if response.clicked() {
                         let padding = if !c.data.series.is_empty()
                             && c.data.series.iter().all(|s| {
-                                matches!(
-                                    s.render_type,
-                                    renderer::DataRenderType::Heatmap { .. }
-                                        | renderer::DataRenderType::Contour { .. }
-                                        | renderer::DataRenderType::HeatmapContour { .. }
-                                )
+                                matches!(s.render_type, renderer::DataRenderType::Field(_))
                             }) {
                             0.0
                         } else {
@@ -481,14 +509,10 @@ impl Editor {
                             }
                         });
                     self.draw_style_menu(ui, c);
+                    self.theme_layout_controls(ui, c);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let save = toolbar_icon(
-                            ui,
-                            Icon::Save,
-                            false,
-                            "Save PNG",
-                            "Export the chart as a PNG image",
-                        );
+                        let save =
+                            toolbar_icon(ui, Icon::Save, false, "Export", "Export PNG, SVG or PDF");
                         self.controls.insert("save".into(), save.rect);
                         egui::Popup::menu(&save)
                             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -496,6 +520,20 @@ impl Editor {
                                 ui.set_width(310.);
                                 ui.heading("Export figure");
                                 ui.add_space(4.);
+                                ui.horizontal(|ui| {
+                                    for format in ["png", "svg", "pdf"] {
+                                        if ui.button(format.to_uppercase()).clicked() {
+                                            self.save_path = std::path::Path::new(&self.save_path)
+                                                .with_extension(format)
+                                                .to_string_lossy()
+                                                .into_owned();
+                                        }
+                                    }
+                                });
+                                ui.add(
+                                    egui::Slider::new(&mut self.export_scale, 0.5..=4.)
+                                        .text("Scale"),
+                                );
                                 ui.label("File path");
                                 let path = ui.add(
                                     egui::TextEdit::singleline(&mut self.save_path)
@@ -516,13 +554,16 @@ impl Editor {
                                 );
                                 self.controls.insert("save_confirm".into(), response.rect);
                                 if response.clicked() {
-                                    c.data.png_encodes += 1;
-                                    match c
-                                        .render(1.)
-                                        .and_then(|r| encode_png(&r).map_err(runtime))
-                                        .and_then(|bytes| {
+                                    let format = std::path::Path::new(&self.save_path)
+                                        .extension()
+                                        .and_then(|v| v.to_str())
+                                        .unwrap_or("png")
+                                        .to_ascii_lowercase();
+                                    match c.export_format(&format, self.export_scale).and_then(
+                                        |bytes| {
                                             std::fs::write(&self.save_path, bytes).map_err(runtime)
-                                        }) {
+                                        },
+                                    ) {
                                         Ok(_) => {
                                             self.error.clear();
                                             self.notice = format!("Saved {}", self.save_path);
@@ -671,7 +712,7 @@ impl Editor {
             let mut config = c.data.chart.config().clone();
             config.active_layer = node.layer;
             config.picked_data = None;
-            config.picked_points = None;
+
             if let Err(error) = c.commit_config(config) {
                 self.error = error.to_string();
             }
@@ -745,6 +786,36 @@ impl Editor {
                 "y",
                 "value",
                 "orientation",
+                "z",
+                "w",
+                "c",
+                "values",
+                "vertices",
+                "category_label",
+                "position",
+                "start",
+                "end",
+                "low",
+                "high",
+                "progress",
+                "state",
+                "total",
+                "q1",
+                "median",
+                "q3",
+                "mean",
+                "sample_count",
+                "whisker_low",
+                "whisker_high",
+                "red",
+                "green",
+                "blue",
+                "text",
+                "offset",
+                "role",
+                "placed",
+                "propagator",
+                "record",
             ] {
                 if let Some(value) = picked.get(key) {
                     ui.monospace(format!("{key}: {value}"));

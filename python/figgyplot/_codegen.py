@@ -23,10 +23,10 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
             code += f"{variable}.configure(identity={pprint.pformat(identity, width=96, sort_dicts=False)})\n"
         return code
     config = settings['config']
-    advanced = config.get('subplots') or config.get('overlays') or config.get('polar') or config.get('annotations')
+    advanced = any(config.get(key) for key in ('subplots','overlays','polar','annotations','ternary','parallel','view_3d')) or any(config.get(axis,{}).get('categories') for axis in ('bottom_x','left_y'))
     for spec in settings['series']:
         style = next(iter(spec['render_type'].values()))
-        advanced = advanced or 'Vector' in spec['render_type'] or any(
+        advanced = advanced or any(key in spec['render_type'] for key in ('Vector','CategoryBars','BoxPlot','RangeBars','TriMesh','EnergyLevels','Feynman','Parallel','Ternary','RgbImage','Hexbin','Streamlines')) or any(
             style.get('scatter', {}).get(key) is not None for key in ('point_color_map', 'point_size_map'))
         advanced = advanced or style.get('line', {}).get('fill') is not None or style.get('line', {}).get('interpolation', 'Linear') != 'Linear'
     if advanced:
@@ -51,8 +51,15 @@ def settings_to_code(settings, defaults, dpi=120, variable="fig"):
         chart = copy.deepcopy(settings["radial"])
         chart["interaction"] = {"hovered": None, "selected": None, "hover_progress": 0.0}
         chart["decorations"]["selected"] = None
-        slices = {i: {key: value for key, value in item.items() if key != "value"}
-                  for i, item in enumerate(chart.pop("slices"))}
+        from ._native import format_radial_labels_json
+        formatted = json.loads(format_radial_labels_json(json.dumps(chart)))
+        def appearance(item, computed):
+            patch = {key:copy.deepcopy(value) for key,value in item.items() if key not in ('value','children')}
+            if item.get('text') == computed.get('text'): patch.pop('text',None)
+            if item.get('children'):
+                patch['children'] = [appearance(child, auto) for child,auto in zip(item['children'],computed['children'])]
+            return patch
+        slices = {i:appearance(item,formatted['slices'][i]) for i,item in enumerate(chart.pop('slices'))}
         chart["slices"] = slices
         args = pprint.pformat(chart, width=96, sort_dicts=False)
         canvas = pprint.pformat({"chart_area": settings["config"]["chart_area"]})

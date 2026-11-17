@@ -89,6 +89,25 @@ class _CapturedData:
                 self.native.remove_column(name)
                 raise
 
+    def upload_composite(self, kind, name, fields):
+        with self.session._store.locked():
+            state = self.session._store.read()
+            if state['rounds'][-1]['id'] != self.round_id:
+                raise ValueError('Stale Figure from a previous review round')
+            doc = self.session._mutable(state, self.figure_id)
+            if doc['instance_id'] != self.instance_id:
+                raise ValueError('Stale Figure instance; restore the current checkpoint')
+            tokens = {key: name+'::'+key for key in fields}
+            references = {tokens[key]: self.session._store.put(array) for key,array in fields.items()}
+            self.native.upload_composite(kind, name, fields)
+            try:
+                doc['columns'].update(references)
+                doc.setdefault('composites', {})[name] = dict(kind=kind, fields=tokens)
+                self.session._store.write(state)
+            except Exception:
+                self.native.remove_column(name)
+                raise
+
     def remove_column(self, name):
         with self.session._store.locked():
             state = self.session._store.read()
@@ -97,6 +116,9 @@ class _CapturedData:
             if doc['instance_id']!=self.instance_id:raise ValueError('Stale Figure instance; restore the current checkpoint')
             self.native.remove_column(name)
             doc['columns'].pop(name, None)
+            composite = doc.get('composites', {}).pop(name, None)
+            if composite:
+                for token in composite['fields'].values(): doc['columns'].pop(token, None)
             self.session._store.write(state)
 
 
@@ -236,7 +258,11 @@ class Session:
             if family not in settings:continue
             chart=settings[family]
             if family=='radial':
-                for index,item in enumerate(chart['slices']):collect(item['value'],f'/radial/slices/{index}/value')
+                def nodes(items,path):
+                    for index,item in enumerate(items):
+                        collect(item['value'],path+f'/{index}/value')
+                        nodes(item.get('children',[]),path+f'/{index}/children')
+                nodes(chart['slices'],'/radial/slices')
                 for index,item in enumerate((chart.get('split') or {}).get('children',[])):
                     collect(item['value'],f'/radial/split/children/{index}/value')
             else:
@@ -432,7 +458,11 @@ class Session:
                        backend=backend or doc['backend'],id=figure_id,
                        pool_bytes=max(8*1024**2,sum(ref['shape'][0]*8 for ref in doc['columns'].values())*2))
             try:
-                for name,ref in doc['columns'].items():fig._native.upload_column(name,self._store.get(ref))
+                composite_fields = {token for item in doc.get('composites', {}).values() for token in item['fields'].values()}
+                for name,ref in doc['columns'].items():
+                    if name not in composite_fields: fig._native.upload_column(name,self._store.get(ref))
+                for name,item in doc.get('composites', {}).items():
+                    fig._native.upload_composite(item['kind'], name, {key:self._store.get(doc['columns'][token]) for key,token in item['fields'].items()})
                 family=next((k for k in ('radial','categorical','boxplot','radar') if k in settings),None)
                 if family=='radial':fig._native.set_radial(json.dumps(settings[family]))
                 elif family:fig._native.set_bounded(family,json.dumps(settings[family]))

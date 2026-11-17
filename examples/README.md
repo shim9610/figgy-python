@@ -97,3 +97,9 @@ For Jupyter, install `python -m pip install jupyterlab ".[notebook]"`. Native
 window creation/event processing belongs on Python's main thread. See the
 [desktop guide](../docs/DESKTOP_EDITOR.md), [host guide](../docs/HOSTS.md) and
 [demo reproduction](../docs/README_DEMO.md) for controls and lifecycle details.
+
+## Renderer 0.19
+
+[renderer_019.py](renderer_019.py) renders stem, violin, waterfall and RGB images
+with every built-in theme. Run `python examples/renderer_019.py --formats png svg pdf`
+for PNG, SVG and PDF output. See the [API guide](../docs/RENDERER_019.md).

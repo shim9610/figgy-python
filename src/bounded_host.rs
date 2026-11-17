@@ -18,7 +18,7 @@ impl SurfaceWindow {
         let ctx = self.ctx.clone();
         let overlay = self.inspector_overlay();
         let mut error = None;
-        let output = ctx.run_ui(input, |root| {
+        let mut output = ctx.run_ui(input, |root| {
             self.editor.show_bounded(root, c, overlay);
             // Side-panel frame margins must not enlarge the chart when the
             // window grows to accommodate the docked inspector.
@@ -58,7 +58,7 @@ impl SurfaceWindow {
                         RendererDevice::new(
                             c.renderer.device().clone(),
                             c.renderer.queue().clone(),
-                        ),
+                        ).map_err(runtime)?,
                         &c.data.document.as_ref().unwrap().chart,
                     )
                     .map_err(runtime)?;
@@ -307,7 +307,7 @@ impl SurfaceWindow {
                         matches!(chart.annotations().items[index].kind, renderer::annotation::AnnotationKind::Text { .. })
                             .then_some(renderer::DecorationId::Annotation(index))
                     }).flatten();
-                    let key = if let Some(text) = text { text } else { match surface.annotations.hit_test_active_layer(
+                    let key = if let Some(text) = text { text } else { match crate::radial_compat::hit_test_layer(&surface.annotations,
                         chart.active_layer(),
                         map,
                         point,
@@ -488,6 +488,18 @@ impl SurfaceWindow {
                 );
             }
         });
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                self.ui_renderer.update_texture(
+                    c.renderer.device(),
+                    c.renderer.queue(),
+                    *id,
+                    delta,
+                );
+            }
+        }
+        let freed_textures = std::mem::take(&mut output.textures_delta.free);
+        output.textures_delta.clear();
         if std::mem::take(&mut self.editor.history_replayed) {
             self.editor.property_text.clear();
         }
@@ -536,20 +548,10 @@ impl SurfaceWindow {
                 })],
                 ..Default::default()
             });
-            radial.annotations.draw_underlay(&mut pass);
             radial.frame.draw(&mut pass);
             radial.annotations.draw_overlay(&mut pass);
         }
-        for (id, deltas) in &output.textures_delta.set {
-            for delta in deltas {
-                self.ui_renderer.update_texture(
-                    c.renderer.device(),
-                    c.renderer.queue(),
-                    *id,
-                    delta,
-                );
-            }
-        }
+
         let jobs = ctx.tessellate(output.shapes, output.pixels_per_point);
         let screen = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [self.config.width, self.config.height],
@@ -584,7 +586,7 @@ impl SurfaceWindow {
             .submit(extra.into_iter().chain(std::iter::once(encoder.finish())));
         c.renderer.queue().present(frame);
         radial.renderer.end_frame();
-        for id in &output.textures_delta.free {
+        for id in &freed_textures {
             self.ui_renderer.free_texture(id);
         }
         self.repaint_at = output

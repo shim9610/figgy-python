@@ -156,11 +156,9 @@ fn picker_series(
         .cloned()
         .map(|mut s| {
             match &mut s.render_type {
-                T::Line { line }
-                | T::ScatterLine { line, .. }
-                | T::LineScatterErrorbarX { line, .. }
-                | T::LineScatterErrorbarY { line, .. }
-                | T::LineScatterErrorbarXY { line, .. } => line.fill = None,
+                T::Xy(renderer::XySeries {
+                    line: Some(line), ..
+                }) => line.fill = None,
                 _ => {}
             }
             s
@@ -182,7 +180,7 @@ impl FigureAccess<'_> {
         let series = self.gpu_series(&self.data.series);
         let mut probe = original_gpu.clone();
         probe.picked_data = None;
-        probe.picked_points = None;
+
         let result = (|| {
             self.renderer
                 .set_chart_config(self.data.chart_id, probe)
@@ -213,7 +211,7 @@ impl FigureAccess<'_> {
                         .renderer
                         .pick_chart_data(self.data.chart_id, request)
                         .map_err(runtime)?;
-                    self.renderer.wait_idle();
+                    self.renderer.wait_idle().map_err(runtime)?;
                     let Some(pick) = pollster::block_on(ticket.resolve()).map_err(runtime)? else {
                         break;
                     };

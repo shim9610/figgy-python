@@ -6,10 +6,10 @@ import figgyplot as figgy
 
 
 CASES = [
-    ('bar', (['A', 'B'], [[2, -1], [3, 4]]), {}, 'categorical'),
-    ('barh', (['A', 'B'], [2, 4]), {}, 'categorical'),
-    ('boxplot', ([[1, 2, 3], [2, 4, 6, 50]],), {}, 'boxplot'),
-    ('bxp', ([dict(q1=1, med=2, q3=3, whislo=0, whishi=4)],), {}, 'boxplot'),
+    ('bar', (['A', 'B'], [[2, -1], [3, 4]]), {}, 'CategoryBars'),
+    ('barh', (['A', 'B'], [2, 4]), {}, 'CategoryBars'),
+    ('boxplot', ([[1, 2, 3], [2, 4, 6, 50]],), {}, 'BoxPlot'),
+    ('bxp', ([dict(q1=1, med=2, q3=3, whislo=0, whishi=4)],), {}, 'BoxPlot'),
     ('errorbar', ([1, 2, 3], [2, 4, 3]), dict(yerr=[[.1, .2, .3], [.2, .1, .2]], xerr=.1), 'LineScatterErrorbarXY'),
     ('hist', ([1, 2, 2, 3, 4],), dict(bins=[0, 2, 4, 6]), 'Histogram'),
     ('stairs', ([1, 3], [0, 1, 3]), dict(orientation='horizontal'), 'Histogram'),
@@ -29,7 +29,10 @@ def test_native_bounded_preparation_reports_the_actual_chart_family(family, meth
         before, revision = figure.get_settings(), figure.revision
         report = figure.prepare()
         assert report['ready'] and report['backend'] == 'native'
-        assert report['stages'] == [{'scope': family, 'stage': 'first-frame', 'phase': 'Ready'}]
+        if family == 'radial':
+            assert report['stages'] == [{'scope': family, 'stage': 'first-frame', 'phase': 'Ready'}]
+        else:
+            assert report['stages'] and any(s['scope']=='renderer.prewarm' for s in report['stages'])
         assert figure.info['preparation'] == report
         assert figure.get_settings() == before and figure.revision == revision
 
@@ -51,8 +54,8 @@ def test_all_constructors_share_native_browser_model_and_render(method, args, kw
             elif isinstance(a,float): assert a == pytest.approx(b, rel=1e-6, abs=1e-6)
             else: assert a==b
         compare(ns,bs)
-        if kind in ('categorical', 'boxplot'):
-            assert ns[kind]['title'] == 'Shared chart'
+        if kind in ('CategoryBars', 'BoxPlot'):
+            assert ''.join(v['text'] for v in ns['config']['chart_title']['text']['segments']) == 'Shared chart'
             for fig in (native, browser):
                 fig.configure_bounded(style={'outline': True})
             assert native.get_settings() == browser.get_settings()
@@ -61,7 +64,7 @@ def test_all_constructors_share_native_browser_model_and_render(method, args, kw
         pixels = np.asarray(native.render_rgba())
         assert pixels.shape == (600, 960, 4)
         assert np.count_nonzero(np.any(pixels[:, :, :3] < 220, axis=2)) > 500
-        assert native.info['column_uploads'] == (0 if kind in ('categorical', 'boxplot') else browser.info['columns'])
+        assert native.info['columns'] == browser.info['columns']
 
 @pytest.mark.parametrize('kind', ['categorical', 'boxplot'])
 def test_bounded_replay_preserves_data_and_rejects_other_category_layout(kind):
@@ -69,13 +72,13 @@ def test_bounded_replay_preserves_data_and_rejects_other_category_layout(kind):
         for fig, offset in [(a, 0), (b, 10)]:
             if kind == 'categorical': fig.axes[0].bar(['A', 'B'], [1+offset, 2+offset])
             else: fig.axes[0].boxplot([[1+offset, 2+offset], [3+offset, 4+offset]])
-        original = copy.deepcopy(b.get_settings()[kind]['series'][0]['values'])
+        original = copy.deepcopy(b._native.columns)
         a.configure_bounded(style={'outline': True})
         exec(a.to_code(), {'fig': b})
-        assert b.get_settings()[kind]['series'][0]['values'] == original
+        assert b._native.columns == original
         before, revision = b.get_settings(), b.revision
         bad = copy.deepcopy(before)
-        bad[kind]['series'][0]['values'] = []
+        bad['series'][0]['y_column'] = 'missing/source'
         with pytest.raises(ValueError): b.apply_settings(bad)
         assert b.get_settings() == before and b.revision == revision
 
@@ -99,8 +102,9 @@ def test_horizontal_bounded_axis_titles_follow_orientation(backend):
     with figgy.figure(backend=backend) as fig:
         ax=fig.axes[0]
         ax.barh(['A','B'],[2,3]);ax.set_xlabel('Value');ax.set_ylabel('Category')
-        chart=fig.get_settings()['categorical']
-        assert chart['value_title']=='Value' and chart['category_title']=='Category'
+        cfg=fig.get_settings()['config']
+        assert ''.join(v['text'] for v in cfg['bottom_x']['title_option']['text']['segments'])=='Value'
+        assert ''.join(v['text'] for v in cfg['left_y']['title_option']['text']['segments'])=='Category'
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])

@@ -33,8 +33,8 @@ def populate(figure, feature):
         ax.plot(np.arange(5)*np.pi/2,[1,2,3,1,1],color=BLUE,linewidth=3,id='orbit')
         ax.text(.65,.05,'Polar',coords='ratio',fontsize=10,color=GREEN,id='note')
     elif feature == 'radar':
-        # Empty captions remove font-metric dependence; the fixed 400px box,
-        # 16px caption reserve and 14px padding give a 170px outer radius.
+        # Empty captions remove font-metric dependence. The shared polar
+        # projection uses a 400px data box with a 200px outer radius.
         ax.radar(['','','',''],[[1,2,3,1],[3,1,2,2]],labels=['First','Second'],colors=[BLUE,RED],value_range=[0,4],font_size=16,
                  grid=False,legend=False,style=dict(line_width_px=4,fill_opacity=0,marker='None'))
         ax.set_title('Independent title',fontsize=18,color='purple')
@@ -60,7 +60,7 @@ def populate(figure, feature):
     if 'colorbar' in config:
         config['colorbar']['visible'] = False
     if feature == 'radar':
-        state['radar']['decorations']['data_area'] = dict(x=100,y=100,width=400,height=400)
+        config['polar']['radial_label_angle_degrees'] = 90
     figure.apply_settings(state)
     return ax
 
@@ -125,9 +125,9 @@ def assert_feature_image(image, feature):
         for point in ((325,250),(300,300)):
             assert_white(image,point)
     elif feature == 'radar':
-        for point in ((343,279),(343,364),(268,332),(279,279)):
+        for point in ((350,275),(350,375),(285,405),(275,275)):
             assert_color(image,point,BLUE)
-        for point in ((321,236),(321,343),(258,343),(258,236)):
+        for point in ((325,225),(325,350),(250,350),(250,225)):
             assert_color(image,point,RED)
         assert_white(image,(300,300))
         assert_white(image,(375,250))

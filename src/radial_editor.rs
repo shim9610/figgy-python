@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Controls for upstream radial materials and global Cartesian draw styles.
 use super::*;
 use renderer::radial::*;
@@ -187,27 +188,38 @@ impl Editor {
                             Err(e) => self.error = e.to_string(),
                         }
                     }
-                    let save = toolbar_icon(
-                        ui,
-                        Icon::Save,
-                        false,
-                        "Save PNG",
-                        "Export the current chart",
-                    );
+                    self.theme_layout_controls(ui, c);
+                    let save =
+                        toolbar_icon(ui, Icon::Save, false, "Export", "Export the current chart");
                     self.controls.insert("save".into(), save.rect);
                     egui::Popup::menu(&save).show(|ui| {
+                        ui.horizontal(|ui| {
+                            for format in ["png", "svg", "pdf"] {
+                                if ui.button(format.to_uppercase()).clicked() {
+                                    self.save_path = std::path::Path::new(&self.save_path)
+                                        .with_extension(format)
+                                        .to_string_lossy()
+                                        .into_owned();
+                                }
+                            }
+                        });
+                        ui.add(egui::Slider::new(&mut self.export_scale, 0.5..=4.).text("Scale"));
                         ui.label("File path");
                         let path = ui.text_edit_singleline(&mut self.save_path);
                         self.controls.insert("save_path".into(), path.rect);
                         let confirm = ui.button("Save image");
                         self.controls.insert("save_confirm".into(), confirm.rect);
                         if confirm.clicked() {
-                            let result = c
-                                .render(1.)
-                                .and_then(|image| encode_png(&image).map_err(runtime))
-                                .and_then(|bytes| {
-                                    std::fs::write(&self.save_path, bytes).map_err(runtime)
-                                });
+                            let format = std::path::Path::new(&self.save_path)
+                                .extension()
+                                .and_then(|v| v.to_str())
+                                .unwrap_or("png")
+                                .to_ascii_lowercase();
+                            let result =
+                                c.export_format(&format, self.export_scale)
+                                    .and_then(|bytes| {
+                                        std::fs::write(&self.save_path, bytes).map_err(runtime)
+                                    });
                             match result {
                                 Ok(()) => {
                                     c.data.png_encodes += 1;
@@ -574,11 +586,16 @@ impl Editor {
             changed = true;
         }
         ui.label("Title");
-        let title = ui.text_edit_singleline(&mut chart.title);
+        let mut title_text = chart
+            .chart_title
+            .as_ref()
+            .map(|v| v.text.segments.iter().map(|s| s.text).collect::<String>())
+            .unwrap_or_default();
+        let title = ui.text_edit_singleline(&mut title_text);
         self.controls.insert("radial_title".into(), title.rect);
         if title.changed() {
             if let Some(option) = chart.chart_title.as_mut() {
-                option.text.segments = renderer::text::rich_segments_from_text(&chart.title);
+                option.text.segments = renderer::text::rich_segments_from_label(&title_text);
             }
             changed = true;
         }

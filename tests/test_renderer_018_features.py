@@ -122,13 +122,13 @@ def test_rejected_combinations_and_stale_edits_are_atomic(backend):
     with figgy.Figure(backend=backend, grid=[['first', 'second']]) as figure:
         ax = figure.subplots['second'].axes
         before, revision = figure.get_settings(), figure.revision
-        for call in [lambda: ax.radar(['A', 'B', 'C'], [1, 2, 3]),
-                     lambda: ax.text(.5, .5, 'Unsupported', coords='ratio'),
+        for call in [lambda: ax.text(.5, .5, 'Unsupported', coords='ratio'),
                      lambda: figure.set_layout([['bad', 'other'], ['bad', 'bad']])]:
             with pytest.raises(ValueError):
                 call()
             assert figure.get_settings() == before and figure.revision == revision
-        ax.set_polar()
+        ax.radar(['A', 'B', 'C'], [1, 2, 3])
+        assert figure.get_settings()['config']['subplots'][0]['config'].get('polar')
         before, revision = figure.get_settings(), figure.revision
         for call in [lambda: ax.twinx(), lambda: ax.quiver([0], [0], [1], [1])]:
             with pytest.raises(ValueError):

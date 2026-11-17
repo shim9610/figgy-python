@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild the public web host plus the recorded, bridge-only host patch.
 set -euo pipefail
-revision=f3f569c4c0e32d3d0682632444b6fe7ce84cba8d
+revision=e68922d73ca6bc43c86adcd081355a67e0b98ef3
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 wasm_source=${FIGGY_WASM_SOURCE:-${TMPDIR:-/tmp}/figgy-web-kernel-$revision}
 if ! git -C "$wasm_source" rev-parse --git-dir >/dev/null 2>&1; then
@@ -13,10 +13,10 @@ fi
 registry_provenance=$(mktemp)
 build_source=$(mktemp -d)
 trap 'rm -f "$registry_provenance"; rm -rf "$build_source"' EXIT
-# Verify the actual published archives and source bytes before compiling WASM.
+# Verify the pinned native renderer/model sources before compiling WASM.
 python "$repo_root/scripts/record_registry_provenance.py" \
     "$repo_root" "$wasm_source" "$revision" "$registry_provenance"
-# Never patch the verified checkout. Archive only tracked release files, then
+# Never patch the verified checkout. Archive only tracked upstream files, then
 # apply the validated bridge-only patch in a disposable build directory.
 git -C "$wasm_source" archive "$revision" | tar -x -C "$build_source"
 # Establish a repository root even when TMPDIR is inside another checkout;

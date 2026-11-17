@@ -130,51 +130,18 @@ pub(super) fn refresh_legends(config: &mut Config, series: &[SeriesConfig]) {
 }
 
 pub(super) fn validate_columns(series: &[SeriesConfig], names: &HashSet<String>) -> PyResult<()> {
-    fn visit(value: &Value, names: &HashSet<String>) -> PyResult<()> {
-        if let Some(fields) = value.as_object() {
-            for (key, value) in fields {
-                if matches!(
-                    key.as_str(),
-                    "column"
-                        | "error_bar_style_index_column"
-                        | "x_column"
-                        | "y_column"
-                        | "point_style_index_column"
-                        | "lower"
-                        | "upper"
-                        | "u"
-                        | "v"
-                ) && let Some(name) = value.as_str()
-                    && !names.contains(name)
-                {
-                    return Err(invalid(format!("unregistered source column: {name}")));
-                }
-                if key == "columns"
-                    && let Some(columns) = value.as_array()
-                {
-                    for name in columns {
-                        if !name.as_str().is_some_and(|n| names.contains(n)) {
-                            return Err(invalid("unregistered matrix column"));
-                        }
-                    }
-                }
-                if key == "Column"
-                    && let Some(name) = value.as_str()
-                    && !names.contains(name)
-                {
-                    return Err(invalid("unregistered vector color column"));
-                }
-                visit(value, names)?;
-            }
-        } else if let Some(items) = value.as_array() {
-            for item in items {
-                visit(item, names)?;
-            }
-        }
-        Ok(())
-    }
     for series in series {
-        visit(&serde_json::to_value(series).map_err(invalid)?, names)?;
+        let mut missing = None;
+        let mut check = |id: &str| {
+            if !id.is_empty() && !names.contains(id) {
+                missing = Some(id.to_owned());
+            }
+        };
+        series.visit_columns(&mut check);
+        series.visit_composite_columns(&mut check);
+        if let Some(id) = missing {
+            return Err(invalid(format!("unregistered source column: {id}")));
+        }
     }
     Ok(())
 }
@@ -267,7 +234,7 @@ pub(super) fn validate_identity(
         let sides: &[&str] = if panel_ids.contains(owner.as_str()) {
             &["bottom_x", "top_x", "left_y", "right_y"]
         } else if meta.panels.iter().any(|p| p.overlays.contains(owner)) {
-            &["y_axis"]
+            &["x_axis", "y_axis"]
         } else {
             return Err(invalid("tick mode references unknown axes owner"));
         };

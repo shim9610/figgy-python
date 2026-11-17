@@ -25,7 +25,7 @@ def check_assets(assets):
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 NATIVE_PACKAGES = {"figgy-renderer": "crates/renderer", "figgy-model": "crates/model"}
 HOST_PATCH = "scripts/wasm-host.patch"
-HOST_PATCH_FILES = {"crates/web/src/lib.rs", "crates/web/src/bounded.rs"}
+HOST_PATCH_FILES = {"crates/web/src/web/chart.rs", "crates/web/src/radial.rs"}
 
 
 def host_patch_record(root):
@@ -76,14 +76,20 @@ def native_registry_packages(root):
         if len(matches) != 1:
             raise ValueError("Expected exactly one native registry package: " + name)
         package = matches[0]
+        if package.get("source", "").startswith("git+https://github.com/shim9610/figgy.git?"):
+            if not re.search(r"#[0-9a-f]{40}$",package["source"]):raise ValueError("Git renderer source must pin a full commit")
+            packages[name]={key:package[key] for key in ("version","source")}
+            continue
         if package.get("source") != REGISTRY_SOURCE or not re.fullmatch(r"[0-9a-f]{64}", package.get("checksum", "")):
             raise ValueError("Native registry source/checksum is invalid: " + name)
         packages[name] = {key: package[key] for key in ("version", "source", "checksum")}
     dependency = cargo.get("dependencies", {}).get("renderer", {})
-    if (not isinstance(dependency, dict) or dependency.get("package") != "figgy-renderer"
-            or dependency.get("version") != "=" + packages["figgy-renderer"]["version"]
-            or any(key in dependency for key in ("git", "path", "registry"))):
-        raise ValueError("Native renderer dependency must exactly pin its crates.io lockfile version")
+    git_revision=dependency.get('rev')
+    if git_revision is not None:
+        if dependency.get('package')!='figgy-renderer' or dependency.get('git')!='https://github.com/shim9610/figgy.git' or not re.fullmatch(r'[0-9a-f]{40}',git_revision):raise ValueError('Git renderer dependency must pin the upstream repository and a full commit')
+        if any(not record['source'].endswith('#'+git_revision) for record in packages.values()):raise ValueError('Native model and renderer must use the same Git commit')
+    elif (not isinstance(dependency, dict) or dependency.get('package')!='figgy-renderer' or dependency.get('version')!='='+packages['figgy-renderer']['version'] or any(key in dependency for key in ('git','path','registry'))):
+        raise ValueError('Native renderer dependency must exactly pin its registry version or upstream Git commit')
     return packages
 
 

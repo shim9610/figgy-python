@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Derived object navigation. IDs, geometry and styles remain in the document.
 use super::*;
 use renderer::LayerRef;
@@ -206,50 +207,59 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
             LayerRef::Base,
             None,
         );
-        let entries = if family == "radial" {
-            &owner["slices"]
-        } else {
-            &owner["series"]
-        };
-        if let Some(entries) = entries.as_array() {
-            for (i, item) in entries.iter().enumerate() {
-                let id = item["id"]
-                    .as_str()
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| format!("slice_0_{i}"));
+        if family == "radial" {
+            let mut rings = std::collections::BTreeMap::new();
+            for (group, index, path) in radial_compat::slice_paths(owner) {
+                let item = owner.pointer(&path).unwrap();
+                let id = format!("slice_{group}_{index}");
                 let label = item["label"]
                     .as_str()
-                    .filter(|s| !s.trim().is_empty())
+                    .filter(|v| !v.trim().is_empty())
                     .unwrap_or(&id);
-                data.children.push(leaf(
+                let child = leaf(
                     &format!("bounded/series/{id}"),
                     label,
                     "series",
                     LayerRef::Base,
                     id.clone(),
-                ));
-            }
-        }
-        if family == "radial" {
-            if let Some(children) = owner["split"]["children"].as_array() {
-                let mut detail = Node::new(
-                    "bounded/split".into(),
-                    "Detail slices".into(),
-                    "group",
-                    LayerRef::Base,
-                    None,
                 );
-                for (i, item) in children.iter().enumerate() {
-                    let id = format!("slice_1_{i}");
-                    detail.children.push(leaf(
-                        &format!("bounded/series/{id}"),
-                        item["label"].as_str().unwrap_or(&id),
-                        "series",
-                        LayerRef::Base,
-                        id.clone(),
-                    ));
+                if group == 0 {
+                    data.children.push(child);
+                } else {
+                    rings
+                        .entry(group)
+                        .or_insert_with(|| {
+                            Node::new(
+                                format!("bounded/ring/{group}"),
+                                if owner["split"].is_object() {
+                                    "Detail slices".into()
+                                } else {
+                                    format!("Ring {}", group + 1)
+                                },
+                                "group",
+                                LayerRef::Base,
+                                None,
+                            )
+                        })
+                        .children
+                        .push(child);
                 }
-                data.children.push(detail);
+            }
+            data.children.extend(rings.into_values());
+        } else if let Some(entries) = owner["series"].as_array() {
+            for item in entries {
+                let id = item["id"].as_str().unwrap();
+                let label = item["label"]
+                    .as_str()
+                    .filter(|v| !v.trim().is_empty())
+                    .unwrap_or(id);
+                data.children.push(leaf(
+                    &format!("bounded/series/{id}"),
+                    label,
+                    "series",
+                    LayerRef::Base,
+                    id.into(),
+                ));
             }
         }
         panel.children.push(data);

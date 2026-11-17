@@ -1,5 +1,8 @@
 # Charts, materials and draw styles
 
+See the [renderer 0.19 API](RENDERER_019.md) for the current column-backed
+constructors, saved-settings migration, themes, SVG/PDF and MCP tools.
+
 The Python package calls the public upstream models and GPU renderers. Pies and
 donuts use `RadialChart` / `RadialRenderer`; handwriting and star modes use
 Cartesian `DrawStyle`. No chart images are synthesized by a Python drawing engine.

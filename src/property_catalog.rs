@@ -77,7 +77,9 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
             "Hatch",
             "Pearl",
         ],
-        "material" if path.starts_with("/boxplot/") => &["Flat", "Matte", "SatinMetal"],
+        "material" if path.starts_with("/boxplot/") || path.contains("/BoxPlot/") => {
+            &["Flat", "Matte", "SatinMetal"]
+        }
         "material" => &["Flat", "Matte", "SatinMetal", "Enamel", "Paper"],
         "labels" if path.starts_with("/radial/") => &["None", "Inside", "Outside"],
         "labels" if path.starts_with("/boxplot/") => &["None", "Median", "MedianAndCount"],
@@ -93,10 +95,16 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
             "NameValuePercent",
         ],
         "label_format" => &["Value", "Percent", "ValuePercent", "CategoryValue"],
-        "mode" if path.starts_with("/categorical/") => &["Grouped", "Stacked", "PercentStacked"],
+        "mode" if path.starts_with("/categorical/") || path.contains("/bar_groups/") => {
+            &["Grouped", "Stacked", "PercentStacked"]
+        }
         "outlier_shape" => &["Circle", "Square"],
         "marker" => &["None", "Circle", "Square"],
-        "grid_layout" => &["Centers", "Edges"],
+        "grid_layout" => &["Centers", "Edges", "Hexagonal"],
+        "shading" => &["Flat", "Interpolated"],
+        "mode" if value == "Continuous" || value == "Bands" => &["Continuous", "Bands"],
+        "placement" if path.contains("/Radar/") => &["None", "Values", "Emphasized"],
+        "projection" if value.is_string() => &["Orthographic", "Perspective"],
         "orientation" if value == "ColumnsAreY" || value == "ColumnsAreX" => {
             &["ColumnsAreY", "ColumnsAreX"]
         }
@@ -353,7 +361,7 @@ fn add_default(
     key: &str,
     value: Value,
 ) {
-    if state.pointer(path).is_none() {
+    if state.pointer(path).is_none_or(Value::is_null) {
         field(out, value, path, group, key, &human(key));
     }
 }
@@ -485,10 +493,54 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     "err_style" => "Error bars",
                     "contour" => "Contours",
                     "style" if kind == "Vector" => "Vectors",
+                    "labels" => "Labels",
+                    "matrix" => "Grid",
+                    "surface" => "Surface",
+                    "violin" => "Violin",
+                    "stem" => "Stems",
                     _ => "Appearance",
                 };
                 let path = format!("{root}/{key}");
-                walk(fields, value, &path, group, "");
+                let modern = matches!(
+                    kind.as_str(),
+                    "CategoryBars"
+                        | "BoxPlot"
+                        | "RangeBars"
+                        | "Radar"
+                        | "Ternary"
+                        | "Parallel"
+                        | "RgbImage"
+                        | "Hexbin"
+                        | "TriMesh"
+                        | "EnergyLevels"
+                        | "Feynman"
+                        | "Streamlines"
+                );
+                let relative = if modern && group == "Appearance" {
+                    key.as_str()
+                } else {
+                    ""
+                };
+                if !modern || !matches!(key.as_str(), "triangles" | "start" | "values") {
+                    walk(fields, value, &path, group, relative);
+                }
+                if kind == "Radar" && key == "style" {
+                    for (name, default) in [
+                        ("line_width_px", json!(2.)),
+                        ("fill_opacity", json!(0.25)),
+                        ("marker_size_px", json!(7.)),
+                        ("marker", json!("Circle")),
+                    ] {
+                        add_default(
+                            fields,
+                            state,
+                            &format!("{path}/{name}"),
+                            group,
+                            &format!("style/{name}"),
+                            default,
+                        );
+                    }
+                }
                 if key == "line" {
                     add_default(
                         fields,
@@ -847,19 +899,6 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     );
                 }
             }
-            if let Some(index) = target
-                .strip_prefix("slice_1_")
-                .and_then(|v| v.parse::<usize>().ok())
-                .filter(|i| *i < chart["split"]["children"].as_array().map_or(0, Vec::len))
-            {
-                optional::bounded_series(
-                    fields,
-                    state,
-                    kind,
-                    &chart["split"]["children"][index],
-                    &format!("{root}/split/children/{index}"),
-                );
-            }
             optional::choice(
                 fields,
                 "Pie / donut/mode",
@@ -902,18 +941,20 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         }
         if kind == "radial" {
-            if let Some(index) = target
-                .strip_prefix("slice_0_")
-                .and_then(|v| v.parse::<usize>().ok())
-                .filter(|i| *i < chart["slices"].as_array().map_or(0, Vec::len))
+            if let Some((group, index)) = target
+                .strip_prefix("slice_")
+                .and_then(|v| v.split_once('_'))
+                .and_then(|(g, i)| Some((g.parse().ok()?, i.parse().ok()?)))
             {
-                optional::bounded_series(
-                    fields,
-                    state,
-                    kind,
-                    &chart["slices"][index],
-                    &format!("{root}/slices/{index}"),
-                );
+                if let Some(path) = radial_compat::slice_path(chart, group, index) {
+                    optional::bounded_series(
+                        fields,
+                        state,
+                        kind,
+                        chart.pointer(&path).unwrap(),
+                        &format!("{root}{path}"),
+                    );
+                }
             }
         }
     } else {
@@ -1611,6 +1652,17 @@ pub(crate) fn apply(
     }
     if field.group == "Panel geometry" {
         result["identity"]["layout"] = Value::Null;
+    }
+    if field.path.starts_with("/radial/")
+        && matches!(
+            key,
+            "label" | "value" | "label_format" | "label_decimals" | "value_suffix"
+        )
+    {
+        let mut chart: renderer::RadialChart =
+            serde_json::from_value(result["radial"].clone()).map_err(invalid)?;
+        chart.format_labels();
+        result["radial"] = serde_json::to_value(chart).map_err(runtime)?;
     }
     Ok(result)
 }

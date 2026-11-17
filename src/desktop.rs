@@ -291,7 +291,7 @@ impl SurfaceWindow {
         let mut config = c.data.chart.config().clone();
         if let Some(choice) = self.chooser.as_ref().and_then(|v| v.preview()) {
             config.set_active_layer(choice.layer);
-            config.picked_points = None;
+
             config.picked_data =
                 choice
                     .pick
@@ -618,7 +618,7 @@ impl SurfaceWindow {
                         cfg.set_active_layer(interaction::base_layer(index));
                     }
                     cfg.picked_data = None;
-                    cfg.picked_points = None;
+
                     if cfg != *c.data.chart.config() {
                         c.commit_config(cfg)?;
                     }
@@ -671,7 +671,7 @@ impl SurfaceWindow {
                         cfg.annotations.items.push(item);
                         cfg.set_active_layer(renderer::LayerRef::Annotations);
                         cfg.picked_data = None;
-                        cfg.picked_points = None;
+
                         if let Err(e) = c.commit_config(cfg) {
                             self.editor.error = e.to_string();
                         } else {
@@ -709,7 +709,7 @@ impl SurfaceWindow {
                                 &CpuTextMeasure::for_style(&display.draw_style),
                             )
                             .unwrap()
-                            .rect;
+                            .rect();
                         let mut cfg = c.data.chart.config().clone();
                         let dx = -(self.cursor.0 - old.0) as f64 / bounds.width.max(1.) as f64;
                         let dy = (self.cursor.1 - old.1) as f64 / bounds.height.max(1.) as f64;
@@ -797,11 +797,10 @@ impl SurfaceWindow {
                     let mut cfg = c.data.chart.config().clone();
                     if cfg.active_layer() != renderer::LayerRef::Annotations
                         || cfg.picked_data.is_some()
-                        || cfg.picked_points.is_some()
                     {
                         cfg.set_active_layer(renderer::LayerRef::Annotations);
                         cfg.picked_data = None;
-                        cfg.picked_points = None;
+
                         c.commit_config(cfg)?;
                     }
                     self.selected = Some(format!("annotation:{}", item.id));
@@ -907,7 +906,7 @@ impl SurfaceWindow {
                                     ..Default::default()
                                 })
                             };
-                            cfg.picked_points = None;
+
                             if cfg != *c.data.chart.config() {
                                 c.commit_config(cfg)?;
                             }
@@ -931,7 +930,7 @@ impl SurfaceWindow {
                             None
                         };
                         cfg.picked_data = None;
-                        cfg.picked_points = None;
+
                         if cfg != *c.data.chart.config() {
                             c.commit_config(cfg)?;
                         }
@@ -1022,7 +1021,7 @@ impl SurfaceWindow {
                         &CpuTextMeasure::for_style(&display.draw_style),
                     )
                     .unwrap()
-                    .rect;
+                    .rect();
                 let x = ((self.cursor.0 - bounds.x) / bounds.width.max(1.)).clamp(0., 1.) as f64;
                 let y =
                     1. - ((self.cursor.1 - bounds.y) / bounds.height.max(1.)).clamp(0., 1.) as f64;
@@ -1215,6 +1214,18 @@ impl SurfaceWindow {
                     });
             }
         });
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                self.ui_renderer.update_texture(
+                    c.renderer.device(),
+                    c.renderer.queue(),
+                    *id,
+                    delta,
+                );
+            }
+        }
+        let freed_textures = std::mem::take(&mut output.textures_delta.free);
+        output.textures_delta.clear();
         if std::mem::take(&mut self.editor.history_replayed) {
             fn contains(nodes: &[navigation::Node], target: &str) -> bool {
                 nodes
@@ -1318,21 +1329,6 @@ impl SurfaceWindow {
                 .as_ref()
                 .and_then(|v| v.preview())
                 .and_then(|v| v.target.clone());
-            let preview_map = HitMap::for_active_layer(&display);
-            let boxes = preview_target
-                .as_ref()
-                .or(self.selected.as_ref())
-                .as_deref()
-                .and_then(|t| preview_map.find(t))
-                .and_then(|id| {
-                    preview_map.selection_box(
-                        id,
-                        &display,
-                        &CpuTextMeasure::for_style(&display.draw_style),
-                    )
-                })
-                .into_iter()
-                .collect::<Vec<_>>();
             let annotation_selected = self
                 .selected
                 .as_deref()
@@ -1342,7 +1338,10 @@ impl SurfaceWindow {
                     self.view.as_mut().unwrap(),
                     &Chart::new(display.clone()),
                     display.chart_area.0,
-                    &boxes,
+                    preview_target
+                        .as_ref()
+                        .or(self.selected.as_ref())
+                        .map(String::as_str),
                 )
                 .map_err(runtime)?;
             // Let the renderer draw the selection from the current annotation
@@ -1386,9 +1385,9 @@ impl SurfaceWindow {
         } else {
             Some(
                 c.renderer
-                    .prepare(&[renderer::ChartDrawItem {
-                        view: self.view.as_ref().unwrap(),
-                        chart_config: &gpu::config(c.data.figure_id, &display),
+                    .prepare(&mut [renderer::ChartDrawItem {
+                        view: self.view.as_mut().unwrap(),
+                        chart: &Chart::new(gpu::config(c.data.figure_id, &display)),
                         series: &series,
                     }])
                     .map_err(runtime)?,
@@ -1414,16 +1413,7 @@ impl SurfaceWindow {
             size_in_pixels: [self.config.width, self.config.height],
             pixels_per_point: output.pixels_per_point,
         };
-        for (id, deltas) in &output.textures_delta.set {
-            for delta in deltas {
-                self.ui_renderer.update_texture(
-                    c.renderer.device(),
-                    c.renderer.queue(),
-                    *id,
-                    delta,
-                );
-            }
-        }
+
         let extra = self.ui_renderer.update_buffers(
             c.renderer.device(),
             c.renderer.queue(),
@@ -1457,7 +1447,7 @@ impl SurfaceWindow {
             .submit(extra.into_iter().chain(std::iter::once(encoder.finish())));
         c.renderer.queue().present(frame);
         c.renderer.end_gpu_frame();
-        for id in &output.textures_delta.free {
+        for id in &freed_textures {
             self.ui_renderer.free_texture(id);
         }
         // egui popups use a sizing pass before their visible pass; text inputs
@@ -1471,6 +1461,11 @@ impl SurfaceWindow {
             self.last_revision = c.data.revision;
         }
         self.frames += 1;
+        if !c.renderer.frame_complete() {
+            // A first frame may omit series while their pipelines compile.
+            // Keep polling through the event loop until every series draws.
+            self.repaint_at = Some(Instant::now() + Duration::from_millis(16));
+        }
         if let Some(start) = self.last_input.take() {
             self.latency_ms = start.elapsed().as_secs_f64() * 1000.;
         }
@@ -1503,14 +1498,14 @@ impl SurfaceWindow {
                     .map(|b| {
                         (
                             name.clone(),
-                            json!([b.rect.x, b.rect.y, b.rect.width, b.rect.height]),
+                            json!([b.rect().x, b.rect().y, b.rect().width, b.rect().height]),
                         )
                     })
             })
             .collect::<serde_json::Map<_, _>>();
         let annotation_selection=self.view.as_ref().and_then(|view|{
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
-            Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
+            Some(json!({"index":index,"rect":[bounds.rect().x,bounds.rect().y,bounds.rect().width,bounds.rect().height]}))
         });
         *self.control.stats.lock().unwrap() = json!({"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())

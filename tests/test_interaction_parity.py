@@ -34,7 +34,7 @@ def test_legacy_settings_and_heatmap_legend_preserve_shared_host_model(backend):
         saved['config']['colorbar']['colormap'] = 'Magma'
         figure.apply_settings(saved)
         current = figure.get_settings()
-        assert current['renderer_version'] == '0.18.1'
+        assert current['renderer_version'] == '0.19.0'
         assert current['config']['legend']['content'] != before['config']['legend']['content']
         assert 'Temperature' in ''.join(s['text'] for s in current['config']['legend']['content']['segments'])
         revision = figure.revision
@@ -765,7 +765,7 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         page.locator('[data-settings]').fill(json.dumps(legacy))
         page.locator('[data-apply]').click()
         page.wait_for_function(ROOT+'.snapshot().config.chart_title.offset_x===7')
-        assert page.evaluate(ROOT+'.snapshot().renderer_version') == '0.18.1'
+        assert page.evaluate(ROOT+'.snapshot().renderer_version') == '0.19.0'
         page.locator('[data-advanced]').evaluate('element=>element.open=false')
         target=ObjectNavigator(page)
         def choose(control, value):
@@ -2869,3 +2869,42 @@ def test_review_controller_displays_a_complete_regenerated_round(tmp_path,backen
         page.wait_for_function("[...document.querySelectorAll('.figgy-editor')].every(r=>{const d=r.figgy.diagnostics();return !d.dirty&&!d.frame_pending&&!d.busy&&!d.queued;})",polling=100,timeout=180000)
         for index in range(2):page.locator('.figgy-editor').nth(index).screenshot(path=str(tmp_path/f'complete-next-round-{index}.png'))
         execute('watcher.cancel(); session.cancel()')
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('kind', ['stem','candle','violin','mesh','sunburst'])
+def test_renderer_019_theme_layout_exports_share_host_state(backend, kind):
+    from test_renderer_019_features import populate
+    with figgy.Figure(backend=backend) as fig:
+        populate(fig.axes[0],kind)
+        for name in fig.theme_names():
+            fig.set_theme(name).tight_layout()
+            state = fig.get_settings()
+            fig.apply_settings(state)
+            assert fig.get_settings() == state
+        if backend == 'native':
+            assert '<svg' in fig.export('svg')
+            assert fig.export('pdf').startswith(b'%PDF-')
+        else:
+            manifest,buffers = fig._native.payload()
+            assert all(m['bytes']==len(b) for m,b in zip(manifest,buffers))
+
+
+@pytest.mark.skipif(os.environ.get('FIGGY_TEST_JUPYTER')!='1',reason='requires real Jupyter WebGPU')
+@pytest.mark.parametrize('source,reference,expected',[
+    ("ax.boxplot([[1,2,3],[2,4,6]])",dict(kind='histogram_bin',bin_index=1),dict(median=4)),
+    ("ax.tripcolor([0,1,0],[0,0,1],[1,2,3],triangles=[[0,1,2]])",dict(kind='mesh_triangle',triangle_index=0),dict(vertices=[0,1,2],values=[1,2,3])),
+    ("ax.scatter([0,1],[0,1],[10,20],c=[3,8],s=[2,4],id='points')",dict(kind='point',point_index=1),dict(x=1,y=1,z=20,color_value=8,size_value=4)),
+    ("ax.imshow(np.array([[[255,0,0],[0,255,0]],[[0,0,255],[255,255,0]]],dtype=np.uint8))",dict(kind='matrix_cell',x_index=0,y_index=0),dict(red=255,green=0,blue=0)),
+])
+def test_renderer_019_browser_sources_selection_themes_and_vector_exports(tmp_path,source,reference,expected):
+    code="import figgyplot as fg\nimport numpy as np\nfig,ax=fg.subplots(backend='webgpu')\n"+source+"\ndisplay(fig.widget())"
+    with notebook(tmp_path,code) as (page,execute):
+        execute("state=fig.get_settings();ref="+repr(reference)+";ref['series_id']=state['series'][0]['series_id'];state['config']['picked_data']={'refs':[ref]};fig.apply_settings(state);await fig.sync()")
+        details=page.evaluate(ROOT+'.details()')
+        for key,value in expected.items():assert details[key]==pytest.approx(value)
+        for name in ('gallery','cool-slate','midnight','warm-paper'):
+            page.locator('[data-theme]').select_option(name)
+            execute('await fig.sync()')
+        page.locator('[data-auto-layout]').click()
+        execute("await fig.sync();svg=await fig.export_async('svg');pdf=await fig.export_async('pdf');assert '<svg' in svg and pdf.startswith(b'%PDF-')")

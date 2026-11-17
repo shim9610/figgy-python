@@ -1,68 +1,42 @@
-diff --git a/crates/web/src/bounded.rs b/crates/web/src/bounded.rs
-index 07b8e02..3abf911 100644
---- a/crates/web/src/bounded.rs
-+++ b/crates/web/src/bounded.rs
-@@ -620,6 +620,20 @@ impl FiggyBoundedChart {
+diff --git a/crates/web/src/web/chart.rs b/crates/web/src/web/chart.rs
+--- a/crates/web/src/web/chart.rs
++++ b/crates/web/src/web/chart.rs
+@@ -1753,6 +1753,18 @@
+ 
+     /// Process pending pool maintenance and draw only when visual state is
+     /// dirty. A clean rAF tick returns before touching the pool or surface.
++    /// Host fence: does not borrow the chart while GPU work completes.
++    pub fn gpu_ready(&self) -> js_sys::Promise { self.streaming_gpu_ready() }
++
++    /// Refresh renderer-owned annotation geometry without submitting a frame.
++    pub fn prepare_interaction(&mut self) -> Result<(), JsValue> {
++        let (config, panel_rect, _) = self.display_config()?;
++        let chart = Chart::new(config.into_owned());
++        self.renderer.refresh_annotations(&mut self.view, &chart, panel_rect, self.selected_annotation).map_err(js_err)?;
++        self.redraw_pending = true;
++        Ok(())
++    }
++
+     pub fn frame(&mut self) -> Result<(), JsValue> {
+         self.renderer
+             .sync_external_invalidations()
+diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
+--- a/crates/web/src/radial.rs
++++ b/crates/web/src/radial.rs
+@@ -219,6 +219,16 @@
              .map_err(js_err)
      }
-
-+    /// Observe completion of work already submitted to this chart's GPU queue.
-+    /// The returned Promise owns a queue clone, not a borrow of this chart.
-+    /// Hosts may keep processing edits while waiting, and should coalesce
-+    /// display submissions until it settles. Device loss rejects the Promise.
+ 
++    /// Host fence: keep edits serialized independently of GPU completion.
 +    pub fn gpu_ready(&self) -> js_sys::Promise {
-+        let queue = self.gpu.queue().clone();
++        let (sender, receiver) = futures_channel::oneshot::channel();
++        self.gpu.queue().on_submitted_work_done(move || { let _ = sender.send(()); });
 +        wasm_bindgen_futures::future_to_promise(async move {
-+            renderer::init::wait_browser_submitted_work(&queue)
-+                .await
-+                .map_err(js_err)?;
++            receiver.await.map_err(|_| js_err("GPU completion callback was dropped"))?;
 +            Ok(JsValue::UNDEFINED)
 +        })
 +    }
 +
      pub async fn export_png(&mut self, scale: f32) -> Result<js_sys::Uint8Array, JsValue> {
-         let image = self.renderer.export(&self.chart, self.size, scale).await?;
-         let bytes = renderer::encode_png(&image).map_err(js_err)?;
-diff --git a/crates/web/src/lib.rs b/crates/web/src/lib.rs
-index 8b1224e..d4de9e4 100644
---- a/crates/web/src/lib.rs
-+++ b/crates/web/src/lib.rs
-@@ -6597,6 +6597,38 @@ mod web {
-             Ok(())
-         }
-
-+        /// Observe completion of work already submitted to this chart's GPU queue.
-+        /// The returned Promise owns a queue clone, not a borrow of this chart.
-+        /// Hosts may keep processing edits while waiting, and should coalesce
-+        /// display submissions until it settles. Device loss rejects the Promise.
-+        pub fn gpu_ready(&self) -> js_sys::Promise {
-+            let queue = self.renderer.queue().clone();
-+            wasm_bindgen_futures::future_to_promise(async move {
-+                renderer::init::wait_browser_submitted_work(&queue)
-+                    .await
-+                    .map_err(js_err)?;
-+                Ok(JsValue::UNDEFINED)
-+            })
-+        }
-+
-+        /// Prepare current annotation geometry without submitting a display frame
-+        /// or awaiting GPU completion. Uses the renderer's canonical display
-+        /// config and annotation raster path, preserving resident source data.
-+        pub fn prepare_interaction(&mut self) -> Result<(), JsValue> {
-+            let (config, panel_rect, _) = self.display_config();
-+            let chart = Chart::new(config);
-+            self.renderer
-+                .refresh_annotations(
-+                    &mut self.view,
-+                    &chart,
-+                    panel_rect,
-+                    self.selected_annotation,
-+                )
-+                .map_err(js_err)?;
-+            self.redraw_pending = true;
-+            Ok(())
-+        }
-+
-         /// Alias for [`Self::first_frame_ready`].
-         pub async fn warm_up(&mut self) -> Result<(), JsValue> {
-             self.first_frame_ready().await
+         let image = self
+             .renderer

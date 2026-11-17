@@ -34,7 +34,11 @@ Documentation = "https://github.com/shim9610/figgy-python/tree/main/docs"
 Source = "https://github.com/shim9610/figgy-python"
 Issues = "https://github.com/shim9610/figgy-python/issues"
 
+[project.scripts]
+figgyplot-mcp = "figgyplot.mcp:main"
+
 [project.optional-dependencies]
+mcp = ["mcp>=1.12,<2; python_version >= '3.10'"]
 notebook = ["anywidget>=0.9,<1"]
 desktop = []
 benchmark = ["matplotlib>=3.7; python_version < '3.9'", "matplotlib>=3.8; python_version >= '3.9'", "psutil>=5.9", "pillow>=10", "pyqtgraph>=0.13"]

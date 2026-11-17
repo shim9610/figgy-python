@@ -72,7 +72,7 @@ def validate(state):
                 raise ValueError(f'duplicate object ID: {value}')
             seen.add(value)
     owners={p['id']:{'bottom_x','top_x','left_y','right_y'} for p in panels}
-    owners.update({o:{'y_axis'} for p in panels for o in p['overlays']})
+    owners.update({o:{'x_axis','y_axis'} for p in panels for o in p['overlays']})
     modes=meta.get('tick_modes',{})
     if not isinstance(modes,dict) or any(owner not in owners or not isinstance(axes,dict)
         or set(axes)-owners[owner] or any(mode not in ('Auto','Fixed') for mode in axes.values())
@@ -132,8 +132,11 @@ def tick_owners(meta, owner, key):
 def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True, spacing=None):
     meta=state.get('identity')
     if meta is None:return
-    owner=overlay_id if overlay_id and side in ('right_y','y_axis') else panel_id
-    key='y_axis' if owner==overlay_id else side
+    axis = 'x' if side in ('bottom_x','top_x','x_axis') else 'y'
+    overlay = overlay_config(state,panel_id,overlay_id) if overlay_id else None
+    own = overlay is not None and not overlay.get('link_'+axis, axis=='x')
+    owner = overlay_id if own else panel_id
+    key = axis+'_axis' if own else side
     for member in tick_owners(meta,owner,key):
         meta.setdefault('tick_modes',{}).setdefault(member,{})[key]='Auto' if automatic else 'Fixed'
         if spacing is not None and key in ('bottom_x','left_y'):panel_config(state,member)[key]['major_spacing']=spacing
@@ -147,7 +150,7 @@ def manual_tick_patch(state, patch, panel_id=None, overlay_id=None, _claimed=Non
     """Configuration of a numeric major spacing explicitly selects fixed ticks."""
     panel_id=panel_id or state['identity']['panels'][0]['id']
     if _claimed is None:_claimed=set()
-    for key in ('bottom_x','top_x','left_y','right_y','y_axis'):
+    for key in ('bottom_x','top_x','left_y','right_y','x_axis','y_axis'):
         if isinstance(patch.get(key),dict) and 'major_spacing' in patch[key]:
             owner=overlay_id if overlay_id and key in ('right_y','y_axis') else panel_id
             claim=(tuple(sorted(tick_owners(state['identity'],owner,key))),key)
@@ -194,9 +197,10 @@ def validate_features(state):
     bounded = [k for k in ('radial', 'categorical', 'boxplot', 'radar') if state.get(k) is not None]
     if bounded and (config.get('subplots') or config.get('overlays') or config.get('polar') or series):
         raise ValueError('bounded chart families require a separate single-panel document')
+    allowed_polar={'Line','Scatter','ScatterLine','Heatmap','Contour','HeatmapContour','CategoryBars','Radar'}
+    if config.get('polar')is not None and any(not set(spec['render_type'])<=allowed_polar for spec in series.values()):
+        raise ValueError('renderer registry requires a Cartesian root for these series kinds')
     owners = {}
-    if config.get('polar') is not None and any(not set(spec['render_type']) <= {'Line', 'Scatter', 'ScatterLine'} for spec in series.values()):
-        raise ValueError('renderer 0.18 requires a Cartesian root panel when other subplots use fields, vectors, histograms or errors')
     for index, panel in enumerate([None, *config.get('subplots', [])]):
         cfg = config if panel is None else panel['config']
         selected = set(series) - {sid for p in config.get('subplots', []) for sid in p.get('series', [])} if panel is None else set(panel.get('series', []))
@@ -216,8 +220,7 @@ def validate_features(state):
             if sid in owners:
                 raise ValueError('series cannot belong to more than one subplot')
             owners[sid] = index, overlay_owners.get(sid)
-            if cfg.get('polar') is not None and not set(series[sid]['render_type']) <= {'Line', 'Scatter', 'ScatterLine'}:
-                raise ValueError('polar supports line, scatter and scatter-line series only')
+
         items = cfg.get('annotations', {}).get('items', [])
         if len({identifier(item['id']) for item in items}) != len(items):
             raise ValueError('duplicate annotation ID')

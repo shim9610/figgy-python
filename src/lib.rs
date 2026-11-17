@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Python owns data input and UI; renderer models own accepted chart settings.
 use numpy::PyReadonlyArray1;
 use pyo3::sync::MutexExt;
@@ -9,8 +10,8 @@ use pyo3::{
 use renderer::{
     Chart, ChartId, Color, Config, CpuTextMeasure, GpuPickRequest, HitId, HitMap, Renderer,
     RendererDevice, Selectable, SeriesConfig,
-    data::{ColumnPairWriter, ColumnUploadStats, HiLoColumnSource, split_f64_to_f32_pair},
-    data_render::{create_instance, request_adapter},
+    data::{ColumnPairWriter, HiLoColumnSource, split_f64_to_f32_pair},
+    data_render::create_instance,
     default, encode_png,
     layout::{ChartArea, Rect, Side},
     resize::{ALL_HANDLES, ResizeHandle},
@@ -70,6 +71,52 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
         }
         styles(&serde_json::from_str::<Value>(json).map_err(invalid)?)?;
     }
+    fn check_config_keys(value: &Value) -> PyResult<()> {
+        if let Some(obj) = value.as_object() {
+            if obj.contains_key("chart_area") && obj.contains_key("bottom_x") {
+                const KEYS: &[&str] = &[
+                    "chart_area",
+                    "top_x",
+                    "bottom_x",
+                    "left_y",
+                    "right_y",
+                    "chart_title",
+                    "grid",
+                    "legend",
+                    "picked_data",
+                    "picked_points",
+                    "colorbar",
+                    "draw_style",
+                    "polar",
+                    "ternary",
+                    "view_3d",
+                    "parallel",
+                    "overlays",
+                    "subplots",
+                    "active_layer",
+                    "annotations",
+                    "bar_groups",
+                    "line_offsets",
+                    "plot_background",
+                    "background",
+                ];
+                for key in obj.keys() {
+                    if !KEYS.contains(&key.as_str()) {
+                        return Err(invalid(format!("unknown settings field: {key}")));
+                    }
+                }
+            }
+            for v in obj.values() {
+                check_config_keys(v)?;
+            }
+        } else if let Some(items) = value.as_array() {
+            for v in items {
+                check_config_keys(v)?;
+            }
+        }
+        Ok(())
+    }
+    check_config_keys(&serde_json::from_str::<Value>(json).map_err(invalid)?)?;
     let mut de = serde_json::Deserializer::from_str(json);
     let mut unknown = Vec::new();
     let value = serde_ignored::deserialize(&mut de, |path| unknown.push(path.to_string()))
@@ -87,10 +134,10 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
 /// Renderer version stamped into Settings documents. Previous compatible
 /// documents are accepted explicitly by supported_settings_version.
 /// It names the `figgy-renderer` pin in Cargo.toml; update both together.
-const RENDERER_VERSION: &str = "0.18.1";
+const RENDERER_VERSION: &str = "0.19.0";
 
 fn supported_settings_version(schema: u32, renderer: &str) -> bool {
-    matches!(schema, 1 | 2) && matches!(renderer, "0.17.0" | "0.18.0" | RENDERER_VERSION)
+    matches!(schema, 1 | 2) && matches!(renderer, "0.17.0" | "0.18.0" | "0.18.1" | RENDERER_VERSION)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -150,40 +197,16 @@ impl Number for f32 {
 /// No Python list, temporary Vec, or retained CPU copy of source data.
 struct BorrowedColumn<'a, T> {
     values: &'a [T],
-    min: f64,
-    max: f64,
 }
 impl<T: Number> HiLoColumnSource for BorrowedColumn<'_, T> {
     fn len(&self) -> usize {
         self.values.len()
     }
-    fn min(&self) -> f64 {
-        self.min
-    }
-    fn max(&self) -> f64 {
-        self.max
-    }
-    fn write_f32_pair_le_into(&self, dst: &mut [u8]) {
-        for (chunk, value) in dst.chunks_exact_mut(8).zip(self.values) {
-            let (hi, lo) = split_f64_to_f32_pair(value.f64());
-            chunk[..4].copy_from_slice(&hi.to_le_bytes());
-            chunk[4..].copy_from_slice(&lo.to_le_bytes());
-        }
-    }
-    fn write_f32_pair_le_into_with_stats(
-        &self,
-        mut dst: ColumnPairWriter<'_>,
-    ) -> ColumnUploadStats {
-        let mut min_positive: Option<f64> = None;
+    fn write_pairs(&self, dst: &mut ColumnPairWriter<'_>) {
         for (i, value) in self.values.iter().enumerate() {
             let (hi, lo) = split_f64_to_f32_pair(value.f64());
             dst.write_pair(i, hi, lo);
-            let encoded = hi as f64 + lo as f64;
-            if (hi + lo).is_finite() && encoded.is_finite() && encoded > 0.0 {
-                min_positive = Some(min_positive.map_or(encoded, |v| v.min(encoded)));
-            }
         }
-        ColumnUploadStats { min_positive }
     }
 }
 
@@ -272,11 +295,11 @@ struct RenderTarget {
 impl FigureAccess<'_> {
     fn render(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
         self.data.readbacks += 1;
-        let device = Arc::clone(self.renderer.device());
+        let device = self.renderer.device().clone();
         let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
         let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let rendered = self.render_inner(scale);
-        self.renderer.wait_idle();
+        self.renderer.wait_idle().map_err(runtime)?;
         let validation = pollster::block_on(validation.pop());
         let oom = pollster::block_on(oom.pop());
         if let Some(error) = oom {
@@ -339,12 +362,19 @@ impl FigureAccess<'_> {
                     .map_err(runtime)?;
                 self.note_render_warnings(view.render_warnings());
             }
-            return pollster::block_on(self.renderer.export_document_rgba_with_clear_async(
-                &Chart::new(gpu::config(self.data.figure_id, self.data.chart.config())),
-                &gpu::series(self.data.figure_id, &self.data.series),
-                scale,
-                self.data.background.unwrap_or(Color::WHITE),
-            ))
+            return pollster::block_on(
+                self.renderer.export_rgba(
+                    renderer::ExportSource::Chart {
+                        chart: &Chart::new(gpu::config(
+                            self.data.figure_id,
+                            self.data.chart.config(),
+                        )),
+                        series: &gpu::series(self.data.figure_id, &self.data.series),
+                    },
+                    renderer::ExportOptions::document(scale)
+                        .with_clear(self.data.background.unwrap_or(Color::WHITE)),
+                ),
+            )
             .map_err(runtime);
         }
         let mut config = gpu::config(self.data.figure_id, self.data.chart.config());
@@ -455,17 +485,17 @@ impl FigureAccess<'_> {
             .collect::<Vec<_>>();
         let prepared = if styled {
             self.renderer
-                .prepare(&[renderer::ChartDrawItem {
-                    view: &target.view,
-                    chart_config: chart.config(),
+                .prepare(&mut [renderer::ChartDrawItem {
+                    view: &mut target.view,
+                    chart: &chart,
                     series: &drawn,
                 }])
                 .map_err(runtime)?
         } else {
             self.renderer
-                .prepare_registered(&[renderer::RegisteredChartDrawItem {
+                .prepare_registered(&mut [renderer::RegisteredChartDrawItem {
                     chart_id: self.data.chart_id,
-                    view: &target.view,
+                    view: &mut target.view,
                 }])
                 .map_err(runtime)?
         };
@@ -518,7 +548,7 @@ impl FigureAccess<'_> {
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = tx.send(result);
         });
-        self.renderer.wait_idle();
+        self.renderer.wait_idle().map_err(runtime)?;
         rx.recv().map_err(runtime)?.map_err(runtime)?;
         let mapped = slice.get_mapped_range().map_err(runtime)?;
         let mut rgba = Vec::with_capacity((target.width * target.height * 4) as usize);
@@ -561,7 +591,7 @@ impl FigureAccess<'_> {
         if !min.is_finite() {
             return Err(invalid("data has no finite values"));
         }
-        let source = BorrowedColumn { values, min, max };
+        let source = BorrowedColumn { values };
         if let Err(error) = self
             .renderer
             .add_hilo_column(gpu::column_id(self.data.figure_id, id), &source)
@@ -826,6 +856,7 @@ fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()>
         }
         return Ok(());
     }
+    config.validate_series(series).map_err(invalid)?;
     use renderer::{DataRenderType, config::DrawStyle};
     // A stylized style silently skips series it has no entry point for; the
     // renderer's own predicate says which, so none reaches it unrejected.
@@ -846,9 +877,17 @@ fn validate_draw_style(config: &Config, series: &[SeriesConfig]) -> PyResult<()>
     // Product policy on top of the renderer: the binding offers Milkyway for
     // plain lines only (the renderer also draws its scatter and errorbars).
     if matches!(config.draw_style, DrawStyle::Milkyway(_))
-        && series
-            .iter()
-            .any(|s| !matches!(s.render_type, DataRenderType::Line { .. }))
+        && series.iter().any(|s| {
+            !matches!(
+                s.render_type,
+                DataRenderType::Xy(renderer::XySeries {
+                    line: Some(_),
+                    scatter: None,
+                    errors: None,
+                    stem: None
+                })
+            )
+        })
     {
         return Err(invalid(
             "Milkyway supports line-only series; scatter and marker lines are disabled",
@@ -1039,7 +1078,7 @@ impl FigureAccess<'_> {
             let prepared = pollster::block_on(self.renderer.prewarm_all_observed(&mut |event| {
                 stages.push(json!({"scope":event.scope,"stage":event.stage,"phase":format!("{:?}",event.phase)}));
             })).map_err(runtime);
-            self.renderer.wait_idle();
+            self.renderer.wait_idle().map_err(runtime)?;
             let validation = pollster::block_on(validation.pop());
             let oom = pollster::block_on(oom.pop());
             if let Some(error) = oom { return Err(PyMemoryError::new_err(format!("GPU preparation allocation failed: {error}"))); }
@@ -1073,8 +1112,7 @@ impl FigureAccess<'_> {
         }
     }
     fn remove_column(&mut self, id: &str) -> PyResult<()> {
-        self.renderer
-            .remove_column(&gpu::column_id(self.data.figure_id, id))
+        gpu::remove_resource(self.renderer, &gpu::column_id(self.data.figure_id, id))
             .map_err(runtime)?;
         self.data.columns.remove(id);
         Ok(())
@@ -1200,6 +1238,9 @@ impl FigureAccess<'_> {
         let before = serde_json::to_value(self.snapshot()).map_err(runtime)?;
         let base_revision = self.data.revision;
         let mut next: Settings = parse(json)?;
+        if let Some(c) = next.radial.as_mut() {
+            c.normalize_labels();
+        }
         if !self.data.history.restoring_identities() {
             identity::track_identities(&before, &mut next)?;
         }
@@ -1309,12 +1350,10 @@ impl FigureAccess<'_> {
                 .filter(|s| {
                     matches!(
                         s.render_type,
-                        renderer::DataRenderType::ScatterErrorbarX { .. }
-                            | renderer::DataRenderType::ScatterErrorbarY { .. }
-                            | renderer::DataRenderType::ScatterErrorbarXY { .. }
-                            | renderer::DataRenderType::LineScatterErrorbarX { .. }
-                            | renderer::DataRenderType::LineScatterErrorbarY { .. }
-                            | renderer::DataRenderType::LineScatterErrorbarXY { .. }
+                        renderer::DataRenderType::Xy(renderer::XySeries {
+                            errors: Some(_),
+                            ..
+                        })
                     )
                 })
                 .collect();
@@ -1326,7 +1365,7 @@ impl FigureAccess<'_> {
                     .map(|s| self.renderer.begin_series_fit_extent(s))
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(runtime)?;
-                self.renderer.wait_idle();
+                self.renderer.wait_idle().map_err(runtime)?;
                 for job in jobs.into_iter().flatten() {
                     if let Some(bounds) = pollster::block_on(job.resolve()).map_err(runtime)? {
                         let bounds = if axis == "x" { bounds.x } else { bounds.y };
@@ -1354,6 +1393,97 @@ impl FigureAccess<'_> {
         if !padding.is_finite() || padding < 0.0 {
             return Err(invalid("padding must be finite and non-negative"));
         }
+        if self.data.chart.config().view_3d().is_some()
+            || self.data.chart.config().ternary().is_some()
+            || self.data.chart.config().parallel().is_some()
+            || self.data.series.iter().any(|s| {
+                !matches!(
+                    s.render_type,
+                    renderer::DataRenderType::Xy(_)
+                        | renderer::DataRenderType::Field(_)
+                        | renderer::DataRenderType::Histogram { .. }
+                        | renderer::DataRenderType::Vector { .. }
+                )
+            })
+        {
+            let specs = gpu::series(self.data.figure_id, &self.data.series);
+            let mut chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
+            let config = chart.config().clone();
+            let mut layers = vec![renderer::LayerRef::Base];
+            layers.extend((0..config.overlays.len()).map(renderer::LayerRef::Overlay));
+            for (i, subplot) in config.subplots.iter().enumerate() {
+                layers.push(renderer::LayerRef::Subplot(i));
+                layers.extend(
+                    (0..subplot.config.overlays.len())
+                        .map(|o| renderer::LayerRef::SubplotOverlay(i, o)),
+                );
+            }
+            for layer in layers {
+                if !active_only || layer == config.active_layer() {
+                    chart
+                        .auto_fit_layer_union(self.renderer.pool(), layer, &specs, padding)
+                        .map_err(runtime)?;
+                    let local = match layer {
+                        renderer::LayerRef::Subplot(i)
+                        | renderer::LayerRef::SubplotOverlay(i, _) => &config.subplots[i].config,
+                        _ => &config,
+                    };
+                    if local.view_3d().is_some()
+                        && specs.iter().any(|s| {
+                            matches!(s.render_type, renderer::DataRenderType::Vector { .. }) && {
+                                let (x, y) = config.series_fit_roles(layer, &s.series_id);
+                                x || y
+                            }
+                        })
+                    {
+                        let (x, y) = py.detach(|| -> PyResult<_> {
+                            pollster::block_on(self.renderer.ensure_errorbar_extent_engine())
+                                .map_err(runtime)?;
+                            let mut x = renderer::chart::FitExtent::EMPTY;
+                            let mut y = renderer::chart::FitExtent::EMPTY;
+                            for s in &specs {
+                                let (fit_x, fit_y) = config.series_fit_roles(layer, &s.series_id);
+                                if !(fit_x || fit_y) || s.is_dataless() {
+                                    continue;
+                                }
+                                let mut a = Chart::slot_extent(self.renderer.pool(), &s.x_column)
+                                    .map_err(runtime)?;
+                                let mut b = Chart::slot_extent(self.renderer.pool(), &s.y_column)
+                                    .map_err(runtime)?;
+                                if let Some(job) =
+                                    self.renderer.begin_series_fit_extent(s).map_err(runtime)?
+                                {
+                                    self.renderer.wait_idle().map_err(runtime)?;
+                                    if let Some(e) =
+                                        pollster::block_on(job.resolve()).map_err(runtime)?
+                                    {
+                                        a = renderer::chart::FitExtent {
+                                            min: e.x.min,
+                                            max: e.x.max,
+                                            min_positive: e.x.min_positive,
+                                        };
+                                        b = renderer::chart::FitExtent {
+                                            min: e.y.min,
+                                            max: e.y.max,
+                                            min_positive: e.y.min_positive,
+                                        };
+                                    }
+                                }
+                                if fit_x {
+                                    x.union(&a);
+                                }
+                                if fit_y {
+                                    y.union(&b);
+                                }
+                            }
+                            Ok((x, y))
+                        })?;
+                        chart.auto_fit_layer_extent(layer, &x, &y, padding);
+                    }
+                }
+            }
+            return self.commit_config(gpu::local_config(self.data.figure_id, chart.config()));
+        }
         let extents = py.detach(|| -> PyResult<Vec<[renderer::chart::FitExtent; 2]>> {
             pollster::block_on(self.renderer.ensure_errorbar_extent_engine()).map_err(runtime)?;
             let specs = gpu::series(self.data.figure_id, &self.data.series);
@@ -1371,7 +1501,7 @@ impl FigureAccess<'_> {
                         .map_err(runtime)?,
                 );
             }
-            self.renderer.wait_idle();
+            self.renderer.wait_idle().map_err(runtime)?;
             for (i, job) in jobs.into_iter().enumerate() {
                 if let Some(job) = job {
                     extents[i] =
@@ -1451,7 +1581,8 @@ impl FigureAccess<'_> {
             let map = frame.decorations();
             let annotations = self.document_annotations()?;
             return Ok(
-                match annotations.hit_test_active_layer(
+                match radial_compat::hit_test_layer(
+                    &annotations,
                     self.data.document.as_ref().unwrap().chart.active_layer(),
                     map,
                     [x, y],
@@ -1500,14 +1631,14 @@ impl FigureAccess<'_> {
                 .and_then(|v| v.parse::<usize>().ok())
         {
             let frame = self.document_annotations()?;
-            let value = frame.annotations().find(index).and_then(|id|frame.annotations().selection_box(id)).map(|b|json!({"rect":[b.rect.x,b.rect.y,b.rect.width,b.rect.height],"handles":b.handles.iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>()}));
+            let value = frame.annotations().find(index).and_then(|id|frame.annotations().selection_box(id)).map(|b|json!({"rect":[b.rect().x,b.rect().y,b.rect().width,b.rect().height],"handles":b.handles().iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>()}));
             return serde_json::to_string(&value).map_err(runtime);
         }
 
         if target.starts_with("annotation:") {
             let view = self.annotation_view()?;
             let map = view.annotation_map();
-            let value = map.find(self.annotation_index(target)?).and_then(|id| map.selection_box(id)).map(|b| json!({"rect":[b.rect.x,b.rect.y,b.rect.width,b.rect.height],"handles":b.handles.iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>() }));
+            let value = map.find(self.annotation_index(target)?).and_then(|id| map.selection_box(id)).map(|b| json!({"rect":[b.rect().x,b.rect().y,b.rect().width,b.rect().height],"handles":b.handles().iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>() }));
             return serde_json::to_string(&value).map_err(runtime);
         }
 
@@ -1518,14 +1649,14 @@ impl FigureAccess<'_> {
                 .entries()
                 .find(|(_, e)| e.id.element_id() == target)
                 .ok_or_else(|| invalid("unknown decoration"))?;
-            let value=map.selection_box(id).map(|b|json!({"rect":[b.rect.x,b.rect.y,b.rect.width,b.rect.height],"handles":b.handles.iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>()}));
+            let value=map.selection_box(id).map(|b|json!({"rect":[b.rect().x,b.rect().y,b.rect().width,b.rect().height],"handles":b.handles().iter().map(|r|vec![r.x,r.y,r.width,r.height]).collect::<Vec<_>>()}));
             return serde_json::to_string(&value).map_err(runtime);
         }
         let id = self.element(target)?;
         let measure = CpuTextMeasure::for_style(&self.data.chart.config().draw_style);
         let value = self.data.hitmap.selection_box(id, self.data.chart.config(), &measure).map(|b| json!({
-            "rect": [b.rect.x, b.rect.y, b.rect.width, b.rect.height],
-            "handles": b.handles.iter().map(|r| vec![r.x, r.y, r.width, r.height]).collect::<Vec<_>>()
+            "rect": [b.rect().x, b.rect().y, b.rect().width, b.rect().height],
+            "handles": b.handles().iter().map(|r| vec![r.x, r.y, r.width, r.height]).collect::<Vec<_>>()
         }));
         serde_json::to_string(&value).map_err(runtime)
     }
@@ -1594,11 +1725,11 @@ impl FigureAccess<'_> {
                 .ok_or_else(|| invalid("unknown resize handle"))?;
             el.as_resizable()
                 .ok_or_else(|| invalid("element cannot be resized"))?
-                .resize_by(&mut cfg, h, dx, dy)
+                .resize_by(&mut cfg, &CpuTextMeasure::default(), h, dx, dy)
         } else {
             el.as_draggable()
                 .ok_or_else(|| invalid("element cannot be dragged"))?
-                .drag_by(&mut cfg, dx, dy)
+                .drag_by(&mut cfg, &CpuTextMeasure::default(), dx, dy)
         };
         if result == renderer::layout::NudgeResult::Moved {
             self.commit_config(cfg)?;
@@ -1623,7 +1754,7 @@ impl FigureAccess<'_> {
                 .renderer
                 .pick_chart_data(self.data.chart_id, request)
                 .map_err(runtime)?;
-            self.renderer.wait_idle();
+            self.renderer.wait_idle().map_err(runtime)?;
             pollster::block_on(ticket.resolve()).map_err(runtime)
         })?;
         let picked = picked.map(|p| {
@@ -1655,9 +1786,9 @@ impl FigureAccess<'_> {
             return Ok(());
         }
         let mut cfg = self.data.chart.config().clone();
-        if cfg.picked_data.is_some() || cfg.picked_points.is_some() {
+        if cfg.picked_data.is_some() {
             cfg.picked_data = None;
-            cfg.picked_points = None;
+
             self.commit_config(cfg)?;
         }
         Ok(())
@@ -1693,6 +1824,8 @@ impl FigureAccess<'_> {
 mod annotation_edit;
 mod axis_edit;
 mod bounded;
+mod chart_api;
+mod composite;
 mod desktop;
 mod document_fit;
 mod drawing;
@@ -1704,11 +1837,13 @@ mod interaction;
 mod navigation;
 mod notebook;
 mod property_catalog;
+mod radial_compat;
 mod target_chooser;
 mod tick_policy;
 mod ui_fonts;
 use identity::{validate_columns, validate_identity};
 mod selection;
+mod selection_019;
 
 #[pyclass(module = "figgyplot._native")]
 struct NativeFigure {
@@ -1743,6 +1878,23 @@ impl NativeFigure {
     }
     fn upload_column(&self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
         self.with(|core| core.upload_column(id, array))
+    }
+    fn upload_composite(
+        &self,
+        kind: &str,
+        id: &str,
+        data: &Bound<'_, pyo3::types::PyDict>,
+    ) -> PyResult<()> {
+        self.with(|c| c.upload_composite(kind, id, data))
+    }
+    fn export_bytes<'py>(
+        &self,
+        py: Python<'py>,
+        format: &str,
+        scale: f32,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let data = self.with(|c| c.export_format(format, scale))?;
+        Ok(PyBytes::new(py, &data))
     }
     fn remove_column(&self, id: &str) -> PyResult<()> {
         self.with(|core| core.remove_column(id))
@@ -1897,6 +2049,11 @@ impl NativeFigure {
 #[pymodule(gil_used = true)]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NativeFigure>()?;
+    m.add_function(wrap_pyfunction!(chart_api::series_template_json, m)?)?;
+    m.add_function(wrap_pyfunction!(chart_api::format_radial_labels_json, m)?)?;
+    m.add_function(wrap_pyfunction!(chart_api::coordinate_defaults_json, m)?)?;
+    m.add_function(wrap_pyfunction!(chart_api::transform_settings_json, m)?)?;
+    m.add_function(wrap_pyfunction!(chart_api::convert_legacy_chart_json, m)?)?;
     m.add_function(wrap_pyfunction!(gpu::release_gpu, m)?)?;
     m.add_function(wrap_pyfunction!(gpu::collect_gpu, m)?)?;
     m.add_class::<notebook::NotebookFigure>()?;
@@ -1940,7 +2097,7 @@ fn font_family_available(family: &str) -> bool {
 /// superscript/subscript character mapping.
 #[pyfunction]
 fn text_segments_json(text: &str) -> PyResult<String> {
-    serde_json::to_string(&renderer::text::rich_segments_from_text(text)).map_err(runtime)
+    serde_json::to_string(&renderer::text::rich_segments_from_label(text)).map_err(runtime)
 }
 
 /// The text whose renderer segments are exactly `json`, when there is one.
