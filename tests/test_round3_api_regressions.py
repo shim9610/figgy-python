@@ -62,20 +62,16 @@ def test_colorbar_label_pixels_are_separate_from_ticks_and_inside_canvas(dpi, si
 @pytest.mark.parametrize('horizontal', [False, True])
 def test_categorical_limits_are_guarded_without_partial_edits(backend, horizontal):
     with fg.Figure(backend=backend) as fig:
-        ax = fig.axes[0]
-        (ax.barh if horizontal else ax.bar)(['A', 'B'], [2, 3])
-        before, revision = fig.get_settings(), fig.revision
-        uploads = fig.info.get('column_uploads')
-        setter = ax.set_xlim if horizontal else ax.set_ylim
-        with pytest.raises(NotImplementedError, match='categorical.*automatic.*range'):
-            setter(0, 10)
-        assert fig.get_settings() == before
-        assert fig.revision == revision
-        assert fig.info.get('column_uploads') == uploads
-        for getter in (ax.get_xlim, ax.get_ylim):
-            with pytest.raises(NotImplementedError, match='automatic bounded-axis limits'):
-                getter()
-        assert fig.get_settings() == before and fig.revision == revision
+        ax=fig.axes[0];(ax.barh if horizontal else ax.bar)(['A','B'],[2,3])
+        before=fig.get_settings();uploads=fig.info.get('column_uploads')
+        setter=ax.set_xlim if horizontal else ax.set_ylim
+        getter=ax.get_xlim if horizontal else ax.get_ylim
+        setter(0,10);assert getter()==(0,10)
+        assert fig.get_settings()['series']==before['series']
+        assert fig.info.get('column_uploads')==uploads
+        checkpoint=fig.get_settings()
+        with pytest.raises(ValueError):setter(float('nan'),10)
+        assert fig.get_settings()==checkpoint
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])

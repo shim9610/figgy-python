@@ -239,7 +239,13 @@ class Text:
                         state[family(state)], segments=_segments(value, dpi=fig.dpi)
                     )
                 else:
-                    rich["segments"] = _segments(value, dpi=fig.dpi)
+                    segments = _segments(value, dpi=fig.dpi)
+                    if self.role == 'title':
+                        import unicodedata
+                        chars = [s['text'] for s in segments]
+                        if len(segments)>512 or chars.count('\n')>7 or any(unicodedata.category(c)=='Cc' and c not in ('\n','\t') for c in chars):
+                            raise ValueError('chart title permits 512 characters, eight lines and no control characters')
+                    rich["segments"] = segments
             elif key in ("fontweight", "fontstyle"):
                 if key == "fontweight":
                     if value not in ("normal", "bold", 400, 700):
@@ -469,6 +475,7 @@ class Axis:
         return AxisLine(self)
 
     def set_label_text(self, label, **kwargs):
+        if label:kwargs.setdefault("visible", True)
         self.label.set(text=label, **kwargs)
         return self.label
 

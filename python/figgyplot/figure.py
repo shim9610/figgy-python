@@ -606,7 +606,10 @@ class Figure(FigureMethods):
             if self._style_batch is not None:
                 self._style_batch = settings
                 return self
-            self._native.apply_settings(json.dumps(settings, allow_nan=False))
+            if self.backend == 'native':
+                self._native.apply_settings(json.dumps(settings, allow_nan=False), dpi=self.dpi)
+            else:
+                self._native.apply_settings(json.dumps(settings, allow_nan=False))
             accepted = json.loads(self._native.settings_json())
             if 'identity' in accepted:
                 self.axes = [self._axes_for(p['id'], overlay) for p in accepted['identity']['panels']
@@ -1920,7 +1923,9 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
                     raise NotImplementedError('bounded axis labels share chart typography')
                 legacy = {'font' if k=='fontfamily' else k:v for k,v in properties.items()}
                 self.figure.update('axis_title_bottom' if role=='xlabel' else 'axis_title_left', _axes=self, text=text, **legacy)
-            else: handle.set(text=text, **properties)
+            else:
+                if role in ('xlabel', 'ylabel') and text:properties.setdefault('visible', True)
+                handle.set(text=text, **properties)
             if offset is not None:
                 # Existing offset= uses pixels; the new Text.set_offset uses points.
                 handle.set_offset(tuple(float(v)*72/self.figure.dpi for v in offset))

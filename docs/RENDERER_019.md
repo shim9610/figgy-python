@@ -1,10 +1,10 @@
 # Renderer 0.19 Python API
 
-This development integration is not release-ready. See the
-[compatibility audit and remaining failures](RENDERER_019_AUDIT.md).
+This development integration awaits the official upstream 0.19 release and final
+package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/e68922d73ca6bc43c86adcd081355a67e0b98ef3).
+[integration revision](https://github.com/shim9610/figgy/commit/c9828223409b8a9253e011572955aa7a729c7efe).
 Settings identify this integration as `0.19.0`. The upstream branch still declares
 renderer package version `0.18.1`; the Git revision pins the actual API and shader
 source. Rebuild the browser module with `scripts/build-wasm.sh` when changing it.
@@ -164,3 +164,42 @@ construction (`chart_add`), inspection and editing (`figure_get`, `figure_patch`
 themes and layout (`figure_theme`, `figure_layout`), file output (`figure_export`)
 and resource release (`figure_close`). Chart construction uses the Python method
 arguments and validation. Tools do not evaluate arbitrary Python code.
+
+## Named category-chart editing
+
+Bars, boxes and radar plots expose the existing `ax.chart` editing handles over
+common renderer series. IDs come from `get_series()` and `get_categories()`:
+
+```python
+import figgyplot as fg
+
+fig, ax = fg.subplots(backend="native")
+ax.bar(["A", "B"], [2.25, 6.75])
+sid = next(iter(ax.chart.get_series()))
+cid = next(iter(ax.chart.get_categories()))
+ax.chart.series(sid).set_label("Measured").set_style(linewidth=1.5)
+ax.chart.cell(cid, sid).set_color("red").set_value_labels(position="outside")
+ax.chart.set_value_labels(format="value", decimals=2, suffix=" eV")
+ax.chart.decoration("value_label", category=cid, series=sid).set_offset((2, 3))
+ax.chart.set_plot_bounds((70, 45, 300, 200))  # points: left, top, width, height
+ax.chart.set_plot_bounds()                  # measured automatic layout
+```
+
+Coordinate-chart decimals are integers from 0 through 6. Bar percentages are
+shares across series within each category. Box labels use median/sample count;
+radar labels use the vertex values. Cell overrides apply to bars and boxes.
+Series styles on the common model are resolved per series; resetting a series
+uses renderer defaults, while resetting a cell restores series inheritance.
+`ax.chart.get_style()` reports the first matching series' effective appearance.
+Spoke label offsets use points along/across that spoke, as defined by the renderer.
+Radar selection uses rings; the old `emphasis_brightness` option is rejected
+because it has no equivalent in the common series model.
+
+`fig.apply_style(...)`, Figure style defaults and execution `style_context(...)`
+apply family-specific presets as well as shared typography. Explicit constructor
+arguments take precedence. Lengths in portable tokens and named controls use points.
+
+SVG/PDF page dimensions follow Figure inches at every DPI. For example,
+`Figure(figsize=(4, 3), dpi=72)` exports a 288×216 pt page; `scale=2` increases
+embedded raster resolution without changing its physical dimensions. The native
+save dialog, `savefig`, and notebook `await fig.savefig_async(...)` use this rule.

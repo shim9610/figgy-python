@@ -70,6 +70,71 @@ pub fn transform_settings_json(
     argument: &str,
 ) -> PyResult<String> {
     let mut state: Settings = parse(settings)?;
+    if operation == "annotation_offset" {
+        use renderer::drag::DragConfig;
+        use renderer::text::MeasureText;
+        let arg: Value = parse(argument)?;
+        let panel = arg["panel"]
+            .as_u64()
+            .ok_or_else(|| invalid("missing panel"))? as usize;
+        let index = arg["index"]
+            .as_u64()
+            .ok_or_else(|| invalid("missing annotation index"))? as usize;
+        let cfg = if panel == 0 {
+            &mut state.config
+        } else {
+            &mut state
+                .config
+                .subplots
+                .get_mut(panel - 1)
+                .ok_or_else(|| invalid("unknown panel"))?
+                .config
+        };
+        let item = cfg
+            .annotations
+            .items
+            .get(index)
+            .ok_or_else(|| invalid("annotation index out of range"))?;
+        let measure = CpuTextMeasure::for_style(&cfg.draw_style);
+        use renderer::annotation::{AnnotationElement, AnnotationKind, MeasuredText};
+        let (rich, padding) = match &item.kind {
+            AnnotationKind::Text {
+                text, box_style, ..
+            } => (Some(text), box_style.as_ref().map_or(0., |s| s.padding)),
+            AnnotationKind::Arrow { text, .. } => (text.as_ref(), 0.),
+            AnnotationKind::ReferenceLine { label, .. } => (label.as_ref(), 0.),
+            _ => (None, 0.),
+        };
+        let text = rich.map(|rt| {
+            let e = measure.measure_rich(rt);
+            MeasuredText {
+                size: [e.width + padding * 2., e.ascent + e.descent + padding * 2.],
+                ascent: e.ascent,
+                padding,
+                em: rt.font_size,
+            }
+        });
+        let element = AnnotationElement {
+            index,
+            space: renderer::annotation::pixel_space_for_config(cfg),
+            text,
+            handle: None,
+        };
+        let number = |key: &str| {
+            arg[key]
+                .as_f64()
+                .filter(|v| v.is_finite())
+                .map(|v| v as f32)
+                .ok_or_else(|| invalid("offset must be finite"))
+        };
+        let result = cfg
+            .annotations
+            .nudge(element, &measure, number("dx")?, number("dy")?);
+        if result != renderer::layout::NudgeResult::Moved {
+            return Err(invalid(format!("annotation move rejected: {result:?}")));
+        }
+        return serde_json::to_string(&state).map_err(runtime);
+    }
     if let Some(radial) = state.radial.as_mut() {
         if operation == "theme" {
             radial.apply_theme(argument).map_err(invalid)?;

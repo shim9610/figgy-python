@@ -154,13 +154,15 @@ impl FigureAccess<'_> {
             else {
                 return Err(invalid("legacy chart requires migration"));
             };
-            return r
+            let bytes = r
                 .export_bytes_blocking(c, (area.width, area.height), options, format)
-                .map_err(runtime);
+                .map_err(runtime)?;
+            return self.physical_export(bytes, format);
         }
         let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
         let series = gpu::series(self.data.figure_id, &self.data.series);
-        self.renderer
+        let bytes = self
+            .renderer
             .export_bytes_blocking(
                 renderer::ExportSource::Chart {
                     chart: &chart,
@@ -169,6 +171,20 @@ impl FigureAccess<'_> {
                 options,
                 format,
             )
-            .map_err(runtime)
+            .map_err(runtime)?;
+        self.physical_export(bytes, format)
+    }
+    fn physical_export(&self, data: Vec<u8>, format: renderer::ExportFormat) -> PyResult<Vec<u8>> {
+        let name = match format {
+            renderer::ExportFormat::Svg => "svg",
+            renderer::ExportFormat::Pdf => "pdf",
+            _ => return Ok(data),
+        };
+        Python::attach(|py| {
+            py.import("figgyplot._export_size")?
+                .getattr("physical_size")?
+                .call1((PyBytes::new(py, &data), name, self.data.code_dpi))?
+                .extract()
+        })
     }
 }

@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.29", features = ["extension-module"] }
 numpy = "0.29"
-renderer = { package = "figgy-renderer", git = "https://github.com/shim9610/figgy.git", rev = "e68922d73ca6bc43c86adcd081355a67e0b98ef3", features = ["serde"] }
+renderer = { package = "figgy-renderer", git = "https://github.com/shim9610/figgy.git", rev = "c9828223409b8a9253e011572955aa7a729c7efe", features = ["serde"] }
 wgpu = "30"
 pollster = "1"
 serde = { version = "1", features = ["derive"] }

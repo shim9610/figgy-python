@@ -63,13 +63,14 @@ unreleased Git revision for the native renderer/model and bundled WASM; see
 manifests still report renderer 0.18.1 and model 0.12.1. These are development
 pins, not evidence that 0.19 has been published.
 
-The [integration audit](RENDERER_019_AUDIT.md) records unresolved compatibility
-and export-sizing failures; the current PR is not release-ready.
+The [integration audit](RENDERER_019_AUDIT.md) records the editing, style, label
+formatting and physical export-size repairs and their validation. Publication
+still requires the official upstream release and matching final package pins.
 
 Release this Python update after upstream renderer 0.19 and its matching model
-are officially available and those failures have been resolved. At that point:
+are officially available. At that point:
 
-1. Include the final upstream fixes (including figgy issues #308 and #309),
+1. Include the final upstream fixes (including figgy issues #308, #309 and #318),
    replace the development Git dependency with the exact published renderer
    version, and regenerate the registry lockfile.
 2. Rebuild WASM from the matching clean release revision. Check native/model
@@ -82,8 +83,8 @@ are officially available and those failures have been resolved. At that point:
    the workflow or bypass its artifact and installation checks.
 
 The rebuild applies `scripts/wasm-host.patch` only to a disposable web host
-copy, exposing GPU completion and interaction preparation through public
-renderer APIs. Provenance records its hash; preflight rejects a mismatched
+copy, exposing GPU completion, interaction preparation and label formatting through
+public renderer/model APIs. Provenance records its hash; preflight rejects a mismatched
 patch or changes outside the permitted web host files. Do not edit provenance
 by hand to bypass a source mismatch. Development source builds require the
 pinned Git dependency; release source builds will fetch published Rust packages.

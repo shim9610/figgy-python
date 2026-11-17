@@ -54,8 +54,13 @@ def test_all_task_profiles_inherit_in_both_backends(profile,kind,backend):
         if kind=='line':close_color(body(fig)['line']['line_color'],token.appearance['palette'][0])
         else:
             family={'bar':'categorical','box':'boxplot','pie':'radial','radar':'radar'}[kind]
-            close_color(state[family]['background'],token.appearance['background'])
-            assert state[family]['font_size']==pytest.approx(PROFILES[profile]['font']*fig.dpi/72)
+            if family == 'radial':
+                close_color(state[family]['background'],token.appearance['background'])
+                size = state[family]['font_size']
+            else:
+                close_color(state['background'],token.appearance['background'])
+                size = state['config']['bottom_x']['label_style']['font_size']
+            assert size==pytest.approx(PROFILES[profile]['font']*fig.dpi/72)
     finally:fig.close()
 
 
@@ -269,7 +274,7 @@ def test_role_map_existing_series_and_solid_contour_contrast():
 def test_single_bounded_series_key_and_ambiguous_multi_series_guard():
     with fg.Figure(backend='webgpu',style='dashboard.operations') as fig:
         fig.axes[0].bar(['a','b'],[1,2],style_key='critical')
-        close_color(fig.get_settings()['categorical']['series'][0]['color'],_color('#ff7c85'))
+        close_color(body(fig)['color'],_color('#ff7c85'))
     with fg.Figure(backend='webgpu',style='dashboard.operations') as fig:
         before=fig.get_settings()
         with pytest.raises(ValueError,match='one series'):
@@ -285,9 +290,9 @@ def test_default_equal_font_and_bounded_style_overrides():
         close_color(rich['color'],_color('black'))
     with fg.Figure(backend='webgpu',style='dashboard.operations') as fig:
         fig.axes[0].bar(['a','b'],[1,2],font_size=18,style=dict(corner_radius=0),color='black')
-        chart=fig.get_settings()['categorical']
-        assert chart['font_size']==18 and chart['style']['corner_radius']==0
-        close_color(chart['series'][0]['color'],_color('black'))
+        chart=fig.get_settings()['config']
+        assert chart['bottom_x']['label_style']['font_size']==18 and body(fig)['style']['corner_radius']==0
+        close_color(body(fig)['color'],_color('black'))
 
 
 @pytest.mark.parametrize('theme',['light','dark'])
@@ -317,13 +322,14 @@ def test_marker_encodings_do_not_repeat_within_declared_capacity():
 
 
 def test_physical_font_limit_is_reported_without_shrinking():
+    # Common axes support physical typography above the old bounded 32px cap.
     with fg.Figure(backend='webgpu',dpi=300,style='print.monochrome') as fig:
+        fig.axes[0].boxplot([1,2,3,4])
+        expected=fg.styles.preset('print.monochrome').appearance['typography']['font_size']*300/72
+        assert fig.get_settings()['config']['bottom_x']['label_style']['font_size']==pytest.approx(expected)
         before=fig.get_settings()
-        with pytest.raises(ValueError,match='8..32'):fig.axes[0].boxplot([1,2,3,4])
+        with pytest.raises(ValueError):fig.axes[0].chart.set_label_style(fontsize=-1)
         assert fig.get_settings()==before
-        # A caller can choose valid renderer pixels explicitly for this family.
-        fig.axes[0].boxplot([1,2,3,4],font_size=32)
-        assert fig.get_settings()['boxplot']['font_size']==32
 
 
 def test_one_shot_and_bounded_palette_exhaustion_are_reported():

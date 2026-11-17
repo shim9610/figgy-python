@@ -1232,6 +1232,7 @@ impl FigureAccess<'_> {
             let mut series = self.data.series.clone();
             series.extend(parse::<Vec<SeriesConfig>>(json)?);
             let config: Config = parse(config)?;
+            self.format_value_labels(&config, &mut series)?;
             validate_config(&config)?;
             validate_draw_style(&config, &series)?;
             self.renderer
@@ -1286,6 +1287,7 @@ impl FigureAccess<'_> {
         }
         validate_config(&next.config)?;
         validate_background(next.background)?;
+        self.format_value_labels(&next.config, &mut next.series)?;
         validate_draw_style(&next.config, &next.series)?;
         let document = next.document()?;
         if document.as_ref().map(|d| d.family())
@@ -1307,7 +1309,7 @@ impl FigureAccess<'_> {
         // Settings cannot introduce, remove or silently reconnect source arrays.
         if next.series.len() != self.data.series.len()
             || next.series.iter().zip(&self.data.series).any(|(a, b)| {
-                a.series_id != b.series_id || a.x_column != b.x_column || a.y_column != b.y_column
+                !value_labels::same_sources(a, b, &next.config, self.data.chart.config())
             })
         {
             return Err(invalid(
@@ -1923,6 +1925,7 @@ mod ui_fonts;
 use identity::{validate_columns, validate_identity};
 mod selection;
 mod selection_019;
+mod value_labels;
 
 #[pyclass(module = "figgyplot._native")]
 struct NativeFigure {
@@ -1996,8 +1999,18 @@ impl NativeFigure {
     fn add_series_batch(&self, py: Python<'_>, json: &str, config: &str) -> PyResult<()> {
         self.with(|core| core.add_series_batch(py, json, config))
     }
-    fn apply_settings(&self, json: &str) -> PyResult<()> {
-        self.with(|core| core.apply_settings(json))
+    #[pyo3(signature=(json, dpi=None))]
+    fn apply_settings(&self, json: &str, dpi: Option<f64>) -> PyResult<()> {
+        if dpi.is_some_and(|v| !v.is_finite() || v <= 0.) {
+            return Err(invalid("dpi must be positive and finite"));
+        }
+        self.with(|core| {
+            core.apply_settings(json)?;
+            if let Some(dpi) = dpi {
+                core.data.code_dpi = dpi;
+            }
+            Ok(())
+        })
     }
     fn edit_history_json(&self) -> PyResult<String> {
         self.with(|core| Ok(core.data.history.status().to_string()))
@@ -2128,6 +2141,7 @@ impl NativeFigure {
 #[pymodule(gil_used = true)]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NativeFigure>()?;
+    m.add_function(wrap_pyfunction!(value_labels::format_value_labels_json, m)?)?;
     m.add_function(wrap_pyfunction!(chart_api::series_template_json, m)?)?;
     m.add_function(wrap_pyfunction!(chart_api::format_radial_labels_json, m)?)?;
     m.add_function(wrap_pyfunction!(chart_api::coordinate_defaults_json, m)?)?;

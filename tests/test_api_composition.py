@@ -9,7 +9,8 @@ import figgyplot as fg
 
 
 def chart(fig,kind):
-    return fig.get_settings()[kind]
+    state=fig.get_settings()
+    return state['radial'] if kind=='radial' else next(iter(state['series'][0]['render_type'].values()))
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])

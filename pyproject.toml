@@ -9,7 +9,7 @@ description = "GPU plotting for NumPy with interactive editing and reusable Pyth
 readme = "PYPI_README.md"
 requires-python = ">=3.8,<3.16"
 license = "MIT OR Apache-2.0"
-dependencies = ["numpy>=1.24"]
+dependencies = ["numpy>=1.24", "pypdf>=5,<6; python_version < '3.9'", "pypdf>=6,<7; python_version >= '3.9'"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: Implementation :: CPython",

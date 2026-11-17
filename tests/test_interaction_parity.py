@@ -3014,6 +3014,8 @@ def test_renderer_019_browser_sources_selection_themes_and_vector_exports(tmp_pa
         execute("state=fig.get_settings();ref="+repr(reference)+";ref['series_id']=state['series'][0]['series_id'];state['config']['picked_data']={'refs':[ref]};fig.apply_settings(state);await fig.sync()")
         details=page.evaluate(ROOT+'.details()')
         for key,value in expected.items():assert details[key]==pytest.approx(value)
+        if reference.get('kind')=='value_label' and reference.get('part')=='level':
+            assert details['id']=='b' and details['text']=='excited' and details['part']=='level'
         for name in ('gallery','cool-slate','midnight','warm-paper'):
             page.locator('[data-theme]').select_option(name)
             execute('await fig.sync()')
@@ -3583,3 +3585,48 @@ def test_renderer_019_native_diagram_layout_and_editor_exports(tmp_path, kind):
                 assert '<svg' in path.read_text() if ext == 'svg' else path.read_bytes().startswith(b'%PDF-')
         finally:
             handle.close();Inputs.pump()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_renderer_019_label_edits_and_physical_pages_in_both_hosts(tmp_path, backend):
+    from io import BytesIO
+    from xml.etree import ElementTree
+    from pypdf import PdfReader
+
+    def check(svg, pdf):
+        root = ElementTree.fromstring(svg)
+        assert float(root.attrib['width'][:-2]) == pytest.approx(288)
+        assert float(root.attrib['height'][:-2]) == pytest.approx(216)
+        page = PdfReader(BytesIO(pdf)).pages[0]
+        assert float(page.mediabox.width) == pytest.approx(288)
+        assert float(page.mediabox.height) == pytest.approx(216)
+
+    if backend == 'native':
+        with figgy.Figure(backend='native', figsize=(4, 3), dpi=72) as fig:
+            ax=fig.axes[0];ax.bar(['A','B'], [[2,6],[6,2]])
+            handle=fig.show(block=False)
+            try:
+                inputs=Inputs(handle)
+                ax.chart.set_value_labels(position='outside', format='percent', decimals=2)
+                inputs.pump()
+                assert fig.get_settings()['series'][0]['render_type']['CategoryBars']['labels']['text'] == ['25%','75%']
+                paths={ext:tmp_path/('physical-page.'+ext) for ext in ('svg','pdf')}
+                for ext,path in paths.items():
+                    inputs.click('save');inputs.click('save_path');inputs.key('ctrl+a')
+                    inputs.xdo('type','--clearmodifiers',str(path));inputs.pump();inputs.click('save_confirm')
+                    assert not inputs.info()['error'] and path.exists()
+                check(paths['svg'].read_text(), paths['pdf'].read_bytes())
+            finally:handle.close();Inputs.pump()
+        return
+    source="import figgyplot as fg\nfig=fg.Figure(backend='webgpu',figsize=(4,3),dpi=72)\nax=fig.axes[0]\nax.bar(['A','B'],[[2,6],[6,2]])\ndisplay(fig.widget())"
+    with notebook(tmp_path/'browser-physical-pages',source) as (page, execute):
+        execute("await fig.sync();assert not fig._native.columns;ax.chart.set_value_labels(position='outside',format='percent',decimals=2);await fig.sync()")
+        state=json.loads(execute("import json;print(json.dumps(fig.get_settings()))"))
+        assert state['series'][0]['render_type']['CategoryBars']['labels']['text'] == ['25%','75%']
+        execute("svg=await fig.export_async('svg',scale=2);pdf=await fig.export_async('pdf',scale=2)")
+        svg=execute('print(svg)')
+        pdf=base64.b64decode(execute('import base64;print(base64.b64encode(pdf).decode())'))
+        check(svg,pdf)
+        execute("state=fig.get_settings();sid=state['series'][0]['series_id'];state['series'][0]['render_type']['CategoryBars']['labels']['text']=['Manual A','Manual B'];fig.apply_settings(state);await fig.sync();ax.chart.cell('category_0',sid).set_color('red');await fig.sync();assert fig.get_settings()['series'][0]['render_type']['CategoryBars']['labels']['text']==['Manual A','Manual B']")
+        assert not page.locator('.figgy-error').inner_text()

@@ -71,6 +71,50 @@ BOUNDED_STYLE = {
     'radar': dict(grid_shape=True, spoke_color=RGBA, ring_color=RGBA, line_width_px=True,
         fill_opacity=True, marker=True, marker_size_px=True, emphasis_brightness=True),
 }
+COORDINATE_FAMILIES = dict(CategoryBars='categorical', BoxPlot='boxplot', Radar='radar')
+
+
+def _render_schema(tag):
+    kind = COORDINATE_FAMILIES.get(tag)
+    if kind is None:
+        return RENDER
+    style = BOUNDED_STYLE[kind]
+    if kind == 'radar':
+        style = dict(line_width_px=True, fill=RGBA, marker=True, marker_size_px=True, fill_opacity=True)
+    elif kind == 'boxplot':
+        style = dict(style, notched=True, show_mean=True, show_outliers=True)
+    return dict(color=RGBA, style=style)
+
+
+def _coordinate_patch(cfg, body, kind, patch, *, container=True):
+    """Translate portable family appearance onto the common chart model."""
+    style = copy.deepcopy(patch.get('style', {}))
+    if kind == 'radar':
+        if container:
+            for key, dst in [('spoke_color', 'major_x_color'), ('ring_color', 'major_y_color')]:
+                if key in style:cfg['grid'][dst] = copy.deepcopy(style[key])
+            if 'grid_shape' in style:cfg['polar']['grid_shape'] = style['grid_shape']
+        for key in ('line_width_px', 'marker', 'marker_size_px'):
+            if key in style:body['style'][key] = copy.deepcopy(style[key])
+        if 'fill_opacity' in style:body['style']['fill_opacity'] = style['fill_opacity']
+    else:
+        _merge(body['style'], style)
+    if 'label_decimals' in patch:body['labels']['decimals'] = patch['label_decimals']
+    if not container:return
+    if 'background' in patch:cfg['background'] = copy.deepcopy(patch['background'])
+    if 'chart_title' in patch:_merge(cfg['chart_title'], patch['chart_title'])
+    if 'legend' in patch:cfg['legend']['visible'] = patch['legend']
+    if 'grid' in patch:
+        for key in ('show_major_x', 'show_major_y'):cfg['grid'][key] = patch['grid']
+    for side in ('bottom_x','top_x','left_y','right_y'):
+        label = cfg[side]['label_style']
+        for src, dst in [('font_family','label_font'), ('font_size','font_size'), ('text_color','color')]:
+            if src in patch:label[dst] = copy.deepcopy(patch[src])
+    if kind != 'radar':
+        for src, dst in [('group_width','group_width'), ('bar_gap','bar_gap'), ('box_gap','bar_gap')]:
+            if src in patch:cfg['bar_groups'][dst] = patch[src]
+
+
 BOUNDED = dict(font_family=True, font_size=True, text_color=RGBA, label_color=RGBA,
     background=RGBA, chart_title=TITLE, grid=True, legend=True, label_decimals=True,
     group_width=True, bar_gap=True, box_gap=True)
@@ -220,7 +264,7 @@ class StyleToken:
             _check(panel,dict(config=PANEL,overlays='json'),'panels')
             for overlay in panel.get('overlays',[]):_check(overlay,dict(y_axis=AXIS),'overlays')
         for spec in a.get('series',[]):
-            _check(spec,dict(kind=True,style=RENDER),'series')
+            _check(spec,dict(kind=True,style=_render_schema(spec.get('kind'))),'series')
         for kind,style in a.get('bounded',{}).items():
             if kind not in BOUNDED_STYLE:raise ValueError('unknown bounded style family')
             _check(style,dict(BOUNDED,style=BOUNDED_STYLE[kind]),'bounded/'+kind)
@@ -303,7 +347,7 @@ def extract(figure, *, scales=False, text=False):
             appearance['panels'].append(p)
         appearance['background']=copy.deepcopy(state.get('background',dict(r=1.,g=1.,b=1.,a=1.)))
         appearance['series']=[dict(kind=next(iter(s['render_type'])),
-            style=_units(_project(next(iter(s['render_type'].values())),RENDER),unit)) for s in state['series']]
+            style=_units(_project(next(iter(s['render_type'].values())),_render_schema(next(iter(s['render_type'])))),unit)) for s in state['series']]
         if kind:
             chart=state[kind]
             appearance['bounded']={kind:_units(_project(chart,dict(BOUNDED,style=BOUNDED_STYLE[kind])),unit)}
@@ -393,8 +437,7 @@ def _render_patch(body, patch):
     """Appearance defaults can style existing components, never introduce kinds."""
     for key,value in patch.items():
         if key in body and isinstance(body[key],dict):
-            if key == 'style' and 'width_px' in value and 'width_px' not in body[key]:
-                continue  # Vector defaults do not apply to other families' style records.
+            if key == 'style':value={k:v for k,v in value.items() if k in body[key]}
             _merge(body[key],value)
 
 
@@ -418,7 +461,12 @@ def _encode_series(body, appearance, index, role=None):
         body['contour']['line']['line_style']=appearance['line_cycle'][block%len(appearance['line_cycle'])]
     if appearance.get('marker_cycle') and 'scatter' in body:
         body['scatter']['point_shape']=appearance['marker_cycle'][(index%max(1,len(palette))+block)%len(appearance['marker_cycle'])]
-    if role in appearance.get('roles',{}):_render_patch(body,appearance['roles'][role])
+    if role in appearance.get('roles',{}):
+        patch=appearance['roles'][role]
+        _render_patch(body,patch)
+        if 'color' in body:
+            for part,key in [('line','line_color'),('scatter','point_color'),('bar','fill_color')]:
+                if key in patch.get(part,{}):body['color']=copy.deepcopy(patch[part][key]);break
 
 
 class _Candidate:
@@ -474,6 +522,7 @@ def apply(figure, token, *, scales=False, text=False, size_scale=1.0,
             if kind:state[kind]['background']=copy.deepcopy(a['background'])
             else:state['background']=copy.deepcopy(a['background'])
         for cfg in targets:
+            if 'background' in a:cfg['background'] = copy.deepcopy(a['background'])
             if 'panel' in a:_panel_patch(cfg,a['panel'],kind,skipped)
             if 'colormap' in a:
                 if cfg.get('colorbar'):
@@ -515,6 +564,16 @@ def apply(figure, token, *, scales=False, text=False, size_scale=1.0,
         for i,s in enumerate(state['series']):
             tag,body=next(iter(s['render_type'].items()))
             _render_patch(body,a.get('series_defaults',{}))
+            common_kind = COORDINATE_FAMILIES.get(tag)
+            if common_kind:
+                cfg = next((p['config'] for p in state['config'].get('subplots', []) if s['series_id'] in p.get('series', [])), state['config'])
+                patch = a.get('bounded', {}).get(common_kind, {})
+                _coordinate_patch(cfg, body, common_kind, patch)
+                items = a.get('bounded_items', {}).get(common_kind, [])
+                if items:
+                    count = counters.get('bounded/' + tag, 0)
+                    _merge(body, items[count % len(items)])
+                    counters['bounded/' + tag] = count + 1
             candidates=[v for v in styles if v['kind']==tag]
             selected=next((styles[k] for k,v in mapping.items() if v==s['series_id']),None)
             if selected is not None and selected['kind']!=tag:raise ValueError('series_map cannot change chart kind')
@@ -543,7 +602,7 @@ def apply(figure, token, *, scales=False, text=False, size_scale=1.0,
             for i,item in enumerate(items):
                 if itemstyles:_merge(item,itemstyles[i%len(itemstyles)])
                 if palette:item['color']=copy.deepcopy(palette[i%len(palette)])
-        elif len(a.get('bounded',{}))==1:skipped.append('bounded style: target is Cartesian')
+        elif len(a.get('bounded',{}))==1 and not any(next(iter(s['render_type'])) in COORDINATE_FAMILIES for s in state['series']):skipped.append('bounded style: target is Cartesian')
         owner=state[kind] if kind else state['config']
         annotation_counts={}
         for item in owner.get('annotations',{}).get('items',[]):
@@ -642,7 +701,7 @@ def apply(figure, token, *, scales=False, text=False, size_scale=1.0,
                     for field in ('font','font_size','color'):
                         if field in typo:body[key][field]=copy.deepcopy(typo[field])
         if isinstance(figure,_Candidate) and figure.finalize is not None:figure.finalize(state)
-        if kind:
+        if kind and not (isinstance(figure,_Candidate) and kind != 'radial'):
             maximum=64 if kind=='radial' else 32
             if not 8<=state[kind]['font_size']<=maximum:
                 raise ValueError('%s renderer font_size must be 8..%s logical pixels at this DPI; lower font_size or size_scale' % (kind,maximum))

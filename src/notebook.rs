@@ -199,7 +199,13 @@ impl NotebookFigure {
         self.history = Default::default();
         Ok(())
     }
-    fn add_series_batch(&mut self, json: &str, config: &str) -> PyResult<()> {
+    #[pyo3(signature=(json, config, formatted=None))]
+    fn add_series_batch(
+        &mut self,
+        json: &str,
+        config: &str,
+        formatted: Option<&str>,
+    ) -> PyResult<()> {
         let previous_config = self.chart.config().clone();
         let previous_series = self.series.clone();
         let revision = self.revision;
@@ -210,6 +216,20 @@ impl NotebookFigure {
             self.chart = Chart::new(config);
             for spec in parse::<Vec<SeriesConfig>>(json)? {
                 self.add_series(&serde_json::to_string(&spec).map_err(invalid)?)?;
+            }
+            if let Some(formatted) = formatted {
+                let all: Vec<SeriesConfig> = parse(formatted)?;
+                if all.len() != self.series.len()
+                    || all.iter().zip(&self.series).any(|(a, b)| {
+                        a.series_id != b.series_id
+                            || a.x_column != b.x_column
+                            || a.y_column != b.y_column
+                    })
+                {
+                    return Err(invalid("formatted labels cannot replace source bindings"));
+                }
+                validate_draw_style(self.chart.config(), &all)?;
+                self.series = all;
             }
             self.fit(0.05)
         })();
@@ -258,9 +278,10 @@ impl NotebookFigure {
             validate_model_numbers(series, "series")?;
         }
         if s.series.len() != self.series.len()
-            || s.series.iter().zip(&self.series).any(|(a, b)| {
-                a.series_id != b.series_id || a.x_column != b.x_column || a.y_column != b.y_column
-            })
+            || s.series
+                .iter()
+                .zip(&self.series)
+                .any(|(a, b)| !value_labels::same_sources(a, b, &s.config, self.chart.config()))
         {
             return Err(invalid(
                 "settings must address the same ordered series and source columns",

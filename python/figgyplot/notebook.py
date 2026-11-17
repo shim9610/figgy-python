@@ -16,6 +16,22 @@ class NotebookData:
     def __getattr__(self, key):
         return getattr(self.model, key)
 
+    def _label_column(self, id, field):
+        if field is not None:
+            record = self.composites.get(id)
+            if record is None: return None
+            id = record[1].get(field)
+        entry = self.columns.get(id)
+        if entry is None: return None
+        dtype, data = entry
+        return np.frombuffer(data, dtype=np.dtype(dtype).newbyteorder('<'))
+
+    def apply_settings(self, value):
+        if self.columns:
+            from ._native import format_value_labels_json
+            value = format_value_labels_json(value, self._label_column, self.model.settings_json())
+        return self.model.apply_settings(value)
+
     def upload_column(self, id, array):
         if self.sealed:
             raise RuntimeError(
@@ -273,7 +289,12 @@ class NotebookData:
             else:
                 continue
             self.model.cache_fit_extent(spec["series_id"], *pair)
-        return self.model.add_series_batch(spec_json, config_json)
+        from ._native import format_value_labels_json
+        previous = self.model.settings_json()
+        candidate = json.loads(previous)
+        candidate.update(config=config, series=all_specs)
+        formatted = json.loads(format_value_labels_json(json.dumps(candidate, allow_nan=False), self._label_column, previous))
+        return self.model.add_series_batch(spec_json, config_json, json.dumps(formatted['series'], allow_nan=False))
 
     def remove_column(self, id):
         self.model.remove_column(id)

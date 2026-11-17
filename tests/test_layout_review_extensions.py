@@ -50,20 +50,22 @@ def test_plot_rectangle_is_distinct_from_panel_geometry(backend):
 @pytest.mark.parametrize('family',['radar','boxplot','radial','categorical'])
 def test_bounded_plot_geometry_can_return_to_automatic(backend,family):
     with fg.Figure(backend=backend) as fig:
-        if family=='radar':fig.axes[0].radar(['A','B','C'],[2,3,4])
-        elif family=='boxplot':fig.axes[0].boxplot([[1,2,3],[2,4,6]])
-        elif family=='radial':fig.axes[0].donut([2,3,4])
-        else:fig.axes[0].bar(['A','B','C'],[2,3,4])
-        before=fig.get_settings()
+        ax=fig.axes[0]
+        if family=='radar':ax.radar(['A','B','C'],[2,3,4])
+        elif family=='boxplot':ax.boxplot([[1,2,3],[2,4,6]])
+        elif family=='radial':ax.donut([2,3,4])
+        else:ax.bar(['A','B','C'],[2,3,4])
+        fig.tight_layout();before=fig.get_settings()
         edit(fig,'data_area','Plot area/bounds',[70,60,500,400])
-        assert fig.get_settings()[family]['decorations']['data_area']==dict(x=70,y=60,width=500,height=400)
-        owner=json.loads(json.dumps(fig.get_settings()[family]));owner['decorations']=before[family]['decorations']
-        assert owner==before[family]
-        edit(fig,'data_area','Plot area/automatic',True)
+        bounds=next(f['value'] for f in object_for(fig,'data_area')['fields'] if f['id']=='Plot area/bounds')
+        assert bounds==[70,60,500,400]
+        assert fig.get_settings()['series']==before['series']
+        if family=='radial':edit(fig,'data_area','Plot area/automatic',True)
+        else:ax.chart.set_plot_bounds()
         assert fig.get_settings()==before
         edit(fig,'figure','Figure size/width',1200)
         assert fig.get_settings()['config']['chart_area']['width']==1200
-        assert fig.get_settings()[family]==before[family]
+        assert fig.get_settings()['series']==before['series']
         if backend=='native':assert fig.render_rgba().shape[1]==1200
         fig.undo();assert fig.get_settings()==before
 

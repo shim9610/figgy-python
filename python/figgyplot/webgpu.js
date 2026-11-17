@@ -459,6 +459,7 @@ export function render({model,el}) {
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
   async function geometryFrame(){
+    await formatPendingLabels();
     // Prepare the current hit map through the renderer without submitting or
     // awaiting a display frame. Keep display work coalesced behind its fence.
     resizeSurface();
@@ -582,6 +583,7 @@ export function render({model,el}) {
       else{chart.set_picked_data('null');chart.set_series('[]');const staging=clone(settings.config);delete staging.picked_data;delete staging.picked_points;chart.set_config(JSON.stringify(staging));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));}clearColor(settings.background);checkNumericConversion(settings,{...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())});
     }
     catch(e){chart.set_series('[]');chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));clearColor(old.background);local=old;throw e;}
+    if(valueLabelSignature(settings)!==valueLabelSignature(old))pendingValueLabels=true;
     local={...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};dirty=true;error.textContent='';
   }
   function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending,draft:pendingDraft};pending=null;pendingDraft=null;historyControls();stats.kernel_edit_messages++;trace('edit.post',{sequence,revision});model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
@@ -594,22 +596,21 @@ export function render({model,el}) {
   root.querySelector('[data-advanced]').before(selectedData);
   let selectedDataKey=null;
   async function selectionDetails(){
-    // Diagram label records are already document metadata. Upstream's generic
-    // ValueLabel reader currently treats them as categorical labels and cannot
-    // return the EnergyLevels record named by `part`.
-    const settings=snapshot(),reference=settings.config.picked_data?.refs?.[0];
-    if(reference?.kind==='value_label' && reference.part){
-      const series=settings.series.find(item=>item.series_id===reference.series_id);
-      const body=series?.render_type?.EnergyLevels;
-      const list={level:'levels',transition:'transitions',limit:'limits',band:'bands'}[reference.part];
-      if(body && list){
-        const record=body[list]?.[reference.category_index];
-        if(!record)throw new Error('Selected energy-level record no longer exists');
-        return {kind:reference.kind,series_id:reference.series_id,index:reference.category_index,
-                part:reference.part,record:clone(record)};
-      }
-    }
     return JSON.parse(await chart.selection_details());
+  }
+  function valueLabelSignature(state){
+    const configs=[state.config,...(state.config.subplots??[]).map(p=>p.config)];
+    const categories=axis=>(axis?.categories??[]).map(c=>[c.id,c.label]);
+    return JSON.stringify([configs.map(c=>[categories(c.bottom_x),categories(c.left_y),c.bar_groups?.direction,(c.overlays??[]).map(o=>[categories(o.x_axis),categories(o.y_axis),o.series,o.link_x,o.link_y])]),
+      state.series.flatMap(s=>Object.entries(s.render_type).filter(([kind])=>['CategoryBars','BoxPlot','Radar'].includes(kind)).map(([kind,b])=>[s.series_id,kind,s.x_column,s.y_column,b.labels?.placement,b.labels?.decimals,b.labels?.value_suffix,b.label_format,(b.overrides??[]).filter(o=>o.labels!=null||o.label_format!=null).map(o=>[o.target,o.labels,o.label_format])]))]);
+  }
+  let pendingValueLabels=false;
+  async function formatPendingLabels(){
+    if(kind||!pendingValueLabels)return;
+    pendingValueLabels=false;
+    const before=JSON.parse(chart.get_series());
+    const after=JSON.parse(await chart.format_value_labels());
+    if(!equalValue(before,after)){local=snapshot();commit();}
   }
   function selectionProperties(){
     if(kind)return;
@@ -1053,6 +1054,7 @@ export function render({model,el}) {
   function resize(){if(!chart || disposed)return;const [width,height]=displaySize();if(!resizeQueued&&(canvas.width!==width||canvas.height!==height)){resizeQueued=true;enqueue(()=>{try{return resizeSurface();}finally{resizeQueued=false;}});}}
   function recordFrame(){syncPanelFocus();if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;}
   async function readyDisplayedFrame(){
+    await formatPendingLabels();
     if(disposed)throw Error('Widget disposed');
     resizeSurface();
     do{trace('ready_frame.started');await chart.first_frame_ready();trace('ready_frame.completed');if(disposed)throw Error('Widget disposed');recordFrame();}while(resizeSurface());
@@ -1075,7 +1077,8 @@ export function render({model,el}) {
     const nextPixelRatio=devicePixelRatio||1;
     if(nextPixelRatio!==pixelRatio){pixelRatio=nextPixelRatio;resize();positionInline();}
     if(kind&&chart&&!busy&&!pendingFrame&&!frameError)enqueue(async()=>{const decoration=hoverPoint?await chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(await chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;});
-    if(chart&&!busy&&!pendingFrame&&!frameError&&(dirty||(!kind&&!chart.frame_complete())))enqueue(()=>{
+    if(chart&&!busy&&!pendingFrame&&!frameError&&(dirty||(!kind&&!chart.frame_complete())))enqueue(async()=>{
+      await formatPendingLabels();
       if((!dirty&&(kind||chart.frame_complete()))||pendingFrame||frameError)return;
       try{
         chart.frame();
@@ -1094,7 +1097,29 @@ export function render({model,el}) {
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1,format='png'){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const raw=format==='svg'?new TextEncoder().encode(await chart.export_svg(scale)):format==='pdf'?await chart.export_pdf(scale):await chart.export_png(scale);const data=bytes(raw);trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
+  let pdfLibrary=null;
+  async function physicalExport(data,format){
+    const dpi=model.get('state').dpi??96,factor=96/dpi;
+    if(format==='png'||factor===1)return data;
+    if(format==='svg'){
+      const text=new TextDecoder().decode(data),doc=new DOMParser().parseFromString(text,'image/svg+xml');
+      if(doc.querySelector('parsererror'))throw new Error('Invalid SVG export');
+      for(const key of ['width','height']){
+        const value=doc.documentElement.getAttribute(key);
+        if(!value?.endsWith('pt'))throw new Error('SVG export has no physical page size');
+        doc.documentElement.setAttribute(key,`${parseFloat(value)*factor}pt`);
+      }
+      return new TextEncoder().encode(new XMLSerializer().serializeToString(doc));
+    }
+    if(!pdfLibrary){
+      const url=URL.createObjectURL(new Blob([model.get('pdf_js')],{type:'text/javascript'}));
+      pdfLibrary=import(url).finally(()=>URL.revokeObjectURL(url));
+    }
+    const {PDFDocument}=await pdfLibrary,doc=await PDFDocument.load(data,{updateMetadata:false});
+    for(const page of doc.getPages())page.scale(factor,factor);
+    return await doc.save({useObjectStreams:false,addDefaultPage:false});
+  }
+  async function exporting(scale=1,format='png'){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const raw=format==='svg'?new TextEncoder().encode(await chart.export_svg(scale)):format==='pdf'?await chart.export_pdf(scale):await chart.export_png(scale);const data=await physicalExport(bytes(raw),format);trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');trace('state.received',{incoming_revision:state.revision});propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;pendingDraft=null;

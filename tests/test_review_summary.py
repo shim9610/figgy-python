@@ -146,14 +146,15 @@ def test_bounded_titles_and_annotations_use_editor_comment_ids(tmp_path,family):
         else:ax.radar(['A','B','C'],[2,3,4])
         ax.set_title('Before');ax.text(.2,.3,'Note',coords='ratio',id='note')
         session.start();ax.set_title('AFTER!')
-        state=fig.get_settings();state[family]['annotations']['items'][0]['kind']['Text']['anchor']['Ratio']['x']=.4
+        state=fig.get_settings();state['radial' if family=='radial' else 'config']['annotations']['items'][0]['kind']['Text']['anchor']['Ratio']['x']=.4
         fig.apply_settings(state)
-        session.comment('plot','요소 댓글',target='bounded/annotation/note')
+        prefix='bounded' if family=='radial' else 'panel/main'
+        session.comment('plot','요소 댓글',target=prefix+'/annotation/note')
         session.submit('plot','request_changes')
         _,small=check_complete(session,session.events()[0]['work_id'])
         targets={o['target']:o for o in small['figures'][0]['objects']}
-        assert targets['bounded/chart_title']['change_count']
-        assert targets['bounded/annotation/note']['change_count'] and targets['bounded/annotation/note']['comments']
+        assert targets[prefix+'/chart_title']['change_count']
+        assert targets[prefix+'/annotation/note']['change_count'] and targets[prefix+'/annotation/note']['comments']
 
 
 def test_summary_cli_details_errors_and_protocol_discovery(tmp_path):

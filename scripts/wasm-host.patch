@@ -1,10 +1,153 @@
 diff --git a/crates/web/src/web/chart.rs b/crates/web/src/web/chart.rs
 --- a/crates/web/src/web/chart.rs
 +++ b/crates/web/src/web/chart.rs
-@@ -1753,6 +1753,18 @@
+@@ -1774,6 +1774,161 @@
  
      /// Process pending pool maintenance and draw only when visual state is
      /// dirty. A clean rAF tick returns before touching the pool or surface.
++    /// Format numerical category/box/radar labels from resident GPU values.
++    /// The host supplies no retained source arrays; the public model owns formatting.
++    pub async fn format_value_labels(&mut self) -> Result<String, JsValue> {
++        use renderer::{Config, SeriesConfig};
++        fn format_host_labels(
++            config: &Config,
++            series: &mut [SeriesConfig],
++            mut read: impl FnMut(&str, Option<&str>, usize) -> Result<Vec<Option<f64>>, JsValue>,
++        ) -> Result<(), JsValue> {
++            let mut layers = Vec::new();
++            for s in series.iter() {
++                let l = config.layer_of_series(&s.series_id);
++                if !layers.contains(&l) {
++                    layers.push(l);
++                }
++            }
++            for layer in layers {
++                let panel = match layer {
++                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
++                        &config.subplots[i].config
++                    }
++                    _ => config,
++                };
++                let overlay = match layer {
++                    renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) => Some(i),
++                    _ => None,
++                };
++                let (x, y) = panel.scaling_axes(overlay);
++                let horizontal =
++                    config.bar_groups_of(layer).direction == renderer::CategoryBarDirection::Horizontal;
++                for kind in 0..3 {
++                    let indices = series
++                        .iter()
++                        .enumerate()
++                        .filter(|(_, s)| {
++                            config.layer_of_series(&s.series_id) == layer
++                                && match kind {
++                                    0 => s.render_type.category_bars().is_some(),
++                                    1 => s.render_type.box_plot().is_some(),
++                                    _ => s.render_type.radar().is_some(),
++                                }
++                        })
++                        .map(|(i, _)| i)
++                        .collect::<Vec<_>>();
++                    if indices.is_empty() {
++                        continue;
++                    }
++                    let categories = if kind == 2 {
++                        panel.bottom_x.categories.as_deref()
++                    } else if horizontal {
++                        y.categories.as_deref()
++                    } else {
++                        x.categories.as_deref()
++                    }
++                    .unwrap_or(&[]);
++                    let mut members = indices
++                        .iter()
++                        .map(|i| series[*i].clone())
++                        .collect::<Vec<_>>();
++                    let values = members
++                        .iter()
++                        .map(|s| {
++                            read(
++                                if kind == 0 && horizontal {
++                                    &s.x_column
++                                } else {
++                                    &s.y_column
++                                },
++                                if kind == 1 { Some("median") } else { None },
++                                categories.len(),
++                            )
++                        })
++                        .collect::<Result<Vec<_>, JsValue>>()?;
++                    let counts = if kind == 1 {
++                        members
++                            .iter()
++                            .map(|s| read(&s.y_column, Some("sample_count"), categories.len()))
++                            .collect::<Result<Vec<_>, JsValue>>()?
++                    } else {
++                        Vec::new()
++                    };
++                    let value =
++                        |k: usize, i: usize| values.get(k).and_then(|v| v.get(i)).copied().flatten();
++                    match kind {
++                        0 => renderer::data_config::format_labels(&mut members, categories, value),
++                        1 => renderer::data_config::format_box_plot_labels(
++                            &mut members,
++                            categories,
++                            |k, i| {
++                                value(k, i).map(|m| {
++                                    (
++                                        m,
++                                        counts
++                                            .get(k)
++                                            .and_then(|v| v.get(i))
++                                            .copied()
++                                            .flatten()
++                                            .filter(|v| *v >= 0.)
++                                            .map(|v| v as u64),
++                                    )
++                                })
++                            },
++                        ),
++                        _ => renderer::data_config::format_radar_labels(&mut members, categories, value),
++                    }
++                    for (index, member) in indices.into_iter().zip(members) {
++                        series[index] = member;
++                    }
++                }
++            }
++            Ok(())
++        }
++
++        let config = self.chart_config()?.clone();
++        let original = self.chart_series()?.to_vec();
++        let mut series = original.clone();
++        let mut plan = Vec::new();
++        format_host_labels(&config, &mut series.clone(), |id,field,count| {
++            plan.push((id.to_string(),field.map(str::to_string),count));
++            Ok(Vec::new())
++        })?;
++        let mut samples = Vec::new();
++        let mut spans = Vec::new();
++        for key in plan {
++            let (id,field,count) = &key;
++            let member = if let Some(field) = field {
++                self.renderer.pool().record(id).and_then(|record| renderer::BOX_PLOT_RECORD.iter().position(|(name,_)|*name==field).and_then(|i|record.slot().fields[i].clone()))
++            } else {Some(id.clone())};
++            let start=samples.len();
++            if let Some(id)=member {
++                if let Some(handle)=self.renderer.pool().handle_for(&id) {
++                    samples.extend((0..(*count).min(handle.len_values)).map(|i|(id.clone(),i)));
++                }
++            }
++            spans.push((key,start..samples.len()));
++        }
++        let values=self.read_selection_samples(&samples).await?;
++        let columns=spans.into_iter().map(|(key,span)|(key,values[span].iter().map(|v|v.is_finite().then_some(*v)).collect::<Vec<_>>())).collect::<std::collections::HashMap<_,_>>();
++        format_host_labels(&config,&mut series,|id,field,count|Ok(columns.get(&(id.to_string(),field.map(str::to_string),count)).cloned().unwrap_or_default()))?;
++        if series!=original {self.set_series(&serde_json::to_string(&series).map_err(js_err)?)?;}
++        self.get_series()
++    }
++
 +    /// Host fence: does not borrow the chart while GPU work completes.
 +    pub fn gpu_ready(&self) -> js_sys::Promise { self.streaming_gpu_ready() }
 +

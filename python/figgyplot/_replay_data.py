@@ -113,18 +113,6 @@ def preserve_data(source, destination):
             )
         if "labels" in body and isinstance(body["labels"], dict):
             before, after = old_body.get("labels", {}), body["labels"]
-            signature = lambda labels: (
-                labels.get("placement"),
-                labels.get("decimals"),
-                labels.get("value_suffix"),
-            )
-            if after.get("placement") not in (None, "None") and (
-                signature(before) != signature(after)
-                or old_body.get("label_format") != body.get("label_format")
-            ):
-                raise ValueError(
-                    "value-label formatting differs; format labels on the destination before appearance replay"
-                )
             if "text" in before:
                 after["text"] = copy.deepcopy(before["text"])
             else:

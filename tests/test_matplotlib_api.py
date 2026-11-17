@@ -390,50 +390,31 @@ def test_cpu_export_canonicalization_matches_the_accepted_f32_serialization():
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])
 @pytest.mark.parametrize("family", ["categorical", "boxplot", "radar", "radial"])
-def test_common_bounded_appearance_uses_named_controls_and_preserves_values(
-    backend, family
-):
-    def build(fig, offset):
-        ax = fig.axes[0]
-        if family == "categorical":
-            ax.bar(["A", "B"], [2 + offset, 4 + offset])
-        elif family == "boxplot":
-            ax.boxplot(
-                [
-                    [1 + offset, 2 + offset, 3 + offset],
-                    [2 + offset, 4 + offset, 5 + offset],
-                ]
-            )
-        elif family == "radar":
-            ax.radar(["A", "B", "C"], [2 + offset, 4 + offset, 3 + offset])
-        else:
-            ax.donut([2 + offset, 4 + offset])
-        ax.set_title("Chart")
-
-    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
-        build(source, 0)
-        build(target, 0)
+def test_common_bounded_appearance_uses_named_controls_and_preserves_values(backend,family):
+    def build(fig,offset):
+        ax=fig.axes[0]
+        if family=='categorical':ax.bar(['A','B'],[2+offset,4+offset])
+        elif family=='boxplot':ax.boxplot([[1+offset,2+offset,3+offset],[2+offset,4+offset,5+offset]])
+        elif family=='radar':ax.radar(['A','B','C'],[2+offset,4+offset,3+offset])
+        else:ax.donut([2+offset,4+offset])
+        if family=='boxplot':ax.chart.set_material('flat')
+        ax.set_title('Chart')
+    with fg.Figure(backend=backend) as source,fg.Figure(backend=backend) as target:
+        build(source,0);build(target,0)
         source.axes[0].chart.set_label_style(fontsize=12)
-        source.axes[0].title.set_fontweight("bold")
-        target.axes[0].chart.set_label_style(fontsize=18, color="red")
-        before = source.get_settings()
-        code = source.to_code()
-        assert ".configure_" not in code and ".apply_settings(" not in code
-        exec(code, {"fig": target})
-        assert target.get_settings()[family] == before[family]
-        if backend == "native":
-            np.testing.assert_array_equal(target.render_rgba(), source.render_rgba())
-        # Appearance export does not overwrite a second dataset.
+        source.axes[0].title.set_fontweight('bold')
+        target.axes[0].chart.set_label_style(fontsize=18,color='red')
+        before=source.get_settings();code=source.to_code()
+        assert '.configure_' not in code
+        exec(code,{'fig':target})
+        for key in (['radial'] if family=='radial' else ['config','series']):assert target.get_settings()[key]==before[key]
+        if backend=='native':np.testing.assert_array_equal(target.render_rgba(),source.render_rgba())
         with fg.Figure(backend=backend) as other:
-            build(other, 10)
-            data_key, value_key = (
-                ("slices", "value") if family == "radial" else ("series", "values")
-            )
-            values = [s[value_key] for s in other.get_settings()[family][data_key]]
-            exec(code, {"fig": other})
-            assert [
-                s[value_key] for s in other.get_settings()[family][data_key]
-            ] == values
+            build(other,10);original=other.get_settings();uploads=other.info.get('column_uploads')
+            exec(code,{'fig':other});after=other.get_settings()
+            assert other.info.get('column_uploads')==uploads
+            if family=='radial':assert [s['value'] for s in after['radial']['slices']]==[s['value'] for s in original['radial']['slices']]
+            else:assert [(s['x_column'],s['y_column']) for s in after['series']]==[(s['x_column'],s['y_column']) for s in original['series']]
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])

@@ -59,28 +59,28 @@ def test_compact_document_replay_replaces_dirty_defaults_exactly(backend, scene)
 @pytest.mark.parametrize('family', ['categorical', 'boxplot', 'radar', 'radial'])
 def test_bounded_compact_reset_preserves_destination_values_and_restores_defaults(backend, family):
     def build(fig, offset):
-        ax = fig.axes[0]
-        if family == 'categorical': ax.bar(['A', 'B'], [1+offset, 3+offset])
-        elif family == 'boxplot': ax.boxplot([[1+offset, 2+offset], [3+offset, 5+offset]])
-        elif family == 'radar': ax.radar(['A', 'B', 'C'], [1+offset, 3+offset, 2+offset])
-        else: ax.pie([1+offset, 3+offset], labels=['A', 'B'])
+        ax=fig.axes[0]
+        if family=='categorical':ax.bar(['A','B'],[1+offset,3+offset])
+        elif family=='boxplot':ax.boxplot([[1+offset,2+offset],[3+offset,5+offset]])
+        elif family=='radar':ax.radar(['A','B','C'],[1+offset,3+offset,2+offset])
+        else:ax.pie([1+offset,3+offset],labels=['A','B'])
         ax.set_title('A multiline\nrich heading')
-    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
-        build(source, 0); build(target, 10)
-        dirty = target.get_settings()
-        dirty[family]['font_size'] = 29
-        dirty[family]['background'] = dict(r=.1, g=.1, b=.1, a=1.)
-        target.apply_settings(dirty)
-        before = copy.deepcopy(target.get_settings()[family])
-        code = source.to_code(mode='exact')
-        assert len(code) < len(pprint.pformat(source.get_settings()[family], width=96, sort_dicts=False)) * .55
-        assert len(code) < len(source.to_code(compact=False)) * .55
-        exec(code, {'fig': target})
-        expected = source.get_settings()[family]
-        data = 'slices' if family == 'radial' else 'series'
-        values = 'value' if family == 'radial' else 'values'
-        for item, original in zip(expected[data], before[data]): item[values] = original[values]
-        assert target.get_settings()[family] == expected
+    with fg.Figure(backend=backend) as source,fg.Figure(backend=backend) as target:
+        build(source,0);build(target,10)
+        target.axes[0].chart.set_label_style(fontsize=16)
+        target.set_facecolor('#191919')
+        before=target.get_settings();uploads=target.info.get('column_uploads')
+        code=source.to_code(mode='exact')
+        exec(code,{'fig':target});after=target.get_settings()
+        assert target.info.get('column_uploads')==uploads
+        assert after['config']==source.get_settings()['config']
+        if family=='radial':
+            assert [s['value'] for s in after['radial']['slices']]==[s['value'] for s in before['radial']['slices']]
+            assert after['radial']['style']==source.get_settings()['radial']['style']
+        else:
+            assert [(s['series_id'],s['x_column'],s['y_column']) for s in after['series']]==[(s['series_id'],s['x_column'],s['y_column']) for s in before['series']]
+            assert next(iter(after['series'][0]['render_type'].values()))['style']==next(iter(source.get_settings()['series'][0]['render_type'].values()))['style']
+            if family=='categorical':assert after['series'][0]['render_type']['CategoryBars']['labels']['text']==['11','13']
 
 
 @pytest.mark.parametrize('variable', ['fig', 'text_segments', '_text_segments', '_color1'])

@@ -38,7 +38,7 @@ def meaning(state):
             result[key]={k:copy.deepcopy(chart[k]) for k in ['categories','mode','direction','kind','value_range','ring_spacing'] if k in chart}
             result[key]['items']=[{k:copy.deepcopy(v) for k,v in s.items() if k in ('id','label','value','values','explode')}
                                   for s in chart.get('slices',chart.get('series',[]))]
-            result[key]['title']=chart['title']
+            result[key]['title']=chart['chart_title']['text']['segments']
     panels=[state['config']]+[p['config'] for p in state['config'].get('subplots',[])]
     result['axes']=[{k:{p:c[k][p] for p in ['scale','min','max','major_spacing','inverted']} for k in ['bottom_x','top_x','left_y','right_y']} for c in panels]
     result['text']=[]
@@ -283,8 +283,8 @@ def test_common_typography_override_is_effective_after_extraction(kind):
         fig.apply_style(t)
         s=fig.get_settings()
         assert s['config']['chart_title']['text']['font_size']==46
-        if kind!='line':
-            chart=s['categorical' if kind=='bar' else 'radial']
+        if kind=='pie':
+            chart=s['radial']
             assert chart['font_size']==30
             assert chart['chart_title']['text']['font_size']==46
         else:assert s['config']['left_y']['label_style']['font_size']==30
@@ -320,9 +320,11 @@ def test_invalid_renderer_style_combination_is_atomic():
 
 def test_renderer_font_limit_is_reported_without_partial_application():
     with fg.Figure(dpi=144) as fig:
-        populate(fig,'bar');before=fig.get_settings()
-        token=fg.StyleToken(dict(typography=dict(font_size=17)))
-        with pytest.raises(ValueError,match='8..32 logical pixels'):fig.apply_style(token)
+        populate(fig,'bar')
+        fig.apply_style(fg.StyleToken(dict(typography=dict(font_size=17))))
+        assert fig.get_settings()['config']['left_y']['label_style']['font_size']==34
+        before=fig.get_settings()
+        with pytest.raises(ValueError):fig.apply_style(fg.StyleToken(dict(typography=dict(font_size=-1))))
         assert fig.get_settings()==before
 
 

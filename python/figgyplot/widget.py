@@ -91,6 +91,7 @@ class FigureWidget(anywidget.AnyWidget):
     columns = traitlets.List(traitlets.Bytes()).tag(sync=True)
     wasm = traitlets.Bytes().tag(sync=True)
     wasm_js = traitlets.Unicode().tag(sync=True)
+    pdf_js = traitlets.Unicode().tag(sync=True)
     status = traitlets.Unicode("initializing").tag(sync=True)
     browser_info = traitlets.Dict().tag(sync=True)
     draw_styles = traitlets.Dict().tag(sync=True)
@@ -113,7 +114,8 @@ class FigureWidget(anywidget.AnyWidget):
         super().__init__(auto_prepare=auto_prepare, manifest=manifest, columns=buffers,
                          draw_styles=json.loads(draw_style_specs_json()),
                          wasm=(assets / "figgy_bg.wasm").read_bytes(),
-                         wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"))
+                         wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"),
+                         pdf_js=Path(__file__).with_name("pdf-lib.js").read_text(encoding="utf-8"))
         self.refresh()
         self.on_msg(self._command)
 
@@ -123,7 +125,7 @@ class FigureWidget(anywidget.AnyWidget):
             from ._codegen import editor_code_payload
             from ._native import object_outline_json, bounded_view_json
             catalog=self.figure._editor_catalog_transport()
-            self.state = {"settings": settings, "revision": self.figure.revision,
+            self.state = {"settings": settings, "revision": self.figure.revision, "dpi": self.figure.dpi,
                           **editor_code_payload(settings,self.figure._default_config,self.figure.dpi),
                           "edit_history": self.figure.edit_history,
                           "property_catalog": catalog['objects'],

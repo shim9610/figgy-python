@@ -196,6 +196,7 @@ def _restore_series(body,original,call):
         'elinewidth':[('err_style','error_bar_width'),('err_style','cap_width')],
         'capsize':[('err_style','error_bar_cap_size')],
         'edgecolor':[('bar','border_color')], 'fill_color':[('line','fill_color')],
+        'label_decimals':[('labels','decimals')], 'value_suffix':[('labels','value_suffix')],
         'gap':[('bar','gap_px')], 'width':[('bar','width_ratio'),('style','width_px')],
         'pivot':[('style','pivot')], 'head_length':[('style','head_length_px')],
         'head_width':[('style','head_width_px')],
@@ -237,6 +238,25 @@ def series(fig,document,spec,panel_id):
     candidate=styles._resolve(fig,source,fig._style_defaults,finalize)
     result=next(s for s in candidate['series'] if s['series_id']==sid)
     cfg=panel_config(document,panel_id);old=panel_config(fig.get_settings(),panel_id)
+    tag = next(iter(spec['render_type']))
+    kind = styles.COORDINATE_FAMILIES.get(tag)
+    from ._document import panel_index
+    index = panel_index(document, panel_id)
+    panels = document['config'].get('subplots', [])
+    owned = set(panels[index-1].get('series', [])) if index else {
+        s['series_id'] for s in document['series']
+    } - {sid for panel in panels for sid in panel.get('series', [])}
+    if kind and not any(s['series_id'] in owned and tag in s['render_type'] for s in document['series']):
+        patch = copy.deepcopy(a.get('bounded', {}).get(kind, {}))
+        if 'background' in a and 'background' not in call['explicit']:
+            cfg['background'] = copy.deepcopy(a['background'])
+        for argument, field in [('width', 'group_width'), ('group_width', 'group_width'),
+                                ('bar_gap', 'bar_gap'), ('box_gap', 'box_gap'),
+                                ('label_decimals', 'label_decimals'), ('font_size', 'font_size'),
+                                ('font_family', 'font_family'), ('background', 'background')]:
+            if argument in call['explicit']:patch.pop(field, None)
+        styles._coordinate_patch(cfg, copy.deepcopy(next(iter(result['render_type'].values()))), kind, patch)
+
     if cfg.get('colorbar'):
         if not old.get('colorbar'):
             bar=panel_config(candidate,panel_id)['colorbar']

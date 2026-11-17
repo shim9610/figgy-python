@@ -44,6 +44,9 @@ class AdvancedMethods:
             state = fig.get_settings()
             if state.get("radial"):
                 raise ValueError("pie/donut charts require a separate Figure")
+            if fig._style_defaults is not None and len(specs) > 1 and any(next(iter(s['render_type'])) in ('CategoryBars','BoxPlot','Radar') for s in specs):
+                if _style_runtime._construction(fig)['key'] is not None:
+                    raise ValueError('style_key identifies one series; supply explicit colors for a multi-series chart')
             existing = {s["series_id"] for s in state["series"]}
             ids = [s["series_id"] for s in specs]
             if len(set(ids)) != len(ids) or existing.intersection(ids):
@@ -756,9 +759,22 @@ class AdvancedMethods:
     def _install_legacy_chart(self, kind, chart):
         from ._native import convert_legacy_chart_json
 
+        # Legacy documents cap a shared label font at 32px. Use their public
+        # data conversion, then restore the requested size on common axes.
+        font_size = float(chart['font_size'])
+        if not math.isfinite(font_size) or font_size <= 0:
+            raise ValueError('font_size must be positive and finite')
+        wire = dict(chart, font_size=min(32., max(8., font_size)))
         bundle = json.loads(
-            convert_legacy_chart_json(kind, json.dumps(chart, allow_nan=False))
+            convert_legacy_chart_json(kind, json.dumps(wire, allow_nan=False))
         )
+        if wire['font_size'] != font_size:
+            for side in ('bottom_x','top_x','left_y','right_y'):
+                bundle['config'][side]['label_style']['font_size'] = font_size
+                bundle['config'][side]['title_option']['text']['font_size'] = font_size
+            bundle['config']['legend']['content']['font_size'] = font_size
+            for spec in bundle['series']:
+                if spec.get('label') is not None:spec['label']['font_size'] = font_size
         prefix = f"chart/{self.figure._next_series}/"
         remap = {
             s["series_id"]: self._sid() + f"/{i}"
@@ -832,6 +848,8 @@ class AdvancedMethods:
     ):
         from .figure import _color, _COLORS
 
+        style_patch = properties.pop("style", {})
+        if not isinstance(style_patch, dict):raise TypeError("style must be a mapping")
         if properties:
             from ._charts import ChartMethods
 
@@ -844,6 +862,7 @@ class AdvancedMethods:
                 color=color,
                 mode=mode,
                 orientation=orientation,
+                style=style_patch,
                 **properties,
             )
         values = np.asarray(height)
@@ -909,7 +928,7 @@ class AdvancedMethods:
             s.update(series_id=sid, x_column=sid + "/x", y_column=sid + "/y")
             b = s["render_type"]["CategoryBars"]
             b["color"] = _color(palette[i])
-            b["style"].update(properties)
+            _style_update(b["style"], style_patch)
             if names[i] is not None:
                 from .figure import _segments
 
@@ -928,11 +947,13 @@ class AdvancedMethods:
     def radar(self, categories, values, *, labels=None, colors=None, **properties):
         from .figure import _color, _COLORS, _segments
 
+        style_patch = properties.pop("style", {})
+        if not isinstance(style_patch, dict):raise TypeError("style must be a mapping")
         if properties:
             from ._features import FeatureMethods
 
             return FeatureMethods.radar(
-                self, categories, values, labels=labels, colors=colors, **properties
+                self, categories, values, labels=labels, colors=colors, style=style_patch, **properties
             )
         categories = list(categories)
         a = np.asarray(values)
@@ -971,6 +992,8 @@ class AdvancedMethods:
             s["render_type"]["Radar"]["color"] = _color(colors[i])
             s["label"] = copy.deepcopy(cfg["legend"]["content"])
             s["label"]["segments"] = _segments(labels[i])
+            s["render_type"]["Radar"]["style"].setdefault("fill_opacity", None)
+            _style_update(s["render_type"]["Radar"]["style"], style_patch)
             specs.append(s)
             columns.extend(
                 [

@@ -29,3 +29,9 @@ The native egui UI embeds `epaint_default_fonts 0.36.2`'s Hack Regular,
 Ubuntu Light, Noto Emoji Regular and emoji-icon-font. Their complete font
 license texts are included as `python/figgyplot/licenses/LICENSE-Egui-*.txt`
 (Hack/Bitstream terms, Ubuntu Font Licence, SIL OFL and icon-font MIT).
+
+## pdf-lib
+
+Browser PDF page-size normalization bundles pdf-lib 1.17.1 (MIT), from
+https://github.com/Hopding/pdf-lib. The license is included as
+`python/figgyplot/licenses/pdf-lib-MIT.txt`.
