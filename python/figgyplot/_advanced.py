@@ -19,6 +19,15 @@ def _style_update(target, properties):
     target.update(properties)
 
 
+def _diagram_style_update(target, properties):
+    from .figure import _merge
+
+    unknown = properties.keys() - target.keys()
+    if unknown:
+        raise TypeError("unknown diagram style options: " + ", ".join(sorted(unknown)))
+    _merge(target, properties)
+
+
 def _rows(data):
     try:
         a = np.asarray(data)
@@ -661,7 +670,8 @@ class AdvancedMethods:
             energy_unit = data.energy_unit
         else:
             energy_unit = None
-        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
+        state = self.figure.get_settings()
+        cfg = copy.deepcopy(self._config(state))
         rich = cfg["legend"]["content"]
         levels = records(levels, "levels", rich, dpi=self.figure.dpi)
         transitions = records(transitions, "transitions", rich, dpi=self.figure.dpi)
@@ -686,15 +696,35 @@ class AdvancedMethods:
         if len(bands):
             body["bands"] = records(bands, "bands", rich, dpi=self.figure.dpi)
         body["show"] = {"main": "Main", "components": "Components"}.get(show, show)
-        _style_update(body["style"], plain(style))
-        ids = list(dict.fromkeys(level["column"] for level in levels))
-        cfg["bottom_x"]["categories"] = [dict(id=value, label=value) for value in ids]
-        energies = np.asarray(
-            [level["energy"] for level in [*levels, *limits]], dtype=float
+        _diagram_style_update(body["style"], plain(style))
+        new_energies = np.asarray(
+            [row["energy"] for row in [*levels, *limits]], dtype=float
         )
-        if not energies.size or not np.isfinite(energies).all():
+        if not new_energies.size or not np.isfinite(new_energies).all():
             raise ValueError("energy levels need finite energies")
-        low, high = float(energies.min()), float(energies.max())
+        categories = {row["id"]: row for row in cfg["bottom_x"].get("categories") or []}
+        energy_series = {
+            spec["series_id"]: spec["render_type"]["EnergyLevels"]
+            for spec in state["series"]
+            if "EnergyLevels" in spec["render_type"]
+        }
+        energies = list(new_energies)
+        for spec in self.figure.subplots[self.subplot_id].axes._owned_series(state):
+            existing = energy_series.get(spec["series_id"])
+            if existing is None:
+                continue
+            if existing.get("source") is not None:
+                existing = energy_series.get(existing["source"], existing)
+            for row in existing.get("levels", []):
+                column = row["column"]
+                categories.setdefault(column, dict(id=column, label=column))
+                energies.append(row["energy"])
+            energies.extend(row["energy"] for row in existing.get("limits", []))
+        for row in levels:
+            column = row["column"]
+            categories.setdefault(column, dict(id=column, label=column))
+        cfg["bottom_x"]["categories"] = list(categories.values())
+        low, high = float(min(energies)), float(max(energies))
         padding = (high - low) * 0.05 if high > low else max(abs(low) * 0.05, 1.0)
         for axis in ("left_y", "right_y"):
             cfg[axis].update(
@@ -741,7 +771,7 @@ class AdvancedMethods:
         body.update(vertices=vertices, propagators=propagators)
         if layout is not None:
             body["layout"] = plain(layout)
-        _style_update(body["style"], plain(style))
+        _diagram_style_update(body["style"], plain(style))
         return self._install_series([s])
 
     def view_init(self, elev=30, azim=-60, *, projection=None):

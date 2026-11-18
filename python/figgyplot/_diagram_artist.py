@@ -92,17 +92,13 @@ class DiagramArtist(Artist):
         """Set common stroke style in points; advanced model fields remain explicit."""
 
         def edit(body, tag):
+            from ._advanced import _diagram_style_update
             from .figure import _merge
             from ._diagram_input import plain
 
             style = copy.deepcopy(_defaults(tag))
             _merge(style, body.get("style", {}))
-            unknown = properties.keys() - style.keys()
-            if unknown:
-                raise TypeError(
-                    "unknown diagram style options: " + ", ".join(sorted(unknown))
-                )
-            _merge(style, plain(properties))
+            _diagram_style_update(style, plain(properties))
             part = style["level"] if tag == "EnergyLevels" else style
             if color is not None:
                 part["color"] = _color(color)

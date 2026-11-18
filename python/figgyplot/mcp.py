@@ -29,6 +29,7 @@ CHART_METHODS = (
     "rose",
     "stem",
     "imshow",
+    "imshow_rgb",
     "contour",
     "contourf",
     "hexbin",
@@ -57,6 +58,7 @@ CHART_METHODS = (
     "energy_levels",
     "feynman",
 )
+NUMERIC_DTYPES = ("float32", "float64", "int16", "int32", "uint8", "uint16", "uint32")
 _figures = {}
 
 
@@ -79,7 +81,7 @@ def capabilities():
         },
         themes=list(Figure.theme_names()),
         formats=["png", "svg", "pdf"],
-        dtypes=["float32", "float64"],
+        dtypes=list(NUMERIC_DTYPES),
         gpu_value_bytes=8,
         dtype_note="float32 input and notebook transfer are preserved; the renderer stores two f32 lanes per scalar",
     )
@@ -109,17 +111,29 @@ def _input(value):
         if set(value) == {"dtype", "values"}:
             import numpy as np
 
-            if value["dtype"] not in (
-                "float32",
-                "float64",
-                "int16",
-                "int32",
-                "uint8",
-                "uint16",
-                "uint32",
-            ):
+            dtype = value["dtype"]
+            if dtype not in NUMERIC_DTYPES:
                 raise ValueError("unsupported numeric dtype")
-            return np.asarray(value["values"], dtype=value["dtype"])
+            target = np.dtype(dtype)
+            if target.kind in "iu":
+                values = np.asarray(value["values"])
+                limits = np.iinfo(target)
+                if (
+                    values.dtype.kind not in "biuf"
+                    or not np.isfinite(values).all()
+                    or (values.dtype.kind == "f" and np.any(values != np.trunc(values)))
+                    or np.any(values < limits.min)
+                    or np.any(values > limits.max)
+                ):
+                    raise ValueError(
+                        f"{dtype} requires whole numbers in [{limits.min}, {limits.max}]"
+                    )
+                return values.astype(target)
+            with np.errstate(over="raise"):
+                try:
+                    return np.asarray(value["values"], dtype=target)
+                except FloatingPointError as exc:
+                    raise ValueError(f"values exceed the range of {dtype}") from exc
         return {key: _input(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_input(item) for item in value]
@@ -151,11 +165,34 @@ def figure_get(id: str):
     return _figure(id).get_settings()
 
 
-def figure_patch(id: str, config: Optional[dict] = None, series: Optional[dict] = None):
-    """Patch renderer configuration or existing series appearance atomically."""
+def figure_patch(
+    id: str,
+    config: Optional[dict] = None,
+    series: Optional[dict] = None,
+    slices: Optional[dict[str, dict]] = None,
+):
+    """Patch chart settings and appearance atomically. For pie, donut and
+    sunburst, config patches radial settings and slices uses zero-based keys.
+    """
     fig = _figure(id)
-    fig.configure(config=config, series=series)
-    return fig.get_settings()
+    with fig._lock:
+        if fig.get_settings().get("radial") is not None:
+            if series is not None:
+                raise ValueError("use slices for radial chart appearance")
+            properties = dict(config or {})
+            if "slices" in properties:
+                raise ValueError("pass slice appearance through the slices argument")
+            indices = {}
+            for key, patch in (slices or {}).items():
+                if not key.isascii() or not key.isdecimal() or str(int(key)) != key:
+                    raise ValueError("slice keys must be zero-based integer strings")
+                indices[int(key)] = patch
+            fig.configure_radial(slices=indices, **properties)
+        else:
+            if slices is not None:
+                raise ValueError("slices requires a radial chart")
+            fig.configure(config=config, series=series)
+        return fig.get_settings()
 
 
 def figure_theme(id: str, name: str):

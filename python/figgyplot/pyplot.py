@@ -28,6 +28,7 @@ def subplots(*args, **kwargs):
 def plot(*args, **kwargs): return gca().plot(*args, **kwargs)
 def scatter(*args, **kwargs): return gca().scatter(*args, **kwargs)
 def imshow(*args, **kwargs): return gca().imshow(*args, **kwargs)
+def imshow_rgb(*args, **kwargs): return gca().imshow_rgb(*args, **kwargs)
 def pie(*args, **kwargs): return gca().pie(*args, **kwargs)
 def donut(*args, **kwargs): return gca().donut(*args, **kwargs)
 def draw_style(*args, **kwargs): return gcf().set_draw_style(*args, **kwargs)

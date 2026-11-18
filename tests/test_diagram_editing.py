@@ -30,6 +30,38 @@ def body(fig):
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_adding_energy_series_preserves_previous_levels_and_category_labels(backend):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        red = {"r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0}
+        first = ax.energy_levels(
+            [{"id": "ground", "column": "S", "energy": 0}],
+            limits=[{"id": "ion", "energy": -10}],
+            id="first",
+            level={"color": red},
+        )
+        first_spec = fig.get_settings()["series"][0]
+        categories = [{"id": "S", "label": "Singlet"}]
+        fig.configure(config={"bottom_x": {"categories": categories}})
+        ax.energy_levels([{"id": "excited", "column": "P", "energy": 100}], id="second")
+        state = fig.get_settings()
+        assert state["series"][0] == first_spec
+        assert state["config"]["bottom_x"]["categories"] == [
+            *categories,
+            {"id": "P", "label": "P"},
+        ]
+        assert state["config"]["left_y"]["min"] < -10
+        assert state["config"]["left_y"]["max"] > 100
+        assert first.get_color() == (1.0, 0.0, 0.0, 1.0)
+        assert first.get_linewidth() > 0
+        if backend == "native":
+            pixels = fig.render_rgba()
+            assert (
+                (pixels[..., 0] > 200) & (pixels[..., 1] < 70) & (pixels[..., 2] < 70)
+            ).any()
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
 @pytest.mark.parametrize("kind", ["energy", "feynman"])
 def test_default_diagram_inspector_can_edit_style_and_label_without_changing_data(
     backend, kind

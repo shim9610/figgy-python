@@ -102,6 +102,17 @@ KINDS = [
 ]
 
 
+def test_pyplot_imshow_rgb_adds_an_image_to_the_current_axes(monkeypatch):
+    from figgyplot import pyplot as plt
+
+    with fg.Figure(backend="webgpu") as fig:
+        monkeypatch.setattr(plt, "_current", fig)
+        image = np.array([[[255, 0, 0], [0, 255, 0]]], dtype=np.uint8)
+        artist = plt.imshow_rgb(image, id="rgb")
+        assert artist.id == "rgb"
+        assert "RgbImage" in fig.get_settings()["series"][0]["render_type"]
+
+
 @pytest.mark.parametrize("kind", KINDS)
 def test_chart_themes_layout_and_renderer_exports(kind, tmp_path):
     with fg.Figure(figsize=(4, 3), dpi=72, backend="native") as fig:
