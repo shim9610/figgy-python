@@ -91,7 +91,7 @@ jobs:
           uv pip install --python .venv/bin/python 'maturin>=1.15,<2'
           .venv/bin/python -m maturin build --release --locked --compatibility linux --out dist -i .venv/bin/python
           for wheel in dist/*.whl; do
-            uv pip install --python .venv/bin/python --only-binary=:all: "${wheel}[test]"
+            uv pip install --python .venv/bin/python --only-binary=:all: "${wheel}[test,mcp]"
           done
           uv pip install --python .venv/bin/python --only-binary=:all: 'PyYAML>=6,<7' 'playwright>=1.50,<2' 'jupyterlab>=4,<5' 'nbformat>=5,<6' 'ipykernel>=6'
           .venv/bin/python scripts/check_installed.py
@@ -155,7 +155,7 @@ jobs:
           uv python install 3.12
           uv venv .venv --python 3.12
           for wheel in dist/*.whl; do
-            uv pip install --python .venv/bin/python --only-binary=:all: "${wheel}[test]"
+            uv pip install --python .venv/bin/python --only-binary=:all: "${wheel}[test,mcp]"
           done
           uv pip install --python .venv/bin/python --only-binary=:all: 'PyYAML>=6,<7' 'playwright>=1.50,<2' 'jupyterlab>=4,<5' 'nbformat>=5,<6' 'ipykernel>=6'
           .venv/bin/python scripts/check_installed.py

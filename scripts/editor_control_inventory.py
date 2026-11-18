@@ -92,12 +92,15 @@ def rows():
             for owner in fig.editor_properties():
                 for field in owner["fields"]:
                     changes={"Vectors/scale_mode":"Data", "Polar coordinates/interpolation_mode":"Arc", "Pie / donut/mode":"Donut", "Detail shape/mode":"Donut"}
+                    if case == "radar" and field["id"] == "Polar coordinates/interpolation_mode":
+                        continue  # Radar requires straight edges.
                     if field["id"] in changes:
                         command(owner["id"],field["id"],changes[field["id"]])
             if case in ("categorical", "boxplot"):
-                state=fig.get_settings();state[case]["selected"]={"series_id":state[case]["series"][0]["id"],"category_id":state[case]["categories"][0]["id"]};fig.apply_settings(state)
-                owner=next(v for v in fig.editor_properties() if v["id"].startswith("bounded/series/"))
-                command(owner["id"],"Selected item/custom",True)
+                chart = fig.axes[0].chart
+                series_id = next(iter(chart.get_series()))
+                category_id = next(iter(chart.get_categories()))
+                chart.cell(category_id, series_id).set_color("red").set_style(outline=True)
             collect()
             if case=="line":
                 owner=next(v for v in fig.editor_properties() if v['target']=='tick_labels_bottom')
