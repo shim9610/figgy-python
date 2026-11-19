@@ -661,17 +661,17 @@ impl Editor {
             .selected_text(format!("{:?}", chart.style.material))
             .show_ui(ui, |ui| {
                 for value in [
-                    RadialMaterial::Flat,
-                    RadialMaterial::Matte,
-                    RadialMaterial::Ceramic,
-                    RadialMaterial::BrushedMetal,
-                    RadialMaterial::Paper,
-                    RadialMaterial::Wood,
-                    RadialMaterial::SatinMetal,
-                    RadialMaterial::Toon,
-                    RadialMaterial::Enamel,
-                    RadialMaterial::Hatch,
-                    RadialMaterial::Pearl,
+                    renderer::Material::Flat,
+                    renderer::Material::Matte,
+                    renderer::Material::Ceramic,
+                    renderer::Material::BrushedMetal,
+                    renderer::Material::Paper,
+                    renderer::Material::Wood,
+                    renderer::Material::SatinMetal,
+                    renderer::Material::Toon,
+                    renderer::Material::Enamel,
+                    renderer::Material::Hatch,
+                    renderer::Material::Pearl,
                 ] {
                     let response =
                         ui.selectable_value(&mut chart.style.material, value, format!("{value:?}"));

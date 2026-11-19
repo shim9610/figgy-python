@@ -166,7 +166,7 @@ diff --git a/crates/web/src/web/chart.rs b/crates/web/src/web/chart.rs
 diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
 --- a/crates/web/src/radial.rs
 +++ b/crates/web/src/radial.rs
-@@ -219,6 +219,16 @@
+@@ -329,6 +329,16 @@
              .map_err(js_err)
      }
  
@@ -181,5 +181,5 @@ diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
 +    }
 +
      pub async fn export_png(&mut self, scale: f32) -> Result<js_sys::Uint8Array, JsValue> {
-         let image = self
-             .renderer
+         self.export_png_with_background(scale, "document").await
+     }

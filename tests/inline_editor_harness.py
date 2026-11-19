@@ -101,6 +101,7 @@ def annotation_point(page, index=0, offset=(8,6)):
 
 
 def open_existing(page):
+    page.locator('.figgy-editor canvas').scroll_into_view_if_needed()
     target = annotation_point(page)
     page.mouse.dblclick(*target['point'])
     entry = page.locator('[data-inline-text]')

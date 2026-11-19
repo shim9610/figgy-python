@@ -114,6 +114,7 @@ def test_blind_trial_titles_render_two_real_lines_in_both_hosts(tmp_path, backen
     """Ready is insufficient: both title lines must be present on the image."""
     from browser_timing import DISPLAY_SETTLED
     from PIL import Image
+    import base64
     import io
     scene = '''
 ax=fig.axes[0]
@@ -132,16 +133,45 @@ ax.bar(['A','B'],[2,4])
         source = (f"import figgyplot as fg\nassert fg.__file__ == {figgy.__file__!r}\n"
                   "fig=fg.Figure(backend='webgpu',figsize=(7,5),dpi=100)\n" + scene + "\ndisplay(fig.widget())")
         with notebook(tmp_path, source) as (page, execute):
-            page.wait_for_function(DISPLAY_SETTLED, polling=100, timeout=180000)
             canvas = page.locator('.figgy-editor canvas')
-            canvas.evaluate('''c=>{const r=c.getBoundingClientRect();c.closest('.figgy-editor').style.transform=`translate(${Math.ceil(r.x)-r.x}px,${Math.ceil(r.y)-r.y}px)`;}''')
-            image = np.asarray(Image.open(io.BytesIO(canvas.screenshot(path=str(tmp_path/'browser.png')))).convert('RGBA'))
+            canvas.scroll_into_view_if_needed()
+            page.wait_for_function(DISPLAY_SETTLED, polling=100, timeout=180000)
+            # Read the displayed WebGPU canvas directly. Chromium's headless
+            # compositor can omit its surface from a page screenshot.
+            data = base64.b64decode(canvas.evaluate('c => c.toDataURL()').split(',', 1)[1])
+            (tmp_path/'browser.png').write_bytes(data)
+            image = np.asarray(Image.open(io.BytesIO(data)).convert('RGBA'))
             state = page.evaluate(ROOT + '.snapshot()')
-    chart = state['categorical']
-    assert chart['category_title'] == 'Requested X' and chart['value_title'] == 'Requested Y'
+    chart = state['config']
+    for axis, expected in [('bottom_x', 'Requested X'), ('left_y', 'Requested Y')]:
+        segments = chart[axis]['title_option']['text']['segments']
+        assert ''.join(s['text'] for s in segments) == expected
     assert ''.join(s['text'] for s in chart['chart_title']['text']['segments']) == 'FIRST\nSECOND'
     result = assert_blind_trial_title_pixels(image)
     (tmp_path/'contract.json').write_text(json.dumps(dict(backend=backend,**result,settings=state),indent=2))
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires a real Jupyter WebGPU widget')
+def test_non_cartesian_series_render_beside_cartesian_root_in_jupyter(tmp_path):
+    source = """
+import figgyplot as fg
+fig = fg.Figure(backend='webgpu', figsize=(10, 7),
+                grid=[['main', 'energy'], ['ternary', 'parallel']])
+fig.subplots['main'].axes.plot([0, 1], [0, 1], id='base')
+fig.subplots['energy'].axes.energy_levels(
+    [{'id': 'ground', 'column': 'S', 'energy': 0}], id='levels')
+fig.subplots['ternary'].axes.ternary([.2,.6], [.3,.2], [.5,.2], id='ternary')
+fig.subplots['parallel'].axes.parallel_coordinates([[1,2,3], [2,1,4]], id='parallel')
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        state = page.evaluate(ROOT + '.snapshot()')
+        assert state['config']['bottom_x'].get('categories') is None
+        assert [p['series'] for p in state['config']['subplots']] == [
+            ['levels'], ['ternary'], ['parallel']
+        ]
+        execute("assert (await fig.export_async('png')).startswith(b'\\x89PNG')")
+        assert not page.locator('.figgy-error').inner_text()
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])

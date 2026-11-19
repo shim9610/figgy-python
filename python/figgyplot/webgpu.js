@@ -299,10 +299,17 @@ export function render({model,el}) {
   }
   function layersInPanel(index){const cfg=panelConfig(index);return [baseLayer(index),...(cfg.overlays??[]).map((_,i)=>index===0?{Overlay:i}:{SubplotOverlay:[index-1,i]})];}
   function setPointerLayer(layer){chart.set_active_layer(JSON.stringify(layer));local.config.active_layer=clone(layer);}
+  // Base automatically routes into an overlapping subplot. The annotation
+  // layer uses the root data axes without that implicit subplot routing.
+  function probeLayer(layer, point) {
+    const overlapsSubplot = layer === 'Base' && focusedPanel === panelId(0)
+      && panelsAt(point).some(index => index !== 0);
+    return overlapsSubplot ? 'Annotations' : layer;
+  }
   function decorationsAt(point,index){
     const original=JSON.parse(chart.active_layer()),hits=[];
     try{for(const layer of layersInPanel(index).reverse()){
-      chart.set_active_layer(JSON.stringify(layer));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
+      chart.set_active_layer(JSON.stringify(probeLayer(layer,point)));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
       if(!hits.some(h=>h.target===target))hits.push({layer:target.includes('overlay_')?layer:baseLayer(index),target});
     }return hits.some(h=>!h.target.endsWith('data_area'))?hits.filter(h=>!h.target.endsWith('data_area')):hits;}finally{chart.set_active_layer(JSON.stringify(original));}
   }
@@ -313,7 +320,7 @@ export function render({model,el}) {
     try{
       chart.set_picked_data('null');
       for(const layer of layersInPanel(index).reverse()){
-        chart.set_active_layer(JSON.stringify(layer));
+        chart.set_active_layer(JSON.stringify(probeLayer(layer,point)));
         while(series.some(v=>!excluded.has(v.series_id)&&sameLayer(owner(v.series_id),layer))){
           const value=await chart.pick_data(...point,6);if(!value)break;
           const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>!['distance_px','label_id','vertex_index'].includes(k)));

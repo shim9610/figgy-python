@@ -45,10 +45,10 @@ other branches before building. This does not change main's branch protection.
 
 | Component | Working tree version | Published version verified 2026-10-21 |
 | --- | --- | --- |
-| `figgy-model` | 0.12.1 | 0.12.1 |
-| `figgy-renderer` | 0.18.1 | 0.18.1 |
+| `figgy-model` | 0.13.0-beta.2 | 0.12.1 |
+| `figgy-renderer` | 0.19.0-beta.2 | 0.18.1 |
 | `figgyplot` | 0.4.0 | 0.3.0 |
-| `figgy` WASM wrapper | 0.15.1 | Not a crates.io package (`publish = false`) |
+| `figgy` WASM wrapper | 0.16.0-beta.2 | Not a crates.io package (`publish = false`) |
 
 Model 0.12.1 and renderer 0.18.1 were published on 2026-10-21. Python 0.3.0 was published on
 2026-10-16 with renderer 0.17.0/model 0.11.0, as verified from its PyPI sdist.
@@ -56,12 +56,12 @@ This tree targets Python 0.4.0; its artifacts still require the complete
 TestPyPI build and installation gates before production promotion. Do not upload
 the changed source as 0.3.0. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
-has its own version; the WASM wrapper's 0.15.1 is not the renderer version.
+has its own version; the WASM wrapper's 0.16.0-beta.2 is not the renderer version.
 The 0.19 integration is accumulated on PR #23. It currently pins the same
 unreleased Git revision for the native renderer/model and bundled WASM; see
 [the integration guide](RENDERER_019.md) for the exact revision. The upstream
-manifests still report renderer 0.18.1 and model 0.12.1. These are development
-pins, not evidence that 0.19 has been published.
+manifests at the pinned beta.2 integration commit report renderer 0.19.0-beta.2
+and model 0.13.0-beta.2.
 
 The [integration audit](RENDERER_019_AUDIT.md) records the editing, style, label
 formatting and physical export-size repairs and their validation. Publication
@@ -242,18 +242,17 @@ does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.
 
 
-Renderer 0.19 integration release gate (2026-11-18): recheck
-[figgy #325](https://github.com/shim9610/figgy/issues/325) after updating both native
-and WASM pins. EnergyLevels/Ternary/Parallel must work in a subplot beside a
-Cartesian root. The three strict xfails in `test_renderer_019_features.py` must be
-removed after verifying the upstream fix; standalone chart success is insufficient.
-Energy stroke/transition selection details are tracked in
-[figgy #321](https://github.com/shim9610/figgy/issues/321) is fixed in the paired
-`f5f611c4532b037f8c3b3087fab22a9f47852343` source pin. The browser calls public
+Renderer 0.19 integration release checks include EnergyLevels, Ternary and
+Parallel subplots beside a Cartesian root. The beta.2 pin with the upstream
+[figgy #325](https://github.com/shim9610/figgy/issues/325) fix passes the native and
+notebook model cases and the actual Jupyter widget render.
+The energy stroke and transition selection fix from
+[figgy #321](https://github.com/shim9610/figgy/issues/321) is included in beta.2.
+The browser calls public
 `selection_details()` directly; native resolves record sources with public
 `energy_level_records`, without retaining numerical arrays.
 
 Re-run the real browser radar pointer scenario after resolving
 [figgy #327](https://github.com/shim9610/figgy/issues/327), related to #299.
-The current software-WebGPU first-pick run exceeds 300 seconds while unrelated
-pick kernels compile; do not describe the full actual-host collection as passing.
+The November 18 software WebGPU measurement exceeded 300 seconds on the previous
+pin. Recheck the first click on the exact release source.

@@ -268,8 +268,305 @@ export const ColorCycle = Object.freeze({
 });
 
 /**
+ * An open column transaction (#334), returned by
+ * `FiggyChart.begin_columns_transaction`: several chunked uploads, each
+ * with its own mapped GPU staging buffer, and optionally the chart's next
+ * Config and Series, installed by `commit(chart)` together or not at all.
+ *
+ * - `stage(chart, id, length, encoding, source_revision)` begins one
+ *   column's upload, as `begin_column_upload` begins one, on the chart that
+ *   began the transaction. An id staged twice is refused.
+ * - `push(id, offset, values)` writes a chunk into that column's staging,
+ *   in index order, with the checks and codes of `ColumnUploadHandle.push`.
+ * - `set_state(config_json, series_json?)` stages the next Config and,
+ *   when given, the next Series, which may read the staged columns.
+ * - `commit(chart)` installs every column, the state and the picker in one
+ *   renderer transaction; `cancel()` releases every staging buffer.
+ *
+ * A refused `stage`, `push` or `set_state` changes nothing and leaves the
+ * transaction open. After a commit, a cancel or a commit that failed, the
+ * transaction is closed and every call but `cancel` throws with `code`
+ * `"upload_closed"`. Every error carries `stage` (`"stage"`, `"push"`,
+ * `"state"` or `"commit"`), `column` (the id it concerns, or `null`) and,
+ * for a refusal with one, `code`; a memory refusal carries `requested` and
+ * `limit` bytes too. The number of staged columns is not limited.
+ */
+export class ColumnTransaction {
+    static __wrap(ptr) {
+        const obj = Object.create(ColumnTransaction.prototype);
+        obj.__wbg_ptr = ptr;
+        ColumnTransactionFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        ColumnTransactionFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_columntransaction_free(ptr, 0);
+    }
+    /**
+     * Abandon the transaction and release every staging buffer. Nothing
+     * was registered. Calling it on a closed transaction does nothing.
+     */
+    cancel() {
+        wasm.columntransaction_cancel(this.__wbg_ptr);
+    }
+    /**
+     * Install every staged column and the staged state on `chart`, the
+     * chart that began the transaction, in one commit: the columns, the
+     * Config and Series and the picker publish together, or nothing
+     * changes — values, revisions, Config, Series, selection and the drawn
+     * pixels stay as they were. Refused when a column is not complete
+     * (`"invalid_chunk"`) or changed since it was staged (`"stale"`, its
+     * `column` named), when the GPU cannot hold the columns
+     * (`"budget_exceeded"`, `"pool_space"`, `"device_limit"`,
+     * `"allocation_failed"`), or when the state, or without one the
+     * chart's own Config and Series, does not hold against the staged
+     * columns (`stage` `"state"`, with the code the setters give). A
+     * monotonic chart takes no state here (`"monotonic_chart"`). The
+     * transaction is closed either way.
+     * @param {FiggyChart} chart
+     */
+    commit(chart) {
+        _assertClass(chart, FiggyChart);
+        const ret = wasm.columntransaction_commit(this.__wbg_ptr, chart.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Whether a state was staged with `set_state`.
+     * @returns {boolean}
+     */
+    has_state() {
+        const ret = wasm.columntransaction_has_state(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Whether the transaction is still open.
+     * @returns {boolean}
+     */
+    is_open() {
+        const ret = wasm.columntransaction_is_open(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * The length in values of staged column `id`; `undefined` for an id
+     * that is not staged.
+     * @param {string} id
+     * @returns {number | undefined}
+     */
+    length(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.columntransaction_length(this.__wbg_ptr, ptr0, len0);
+        return ret[0] === 0 ? undefined : ret[1];
+    }
+    /**
+     * Write one chunk of staged column `id` at value `offset`: a
+     * `Float32Array` for an `"f32"` column, a `Float64Array` for an `"f64"`
+     * one, at most `max_chunk_bytes` bytes, starting at `written(id)`.
+     * Refused with `code` `"invalid_chunk"` as `ColumnUploadHandle.push`
+     * refuses a chunk, and for an id that is not staged; a refused chunk
+     * changes nothing and the transaction stays open. The array is read in
+     * place into the mapped staging buffer; nothing is copied on the way.
+     * @param {string} id
+     * @param {number} offset
+     * @param {any} values
+     */
+    push(id, offset, values) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.columntransaction_push(this.__wbg_ptr, ptr0, len0, offset, values);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Stage the chart's next Config (`config_json`, `get_config` JSON)
+     * and, when `series_json` is given, its next Series (`get_series`
+     * JSON); without it the chart keeps its series. The commit installs
+     * them as `set_config` followed by `set_series` would, legend
+     * included, after checking them against the staged columns. A second
+     * call replaces the first. JSON that does not parse is refused here
+     * and the staged state stays as it was.
+     * @param {string} config_json
+     * @param {string | null} [series_json]
+     */
+    set_state(config_json, series_json) {
+        const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(series_json) ? 0 : passStringToWasm0(series_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.columntransaction_set_state(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Stage column `id` on `chart`, the chart that began the transaction:
+     * `length` values of `encoding` (`"f32"` or `"f64"`), replacing the
+     * column at `source_revision` (`column_revision(id)`, or `null` /
+     * `undefined` for an id that is not registered). One GPU staging
+     * buffer of the column's size is created and held until the commit or
+     * the cancel, as `begin_column_upload` creates one; the codes are its
+     * codes (`"stale"`, `"budget_exceeded"`, `"device_limit"`, …). An id
+     * already staged is refused (`"registration_failed"`), as are a
+     * streamed and a reserved id. The `<figgy-chart>` element passes its
+     * chart itself: there it is `stage(id, length, encoding, revision)`.
+     * @param {FiggyChart} chart
+     * @param {string} id
+     * @param {number} length
+     * @param {string} encoding
+     * @param {number | null} [source_revision]
+     */
+    stage(chart, id, length, encoding, source_revision) {
+        _assertClass(chart, FiggyChart);
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(encoding, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.columntransaction_stage(this.__wbg_ptr, chart.__wbg_ptr, ptr0, len0, length, ptr1, len1, !isLikeNone(source_revision), isLikeNone(source_revision) ? 0 : source_revision);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * How many columns are staged.
+     * @returns {number}
+     */
+    staged_count() {
+        const ret = wasm.columntransaction_staged_count(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * How many values of staged column `id` were written: the offset of
+     * its next chunk. `undefined` for an id that is not staged.
+     * @param {string} id
+     * @returns {number | undefined}
+     */
+    written(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.columntransaction_written(this.__wbg_ptr, ptr0, len0);
+        return ret[0] === 0 ? undefined : ret[1];
+    }
+}
+if (Symbol.dispose) ColumnTransaction.prototype[Symbol.dispose] = ColumnTransaction.prototype.free;
+
+/**
+ * An open chunked column upload (#311), returned by
+ * `FiggyChart.begin_column_upload`. It owns a mapped GPU staging buffer the
+ * size of the column; `push` writes typed array chunks straight into it in
+ * index order, and `commit(chart)` installs the column at once. Nothing is
+ * registered before the commit. `cancel` (or dropping the handle with
+ * `free()`) releases the staging buffer. After a commit, a cancel or a
+ * commit that failed, the handle is closed and every call but `cancel`
+ * throws with `code` `"upload_closed"`.
+ */
+export class ColumnUploadHandle {
+    static __wrap(ptr) {
+        const obj = Object.create(ColumnUploadHandle.prototype);
+        obj.__wbg_ptr = ptr;
+        ColumnUploadHandleFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        ColumnUploadHandleFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_columnuploadhandle_free(ptr, 0);
+    }
+    /**
+     * Abandon the upload and release its staging buffer. Nothing was
+     * registered. Calling it on a closed handle does nothing.
+     */
+    cancel() {
+        wasm.columnuploadhandle_cancel(this.__wbg_ptr);
+    }
+    /**
+     * Install the column on `chart`, the chart that began the upload, as
+     * one atomic insert or replacement: the series that read it redraw with
+     * the new values. Refused, changing nothing, when a value was not
+     * written (`"invalid_chunk"`), when `chart` is not the chart that began
+     * the upload or the column changed since (`"stale"`), or when the GPU
+     * cannot hold the column (the codes of `register_column_f32`:
+     * `"budget_exceeded"`, `"pool_space"`, `"device_limit"`,
+     * `"allocation_failed"`). The handle is closed either way.
+     * @param {FiggyChart} chart
+     */
+    commit(chart) {
+        _assertClass(chart, FiggyChart);
+        const ret = wasm.columnuploadhandle_commit(this.__wbg_ptr, chart.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Whether the upload is still open.
+     * @returns {boolean}
+     */
+    is_open() {
+        const ret = wasm.columnuploadhandle_is_open(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * The column's length in values.
+     * @returns {number}
+     */
+    length() {
+        const ret = wasm.columnuploadhandle_length(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Write one chunk at value `offset`: a `Float32Array` for an `"f32"`
+     * upload, a `Float64Array` for an `"f64"` one, at most
+     * `max_chunk_bytes` bytes. Chunks arrive in order: `offset` must be
+     * `written()`, so a chunk that overlaps written values, leaves a gap
+     * or runs past the length is refused (`code` `"invalid_chunk"`), as is
+     * one of the other array type. A refused chunk changes nothing; the
+     * upload stays open. The array's values are read in place and written
+     * into the mapped staging buffer; nothing is copied on the way.
+     * @param {number} offset
+     * @param {any} values
+     */
+    push(offset, values) {
+        const ret = wasm.columnuploadhandle_push(this.__wbg_ptr, offset, values);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * How many values were written: the offset of the next chunk.
+     * @returns {number}
+     */
+    written() {
+        const ret = wasm.columnuploadhandle_written(this.__wbg_ptr);
+        return ret;
+    }
+}
+if (Symbol.dispose) ColumnUploadHandle.prototype[Symbol.dispose] = ColumnUploadHandle.prototype.free;
+
+/**
  * The browser host of one radial document, exported to JavaScript as
  * `FiggyBoundedChart`.
+ *
+ * A chart made by [`Self::create`] requests its own adapter and device. A
+ * chart made by [`Self::create_on`] draws on a `FiggyChart`'s device and
+ * queue instead (#313): its own surface on its own canvas, the same
+ * device-loss record, and the same GPU ledger and memory budget. Disposing
+ * either chart (`free()`) drops only its own handles: the device lives while
+ * the other holds it, and a dispose never destroys a device another chart
+ * still draws on. Disposing the last chart on the device destroys it, since
+ * figgy requested it, once the work submitted on it completes (#322).
  */
 export class FiggyBoundedChart {
     static __wrap(ptr) {
@@ -290,7 +587,10 @@ export class FiggyBoundedChart {
     }
     /**
      * The layer that receives pointer interaction, as JSON.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     active_layer() {
         let deferred2_0;
@@ -346,6 +646,8 @@ export class FiggyBoundedChart {
     }
     /**
      * The compass name of the annotation's live handle under a point.
+     *
+     * `x`, `y` are document logical pixels.
      * @param {number} index
      * @param {number} x
      * @param {number} y
@@ -361,7 +663,81 @@ export class FiggyBoundedChart {
         return v1;
     }
     /**
+     * The `id` of every annotation, in index order, as an array of strings
+     * (not a JSON string): `""` for an item without one (#315). Like
+     * `FiggyChart.annotation_ids`.
+     * @returns {string[]}
+     */
+    annotation_ids() {
+        const ret = wasm.figgyboundedchart_annotation_ids(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * The current index of the annotation whose `id` is `id`, or
+     * `undefined` when none has it (#315). An empty id, or one several
+     * items share, is an error. Like `FiggyChart.annotation_index`.
+     * @param {string} id
+     * @returns {number | undefined}
+     */
+    annotation_index(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_annotation_index(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] === Number.MAX_SAFE_INTEGER ? undefined : ret[0];
+    }
+    /**
+     * Where an annotation that is not part of the document yet would be
+     * drawn (#334), with the contract of `FiggyChart.annotation_preview`:
+     * placed by the annotation layer's own placement code in the current
+     * frame's anchor space, its text measured at the scale the canvas
+     * shows the chart at. The document, the selection and the raster stay
+     * as they are. `json` is an `Annotation`, the shape `add_annotation`
+     * takes, checked like `FiggyChart.annotation_preview` checks it
+     * (codes `annotation_json`, `annotation_invalid`).
+     *
+     * Returns JSON `{ kind, visible, drawn, canvas, document }`. `canvas`
+     * is the shape in physical canvas pixels and `document` in document
+     * logical pixels (the units of `annotations` and `hit_annotation`),
+     * each `{ shape, points | rect, bounds }`: `shape` is `"text"` (`rect`
+     * `[x, y, w, h]`), `"arrow"` (`points`, its two ends) or `"polygon"`
+     * (a shape's outline), and `bounds` is everything the raster paints for
+     * it, labels included. The radial chart has no value axes, so a
+     * reference line, a span and a data anchor are never drawn. An item the
+     * raster would skip has `drawn: false` and the `reason`
+     * `annotation_warnings` would give (`NonFinite`, `NoValueAxis`,
+     * `OutOfRange`, `EmptyText`). `visible: false` (a hidden item) is
+     * placed as it is drawn once shown.
+     * JS: `const p = JSON.parse(chart.annotation_preview(itemJson));`
+     * @param {string} json
+     * @returns {string}
+     */
+    annotation_preview(json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgyboundedchart_annotation_preview(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * The vertex handle (`"v<i>"`) of a polygon annotation under a point.
+     *
+     * `x`, `y` are document logical pixels.
      * @param {number} index
      * @param {number} x
      * @param {number} y
@@ -378,7 +754,10 @@ export class FiggyBoundedChart {
     }
     /**
      * Annotations the current frame skipped, as `[{index, reason}]`.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     annotation_warnings() {
         let deferred2_0;
@@ -402,7 +781,11 @@ export class FiggyBoundedChart {
      * The drawn annotations as JSON: `index`, `id`, `kind`, the selection
      * box `rect` and `handles`, and `selected`. Skipped items are listed by
      * `annotation_warnings` instead.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * Rects are in document logical pixels, not canvas pixels.
+     * @returns {FiggyJson}
      */
     annotations() {
         let deferred2_0;
@@ -462,8 +845,49 @@ export class FiggyBoundedChart {
         return ret;
     }
     /**
+     * A radial chart on `parent`'s device and queue (#313), drawn to its
+     * own `canvas`: a promise of the `FiggyBoundedChart`, which validates
+     * the document as [`Self::create`] does but requests no adapter and no
+     * device.
+     *
+     * Lifetime: the chart holds clones of the parent's handles. Disposing
+     * it (`free()`) never destroys the parent's device, and disposing the
+     * parent leaves this chart drawing; the device lives while either
+     * holds it, and disposing the last of them destroys it (#322). Both share one device-loss record, so a lost device fails
+     * the next frame, export or pick of each with the loss, and one GPU
+     * ledger and memory budget: the parent's `gpu_memory_status` counts
+     * this chart's allocations, and the one budget bounds both charts.
+     * Both submit to the one queue in call order; a wait on
+     * either (`first_frame_ready`, an export) completes with the work
+     * submitted before it, the other chart's included. An async call
+     * (an export, a pick) borrows only this chart: while it is pending,
+     * `free()` on this chart throws as on every wasm-bindgen object
+     * (await it first), and disposing the parent does not cancel it.
+     * @param {FiggyChart} parent
+     * @param {HTMLCanvasElement} canvas
+     * @param {string} family
+     * @param {string} value
+     * @param {number} width
+     * @param {number} height
+     * @returns {Promise<any>}
+     */
+    static create_on(parent, canvas, family, value, width, height) {
+        _assertClass(parent, FiggyChart);
+        const ptr0 = passStringToWasm0(family, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(value, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_create_on(parent.__wbg_ptr, canvas, ptr0, len0, ptr1, len1, width, height);
+        return ret;
+    }
+    /**
      * Renderer-measured logical pixel bounds and resize handles.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * Rects are `[x, y, width, height]` in document logical pixels, not canvas
+     * pixels.
+     * @returns {FiggyJson}
      */
     decorations() {
         let deferred2_0;
@@ -538,6 +962,24 @@ export class FiggyBoundedChart {
         return ret;
     }
     /**
+     * [`Self::export_png`] over another background (#313): `"document"`
+     * (the chart's own, as `export_png` draws it), `"transparent"` (no
+     * background: only the slices, labels and annotations) or a colour JSON
+     * `{"r":..,"g":..,"b":..,"a":..}` (components `0..=1`). The override is
+     * the export's alone: the document, its selection and the image on
+     * screen are unchanged. Any other value throws `code`
+     * `"export_background"` before anything is drawn.
+     * @param {number} scale
+     * @param {string} background
+     * @returns {Promise<Uint8Array>}
+     */
+    export_png_with_background(scale, background) {
+        const ptr0 = passStringToWasm0(background, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_export_png_with_background(this.__wbg_ptr, scale, ptr0, len0);
+        return ret;
+    }
+    /**
      * The chart as an SVG document at `scale ×` resolution: the slices and
      * background as one image, the title, labels, leader lines and
      * annotations as vector content.
@@ -565,7 +1007,9 @@ export class FiggyBoundedChart {
         }
     }
     /**
-     * @returns {string}
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     get_document() {
         let deferred2_0;
@@ -595,6 +1039,8 @@ export class FiggyBoundedChart {
     }
     /**
      * The topmost drawn annotation under a point, as its index.
+     *
+     * `x`, `y` are document logical pixels.
      * @param {number} x
      * @param {number} y
      * @returns {number | undefined}
@@ -611,6 +1057,9 @@ export class FiggyBoundedChart {
      *
      * Asynchronous: over the plot area it asks whether data is drawn
      * there, which the radial chart answers with its GPU pick.
+     *
+     * `x`, `y` are document logical pixels. Resolves to the plain id string,
+     * not JSON.
      * @param {number} x
      * @param {number} y
      * @param {boolean} edit_area
@@ -637,10 +1086,13 @@ export class FiggyBoundedChart {
      * Select the data under a point (or toggle it off) and resolve to the
      * selection as JSON. Asynchronous: the radial chart picks on the GPU,
      * like `FiggyChart.pick_point`.
+     *
+     * Resolves to JSON text (`FiggyJson`), not an object. `x`, `y` are
+     * document logical pixels.
      * @param {number} x
      * @param {number} y
      * @param {boolean} toggle
-     * @returns {Promise<string>}
+     * @returns {FiggyJson}
      */
     pick(x, y, toggle) {
         const ret = wasm.figgyboundedchart_pick(this.__wbg_ptr, x, y, toggle);
@@ -649,10 +1101,14 @@ export class FiggyBoundedChart {
     /**
      * The `Anchor` JSON at a point for `"Data"` or `"Ratio"`; `null` when
      * the point has no such position (a radial chart has no data anchors).
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * `x`, `y` are document logical pixels.
      * @param {number} x
      * @param {number} y
      * @param {string} kind
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     pointer_to_anchor(x, y, kind) {
         let deferred3_0;
@@ -675,6 +1131,22 @@ export class FiggyBoundedChart {
         }
     }
     /**
+     * Rewrite the automatic slice labels from the document's values and
+     * label format (#313): each generated text (`text_generated`) and each
+     * missing one, as `RadialChart::regenerate_labels` writes them; a text
+     * the host wrote stays. With `rewrite_user_text`, every text is
+     * rewritten, the host's included (`RadialChart::format_labels`).
+     * `set_document` already regenerates the generated texts of the
+     * document it is given; this is the call for an explicit rewrite.
+     * @param {boolean} rewrite_user_text
+     */
+    regenerate_labels(rewrite_user_text) {
+        const ret = wasm.figgyboundedchart_regenerate_labels(this.__wbg_ptr, rewrite_user_text);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * Remove the annotation at `index`; later indices move down one and the
      * selection follows or clears.
      * @param {number} index
@@ -686,6 +1158,26 @@ export class FiggyBoundedChart {
         }
     }
     /**
+     * Put the decoration `id` (an id [`Self::decorations`] lists, such as
+     * `"chart_title"` or `"radial_label_0_1"`) back where the layout places
+     * it (#313): its stored offset is removed, and for `"data_area"` the
+     * explicit plot region too (`DecorationLayout::reset`). Not a drag by
+     * the negative offset: nothing is left stored. Returns whether the
+     * document changed. An unknown id, and an annotation (which has a
+     * position of its own, not an offset), throw.
+     * @param {string} id
+     * @returns {boolean}
+     */
+    reset_decoration_position(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_reset_decoration_position(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
      * @param {number} width
      * @param {number} height
      */
@@ -693,6 +1185,7 @@ export class FiggyBoundedChart {
         wasm.figgyboundedchart_resize(this.__wbg_ptr, width, height);
     }
     /**
+     * `x`, `y` are document logical pixels.
      * @param {string} target
      * @param {number} x
      * @param {number} y
@@ -722,6 +1215,20 @@ export class FiggyBoundedChart {
         }
     }
     /**
+     * Select the annotation whose `id` is `id`, like `select_annotation`
+     * with its index (#315); an error, with the selection unchanged, when
+     * no annotation or more than one has it, or `id` is empty.
+     * @param {string} id
+     */
+    select_annotation_by_id(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgyboundedchart_select_annotation_by_id(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * Select a decoration by the id `hit_decoration` reported, or none.
      * An `"annotation_<n>"` id selects that drawn annotation
      * (`decorations.selected = Annotation(n)`).
@@ -736,6 +1243,8 @@ export class FiggyBoundedChart {
         }
     }
     /**
+     * The index of the selected annotation, or `undefined`. An index is
+     * valid until the annotation list changes (see `annotation_index`).
      * @returns {number | undefined}
      */
     selected_annotation() {
@@ -749,8 +1258,11 @@ export class FiggyBoundedChart {
      * decoration selection (`decorations.selected`, an annotation
      * included); the data selection is kept. Returns the stored layer as
      * JSON. Drawn pixels never depend on it.
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
      * @param {string} json
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     set_active_layer(json) {
         let deferred3_0;
@@ -816,9 +1328,25 @@ export class FiggyBoundedChart {
         wasm.figgyboundedchart_step_selection(this.__wbg_ptr, backwards);
     }
     /**
+     * The chart families `create` opens, as an array of strings (#315):
+     * `["radial"]`. The categorical, box plot and radar families moved to
+     * `FiggyChart` (`set_categorical_document`, `set_boxplot_document`,
+     * `set_radar_document`); passing one of them to `create` is an error
+     * naming that method.
+     *
+     * JS: `FiggyBoundedChart.supported_families() // ["radial"]`
+     * @returns {string[]}
+     */
+    static supported_families() {
+        const ret = wasm.figgyboundedchart_supported_families();
+        return ret;
+    }
+    /**
      * The theme names (#291, #295), as an array of strings: the four
      * families.
-     * @returns {Array<any>}
+     *
+     * Returns an array of strings, not a JSON string.
+     * @returns {string[]}
      */
     theme_names() {
         const ret = wasm.figgyboundedchart_theme_names(this.__wbg_ptr);
@@ -848,7 +1376,10 @@ export class FiggyChart {
      * The layer that receives pointer interaction, as JSON, with the
      * out-of-range fallback applied.
      * JS: `JSON.parse(chart.active_layer())`
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     active_layer() {
         let deferred2_0;
@@ -938,6 +1469,8 @@ export class FiggyChart {
      * under a point, or none. Only the handles `annotations` lists are
      * live: a span's two edges, a line's two value handles, an arrow's
      * two endpoints.
+     *
+     * `x`, `y` are physical canvas pixels. Returns a plain string, not JSON.
      * @param {number} index
      * @param {number} x
      * @param {number} y
@@ -953,8 +1486,90 @@ export class FiggyChart {
         return v1;
     }
     /**
+     * The `id` of every annotation, in index order, as an array of
+     * strings (not a JSON string): `""` for an item without one (#315).
+     * An id is the host's free label (`Annotation.id`), kept by every edit
+     * and by serialization, so it survives reordering and removal of other
+     * items, which shift indices.
+     *
+     * JS: `const ids = chart.annotation_ids(); // ["peak", "", "note-1"]`
+     * @returns {string[]}
+     */
+    annotation_ids() {
+        const ret = wasm.figgychart_annotation_ids(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * The current index of the annotation whose `id` is `id`, or
+     * `undefined` when none has it (#315). The renderer does not require
+     * ids to be unique, so an empty id, or one that several items share,
+     * is rejected with an error rather than guessed. Look the index up
+     * again after any edit that adds, removes or reorders annotations.
+     *
+     * JS: `const i = chart.annotation_index("peak"); // undefined when absent`
+     * @param {string} id
+     * @returns {number | undefined}
+     */
+    annotation_index(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_annotation_index(this.__wbg_ptr, ptr0, len0);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] === Number.MAX_SAFE_INTEGER ? undefined : ret[0];
+    }
+    /**
+     * Where an annotation that is not part of the document yet would be
+     * drawn (#312), placed by the annotation layer's own placement code
+     * from the document as the canvas shows it: the document, the
+     * selection, the undo state and the raster stay as they are. `json` is
+     * an `Annotation`, the shape `add_annotation` takes.
+     *
+     * Returns JSON `{ kind, visible, drawn, canvas, document }`. `canvas`
+     * is the shape in physical canvas pixels and `document` in document
+     * pixels, each `{ shape, points | rect, bounds }`: `shape` is `"line"`
+     * (a reference line's two ends), `"span"` or `"text"` (`rect`
+     * `[x, y, w, h]`), `"arrow"` (`from`, `to`) or `"polygon"` (a shape's
+     * outline clipped to the plot), and `bounds` is everything the raster
+     * paints for it, labels included. A span or a reference line on a
+     * broken axis is reported whole, before its gaps are cut out. An item
+     * the raster would skip has `drawn: false` and the `reason`
+     * `annotation_warnings` would give (`NonFinite`, `NoValueAxis`,
+     * `OutOfRange`, `EmptyText`). `visible: false` (a hidden item) is
+     * placed as it is drawn once shown.
+     * JS: `const p = JSON.parse(chart.annotation_preview(itemJson));`
+     * @param {string} json
+     * @returns {string}
+     */
+    annotation_preview(json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_annotation_preview(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * The vertex handle (`"v<i>"`) of a polygon annotation under a
      * point, or none: a polygon's handles are its vertices.
+     *
+     * `x`, `y` are physical canvas pixels. Returns a plain string, not JSON.
      * @param {number} index
      * @param {number} x
      * @param {number} y
@@ -973,7 +1588,10 @@ export class FiggyChart {
      * Annotations the current raster skipped, as `[{index, reason}]`
      * with `reason` one of `NonFinite`, `NoValueAxis`, `OutOfRange`,
      * `EmptyText`.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     annotation_warnings() {
         let deferred2_0;
@@ -998,7 +1616,10 @@ export class FiggyChart {
      * `kind`, the selection box `rect` and its `handles` in physical
      * canvas pixels, and `selected`. Items the raster skipped are
      * absent here and listed by `annotation_warnings`.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     annotations() {
         let deferred2_0;
@@ -1025,12 +1646,15 @@ export class FiggyChart {
      * chart's x range moves by exactly the new samples' span; the host may
      * drop every sample before the window. Returns the update as JSON.
      * JS: `chart.append_monotonic("daq", [new0, new1], true)`
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
      * @param {string} group
      * @param {any} data
      * @param {boolean} sliding
      * @param {number | null} [stride]
      * @param {Uint32Array | null} [columns]
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     append_monotonic(group, data, sliding, stride, columns) {
         let deferred4_0;
@@ -1347,6 +1971,70 @@ export class FiggyChart {
         return StreamingStepResult.__wrap(ret[0]);
     }
     /**
+     * Begin a chunked upload of the resident column `id`: `length` values,
+     * `encoding` `"f32"` (chunks are `Float32Array`s) or `"f64"`
+     * (`Float64Array`s, kept as GPU `(hi, lo)` pairs). The returned handle
+     * takes the chunks (`push`) and installs the column (`commit(chart)`).
+     *
+     * `source_revision` is the revision of the column the upload replaces,
+     * as `column_revision(id)` reports it, or `null` / `undefined` for an id
+     * that is not registered; anything else throws with `code` `"stale"`,
+     * and so does a commit after the column changed. `max_chunk_bytes`
+     * bounds the bytes of each pushed chunk.
+     *
+     * One GPU staging buffer of the column's size (8 bytes per value) is
+     * created here and held until the commit or the cancel; it counts
+     * against the memory budget, and a budget or device that cannot hold
+     * it throws with the codes of `register_column_f32`. A streamed id or a
+     * reserved id is refused.
+     *
+     * JS: `const up = chart.begin_column_upload("x", n, "f64", chart.column_revision("x"), 1 << 20);`
+     * @param {string} id
+     * @param {number} length
+     * @param {string} encoding
+     * @param {number | null | undefined} source_revision
+     * @param {number} max_chunk_bytes
+     * @returns {ColumnUploadHandle}
+     */
+    begin_column_upload(id, length, encoding, source_revision, max_chunk_bytes) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(encoding, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_begin_column_upload(this.__wbg_ptr, ptr0, len0, length, ptr1, len1, !isLikeNone(source_revision), isLikeNone(source_revision) ? 0 : source_revision, max_chunk_bytes);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ColumnUploadHandle.__wrap(ret[0]);
+    }
+    /**
+     * Begin a column transaction (#334): several columns uploaded in
+     * chunks and, optionally, the chart's next Config and Series, installed
+     * together by one `commit(chart)` or not at all. `max_chunk_bytes`
+     * bounds the bytes of each pushed chunk. Nothing is allocated until a
+     * column is staged. See `ColumnTransaction`.
+     *
+     * JS:
+     * ```js
+     * const tx = chart.begin_columns_transaction(1 << 20);
+     * tx.stage(chart, "x", n, "f64", chart.column_revision("x") ?? null);
+     * tx.stage(chart, "y", n, "f64", chart.column_revision("y") ?? null);
+     * tx.push("x", 0, xs);
+     * tx.push("y", 0, ys);
+     * tx.set_state(JSON.stringify(config), JSON.stringify(series));
+     * tx.commit(chart);
+     * ```
+     * @param {number} max_chunk_bytes
+     * @returns {ColumnTransaction}
+     */
+    begin_columns_transaction(max_chunk_bytes) {
+        const ret = wasm.figgychart_begin_columns_transaction(this.__wbg_ptr, max_chunk_bytes);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ColumnTransaction.__wrap(ret[0]);
+    }
+    /**
      * Begin an independent replay of the completed stream. The facade
      * supplies only renderer-requested ranges between these calls.
      * @param {number} scale
@@ -1359,31 +2047,6 @@ export class FiggyChart {
             throw takeFromExternrefTable0(ret[1]);
         }
         return StreamingOperationHandle.__wrap(ret[0]);
-    }
-    /**
-     * Compatibility entry point; always rejects without requesting ranges.
-     * @param {number} _x
-     * @param {number} _y
-     * @param {number} _max_distance_px
-     * @param {number} _max_primitives_per_chunk
-     * @returns {Promise<StreamingOperationHandle>}
-     */
-    begin_stream_pick_data(_x, _y, _max_distance_px, _max_primitives_per_chunk) {
-        const ret = wasm.figgychart_begin_stream_pick_data(this.__wbg_ptr, _x, _y, _max_distance_px, _max_primitives_per_chunk);
-        return ret;
-    }
-    /**
-     * Compatibility entry point. Nonresident picking is disabled because
-     * exact source replay can take as long as the original render.
-     * @param {number} _x
-     * @param {number} _y
-     * @param {number} _max_distance_px
-     * @param {number} _max_primitives_per_chunk
-     * @returns {Promise<StreamingOperationHandle>}
-     */
-    begin_stream_pick_point(_x, _y, _max_distance_px, _max_primitives_per_chunk) {
-        const ret = wasm.figgychart_begin_stream_pick_point(this.__wbg_ptr, _x, _y, _max_distance_px, _max_primitives_per_chunk);
-        return ret;
     }
     /**
      * Start or restart this chart's exact streaming surface and renderer-
@@ -1430,6 +2093,37 @@ export class FiggyChart {
         }
     }
     /**
+     * End every element selection and pointer gesture (#311): the
+     * decoration selection (`HitId`), the annotation selection, a value
+     * label or Feynman part drag, an element drag or handle resize, a
+     * pending plot-area resize proposal and a held subplot display
+     * placement. The chart redraws. The active layer, the config, the
+     * series and the columns stay as they are, and so does the data
+     * highlight (`picked_data`, a value label's typed selection included):
+     * clear that with `set_picked_data("null")`.
+     *
+     * JS: `chart.clear_selection();`
+     */
+    clear_selection() {
+        const ret = wasm.figgychart_clear_selection(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * The revision of column `id`: what `begin_column_upload` takes as
+     * `source_revision`. Every upload of a resident column renews it.
+     * `undefined` for an id that is not registered.
+     * @param {string} id
+     * @returns {number | undefined}
+     */
+    column_revision(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_column_revision(this.__wbg_ptr, ptr0, len0);
+        return ret[0] === 0 ? undefined : ret[1];
+    }
+    /**
      * Configure the total GPU budget and chart-local packed-view limit.
      * Automatic streaming keeps original sources nonresident, then caches
      * only source rows whose geometry reaches the current view when the
@@ -1456,6 +2150,44 @@ export class FiggyChart {
         const ret = wasm.figgychart_configure_streaming(this.__wbg_ptr, max_active_charts, max_in_flight_chunks, max_columns_per_chunk, max_chunk_input_bytes, max_in_flight_gpu_bytes);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * `json`, an `Annotation`, with every anchor converted to
+     * `anchor_kind` (`"Data"` or `"Ratio"`) at the position it is drawn
+     * at now (#312): a text box's anchor, an arrow's and a box shape's
+     * two ends, a polygon's vertices. A reference line or a span has no
+     * anchor and comes back unchanged. Nothing is installed; pass the
+     * result to `add_annotation` or `set_annotation`. An anchor with no
+     * position (a data anchor on a chart without value axes, a
+     * non-positive value on a logarithmic axis, a non-finite coordinate)
+     * is refused with code `anchor_unplaceable`. A ratio anchor is an
+     * `f32` fraction of the plot, so a round trip keeps the drawn pixel.
+     * JS: `chart.set_annotation(i, chart.convert_annotation_anchor(itemJson, "Ratio"));`
+     * @param {string} json
+     * @param {string} anchor_kind
+     * @returns {string}
+     */
+    convert_annotation_anchor(json, anchor_kind) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passStringToWasm0(anchor_kind, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len1 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_convert_annotation_anchor(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
         }
     }
     /**
@@ -1507,11 +2239,43 @@ export class FiggyChart {
         return ret;
     }
     /**
+     * The active layer's exact data area (#312), as JSON `{ layer, panel,
+     * document, canvas }` with `[x, y, w, h]` rects in document and
+     * physical canvas pixels: the rectangle the data is drawn in, not the
+     * padded box `decoration_bounds("data_area")` selects. The annotation
+     * layer reads the parent chart's. Refused with code `data_area` for a
+     * chart without one.
+     * JS: `const [x, y, w, h] = JSON.parse(chart.data_area_rect()).canvas;`
+     * @returns {string}
+     */
+    data_area_rect() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgychart_data_area_rect(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
      * Renderer-measured decoration bounds in physical canvas pixels.
      * An `"annotation_<n>"` id that `hit_test` reports resolves to the
      * drawn item's selection box.
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * `{ rect: [x, y, width, height], handles: [[x, y, width, height], …] }`.
      * @param {string} target
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     decoration_bounds(target) {
         let deferred3_0;
@@ -1692,26 +2456,6 @@ export class FiggyChart {
         return ret;
     }
     /**
-     * Compatibility entry point; no streamed pick operation can start.
-     * @param {StreamingOperationHandle} _handle
-     * @returns {Promise<any>}
-     */
-    finish_stream_pick_data(_handle) {
-        _assertClass(_handle, StreamingOperationHandle);
-        const ret = wasm.figgychart_finish_stream_pick_data(this.__wbg_ptr, _handle.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * Compatibility entry point; no streamed pick operation can start.
-     * @param {StreamingOperationHandle} _handle
-     * @returns {Promise<any>}
-     */
-    finish_stream_pick_point(_handle) {
-        _assertClass(_handle, StreamingOperationHandle);
-        const ret = wasm.figgychart_finish_stream_pick_point(this.__wbg_ptr, _handle.__wbg_ptr);
-        return ret;
-    }
-    /**
      * Submit the current chart if it is dirty, then wait until that GPU
      * work has finished. Hosts should keep a loading overlay up until
      * this resolves. The wait does not remove a main-thread Dawn/driver
@@ -1728,6 +2472,102 @@ export class FiggyChart {
         return ret;
     }
     /**
+     * Fit a candidate config without installing it (#312): `config_json`
+     * is a whole `Config` (what `get_config` returns, edited); the result
+     * is that config as JSON with the ranges of every layer, link and
+     * subplot fitted from the resident columns' statistics by the same
+     * code as `fit_ranges` (`Renderer::fit_config`), with `padding` (the
+     * fraction of the data span left on each side, finite and at least 0)
+     * instead of the fixed 5%. The fit uses this chart's registered
+     * series. The installed chart, its view and its columns are
+     * untouched; install the result with `set_config`.
+     *
+     * Refused (an exception, nothing changes): JSON that is not a
+     * `Config`, a negative or non-finite padding, a candidate whose
+     * overlays, subplots or line offsets name a series this chart has not
+     * registered (`LayerSeriesUnknown`) or break their rules, a series
+     * whose column is not registered or is streamed (rule 8), and a
+     * monotonic chart. The call is synchronous, so the columns and series
+     * it reads cannot change while it runs.
+     * JS: `const fitted = JSON.parse(chart.fit_config(JSON.stringify(cfg), 0.05));`
+     * @param {string} config_json
+     * @param {number} padding
+     * @returns {string}
+     */
+    fit_config(config_json, padding) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_fit_config(this.__wbg_ptr, ptr0, len0, padding);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * `fit_config` for one layer's chosen axes (#334,
+     * `Renderer::fit_config_scoped`): the candidate comes back with only
+     * the axes `scope_json` selects fitted, every other axis exactly as
+     * given. `scope_json` is `{ "layer": <layer>, "axes": ["x", "y",
+     * "z"], "linked": "group" | "target", "keep": [{ "layer": <layer>,
+     * "axis": "x" | "y" | "z" }] }`, a layer written as for
+     * `set_active_layer` (`"Base"`, `{"Overlay":0}`, `{"Subplot":1}`,
+     * `{"SubplotOverlay":[1,0]}`). `"z"` is a 3D chart's z axis (its
+     * `right_y`); on a parallel chart the parallel axes are `"y"`. A
+     * moved axis that is linked moves its link group. `linked` (default
+     * `"group"`) reads every series drawn against a linked axis' group,
+     * or with `"target"` only those drawn in the target's panel (the
+     * parent chart or one subplot, its overlays included; the group still
+     * shares the range). `keep` (default none) names axes that hold their
+     * range, and every axis linked to one holds too. Statistics only:
+     * error bar ends, heatmap cell half-widths and arrow tips are not
+     * included (`auto_fit_all` measures drawn extents). The installed
+     * chart is untouched.
+     *
+     * Refused (an exception, nothing changes): the refusals of
+     * `fit_config`, a scope that is not this JSON (an unknown field, axis
+     * name or `linked` value), and a `layer` or `keep` layer naming an
+     * overlay or subplot the candidate does not have (code
+     * `FitScopeLayer`).
+     * JS: `chart.fit_config_scoped(JSON.stringify(cfg), JSON.stringify({ layer: "Base", axes: ["x"], linked: "target" }), 0.05)`
+     * @param {string} config_json
+     * @param {string} scope_json
+     * @param {number} padding
+     * @returns {string}
+     */
+    fit_config_scoped(config_json, scope_json, padding) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passStringToWasm0(scope_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len1 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_fit_config_scoped(this.__wbg_ptr, ptr0, len0, ptr1, len1, padding);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+        }
+    }
+    /**
      * Fits the chart's layout to its labels and titles and applies it
      * (`Renderer::fit_layout`, #271). It can move the plot's edges, so it
      * takes the sources of the chart's monotonic groups as
@@ -1737,6 +2577,25 @@ export class FiggyChart {
      */
     fit_layout(sources) {
         const ret = wasm.figgychart_fit_layout(this.__wbg_ptr, isLikeNone(sources) ? 0 : addToExternrefTable0(sources));
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Fit series `series_id`'s point size map domain to its size column's
+     * native extent, from the column's cached statistics
+     * (`PointSizeMap::fit_domain`, #312): only that series' `domain_min`
+     * and `domain_max` change, and no column is read back. Refused
+     * (an exception, the style unchanged): an unknown series, a series
+     * without `point_size_map`, a streamed or unregistered size column,
+     * and an extent that is empty, non-finite or a single value.
+     * JS: `chart.fit_point_size_domain("bubbles")`
+     * @param {string} series_id
+     */
+    fit_point_size_domain(series_id) {
+        const ptr0 = passStringToWasm0(series_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_fit_point_size_domain(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -1758,6 +2617,64 @@ export class FiggyChart {
         const ret = wasm.figgychart_fit_ranges(this.__wbg_ptr);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Fit vector series `series_id`'s scale so the longest vector its U/V
+     * columns' extents allow draws `target` long
+     * (`VectorStyle::fit_scale`, #312): logical pixels for a `Pixels`
+     * scale, data units for a `Data` scale. Point and grid components
+     * both fit (a grid from the union of its columns' statistics), and a
+     * point field drawn in 3D fits its `w` column too
+     * (`fit_scale_3d`). Only that series' scale value changes, and no
+     * column is read back. Refused (an exception, the style unchanged):
+     * an unknown or non-vector series, a `target` that is not finite and
+     * positive, a streamed or unregistered component column, and
+     * components whose extent is empty, non-finite or all zero.
+     * JS: `chart.fit_vector_scale("wind", 24)`
+     * @param {string} series_id
+     * @param {number} target
+     */
+    fit_vector_scale(series_id, target) {
+        const ptr0 = passStringToWasm0(series_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_fit_vector_scale(this.__wbg_ptr, ptr0, len0, target);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * `fit_config` that moves only Y axes (#312): every X axis of the
+     * candidate (`bottom_x`, `top_x`, each overlay's `x_axis`, the same in
+     * each subplot) comes back exactly as given, ticks and label format
+     * included; the Y axes (`left_y`, `right_y` — the z axis of a 3D
+     * chart —, overlay `y_axis` and parallel axes) are fitted. An axis no
+     * fit moves (categorical, ternary) keeps its range. The config has no
+     * "manual range" flag: a host that holds a Y range by hand restores it
+     * in the result. Same refusals as `fit_config`.
+     * JS: `chart.fit_y_axes_config(JSON.stringify(cfg), 0.05)`
+     * @param {string} config_json
+     * @param {number} padding
+     * @returns {string}
+     */
+    fit_y_axes_config(config_json, padding) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_fit_y_axes_config(this.__wbg_ptr, ptr0, len0, padding);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
         }
     }
     /**
@@ -1790,7 +2707,12 @@ export class FiggyChart {
     /**
      * Serialize the full chart option SSoT to a JSON string.
      * JS: `const cfg = JSON.parse(chart.get_config());`
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * Positions and sizes in it (`chart_area`, margins, decoration offsets)
+     * are document logical pixels, not canvas pixels.
+     * @returns {FiggyJson}
      */
     get_config() {
         let deferred2_0;
@@ -1812,7 +2734,10 @@ export class FiggyChart {
     }
     /**
      * Serialize the series declarations (columns, render type, styles).
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     get_series() {
         let deferred2_0;
@@ -1836,7 +2761,11 @@ export class FiggyChart {
      * Read-only accounting. These are requested GPU allocations, not a
      * driver VRAM measurement; retired bytes remain charged until the
      * queue completion callback fires.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * Sizes are in bytes.
+     * @returns {FiggyJson}
      */
     gpu_memory_status() {
         let deferred1_0;
@@ -1872,6 +2801,9 @@ export class FiggyChart {
     /**
      * The topmost drawn annotation under a point in physical canvas
      * pixels, as its index.
+     *
+     * `x`, `y` are physical canvas pixels (the canvas's `width`/`height`
+     * space, not CSS pixels).
      * @param {number} x
      * @param {number} y
      * @returns {number | undefined}
@@ -1900,6 +2832,9 @@ export class FiggyChart {
      * While the annotation layer is active (and shown) its drawn items
      * sit on top and answer as `"annotation_<n>"`; on every other layer
      * they are not registered and clicks pass through them.
+     *
+     * `x`, `y` are physical canvas pixels (the canvas's `width`/`height`
+     * space, not CSS pixels). Returns the plain id string, not JSON.
      * @param {number} x
      * @param {number} y
      * @returns {string | undefined}
@@ -1919,7 +2854,10 @@ export class FiggyChart {
     /**
      * The subplots that are insets now (nested in another panel's plot),
      * bottom to top, as a JSON array of indices.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     insets() {
         let deferred2_0;
@@ -1942,8 +2880,12 @@ export class FiggyChart {
     /**
      * Metadata-only admission for incoming columns; no payload is read,
      * registered, uploaded, or reserved. Chart-derived buffers are excluded.
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * Sizes are in bytes.
      * @param {Float64Array} lengths
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     inspect_column_admission(lengths) {
         let deferred3_0;
@@ -1966,8 +2908,100 @@ export class FiggyChart {
         }
     }
     /**
-     * Queue cancellation only when an automatic stream is active.
+     * The displayed geometry of a document and its panels, read-only
+     * (#312). Without a config it is the installed document as the canvas
+     * shows it; with a `Config` JSON it is that candidate, placed on this
+     * canvas the way `set_config` would place it, and nothing is
+     * installed. A candidate whose overlays, subplots or line offsets
+     * cannot be laid out is refused with code `layout`.
+     *
+     * `surface_width` and `surface_height` (#334), physical pixels, lay
+     * the document (or the candidate) out as a canvas of that size would
+     * show it, the way the chart reports it after `resize(width,
+     * height)`; the canvas and its surface are not resized. Give both or
+     * neither: one alone, or a dimension that is not a whole number of
+     * pixels from 1, is refused with code `invalid_size`. Without them the
+     * call reads the canvas as before.
+     *
+     * Returns JSON `{ scale, surface, document_area, active_layer, panels }`:
+     * `scale` is canvas pixels per document pixel, `surface` the canvas
+     * size, and every rect a `{ document, canvas }` pair of
+     * `[x, y, w, h]`, in document and physical canvas pixels. `panels`
+     * lists every panel in the order the renderer draws them (base,
+     * overlays, line offset members, then each subplot's panels), each
+     * `{ index, layer, subplot, member, frame, data_area }`: `layer` as
+     * `set_active_layer` takes it, `member` the line offset series a
+     * member panel draws, `frame` its chart's `chart_area` and
+     * `data_area` its exact data area (`null` without one). An overlay
+     * and a member share their chart's frame and data area.
+     * JS: `const layout = JSON.parse(chart.inspect_document_layout());`
+     * @param {string | null} [config_json]
+     * @param {number | null} [surface_width]
+     * @param {number | null} [surface_height]
      * @returns {string}
+     */
+    inspect_document_layout(config_json, surface_width, surface_height) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            var len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_inspect_document_layout(this.__wbg_ptr, ptr0, len0, !isLikeNone(surface_width), isLikeNone(surface_width) ? 0 : surface_width, !isLikeNone(surface_height), isLikeNone(surface_height) ? 0 : surface_height);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * Whether a candidate document could stream (#311), checked with the
+     * renderer's own streaming rules (`Renderer::inspect_streaming_candidate`,
+     * the rules `streaming_capabilities` applies to the current chart)
+     * without changing anything: no state is read but the two JSON
+     * strings, and the candidate need not be valid for this chart's columns.
+     * Returns `{ "supported": true, "reason": null }` or
+     * `{ "supported": false, "reason": "<the first rule it breaks>" }`.
+     * JSON that does not parse as a `Config` or a series list throws.
+     *
+     * JS: `const { supported, reason } = JSON.parse(chart.inspect_streaming_capabilities(cfg, series));`
+     * @param {string} config_json
+     * @param {string} series_json
+     * @returns {string}
+     */
+    inspect_streaming_capabilities(config_json, series_json) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passStringToWasm0(series_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len1 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_inspect_streaming_capabilities(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+        }
+    }
+    /**
+     * Queue cancellation only when an automatic stream is active.
+     *
+     * Returns a plain string, not JSON.
+     * @returns {"stream_cancel_queued" | "resident"}
      */
     interrupt_render() {
         let deferred2_0;
@@ -1988,6 +3022,39 @@ export class FiggyChart {
         }
     }
     /**
+     * One legend row for series `series_id` as the auto legend writes it
+     * (#312): its symbol, drawn from the series' style and the chart's
+     * colourbar map and naming the series, a space, the `"\t"` column
+     * separator and the series' label. Returns the row's `RichSegment`s as
+     * a JSON array; append them to `legend.content.segments` (after a
+     * `"\n"` segment when the legend has rows) with `set_config`, and the
+     * rest of the legend keeps its text. A series without a label gets an
+     * empty label. An unknown series is refused with code `series`.
+     * JS: `const row = JSON.parse(chart.legend_entry("fit"));`
+     * @param {string} series_id
+     * @returns {string}
+     */
+    legend_entry(series_id) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(series_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_legend_entry(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * Load the bundled demo (sine + RC charge curves) — lets a frontend
      * see a real chart without wiring data first. Repeated calls replace
      * the demo registrations and keep the same series declarations.
@@ -2002,7 +3069,10 @@ export class FiggyChart {
      * The chart's monotonic groups, each once, as a JSON array of names
      * (#271): the groups whose sources `resize_monotonic`, `fit_layout`
      * and the monotonic exports take. Empty for a chart without them.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     monotonic_groups() {
         let deferred2_0;
@@ -2028,7 +3098,10 @@ export class FiggyChart {
      * series whose group was never supplied, which draw nothing until
      * `set_monotonic` supplies it. A call that moves the mapping takes the
      * source or is refused, so no other series is listed.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     needs_source() {
         let deferred2_0;
@@ -2051,11 +3124,13 @@ export class FiggyChart {
     /**
      * Move among source rows represented in the completed packed view.
      * Returns only the original source index; no source or GPU readback.
+     *
+     * Returns a number, or `undefined`.
      * @param {string | null | undefined} source_id
      * @param {string} series_id
      * @param {number} current
      * @param {boolean} forward
-     * @returns {any}
+     * @returns {number | undefined}
      */
     next_view_point_index(source_id, series_id, current, forward) {
         var ptr0 = isLikeNone(source_id) ? 0 : passStringToWasm0(source_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -2115,16 +3190,56 @@ export class FiggyChart {
         }
     }
     /**
+     * The panel on top at physical canvas point `(x, y)` (#312), as JSON
+     * `{ layer, panel, subplot, active, in_data_area, document }`, or
+     * `null` off every frame. Subplot frames win over the parent chart:
+     * the one drawn on top (insets in paint order, then subplots of their
+     * own, later over earlier), the same rule a base-layer press uses.
+     * Where the active layer is an overlay of the chart found, the
+     * overlay is reported, since it is drawn over its chart's frame; the
+     * annotation layer, while active and shown, is reported on the parent
+     * frame outside every subplot. `panel` indexes
+     * `inspect_document_layout`'s `panels`, `active` says whether `layer`
+     * is the active layer, `in_data_area` whether the point is inside that
+     * chart's exact data area, and `document` is the point in document
+     * pixels.
+     * JS: `const hit = JSON.parse(chart.panel_at(x, y));`
+     * @param {number} x
+     * @param {number} y
+     * @returns {string}
+     */
+    panel_at(x, y) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgychart_panel_at(this.__wbg_ptr, x, y);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
      * Pick the nearest visible data primitive at canvas pixel `(x, y)`;
      * equal-distance hits follow chart paint order.
      * Unlike `pick_point`, this includes histogram bins, canonical heatmap
      * cells and contour levels. The tagged result contains only stable
      * source/series indices plus `distance_px`; values and geometry stay
      * in the renderer's GPU-backed SSoT. Resolves to `undefined` on miss.
+     *
+     * Resolves to JSON text (`FiggyJson`), not an object. `x`, `y` and
+     * `max_distance_px` are physical canvas pixels.
      * @param {number} x
      * @param {number} y
      * @param {number} max_distance_px
-     * @returns {Promise<any>}
+     * @returns {FiggyJson | undefined}
      */
     pick_data(x, y, max_distance_px) {
         const ret = wasm.figgychart_pick_data(this.__wbg_ptr, x, y, max_distance_px);
@@ -2146,10 +3261,13 @@ export class FiggyChart {
      * takes to drag it.
      * The `<figgy-chart>` facade parses the string and normalizes
      * `undefined` to `null`.
+     *
+     * Resolves to JSON text (`FiggyJson`), not an object. `x`, `y` and
+     * `max_distance_px` are physical canvas pixels.
      * @param {number} x
      * @param {number} y
      * @param {number} max_distance_px
-     * @returns {Promise<any>}
+     * @returns {FiggyJson | undefined}
      */
     pick_point(x, y, max_distance_px) {
         const ret = wasm.figgychart_pick_point(this.__wbg_ptr, x, y, max_distance_px);
@@ -2162,7 +3280,9 @@ export class FiggyChart {
      * (any other rejection), `"device_lost"` or `"cancelled"`.
      *
      * JS: `for (const { label, kind } of chart.pipeline_failures()) …`
-     * @returns {Array<any>}
+     *
+     * Returns an array of plain objects, not a JSON string.
+     * @returns {FiggyPipelineFailure[]}
      */
     pipeline_failures() {
         const ret = wasm.figgychart_pipeline_failures(this.__wbg_ptr);
@@ -2180,7 +3300,7 @@ export class FiggyChart {
      * compiles too.
      *
      * JS: `const { screen, all, frame_complete } = chart.pipeline_status();`
-     * @returns {any}
+     * @returns {FiggyPipelineStatus}
      */
     pipeline_status() {
         const ret = wasm.figgychart_pipeline_status(this.__wbg_ptr);
@@ -2224,10 +3344,13 @@ export class FiggyChart {
      * as `"Data"` or `"Ratio"`, for placing a new text box or arrow
      * where the user clicked. `null` when the point has no data
      * position (outside a log axis, or the chart has no value axes).
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
      * @param {number} x
      * @param {number} y
      * @param {string} kind
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     pointer_to_anchor(x, y, kind) {
         let deferred3_0;
@@ -2370,6 +3493,21 @@ export class FiggyChart {
     prewarm_gpu_picking() {
         const ret = wasm.figgychart_prewarm_gpu_picking(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * A handle on the chart's background pipeline compiles that does not
+     * borrow the chart (#315): see [`FiggyReadiness`]. Its waits leave the
+     * chart free for `pipeline_status()`, `frame()`, `resize()` and
+     * `free()`; once the chart is freed they reject with a
+     * `"chart disposed"` `Error`. `series_ready()`, `pipelines_ready()` and
+     * `first_frame_ready()` on the chart keep working as before.
+     *
+     * JS: `const readiness = chart.readiness(); await readiness.pipelines_ready();`
+     * @returns {FiggyReadiness}
+     */
+    readiness() {
+        const ret = wasm.figgychart_readiness(this.__wbg_ptr);
+        return FiggyReadiness.__wrap(ret);
     }
     /**
      * Register a new `Float32Array` column. Existing ids are rejected.
@@ -2597,7 +3735,10 @@ export class FiggyChart {
      * Compact live resident columns, drop the unused pool slab, and wait
      * for the device completion fence before reporting reclaimed bytes.
      * The 16 MiB startup slab remains as the minimum reusable pool.
-     * @returns {Promise<string>}
+     *
+     * Resolves to JSON text (`FiggyJson`) in the shape of `gpu_memory_status`,
+     * not an object.
+     * @returns {FiggyJson}
      */
     release_unused_gpu_memory() {
         const ret = wasm.figgychart_release_unused_gpu_memory(this.__wbg_ptr);
@@ -2663,6 +3804,41 @@ export class FiggyChart {
             throw takeFromExternrefTable0(ret[1]);
         }
         return ret[0] !== 0;
+    }
+    /**
+     * Every warning of the last drawn frame (#312), as a JSON array: tick
+     * settings the axis raster drew differently from how they were
+     * written, on any axis of any panel, and annotations the raster
+     * skipped. Each is `{ kind, ..., message }`: `MajorSpacingReplaced`
+     * and `LogDecadeStepAdjusted` (`axis`, `requested`, `used`; a
+     * replaced spacing also has `reason` and, for `TooManyTicks`,
+     * `limit`), `MinorCountClamped` (`axis`, `requested`, `used`) and
+     * `AnnotationSkipped` (`index`, `reason`). `axis` is the `Config`
+     * field path (`"bottom_x"`, `"overlays[0].y_axis"`,
+     * `"subplots[1].config.left_y"`), a non-finite number is `null`, and
+     * `message` is one line naming the setting and both values. A later
+     * kind has `kind: "Other"`. The list is the one `frame` last
+     * rasterized; `annotation_warnings` is its annotation part.
+     * JS: `for (const w of JSON.parse(chart.render_warnings())) console.warn(w.message);`
+     * @returns {string}
+     */
+    render_warnings() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.figgychart_render_warnings(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
     }
     /**
      * Replace existing stream metadata. The new revision becomes live
@@ -2770,8 +3946,9 @@ export class FiggyChart {
         }
     }
     /**
-     * Explicitly rebuild the auto legend from `SeriesConfig.label`.
-     * Legacy string labels are used only when a series has no rich label.
+     * Explicitly rebuild the auto legend from `SeriesConfig.label`: every
+     * auto legend row from the series' label; a series without one gets no
+     * row.
      */
     reset_legend_from_series_labels() {
         const ret = wasm.figgychart_reset_legend_from_series_labels(this.__wbg_ptr);
@@ -2828,6 +4005,24 @@ export class FiggyChart {
         }
     }
     /**
+     * Select the annotation whose `id` is `id`, like `select_annotation`
+     * with its index (#315). Errors when no annotation, or more than one,
+     * has that id, or when `id` is empty; the selection is unchanged then.
+     *
+     * JS: `chart.select_annotation_by_id("peak");`
+     * @param {string} id
+     */
+    select_annotation_by_id(id) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.figgychart_select_annotation_by_id(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * The index of the selected annotation, or `undefined`. An index is
+     * valid until the annotation list changes (see `annotation_index`).
      * @returns {number | undefined}
      */
     selected_annotation() {
@@ -2840,7 +4035,10 @@ export class FiggyChart {
      * expose `bin_start`, `bin_end`, `value`, and `orientation`; the value
      * is the stored height (also valid for weighted/density histograms).
      * Point and matrix selections expose their coordinates and cell value.
-     * @returns {Promise<string>}
+     *
+     * Resolves to JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     selection_details() {
         const ret = wasm.figgychart_selection_details(this.__wbg_ptr);
@@ -2848,8 +4046,12 @@ export class FiggyChart {
     }
     /**
      * Report the effective primitive/grid extent currently drawn.
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * `{ drawn_count, cols, rows, truncated }`: counts, not pixels.
      * @param {string} series_id
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     series_draw_info(series_id) {
         let deferred3_0;
@@ -2894,8 +4096,11 @@ export class FiggyChart {
      * index past the overlay list is stored as `"Base"`; the stored
      * layer is returned as JSON. Drawn pixels never depend on it.
      * JS: `chart.set_active_layer(JSON.stringify({ Overlay: 0 }))`
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
      * @param {string} json
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     set_active_layer(json) {
         let deferred3_0;
@@ -2970,26 +4175,46 @@ export class FiggyChart {
      * upload through borrowed adapters; nothing is copied. Without a
      * document `value_range` the value axis is fitted to the records' and
      * outliers' statistics with a tenth of the span as padding and rounded
-     * to nice ticks. The chart keeps its chart area; the series, columns,
+     * to nice ticks. The chart keeps its chart area, and an explicit
+     * `decorations.data_area` (logical pixels, edges rounded to whole
+     * pixels) is the data area in it (`Config::fit_legacy_data_area`, #334)
+     * unless the layout cannot hold it, which keeps the automatic layout; the series, columns,
      * records and config of a box plot document opened before are
      * replaced, every other column stays. From here on the chart is edited
      * through the Cartesian API.
      *
-     * A document that does not parse or validate, or whose series styles
-     * cannot be created, is rejected with the previous chart unchanged. A
-     * failure while the new columns upload or the axis fits from them
-     * rejects with a chart that has no series: the previous document's
-     * series and columns are retired by then.
+     * The replace is atomic (#311): see "Document replace" on
+     * [`Self::set_radar_document`]. The ids are the documented ones for
+     * every document opened.
      *
-     * JS: `chart.set_boxplot_document(JSON.stringify(doc));`
+     * Returns the conversion report and takes the loss policy described
+     * in "Review and apply" on [`Self::set_radar_document`] (#334).
+     *
+     * JS: `const report = JSON.parse(chart.set_boxplot_document(JSON.stringify(doc), JSON.stringify({ refuse: "any" })));`
      * @param {string} json
+     * @param {string | null} [options]
+     * @returns {string}
      */
-    set_boxplot_document(json) {
-        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.figgychart_set_boxplot_document(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+    set_boxplot_document(json, options) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            var ptr1 = isLikeNone(options) ? 0 : passStringToWasm0(options, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            var len1 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_set_boxplot_document(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
         }
     }
     /**
@@ -3003,27 +4228,47 @@ export class FiggyChart {
      * (`categorical.positions`) and one value column per series
      * (`categorical.values.<series id>`), registered as one batch. The
      * value axis is fitted to the bars from the columns' statistics and
-     * rounded to nice ticks. The chart keeps its chart area; the series,
+     * rounded to nice ticks. The chart keeps its chart area, and an explicit
+     * `decorations.data_area` (logical pixels, edges rounded to whole
+     * pixels) is the data area in it (`Config::fit_legacy_data_area`, #334)
+     * unless the layout cannot hold it, which keeps the automatic layout; the series,
      * columns and config of a categorical document opened before
      * are replaced, every other column stays. From here on the chart is
      * edited through the Cartesian API (`get_config` / `set_config`,
      * `get_series` / `set_series`, the column registry).
      *
-     * A document that does not parse or validate, or whose series styles
-     * cannot be created, is rejected with the previous chart unchanged. A
-     * failure while the new columns upload or the axis fits from them
-     * rejects with a chart that has no series: the previous document's
-     * series and columns are retired by then.
+     * The replace is atomic (#311): see "Document replace" on
+     * [`Self::set_radar_document`]. The ids are the documented ones for
+     * every document opened.
      *
-     * JS: `chart.set_categorical_document(JSON.stringify(doc));`
+     * Returns the conversion report and takes the loss policy described
+     * in "Review and apply" on [`Self::set_radar_document`] (#334).
+     *
+     * JS: `const report = JSON.parse(chart.set_categorical_document(JSON.stringify(doc), JSON.stringify({ refuse: "any" })));`
      * @param {string} json
+     * @param {string | null} [options]
+     * @returns {string}
      */
-    set_categorical_document(json) {
-        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.figgychart_set_categorical_document(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+    set_categorical_document(json, options) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            var ptr1 = isLikeNone(options) ? 0 : passStringToWasm0(options, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            var len1 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_set_categorical_document(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
         }
     }
     /**
@@ -3120,6 +4365,9 @@ export class FiggyChart {
      * chart). Returns `{ len, truncated, dropped, x_range, pixel_offset }`
      * as JSON.
      * JS: `chart.set_monotonic("daq", 0, 1e-3, [ch0, ch1], "autoscale")`
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
      * @param {string} group
      * @param {number} start
      * @param {number} interval
@@ -3127,7 +4375,7 @@ export class FiggyChart {
      * @param {any} range
      * @param {number | null} [stride]
      * @param {Uint32Array | null} [columns]
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     set_monotonic(group, start, interval, data, range, stride, columns) {
         let deferred4_0;
@@ -3210,27 +4458,102 @@ export class FiggyChart {
      * radius axis is fitted to the value columns' statistics, from zero
      * when no value is negative (as the former chart fitted it), and
      * rounded to nice ticks; a document `ring_spacing` is the ring spacing
-     * either way. The chart keeps its chart area; the series, columns and
+     * either way. The chart keeps its chart area, and an explicit
+     * `decorations.data_area` (logical pixels, edges rounded to whole
+     * pixels) is the data area in it (`Config::fit_legacy_data_area`, #334)
+     * unless the layout cannot hold it, which keeps the automatic layout; the series, columns and
      * config of a radar document opened before are replaced, every other
      * column stays. From here on the chart is edited through the Cartesian
      * API (`get_config` / `set_config`, `get_series` / `set_series`, the
      * column registry), and its vertices pick, select and step as points.
      *
-     * A document that does not parse or validate, or whose series styles
-     * cannot be created, is rejected with the previous chart unchanged. A
-     * failure while the new columns upload or the axis fits from them
-     * rejects with a chart that has no series: the previous document's
-     * series and columns are retired by then.
+     * # Review and apply
      *
-     * JS: `chart.set_radar_document(JSON.stringify(doc));`
+     * The three document calls convert the document once, on this chart's
+     * chart area (`Config::from_*_with_report_in`, #334), and install that
+     * conversion. They return its report as JSON, `{config, series,
+     * uploads, columns, notes}`, which is what `convert_*_document` returns
+     * with `{"chart_area": [x, y, width, height]}` set to this chart's
+     * chart area. The report's `config` is the converted one; the
+     * installed config also has its value axis fitted (`get_config`).
+     * `options` is an optional JSON object `{"refuse"?: ["path", ...] |
+     * "any"}`: when a note's path is a listed path or lies under one
+     * (followed by `.` or `[`), or with `"any"` when there is any note,
+     * the call rejects at `"validate"` with `code` `"conversion_loss"` and
+     * the refused notes as `notes`, before anything is installed. Other
+     * option fields, or another `refuse`, reject at `"validate"` with
+     * `code` `"invalid_options"`.
+     *
+     * # Document replace
+     *
+     * The three document calls replace the chart atomically (#311), in
+     * one renderer transaction. They prepare the candidate config, series
+     * and uploads, check them (styles; each documented id is free or holds
+     * what the document uploads under it: a column, a record or a ragged
+     * column, and is not streamed), then upload every column, record and
+     * ragged column under its documented id (`radar.positions`,
+     * `boxplot.record.<series id>`, ...), fit the axes from the candidate
+     * columns, and commit the columns, the removal of the previous
+     * document's columns and the chart's config and series in one step.
+     * The previous document's columns are each id under `categorical.`,
+     * `boxplot.` or `radar.` that the replaced series read, of whichever
+     * family, that the new document does not upload again; an id it does
+     * upload again is replaced in place. The ids are therefore the
+     * documented ones for every document opened.
+     * On a chart that shows a monotonic document
+     * (`set_monotonic_document`), the document replaces the general chart
+     * behind it and the monotonic chart ends with the commit, as
+     * `clear_monotonic_document` ends it; a failure leaves the monotonic
+     * document shown.
+     *
+     * A failure rejects with an `Error` whose `stage` is `"validate"`
+     * (parse, validation, styles, ids), `"upload"` (a column that the GPU or the memory budget cannot hold, with the `code` and byte fields of
+     * `register_column_f32`), `"fit"` or `"commit"` (the series checks
+     * against the candidate columns, the chart's revisions, the picker)
+     * and whose message names the stage and the cause. The chart's
+     * config, series, columns, element and data selections, picks and
+     * image are then exactly as they were: nothing reaches the chart
+     * before the commit, which cannot fail. Only a broken internal
+     * invariant after the commit (the monotonic chart or the chart itself
+     * gone) rejects then, with an error that names it as internal and no
+     * `stage`; the new document is shown in that case.
+     *
+     * Memory: the transaction builds a complete candidate column pool, so
+     * at the peak the GPU holds the live pool slab, the new document's
+     * staging (half of it for single-lane columns, plus their transient
+     * expansion buffer) and a candidate slab of the pool's capacity — or a
+     * grown one, twice the capacity or what the surviving columns and the
+     * new document need, when they do not fit. The previous document's
+     * columns take no room in the candidate. After the commit the former
+     * slab stays as the pool's backup when the capacity did not change.
+     * A memory budget that cannot hold the peak refuses the call at the
+     * upload stage with `code` `"budget_exceeded"`.
+     *
+     * JS: `const report = JSON.parse(chart.set_radar_document(JSON.stringify(doc), JSON.stringify({ refuse: "any" })));`
      * @param {string} json
+     * @param {string | null} [options]
+     * @returns {string}
      */
-    set_radar_document(json) {
-        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.figgychart_set_radar_document(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+    set_radar_document(json, options) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            var ptr1 = isLikeNone(options) ? 0 : passStringToWasm0(options, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            var len1 = WASM_VECTOR_LEN;
+            const ret = wasm.figgychart_set_radar_document(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
         }
     }
     /**
@@ -3394,7 +4717,9 @@ export class FiggyChart {
     }
     /**
      * The shader set this chart compiles (#299): `"basic"` or `"full"`.
-     * @returns {string}
+     *
+     * Returns a plain string, not JSON.
+     * @returns {"basic" | "full"}
      */
     shader_set() {
         let deferred1_0;
@@ -3497,7 +4822,10 @@ export class FiggyChart {
     }
     /**
      * Pure metadata inspection; does not poll, reserve a range, or draw.
-     * @returns {string}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     stream_status() {
         let deferred2_0;
@@ -3538,7 +4866,9 @@ export class FiggyChart {
         return StreamingStepResult.__wrap(ret[0]);
     }
     /**
-     * @returns {string}
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson}
      */
     streaming_capabilities() {
         let deferred1_0;
@@ -3556,7 +4886,7 @@ export class FiggyChart {
      * Wake after work already submitted to this queue completes. The
      * returned promise owns only its completion receiver, not a chart or
      * renderer borrow. Resolving does not service receipts or draw a frame.
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     streaming_gpu_ready() {
         const ret = wasm.figgychart_streaming_gpu_ready(this.__wbg_ptr);
@@ -3572,8 +4902,11 @@ export class FiggyChart {
     /**
      * Subplot `index`'s frame as JSON `{"x":..,"y":..,"width":..,"height":..}`
      * in document pixels.
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
      * @param {number} index
-     * @returns {string}
+     * @returns {FiggyJson}
      */
     subplot_area(index) {
         let deferred2_0;
@@ -3612,8 +4945,10 @@ export class FiggyChart {
     /**
      * Subplot `index`'s text mode (#292, #295), as its setter
      * [`Self::set_subplot_text_scale`] takes it: `"Auto"` or `"Fixed"`.
+     *
+     * Returns a plain string, not JSON.
      * @param {number} index
-     * @returns {string}
+     * @returns {"Auto" | "Fixed"}
      */
     subplot_text_scale(index) {
         let deferred2_0;
@@ -3639,9 +4974,11 @@ export class FiggyChart {
      * pass to [`Self::apply_custom_theme`]. Refused as [`Self::theme`]
      * refuses the name, and with `code` `"subplot_index"` for an index
      * past the subplots.
+     *
+     * Returns a plain object, not a JSON string.
      * @param {number} index
      * @param {string} name
-     * @returns {any}
+     * @returns {FiggyThemeObject}
      */
     subplot_theme(index, name) {
         const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -3664,7 +5001,10 @@ export class FiggyChart {
      * document pixels, or `undefined` (#271). Read once: the element emits
      * it as `figgy-plot-resize`, and the host applies it with
      * `resize_monotonic(width, height, sources, plotArea)`.
-     * @returns {string | undefined}
+     *
+     * Returns JSON text (`FiggyJson`), not an object: parse it with
+     * `JSON.parse`.
+     * @returns {FiggyJson | undefined}
      */
     take_plot_resize_request() {
         const ret = wasm.figgychart_take_plot_resize_request(this.__wbg_ptr);
@@ -3684,8 +5024,10 @@ export class FiggyChart {
      * pass it to [`Self::apply_custom_theme`]. A name that is not a family
      * throws an `Error` with `code` `"theme_unknown_name"` and the family
      * `names`.
+     *
+     * Returns a plain object, not a JSON string.
      * @param {string} name
-     * @returns {any}
+     * @returns {FiggyThemeObject}
      */
     theme(name) {
         const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -3699,7 +5041,9 @@ export class FiggyChart {
     /**
      * The theme names (#291, #295), as an array of strings: the four
      * families, `gallery`, `cool-slate`, `midnight` and `warm-paper`.
-     * @returns {Array<any>}
+     *
+     * Returns an array of strings, not a JSON string.
+     * @returns {string[]}
      */
     theme_names() {
         const ret = wasm.figgychart_theme_names(this.__wbg_ptr);
@@ -3748,14 +5092,6 @@ export class FiggyChart {
         return ret;
     }
     /**
-     * Alias for [`Self::first_frame_ready`].
-     * @returns {Promise<void>}
-     */
-    warm_up() {
-        const ret = wasm.figgychart_warm_up(this.__wbg_ptr);
-        return ret;
-    }
-    /**
      * Zoom a 3D chart's camera (`Config.view_3d`): the eye distance is
      * divided by `factor` and clamped (`Config::zoom_view`). Returns whether
      * the view changed; a flat chart never does.
@@ -3771,6 +5107,93 @@ export class FiggyChart {
     }
 }
 if (Symbol.dispose) FiggyChart.prototype[Symbol.dispose] = FiggyChart.prototype.free;
+
+/**
+ * A handle on a chart's background pipeline compiles that does not borrow
+ * the chart (#315), from [`FiggyChart::readiness`]. While one of its waits
+ * is pending the host keeps full use of the chart: `pipeline_status()`,
+ * `frame()`, `resize()` and `free()` all work. It holds the chart's compile
+ * queue weakly and keeps nothing alive. Once the chart is freed a pending
+ * or later wait rejects with an `Error` whose message starts with
+ * `"chart disposed"`, and `status().disposed` is `true`. The handle draws
+ * nothing: after `series_ready()` resolves, the host's next `frame()`
+ * draws the series (or use `chart.series_ready()`, which draws, but
+ * borrows the chart until it settles). Free the handle with `free()` when
+ * done; freeing it ends nothing.
+ *
+ * A chart that compiles no pipeline in the background (one made without
+ * the browser's async compile queue) gives a handle with nothing to wait
+ * for: its waits resolve at once and `disposed` stays `false`.
+ *
+ * JS:
+ * ```js
+ * const readiness = chart.readiness();
+ * const ready = readiness.series_ready(); // the chart stays usable
+ * overlay.textContent = `${readiness.status().screen.ready} /
+ * ${readiness.status().screen.total}`;
+ * chart.resize(w, h);
+ * await ready;
+ * chart.frame();
+ * ```
+ */
+export class FiggyReadiness {
+    static __wrap(ptr) {
+        const obj = Object.create(FiggyReadiness.prototype);
+        obj.__wbg_ptr = ptr;
+        FiggyReadinessFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        FiggyReadinessFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_figgyreadiness_free(ptr, 0);
+    }
+    /**
+     * Resolves once every background compile scheduled so far has ended,
+     * like `chart.pipelines_ready()` but without borrowing the chart.
+     * Rejects like [`Self::series_ready`].
+     * @returns {Promise<void>}
+     */
+    pipelines_ready() {
+        const ret = wasm.figgyreadiness_pipelines_ready(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Resolves once every background compile the chart's last frame
+     * needed has ended, like `chart.series_ready()` but without drawing
+     * and without borrowing the chart. Rejects with an `Error` carrying
+     * `label`, `kind` and `message` when one of them failed, or with a
+     * `"chart disposed"` `Error` once the chart is freed. The promise owns
+     * a clone of the handle; it does not borrow this object.
+     * @returns {Promise<void>}
+     */
+    series_ready() {
+        const ret = wasm.figgyreadiness_series_ready(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * The chart's background compiles now, as a plain object (not a JSON
+     * string): `{ screen: { total, ready, compiling, failed }, all: { … },
+     * disposed }`. `screen` and `all` are as in `chart.pipeline_status()`;
+     * there is no `frame_complete` (only a frame decides it, so read it on
+     * the chart). `disposed` is `true` once the chart is freed; the counts
+     * are zero then. Readable at any time, also while a wait is pending.
+     * @returns {FiggyReadinessStatus}
+     */
+    status() {
+        const ret = wasm.figgyreadiness_status(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+}
+if (Symbol.dispose) FiggyReadiness.prototype[Symbol.dispose] = FiggyReadiness.prototype.free;
 
 /**
  * Opaque renderer-issued replay operation. Contains no column payload.
@@ -3923,8 +5346,11 @@ if (Symbol.dispose) StreamingUsageResult.prototype[Symbol.dispose] = StreamingUs
  * Errors are JSON errors.
  *
  * JS: `chart.set_config(autoLayout(chart.get_config()));`
+ *
+ * Returns JSON text (`FiggyJson`), not an object: parse it with `JSON.parse`.
+ * Lengths in the config are document logical pixels.
  * @param {string} config_json
- * @returns {string}
+ * @returns {FiggyJson}
  */
 export function autoLayout(config_json) {
     let deferred3_0;
@@ -3961,8 +5387,155 @@ export function color_cycle_css(cycle) {
 }
 
 /**
- * Every valid `draw_style` mode tag, as a JSON string array.
+ * A legacy box plot document (`BoxPlotChart` JSON) converted without a
+ * chart (`Config::from_boxplot_with_report_in`), in the shape and with the
+ * `options` `convert_categorical_document` takes. A record upload is
+ * `{column, role: "box_record", rows, fields}` and an outlier upload
+ * `{column, role: "box_outliers", len, groups}`.
+ *
+ * JS: `const converted = JSON.parse(convert_boxplot_document(text));`
+ * @param {string} json
+ * @param {string | null} [options]
  * @returns {string}
+ */
+export function convert_boxplot_document(json, options) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(options) ? 0 : passStringToWasm0(options, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.convert_boxplot_document(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * A legacy categorical bar document (`CategoricalChart` JSON) converted
+ * without a chart (`Config::from_categorical_with_report_in`): `{config,
+ * series, uploads, columns, notes}`. `uploads` describes each column to
+ * register (`{column, role, len}`, without the values); `columns` names
+ * the document series of each (`{series_id, role, column}`); `notes` lists
+ * every field the document set that the chart does not carry
+ * (`{path, kind: "dropped" | "changed", reason}`).
+ *
+ * `options` is an optional JSON object `{"chart_area"?: [x, y, width,
+ * height]}` (#334): the chart area in whole logical pixels, as the chart's
+ * `chart_area` (`get_config().chart_area`). The conversion places the
+ * config on it and fits an explicit `decorations.data_area` to it, so the
+ * result is the report `set_categorical_document` returns on a chart of
+ * that chart area: the same config, series and notes. Without it, the
+ * config keeps the placeholder chart area (1000 x 800) and the data area
+ * is fitted to that. A data area the layout cannot hold is noted as
+ * dropped with the reason. Options that are not such an object, or that
+ * name another field, throw an `Error` with `code` `"invalid_options"`.
+ * Throws the JSON error, or the document rule (an `Error` with a `code`),
+ * as `set_categorical_document` does.
+ *
+ * JS: `const { config, series, notes } = JSON.parse(convert_categorical_document(text, JSON.stringify({ chart_area: chart_area_of_the_chart })));`
+ * @param {string} json
+ * @param {string | null} [options]
+ * @returns {string}
+ */
+export function convert_categorical_document(json, options) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(options) ? 0 : passStringToWasm0(options, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.convert_categorical_document(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * A legacy radar document (`RadarChart` JSON) converted without a chart
+ * (`Config::from_radar_with_report_in`), in the shape and with the
+ * `options` `convert_categorical_document` takes.
+ *
+ * JS: `const converted = JSON.parse(convert_radar_document(text));`
+ * @param {string} json
+ * @param {string | null} [options]
+ * @returns {string}
+ */
+export function convert_radar_document(json, options) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(options) ? 0 : passStringToWasm0(options, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.convert_radar_document(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * The default config (`default::default_config`) as JSON: the document a
+ * new chart starts from, for an editor to fill in. Its `chart_area` is a
+ * placeholder the host sets.
+ *
+ * JS: `const config = JSON.parse(default_config());`
+ * @returns {string}
+ */
+export function default_config() {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ret = wasm.default_config();
+        var ptr1 = ret[0];
+        var len1 = ret[1];
+        if (ret[3]) {
+            ptr1 = 0; len1 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred2_0 = ptr1;
+        deferred2_1 = len1;
+        return getStringFromWasm0(ptr1, len1);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Every valid `draw_style` mode tag, as a JSON string array.
+ *
+ * Returns JSON text (`FiggyJson`), not an object: parse it with `JSON.parse`.
+ * @returns {FiggyJson}
  */
 export function draw_style_modes() {
     let deferred2_0;
@@ -3992,8 +5565,10 @@ export function draw_style_modes() {
  *
  * JS: `const specs = JSON.parse(draw_style_param_specs("constellation"));`
  * Valid modes: `draw_style_modes()`.
+ *
+ * Returns JSON text (`FiggyJson`), not an object: parse it with `JSON.parse`.
  * @param {string} mode
- * @returns {string}
+ * @returns {FiggyJson}
  */
 export function draw_style_param_specs(mode) {
     let deferred3_0;
@@ -4017,12 +5592,85 @@ export function draw_style_param_specs(mode) {
 }
 
 /**
+ * The layout `FiggyChart.inspect_document_layout(configJson)` reports for
+ * a candidate `Config` JSON on a canvas whose surface is `surface_width` x
+ * `surface_height` physical pixels, without a chart (#334): no renderer,
+ * GPU device or surface is created, and the result is the JSON a chart
+ * of that surface size reports for the same candidate: a canvas places
+ * its document by its surface size alone, and the result's `scale` is
+ * that fit. Refused with code `config_json` or `layout` as
+ * `inspect_document_layout` refuses a candidate, and with `invalid_size`
+ * for a dimension that is not a whole number of pixels from 1.
+ *
+ * JS: `const layout = JSON.parse(inspect_config_layout(cfg, canvas.width, canvas.height));`
+ * @param {string} config_json
+ * @param {number} surface_width
+ * @param {number} surface_height
+ * @returns {string}
+ */
+export function inspect_config_layout(config_json, surface_width, surface_height) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.inspect_config_layout(ptr0, len0, surface_width, surface_height);
+        var ptr2 = ret[0];
+        var len2 = ret[1];
+        if (ret[3]) {
+            ptr2 = 0; len2 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
+ * A config JSON in its normalized form: read and written back, so an
+ * omitted optional field takes its documented default and a field at its
+ * default is written as the renderer writes it. Numbers keep every bit.
+ * Throws the JSON error when the text is not a config; a config that
+ * parses but breaks a rule is returned as it is (`validate_config` checks
+ * it).
+ *
+ * JS: `const canonical = normalize_config(text);`
+ * @param {string} config_json
+ * @returns {string}
+ */
+export function normalize_config(config_json) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.normalize_config(ptr0, len0);
+        var ptr2 = ret[0];
+        var len2 = ret[1];
+        if (ret[3]) {
+            ptr2 = 0; len2 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
  * A rich text from TeX (`RichText::from_tex`, #45): text with `$…$` or
  * `\(…\)` math spans, as the JSON of a `RichText` for any title, axis
  * title, legend, label or annotation text of `set_config` / `set_series`.
  * Errors name the TeX byte range.
  *
  * JS: `cfg.chart_title.text = JSON.parse(rich_text_from_tex("$E = mc^2$", 16, "", 0, 0, 0, 1));`
+ *
+ * Returns JSON text (`FiggyJson`), not an object: parse it with `JSON.parse`.
  * @param {string} tex
  * @param {number} font_size
  * @param {string} font
@@ -4030,7 +5678,7 @@ export function draw_style_param_specs(mode) {
  * @param {number} g
  * @param {number} b
  * @param {number} a
- * @returns {string}
+ * @returns {FiggyJson}
  */
 export function rich_text_from_tex(tex, font_size, font, r, g, b, a) {
     let deferred4_0;
@@ -4041,6 +5689,48 @@ export function rich_text_from_tex(tex, font_size, font, r, g, b, a) {
         const ptr1 = passStringToWasm0(font, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.rich_text_from_tex(ptr0, len0, font_size, ptr1, len1, r, g, b, a);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * Check a config JSON and, when given, a series list JSON against the
+ * chart rules (`Config::validate_chart`, then `Config::validate_series`)
+ * without a chart. Returns `{"valid": bool, "errors": [..]}`; it does not
+ * throw for a refused document. An error is `{stage, path, field,
+ * series_id, series_index, code, message}`: `stage` is `"parse"`,
+ * `"chart"` or `"series"`; `path` names the field (`"bottom_x"`,
+ * `"colorbar.axis"`, `"series[2]"`, or `"config"` / `"series"` for JSON
+ * that does not parse, which adds `line` and `column`); `code` is the
+ * rule's code, as on the `Error`s `set_config` throws (`"json"` for a
+ * parse error). The rules stop at the first refusal, so `errors` holds at
+ * most one. What needs the column pool (registered columns, lengths, GPU
+ * limits) is checked by `set_config` / `set_series` only.
+ *
+ * JS: `const { valid, errors } = JSON.parse(validate_config(JSON.stringify(cfg), JSON.stringify(series)));`
+ * @param {string} config_json
+ * @param {string | null} [series_json]
+ * @returns {string}
+ */
+export function validate_config(config_json, series_json) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(series_json) ? 0 : passStringToWasm0(series_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.validate_config(ptr0, len0, ptr1, len1);
         var ptr3 = ret[0];
         var len3 = ret[1];
         if (ret[3]) {
@@ -4202,6 +5892,9 @@ function __wbg_get_imports() {
         __wbg_destroy_249478e98a7943d5: function(arg0) {
             arg0.destroy();
         },
+        __wbg_destroy_275564a0a8b8d071: function(arg0) {
+            arg0.destroy();
+        },
         __wbg_destroy_637537007d9eaa44: function(arg0) {
             arg0.destroy();
         },
@@ -4325,6 +6018,16 @@ function __wbg_get_imports() {
         },
         __wbg_height_fc97e1a0c2e7331f: function(arg0) {
             const ret = arg0.height;
+            return ret;
+        },
+        __wbg_instanceof_Error_80a725f81f2e102d: function(arg0) {
+            let result;
+            try {
+                result = arg0 instanceof Error;
+            } catch (_) {
+                result = false;
+            }
+            const ret = result;
             return ret;
         },
         __wbg_instanceof_Float32Array_595afb0f28b828c9: function(arg0) {
@@ -4622,6 +6325,10 @@ function __wbg_get_imports() {
             const len1 = WASM_VECTOR_LEN;
             getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
             getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+        },
+        __wbg_message_5f8387f0c32b90a7: function(arg0) {
+            const ret = arg0.message;
+            return ret;
         },
         __wbg_message_ab4cad9eeb386607: function(arg0, arg1) {
             const ret = arg1.message;
@@ -5142,6 +6849,9 @@ function __wbg_get_imports() {
         __wbg_set_max_anisotropy_84749fdcec362dc4: function(arg0, arg1) {
             arg0.maxAnisotropy = arg1;
         },
+        __wbg_set_message_db0b496321654368: function(arg0, arg1, arg2) {
+            arg0.message = getStringFromWasm0(arg1, arg2);
+        },
         __wbg_set_min_binding_size_f64_897e3cd4496ddec9: function(arg0, arg1) {
             arg0.minBindingSize = arg1;
         },
@@ -5475,38 +7185,38 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1269, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1079, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1671, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1692, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1619, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1640, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 1624, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 1645, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1624, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__243);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1645, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__294);
             return ret;
         },
         __wbindgen_generic_0000000000000006: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1619, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__244);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1640, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__295);
             return ret;
         },
         __wbindgen_generic_0000000000000007: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1619, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__245);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1640, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__296);
             return ret;
         },
         __wbindgen_generic_0000000000000008: function(arg0) {
@@ -5548,8 +7258,8 @@ function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385
     wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_(arg0, arg1, arg2);
 }
 
-function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__243(arg0, arg1, arg2) {
-    wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__243(arg0, arg1, arg2);
+function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__294(arg0, arg1, arg2) {
+    wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__294(arg0, arg1, arg2);
 }
 
 function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_(arg0, arg1, arg2) {
@@ -5566,15 +7276,15 @@ function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__244(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__244(arg0, arg1, arg2);
+function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__295(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__295(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__245(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__245(arg0, arg1, arg2);
+function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__296(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__296(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
@@ -5673,12 +7383,21 @@ const AutoStreamingRangeRequestResultFinalization = (typeof FinalizationRegistry
 const AutoStreamingRequestResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_autostreamingrequestresult_free(ptr, 1));
+const ColumnTransactionFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_columntransaction_free(ptr, 1));
+const ColumnUploadHandleFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_columnuploadhandle_free(ptr, 1));
 const FiggyBoundedChartFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_figgyboundedchart_free(ptr, 1));
 const FiggyChartFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_figgychart_free(ptr, 1));
+const FiggyReadinessFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_figgyreadiness_free(ptr, 1));
 const StreamingOperationHandleFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_streamingoperationhandle_free(ptr, 1));

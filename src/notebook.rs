@@ -536,7 +536,10 @@ impl NotebookFigure {
                     b = columns[&s.y_column];
                 }
             }
-            if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
+            if let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries {
+                bar,
+            }) = &s.render_type
+            {
                 let base = renderer::chart::FitExtent {
                     min: bar.baseline,
                     max: bar.baseline,
@@ -700,10 +703,12 @@ impl NotebookFigure {
                     } else if let Some(name) = &series.z_column {
                         if let Some(anchors) = self.columns.get(name) {
                             z.union(anchors);
-                            if let renderer::DataRenderType::Vector {
-                                components: VectorComponents::Points { w: Some(w), .. },
-                                style,
-                            } = &series.render_type
+                            if let renderer::DataRenderType::Vector(
+                                renderer::data_config::VectorSeries {
+                                    components: VectorComponents::Points { w: Some(w), .. },
+                                    style,
+                                },
+                            ) = &series.render_type
                             {
                                 if let (VectorScale::Data { factor }, Some(w)) =
                                     (&style.scale, self.columns.get(w))

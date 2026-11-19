@@ -1,5 +1,8 @@
 # Renderer 0.19 통합 점검 — 2026-11-18
 
+이 문서의 11월 18일 측정은 이전 pin의 기록이다. 현재 native/WASM pin은
+[0.19 Python API 안내](RENDERER_019.md)에 있다.
+
 Python PR [#23](https://github.com/shim9610/figgy-python/pull/23)에서 누락됐던
 차트 편집 API, 프리셋 적용, 값 라벨 포맷과 SVG/PDF 인쇄 크기를 수정했다.
 배포는 Figgy 0.19 정식 발행 후 정확한 공개 패키지 버전과 WASM을 고정하는

@@ -139,7 +139,10 @@ impl FigureAccess<'_> {
                 }
             }
             PickedDataRef::HistogramBin { bin_index, .. } => {
-                let renderer::DataRenderType::Histogram { bar } = &series.render_type else {
+                let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries {
+                    bar,
+                }) = &series.render_type
+                else {
                     return Err(invalid("selected series is not a histogram"));
                 };
                 let (edges, values) = match bar.orientation {
@@ -255,7 +258,7 @@ impl FigureAccess<'_> {
                 self.data.series[position].render_type,
                 renderer::DataRenderType::Xy(_)
                     | renderer::DataRenderType::Field(_)
-                    | renderer::DataRenderType::Histogram { .. }
+                    | renderer::DataRenderType::Histogram(..)
             )
         {
             let changed = self
@@ -315,8 +318,9 @@ impl FigureAccess<'_> {
                 source_id,
                 bin_index,
             } => {
-                let renderer::DataRenderType::Histogram { bar } =
-                    &self.data.series[position].render_type
+                let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries {
+                    bar,
+                }) = &self.data.series[position].render_type
                 else {
                     return Ok(false);
                 };
@@ -330,7 +334,7 @@ impl FigureAccess<'_> {
                     .iter()
                     .filter(|s| {
                         matches!(&s.render_type,
-                        renderer::DataRenderType::Histogram { bar: other }
+                        renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries { bar: other })
                         if other.orientation == bar.orientation)
                     })
                     .collect::<Vec<_>>();

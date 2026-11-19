@@ -4,10 +4,10 @@ This development integration awaits the official upstream 0.19 release and final
 package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/f5f611c4532b037f8c3b3087fab22a9f47852343).
-Settings identify this integration as `0.19.0`. The upstream branch still declares
-renderer package version `0.18.1`; the Git revision pins the actual API and shader
-source. Rebuild the browser module with `scripts/build-wasm.sh` when changing it.
+[integration revision](https://github.com/shim9610/figgy/commit/d5272e4bd9dc36eaa75671fcf06a0b9b04fce066)
+for renderer `0.19.0-beta.2` and model `0.13.0-beta.2`. Settings identify this
+integration as `0.19.0`. Rebuild the browser module with `scripts/build-wasm.sh`
+when changing the pin.
 
 ## Construct and edit charts
 

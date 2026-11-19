@@ -14,7 +14,7 @@ use renderer::{
     data_render::create_instance,
     default, encode_png,
     layout::{ChartArea, Rect, Side},
-    resize::{ALL_HANDLES, ResizeHandle},
+    resize::ResizeHandle,
     select::{
         AxisElement, AxisLabelElement, AxisTitleElement, ChartTitleElement, ColorBarAxisElement,
         ColorBarElement, ColorBarLabelElement, ColorBarTitleElement, DataAreaElement,
@@ -132,9 +132,14 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
     Ok(value)
 }
 
+// Compass names used by native editor gestures and Python settings.
+const ALL_HANDLES: [ResizeHandle; 8] = {
+    use ResizeHandle::*;
+    [NW, N, NE, E, SE, S, SW, W]
+};
+
 /// Renderer version stamped into Settings documents. Previous compatible
 /// documents are accepted explicitly by supported_settings_version.
-/// It names the `figgy-renderer` pin in Cargo.toml; update both together.
 const RENDERER_VERSION: &str = "0.19.0";
 
 fn supported_settings_version(schema: u32, renderer: &str) -> bool {
@@ -734,7 +739,9 @@ fn positive_data_bounds(
             }
             _ => return Err(invalid("log bounds axis must be x, y or z")),
         }
-        if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
+        if let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries { bar }) =
+            &s.render_type
+        {
             let dimension = match bar.orientation {
                 renderer::data_config::BarOrientation::Vertical => "y",
                 renderer::data_config::BarOrientation::Horizontal => "x",
@@ -1438,8 +1445,8 @@ impl FigureAccess<'_> {
                     s.render_type,
                     renderer::DataRenderType::Xy(_)
                         | renderer::DataRenderType::Field(_)
-                        | renderer::DataRenderType::Histogram { .. }
-                        | renderer::DataRenderType::Vector { .. }
+                        | renderer::DataRenderType::Histogram(..)
+                        | renderer::DataRenderType::Vector(..)
                 )
             })
         {
@@ -1467,7 +1474,7 @@ impl FigureAccess<'_> {
                     };
                     if local.view_3d().is_some()
                         && specs.iter().any(|s| {
-                            matches!(s.render_type, renderer::DataRenderType::Vector { .. }) && {
+                            matches!(s.render_type, renderer::DataRenderType::Vector(..)) && {
                                 let (x, y) = config.series_fit_roles(layer, &s.series_id);
                                 x || y
                             }
@@ -1559,7 +1566,10 @@ impl FigureAccess<'_> {
                             [renderer::chart::FitExtent::EMPTY; 2]
                         };
                 }
-                if let renderer::DataRenderType::Histogram { bar } = &specs[i].render_type {
+                if let renderer::DataRenderType::Histogram(
+                    renderer::data_config::HistogramSeries { bar },
+                ) = &specs[i].render_type
+                {
                     let dimension = usize::from(matches!(
                         bar.orientation,
                         renderer::data_config::BarOrientation::Vertical

@@ -95,7 +95,7 @@ pub(super) fn decorations_at(
         .rev()
     {
         let mut probe = config.clone();
-        probe.set_active_layer(layer);
+        probe.set_active_layer(probe_layer(config, layer, [point.0, point.1]));
         let map = HitMap::for_active_layer(&probe);
         if let Some(target) = map
             .hit_test(&probe, &measure, point.0, point.1)
@@ -123,6 +123,17 @@ pub(super) fn panels_at(config: &Config, point: (f32, f32)) -> Vec<usize> {
         .rev()
         .filter(|&i| contains(panel(config, i).chart_area.0, point))
         .collect()
+}
+
+// Base routes into any subplot under the pointer. The annotation layer uses
+// the root data axes without that automatic routing. Decorations and data
+// queries use it only while probing the panel the host explicitly selected.
+fn probe_layer(config: &Config, layer: LayerRef, point: [f32; 2]) -> LayerRef {
+    if layer == LayerRef::Base && config.subplot_at(point[0], point[1]).is_some() {
+        LayerRef::Annotations
+    } else {
+        layer
+    }
 }
 pub(super) fn overlapping_panels(config: &Config, index: usize) -> Vec<usize> {
     let a = panel(config, index).chart_area.0;
@@ -177,6 +188,11 @@ impl FigureAccess<'_> {
         self.renderer.enable_gpu_picking().map_err(runtime)?;
         let original = self.data.chart.config().clone();
         let original_gpu = gpu::config(self.data.figure_id, &original);
+        let displayed = renderer::place_document(
+            &original_gpu,
+            request.display_scale,
+            request.display_panel_px,
+        );
         let series = self.gpu_series(&self.data.series);
         let mut probe = original_gpu.clone();
         probe.picked_data = None;
@@ -194,7 +210,10 @@ impl FigureAccess<'_> {
                 .rev()
             {
                 self.renderer
-                    .set_active_layer(self.data.chart_id, layer)
+                    .set_active_layer(
+                        self.data.chart_id,
+                        probe_layer(&displayed, layer, request.canvas_position_px),
+                    )
                     .map_err(runtime)?;
                 loop {
                     let remaining = self

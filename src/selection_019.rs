@@ -88,7 +88,13 @@ impl FigureAccess<'_> {
                     .box_plot()
                     .is_some_and(|b| b.points.is_some()) =>
             {
-                let points = series.render_type.box_plot().unwrap().points.unwrap();
+                let points = series
+                    .render_type
+                    .box_plot()
+                    .unwrap()
+                    .points
+                    .as_ref()
+                    .unwrap();
                 let values = self.read_samples(&[
                     (points.positions.clone(), *point_index),
                     (points.values.clone(), *point_index),

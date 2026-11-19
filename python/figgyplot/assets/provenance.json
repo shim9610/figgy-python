@@ -1,25 +1,25 @@
 {
   "upstream_repository": "https://github.com/shim9610/figgy",
-  "upstream_revision": "f5f611c4532b037f8c3b3087fab22a9f47852343",
-  "renderer_version": "0.18.1",
-  "web_package_version": "0.15.1",
+  "upstream_revision": "d5272e4bd9dc36eaa75671fcf06a0b9b04fce066",
+  "renderer_version": "0.19.0-beta.2",
+  "web_package_version": "0.16.0-beta.2",
   "native_packages": {
     "figgy-renderer": {
-      "version": "0.18.1",
-      "source": "git+https://github.com/shim9610/figgy.git?rev=f5f611c4532b037f8c3b3087fab22a9f47852343#f5f611c4532b037f8c3b3087fab22a9f47852343",
-      "upstream_revision": "f5f611c4532b037f8c3b3087fab22a9f47852343",
+      "version": "0.19.0-beta.2",
+      "source": "git+https://github.com/shim9610/figgy.git?rev=d5272e4bd9dc36eaa75671fcf06a0b9b04fce066#d5272e4bd9dc36eaa75671fcf06a0b9b04fce066",
+      "upstream_revision": "d5272e4bd9dc36eaa75671fcf06a0b9b04fce066",
       "path_in_vcs": "crates/renderer"
     },
     "figgy-model": {
-      "version": "0.12.1",
-      "source": "git+https://github.com/shim9610/figgy.git?rev=f5f611c4532b037f8c3b3087fab22a9f47852343#f5f611c4532b037f8c3b3087fab22a9f47852343",
-      "upstream_revision": "f5f611c4532b037f8c3b3087fab22a9f47852343",
+      "version": "0.13.0-beta.2",
+      "source": "git+https://github.com/shim9610/figgy.git?rev=d5272e4bd9dc36eaa75671fcf06a0b9b04fce066#d5272e4bd9dc36eaa75671fcf06a0b9b04fce066",
+      "upstream_revision": "d5272e4bd9dc36eaa75671fcf06a0b9b04fce066",
       "path_in_vcs": "crates/model"
     }
   },
   "wasm_host_patch": {
     "path": "scripts/wasm-host.patch",
-    "sha256": "bfda9aad3fc5ab3fb7a715113c3b26da0c19497f2b8f4cd9120ff493e628e028",
+    "sha256": "d0e80093b24682e9922e2c8714582dc7e8187d7bdd65e410ec9784c70129277f",
     "files": [
       "crates/web/src/radial.rs",
       "crates/web/src/web/chart.rs"
@@ -28,12 +28,12 @@
   "wasm_bindgen_version": "0.2.129",
   "assets": {
     "figgy.js": {
-      "sha256": "bc2dd752e0ea12ad371fae72eec1222729d1535b91d666431eb67831cfa98c0a",
-      "bytes": 252695
+      "sha256": "740006ed922a89e909ef6438c705a04978b265ae2ba69fee458d5882cc9fd034",
+      "bytes": 330314
     },
     "figgy_bg.wasm": {
-      "sha256": "e8573d67cac46344e687b3327d542653b9fe9ee0ba279f7a6934e913ada3a713",
-      "bytes": 29864015
+      "sha256": "3eb5eb0a2b69c094be1a66deb031d7d6844584bb0c4cafa964ac9f6a5de8ecae",
+      "bytes": 30324045
     }
   }
 }
