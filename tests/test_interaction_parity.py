@@ -1421,17 +1421,15 @@ def test_renderer_018_features_display_edit_and_export_in_both_hosts(tmp_path, f
 def test_annotation_layer_drag_and_endpoint_resize_match_hosts(tmp_path, kind):
     import copy
     setup = "ax.plot([0,1,2],[1,2,0],id='signal')" if kind == 'cartesian' else "ax.radar(['A','B','C'],[2,4,3])"
-    setup += "; ax.arrow(.25,.3,.25,.15,coords='ratio',id='arrow').select()"
-    if kind == 'cartesian': setup += "; ax.activate()"  # The annotation layer starts inactive.
+    setup += "; ax.arrow(.25,.3,.25,.15,coords='ratio',id='arrow').select(); ax.activate()"
     def geometry(state):
-        owner = state['config'] if kind == 'cartesian' else state['radar']
-        return owner['annotations']['items'][0]['kind']['Arrow']
+        return state['config']['annotations']['items'][0]['kind']['Arrow']
     with figgy.Figure(backend='native') as fig:
         exec(setup, {'fig': fig, 'ax': fig.axes[0]})
         handle = fig.show(block=False)
         try:
             inputs = Inputs(handle)
-            target = 'annotation:arrow' if kind == 'cartesian' else 'annotation_0'
+            target = 'annotation:arrow'
             box = json.loads(fig._native.bounds_json(target))['rect']
             original = copy.deepcopy(geometry(fig.get_settings()))
             scale = inputs.info()['chart_panel'][2]/960
@@ -1450,14 +1448,10 @@ def test_annotation_layer_drag_and_endpoint_resize_match_hosts(tmp_path, kind):
             handle.close();Inputs.pump()
     source = "import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\ndisplay(fig.widget())"
     with notebook(tmp_path/kind, source) as (page, execute):
-        def screen(point):
-            if kind == 'radar':
-                return browser_point(page, point)
-            return page.evaluate("""p=>{const c=document.querySelector('.figgy-editor canvas'),r=c.getBoundingClientRect();return [r.x+p[0]*r.width/c.width,r.y+p[1]*r.height/c.height];}""", point)
         original = geometry(page.evaluate(ROOT+'.snapshot()'))
         annotation = page.evaluate(ROOT+'.annotations()')[0]
         box = annotation['rect']
-        start = screen([box[0]+box[2]/2, box[1]+box[3]/2])
+        start = browser_surface_point(page, [box[0]+box[2]/2, box[1]+box[3]/2])
         page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+12,start[1]+6,steps=5);page.mouse.up()
         page.evaluate(ROOT+'.flush()')
         moved = geometry(page.evaluate(ROOT+'.snapshot()'))
@@ -1466,7 +1460,7 @@ def test_annotation_layer_drag_and_endpoint_resize_match_hosts(tmp_path, kind):
             click_button(page, '[data-close-properties]')
         annotation = page.evaluate(ROOT+'.annotations()')[0]
         endpoint = max(annotation['handles'], key=lambda r:r[0]+r[1])
-        start = screen([endpoint[0]+endpoint[2]/2, endpoint[1]+endpoint[3]/2])
+        start = browser_surface_point(page, [endpoint[0]+endpoint[2]/2, endpoint[1]+endpoint[3]/2])
         page.mouse.move(*start);page.mouse.down();page.mouse.move(start[0]+10,start[1],steps=5);page.mouse.up()
         page.evaluate(ROOT+'.flush()')
         resized = geometry(page.evaluate(ROOT+'.snapshot()'))
@@ -2582,7 +2576,8 @@ def test_zoom_recalculates_auto_ticks_and_preserves_fixed_ticks_in_both_hosts(tm
 def test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle(tmp_path,backend,kind):
     setup={'cartesian':"ax.plot([0,10],[0,20],id='signal');ax.set_xlim(0,10);ax.set_ylim(0,20)", 'categorical':"ax.bar(['A','B'],[5,10])",'boxplot':"ax.boxplot([[1,2,3],[2,4,6]])"}[kind]
     setup+=";ax.text(0,5,'Keep position',coords='data',id='probe')"
-    target='annotation:probe' if kind=='cartesian' else 'annotation_0';key=('panel/main' if kind=='cartesian' else 'bounded')+'/annotation/probe'
+    target = 'annotation:probe'
+    key = 'panel/main/annotation/probe'
     if backend=='native':
         with figgy.Figure(backend=backend,id='anchor-ui') as fig:
             exec(setup,{'fig':fig,'ax':fig.axes[0]});handle=fig.show(block=False)
@@ -2592,7 +2587,7 @@ def test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle(tmp_pat
                 inputs.click('property:Coordinates/anchor');inputs.click('anchor_Ratio')
                 after=json.loads(fig._native.bounds_json(target))['rect']
                 assert after==pytest.approx(before,abs=.01)
-                assert 'Ratio' in fig.get_settings()['config' if kind=='cartesian' else kind]['annotations']['items'][0]['kind']['Text']['anchor']
+                assert 'Ratio' in fig.get_settings()['config']['annotations']['items'][0]['kind']['Text']['anchor']
                 inputs.click('undo');assert json.loads(fig._native.bounds_json(target))['rect']==pytest.approx(before,abs=.01)
                 assert not inputs.info()['error']
             finally:handle.close();Inputs.pump()
@@ -2606,7 +2601,7 @@ def test_anchor_mode_controls_preserve_the_prepared_annotation_rectangle(tmp_pat
         after=page.evaluate(ROOT+'.annotations()')[0]['rect']
         assert after==pytest.approx(before,abs=.01)
         state=json.loads(execute('print(json.dumps(fig.get_settings()))'))
-        assert 'Ratio' in state['config' if kind=='cartesian' else kind]['annotations']['items'][0]['kind']['Text']['anchor']
+        assert 'Ratio' in state['config']['annotations']['items'][0]['kind']['Text']['anchor']
         click_button(page, '[data-undo]');page.evaluate(ROOT+'.flush()')
         assert page.evaluate(ROOT+'.annotations()')[0]['rect']==pytest.approx(before,abs=.01)
         assert not page.locator('.figgy-error').inner_text()
