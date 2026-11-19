@@ -891,6 +891,8 @@ class Figure(FigureMethods):
             if pad is not None and not state.get('radial'):
                 extra=float(pad)*12*self.dpi/72
                 def padding(config):
+                    if extra:
+                        config['layout_state'] = 'fixed'
                     for axis in ('bottom_x','top_x','left_y','right_y'):
                         config[axis]['out_margin'] += extra
                     for panel in config.get('subplots',[]): padding(panel['config'])
@@ -1309,7 +1311,17 @@ def _merge(base, patch):
     if not isinstance(base, dict):
         base = {}
     for key, value in patch.items():
-        base[key] = _merge(base.get(key, {}), value) if isinstance(value, dict) else copy.deepcopy(value)
+        prior = base.get(key, {})
+        if (
+            key == "format"
+            and isinstance(value, dict)
+            and isinstance(prior, dict)
+            and len(value) == len(prior) == 1
+            and prior.keys().isdisjoint(value)
+        ):
+            # A label format holds a single externally tagged variant.
+            prior = {}
+        base[key] = _merge(prior, value) if isinstance(value, dict) else copy.deepcopy(value)
     return base
 
 
@@ -1358,7 +1370,8 @@ def _code_tree(value, segments_function="text_segments"):
                     overrides = {k: v for k, v in style.items() if any(s.get(k) != v for s in base)}
                     rebuilt = [dict(s, **overrides) for s in base]
                     allowed = {'bold', 'italic', 'underline', 'superscript', 'subscript', 'greek',
-                               'color', 'font_size', 'field_em', 'rule', 'rule_dash', 'rule_band', 'series_id'}
+                               'color', 'font_size', 'field_em', 'rule', 'rule_dash',
+                               'rule_thickness_em', 'rule_band', 'series_id'}
                     if rebuilt != segments or set(overrides) - allowed:
                         break
                     args = ', '.join(f'{k}={v!r}' for k, v in overrides.items())
@@ -1382,7 +1395,8 @@ def text_segments(text, **style):
     to the whole run. Text remains ordinary Python, including Unicode/newlines.
     """
     allowed = {'bold', 'italic', 'underline', 'superscript', 'subscript', 'greek',
-               'color', 'font_size', 'field_em', 'rule', 'rule_dash', 'rule_band', 'series_id'}
+               'color', 'font_size', 'field_em', 'rule', 'rule_dash',
+               'rule_thickness_em', 'rule_band', 'series_id'}
     if set(style) - allowed:
         raise ValueError('unknown rich-text segment style')
     return [dict(segment, **copy.deepcopy(style)) for segment in _segments(text)]

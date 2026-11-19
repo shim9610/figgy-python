@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class TextRun:
-    """One styled span. Font size is in points; width/dashes use em units.
+    """One styled span. Font size is in points. Width, dashes and rule thickness use em units.
 
     script is normal, super or sub. None color/fontsize inherits the parent.
     rule draws a line in place of glyphs; fill shades below a legend rule.
@@ -24,6 +24,7 @@ class TextRun:
     dashes: object = None
     fill: object = None
     series_id: object = None
+    rule_thickness: object = None
 
     def _segments(self, dpi):
         from .figure import _color
@@ -61,6 +62,11 @@ class TextRun:
             style["rule_dash"] = [
                 _number(v, "dash length", positive=True) for v in self.dashes
             ]
+        if self.rule_thickness is not None:
+            thickness = _number(self.rule_thickness, "rule_thickness")
+            if thickness < 0:
+                raise ValueError("rule_thickness must be nonnegative")
+            style["rule_thickness_em"] = thickness
         if self.series_id is not None:
             if not isinstance(self.series_id, str) or not self.series_id:
                 raise ValueError("series_id must name a nonempty legend series ID")
@@ -98,7 +104,11 @@ def run_expression(segments, dpi, name="TextRun"):
                 args.append(public + "=" + repr(_color_literal(style[native])))
         if style.get("font_size") is not None:
             args.append("fontsize=" + repr(_points(style["font_size"], dpi)))
-        for public, native in (("width", "field_em"), ("dashes", "rule_dash")):
+        for public, native in (
+            ("width", "field_em"),
+            ("dashes", "rule_dash"),
+            ("rule_thickness", "rule_thickness_em"),
+        ):
             if style.get(native) is not None:
                 args.append(public + "=" + repr(style[native]))
         if style.get('series_id') is not None:

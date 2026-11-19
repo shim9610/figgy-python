@@ -49,8 +49,19 @@ def _formatter_expression(label, names):
             "Power": "power",
             "Degrees": "degrees",
             "Radians": "radians",
+            "Percent": "percent",
         }[native]
         return f"{names['SignificantFormatter']}({precision!r}, style={notation!r})"
+    if "Auto" in native:
+        options = native["Auto"].copy()
+        if "notation" in options:
+            options["notation"] = options["notation"].lower()
+        args = [repr(precision), *(f"{key}={value!r}" for key, value in options.items())]
+        return f"{names['AutoFormatter']}({', '.join(args)})"
+    if "Plain" in native:
+        args = [f"precision={precision!r}"]
+        args.extend(f"{key}={value!r}" for key, value in native["Plain"].items())
+        return f"{names['PlainFormatter']}({', '.join(args)})"
     spec = native["Timestamp"]
     unit = {
         "Seconds": "s",
@@ -75,6 +86,8 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         MultipleLocator,
         LogLocator,
         AutoMinorLocator,
+        AutoFormatter,
+        PlainFormatter,
         SignificantFormatter,
         TimestampFormatter,
     )
@@ -98,6 +111,8 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         "MultipleLocator": MultipleLocator,
         "LogLocator": LogLocator,
         "AutoMinorLocator": AutoMinorLocator,
+        "AutoFormatter": AutoFormatter,
+        "PlainFormatter": PlainFormatter,
         "SignificantFormatter": SignificantFormatter,
         "TimestampFormatter": TimestampFormatter,
     }

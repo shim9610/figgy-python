@@ -1748,17 +1748,20 @@ fn label_format_controls(
     controls: &mut HashMap<String, egui::Rect>,
 ) -> bool {
     ui.label("Number format");
-    let previous = labels["format"].as_str().unwrap_or("Timestamp");
+    let previous = crate::property_catalog::label_format_name(&labels["format"]);
     let mut value = previous.to_owned();
     let response = egui::ComboBox::from_id_salt("label_format")
         .selected_text(previous)
         .show_ui(ui, |ui| {
             for (name, label) in [
+                ("Auto", "Automatic"),
                 ("Decimal", "Decimal (123.45)"),
+                ("Plain", "Plain number"),
                 ("Scientific", "Scientific (1.23e2)"),
                 ("Power", "Power (1.23 × 10²)"),
                 ("Degrees", "Degrees (90°)"),
                 ("Radians", "Radians (π/2)"),
+                ("Percent", "Percent (25%)"),
                 ("Timestamp", "Timestamp"),
             ] {
                 let response = ui.selectable_value(&mut value, name.to_owned(), label);
@@ -1768,13 +1771,9 @@ fn label_format_controls(
     controls.insert("label_format".into(), response.response.rect);
     let mut changed = value != previous;
     if changed {
-        labels["format"] = if value == "Timestamp" {
-            json!({"Timestamp":{}})
-        } else {
-            json!(value)
-        };
+        labels["format"] = crate::property_catalog::label_format_wire(&value);
     }
-    if value != "Timestamp" {
+    if !matches!(value.as_str(), "Timestamp" | "Plain") {
         let mut digits = labels["significant_digits"].as_u64().unwrap_or(3) as u8;
         let response = ui
             .horizontal(|ui| {

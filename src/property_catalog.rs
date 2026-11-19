@@ -199,11 +199,14 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
         "scale" if value == "Linear" || value == "Logarithmic" => &["Linear", "Logarithmic"],
         "colormap" => &["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"],
         "format" => &[
+            "Auto",
             "Decimal",
+            "Plain",
             "Scientific",
             "Power",
             "Degrees",
             "Radians",
+            "Percent",
             "Timestamp",
         ],
         "unit" if path.contains("/Timestamp/") => {
@@ -251,6 +254,20 @@ fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: 
         choices: options,
     });
 }
+pub(super) fn label_format_name(value: &Value) -> &str {
+    value
+        .as_str()
+        .or_else(|| value.as_object()?.keys().next().map(String::as_str))
+        .unwrap_or("Decimal")
+}
+
+pub(super) fn label_format_wire(name: &str) -> Value {
+    match name {
+        "Auto" | "Plain" | "Timestamp" => json!({(name): {}}),
+        _ => json!(name),
+    }
+}
+
 fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: &str) {
     if diagrams::fields(out, value, path, group, relative) {
         return;
@@ -273,7 +290,7 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
     if path.ends_with("/format") {
         field(
             out,
-            json!(value.as_str().unwrap_or("Timestamp")),
+            json!(label_format_name(value)),
             path,
             group,
             relative,
@@ -1790,8 +1807,10 @@ pub(crate) fn apply(
             result.pointer(&field.path).unwrap(),
             json!(renderer::text::rich_segments_from_text(text)),
         )
-    } else if key == "format" && value == "Timestamp" {
-        json!({"Timestamp":{}})
+    } else if key == "format"
+        && let Some(name) = value.as_str()
+    {
+        label_format_wire(name)
     } else {
         value
     };

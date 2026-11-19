@@ -48,9 +48,8 @@ class LogLocator:
 class SignificantFormatter:
     """Figgy extension: numeric labels with significant digits and notation.
 
-    ``style`` is plain, scientific or power. This is deliberately distinct from
-    Matplotlib's arbitrary string/callable formatters, which require explicit
-    per-tick labels that the current renderer does not support.
+    Use ``style`` to select plain, scientific, power, degrees, radians or
+    percent notation.
     """
 
     def __init__(self, precision=3, style="plain"):
@@ -62,9 +61,11 @@ class SignificantFormatter:
             "power",
             "degrees",
             "radians",
+            "percent",
         ):
             raise ValueError(
-                "precision must be 1..15; style plain, scientific, power, degrees or radians"
+                "precision must be 1..15 and style must be plain, scientific, "
+                "power, degrees, radians or percent"
             )
 
     def _format(self):
@@ -74,7 +75,64 @@ class SignificantFormatter:
             power="Power",
             degrees="Degrees",
             radians="Radians",
+            percent="Percent",
         )[self.style]
+
+
+class AutoFormatter(SignificantFormatter):
+    """Derive number formatting from the axis ticks and view range."""
+
+    def __init__(
+        self,
+        precision=3,
+        *,
+        uniform_decimals=True,
+        notation="power",
+        exponent_low=-5,
+        exponent_high=6,
+    ):
+        super().__init__(precision)
+        if not isinstance(uniform_decimals, bool):
+            raise TypeError("uniform_decimals must be bool")
+        if notation not in ("power", "scientific", "engineering"):
+            raise ValueError("notation must be power, scientific or engineering")
+        if any(
+            not isinstance(value, (int, np.integer)) or not -128 <= value <= 127
+            for value in (exponent_low, exponent_high)
+        ):
+            raise ValueError("exponent limits must be signed 8-bit integers")
+        self.uniform_decimals = uniform_decimals
+        self.notation = notation
+        self.exponent_low = int(exponent_low)
+        self.exponent_high = int(exponent_high)
+
+    def _format(self):
+        return {
+            "Auto": {
+                "uniform_decimals": self.uniform_decimals,
+                "notation": self.notation.title(),
+                "exponent_low": self.exponent_low,
+                "exponent_high": self.exponent_high,
+            }
+        }
+
+
+class PlainFormatter(SignificantFormatter):
+    """Format each number with optional fixed decimal places."""
+
+    def __init__(self, *, decimals=None, trim_zeros=False, precision=3):
+        super().__init__(precision)
+        if decimals is not None and (
+            not isinstance(decimals, (int, np.integer)) or not 0 <= decimals <= 255
+        ):
+            raise ValueError("decimals must be None or an integer from 0 to 255")
+        if not isinstance(trim_zeros, bool):
+            raise TypeError("trim_zeros must be bool")
+        self.decimals = None if decimals is None else int(decimals)
+        self.trim_zeros = trim_zeros
+
+    def _format(self):
+        return {"Plain": {"decimals": self.decimals, "trim_zeros": self.trim_zeros}}
 
 
 class TimestampFormatter(SignificantFormatter):

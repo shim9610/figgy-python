@@ -100,6 +100,7 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
                     "line_offsets",
                     "plot_background",
                     "background",
+                    "layout_state",
                 ];
                 for key in obj.keys() {
                     if !KEYS.contains(&key.as_str()) {

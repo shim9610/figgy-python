@@ -819,7 +819,7 @@ export function render({model,el}) {
     }
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
-      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Auto:'Automatic',Decimal:'Decimal (123.45)',Plain:'Plain number',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Percent:'Percent (25%)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
       input.addEventListener('change',()=>submitProperty(apply,input.value,()=>{input.value=value;}));row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find,dimension){
@@ -831,9 +831,11 @@ export function render({model,el}) {
       const note=document.createElement('p');note.textContent='Log view omits zero and negative values; source data is preserved.';fields.append(note);
     }
     function numberFormat(style,find){
-      const current=typeof style.format==='string'?style.format:'Timestamp';
-      choice('label_format',current,['Decimal','Scientific','Power','Degrees','Radians','Timestamp'],(s,v)=>{find(s).format=v==='Timestamp'?{Timestamp:{}}:v;});
-      if(current==='Timestamp')return;
+      const current=typeof style.format==='string'?style.format:Object.keys(style.format??{})[0]??'Decimal';
+      const structured=['Auto','Plain','Timestamp'];
+      choice('label_format',current,['Auto','Decimal','Plain','Scientific','Power','Degrees','Radians','Percent','Timestamp'],
+        (state,value)=>{find(state).format=structured.includes(value)?{[value]:{}}:value;});
+      if(current==='Timestamp'||current==='Plain')return;
       const digits=field('significant_digits',style.significant_digits,'number',(s,v)=>{
         if(!Number.isInteger(v)||v<1||v>15)throw Error('Significant digits must be an integer from 1 to 15');
         find(s).significant_digits=v;

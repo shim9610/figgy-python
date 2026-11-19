@@ -825,6 +825,7 @@ class AdvancedMethods:
         cfg = rename(bundle["config"])
         area = chart.get("decorations", {}).get("data_area")
         if area is not None:
+            cfg["layout_state"] = "fixed"
             canvas = self._config(self.figure.get_settings())["chart_area"]
             for axis, margin in (
                 ("left_y", area["x"] - canvas["x"]),

@@ -688,7 +688,7 @@ class Axis:
         )
 
     def set_major_formatter(self, formatter):
-        from .ticker import SignificantFormatter, TimestampFormatter
+        from .ticker import SignificantFormatter
 
         if not isinstance(formatter, SignificantFormatter):
             raise NotImplementedError(
@@ -698,15 +698,7 @@ class Axis:
         state = fig.get_settings()
         for node in self._nodes(state):
             node["label_style"].update(
-                format=formatter._format()
-                if isinstance(formatter, TimestampFormatter)
-                else {
-                    "plain": "Decimal",
-                    "scientific": "Scientific",
-                    "power": "Power",
-                    "degrees": "Degrees",
-                    "radians": "Radians",
-                }[formatter.style],
+                format=formatter._format(),
                 significant_digits=formatter.precision,
             )
         fig.apply_settings(state)
