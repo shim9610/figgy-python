@@ -25,7 +25,7 @@ def check_assets(assets):
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 NATIVE_PACKAGES = {"figgy-renderer": "crates/renderer", "figgy-model": "crates/model"}
 HOST_PATCH = "scripts/wasm-host.patch"
-HOST_PATCH_FILES = {"crates/web/src/web/chart.rs", "crates/web/src/radial.rs"}
+HOST_PATCH_FILES = {"crates/web/src/web/chart/frame.rs", "crates/web/src/radial.rs"}
 
 
 def host_patch_record(root):

@@ -105,7 +105,13 @@ export enum AxisPreset {
 }
 
 /**
- * Series color rotations (mirror of `model::ColorCycle`).
+ * Series color rotations (mirror of `model::ColorCycle`). `Balanced` is
+ * the default cycle a new series takes. The categorical presets from
+ * public palettes (#357) are `Balanced` (D3 category10 / matplotlib
+ * tab10), `ColorblindSafe` (Okabe–Ito), `Tableau10`, `Set2` and `Dark2`
+ * (ColorBrewer, Apache-2.0), `Plotly` and `HighContrast` (plotly.py
+ * Dark24); `crates/renderer/USAGE.md` ("Palette presets") lists each source and
+ * licence.
  */
 export enum ColorCycle {
     Classic = 0,
@@ -113,6 +119,11 @@ export enum ColorCycle {
     Balanced = 2,
     ColorblindSafe = 3,
     Monochrome = 4,
+    Tableau10 = 5,
+    Set2 = 6,
+    Dark2 = 7,
+    Plotly = 8,
+    HighContrast = 9,
 }
 
 /**
@@ -388,6 +399,12 @@ export class FiggyBoundedChart {
      * `names`.
      */
     apply_theme(name: string): void;
+    /**
+     * [`Self::apply_theme`] with the palette preset `cycle` on the
+     * top-level slices instead of the family's colours (#357). Refused,
+     * changing nothing, as [`Self::apply_theme`] refuses the name.
+     */
+    apply_theme_with_palette(name: string, cycle: ColorCycle): void;
     clear_selection(): void;
     /**
      * One GPU surface; no kernel PNG transport is used for interactive frames.
@@ -1232,12 +1249,14 @@ export class FiggyChart {
      */
     fit_y_axes_config(config_json: string, padding: number): string;
     /**
-     * Process pending pool maintenance and draw only when visual state is
-     * dirty. A clean rAF tick returns before touching the pool or surface.
      * Format numerical category/box/radar labels from resident GPU values.
      * The host supplies no retained source arrays; the public model owns formatting.
      */
     format_value_labels(): Promise<string>;
+    /**
+     * Process pending pool maintenance and draw only when visual state is
+     * dirty. A clean rAF tick returns before touching the pool or surface.
+     */
     frame(): void;
     /**
      * Whether the last frame drew every series of the chart (#299): false
@@ -2317,6 +2336,16 @@ export class FiggyChart {
      */
     theme_names(): string[];
     /**
+     * [`Self::theme`] with its series palette replaced by the preset
+     * `cycle` (#357): the family's chrome and parts with, say, the
+     * Okabe–Ito or ColorBrewer Set2 colours. Pass it to
+     * [`Self::apply_custom_theme`]. Refused as [`Self::theme`] refuses the
+     * name.
+     *
+     * Returns a plain object, not a JSON string.
+     */
+    theme_with_palette(name: string, cycle: ColorCycle): FiggyThemeObject;
+    /**
      * Atomically replace an existing column from a `Float32Array`.
      * Missing ids are rejected; every accepted call performs an upload.
      */
@@ -2511,6 +2540,20 @@ export function convert_radar_document(json: string, options?: string | null): s
 export function default_config(): string;
 
 /**
+ * The default config for a chart of the series list JSON `series_json`
+ * (`default::config_for_series`, #357) as JSON: `default_config()` in the
+ * frame the series' family draws by default. A chart that draws a Feynman
+ * series has no axes, grid or tick labels (`AxisPreset::Hidden`), one that
+ * draws an energy-level series takes the Grotrian frame, and every other
+ * list gives `default_config()`. The frame is chosen here, once: an
+ * `apply_axis_preset` or `set_config` afterwards keeps the host's choice.
+ * Throws for a series list that does not parse.
+ *
+ * JS: `const config = JSON.parse(default_config_for_series(JSON.stringify(series)));`
+ */
+export function default_config_for_series(series_json: string): FiggyJson;
+
+/**
  * Every valid `draw_style` mode tag, as a JSON string array.
  *
  * Returns JSON text (`FiggyJson`), not an object: parse it with `JSON.parse`.
@@ -2644,6 +2687,7 @@ export interface InitOutput {
     readonly convert_categorical_document: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly convert_radar_document: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly default_config: () => [number, number, number, number];
+    readonly default_config_for_series: (a: number, b: number) => [number, number, number, number];
     readonly draw_style_modes: () => [number, number, number, number];
     readonly draw_style_param_specs: (a: number, b: number) => [number, number, number, number];
     readonly figgyboundedchart_active_layer: (a: number) => [number, number, number, number];
@@ -2657,6 +2701,7 @@ export interface InitOutput {
     readonly figgyboundedchart_annotation_warnings: (a: number) => [number, number, number, number];
     readonly figgyboundedchart_annotations: (a: number) => [number, number, number, number];
     readonly figgyboundedchart_apply_theme: (a: number, b: number, c: number) => [number, number];
+    readonly figgyboundedchart_apply_theme_with_palette: (a: number, b: number, c: number, d: number) => [number, number];
     readonly figgyboundedchart_clear_selection: (a: number) => void;
     readonly figgyboundedchart_create: (a: any, b: number, c: number, d: number, e: number, f: number, g: number) => any;
     readonly figgyboundedchart_create_on: (a: number, b: any, c: number, d: number, e: number, f: number, g: number, h: number) => any;
@@ -2872,6 +2917,7 @@ export interface InitOutput {
     readonly figgychart_take_plot_resize_request: (a: number) => [number, number, number, number];
     readonly figgychart_theme: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_theme_names: (a: number) => any;
+    readonly figgychart_theme_with_palette: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly figgychart_update_register_column_f32: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgychart_update_register_column_f64: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgychart_wait_submitted_work: (a: number) => any;
@@ -2894,11 +2940,11 @@ export interface InitOutput {
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__295: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__296: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__298: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__299: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__294: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__297: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

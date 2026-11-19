@@ -1,5 +1,6 @@
 """Keep content-addressed web assets intact through Windows-style checkout."""
 from pathlib import Path
+import re
 import runpy
 import shutil
 import subprocess
@@ -144,9 +145,10 @@ def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
 def test_host_patch_cannot_change_native_sources_or_build_configuration(registry_pairing, change):
     patch = registry_pairing / "scripts/wasm-host.patch"
     data = patch.read_text()
+    original = data
     if change in ("renderer", "model", "manifest"):
         destination = "Cargo.toml" if change == "manifest" else "crates/" + change + "/src/lib.rs"
-        data = data.replace("crates/web/src/web/chart.rs", destination)
+        data = data.replace("crates/web/src/web/chart/frame.rs", destination)
     elif change == "mode":
         data = data.replace("--- a/", "old mode 100644\nnew mode 100755\n--- a/", 1)
     elif change == "crlf":
@@ -154,10 +156,12 @@ def test_host_patch_cannot_change_native_sources_or_build_configuration(registry
     elif change == "deletion":
         # A syntactically valid patch that removes existing bridge code is
         # outside this deliberately additive host extension's scope.
-        data = data.replace("@@ -1753,6 +1753,18 @@", "@@ -1753,6 +1753,17 @@")
-        data = data.replace("     pub fn frame(&mut self) -> Result<(), JsValue> {\n", "-    pub fn frame(&mut self) -> Result<(), JsValue> {\n", 1)
+        hunk = re.search(r"^@@ -\d+,\d+ \+\d+,(\d+) @@\n ", data, re.MULTILINE)
+        start, end = hunk.span(1)
+        data = data[:start] + str(int(hunk[1]) - 1) + " @@\n-" + data[hunk.end():]
     else:
         data = "not a patch\n"
+    assert data != original
     patch.write_bytes(data.encode())
     checker = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"]
     with pytest.raises(ValueError, match="host patch"):

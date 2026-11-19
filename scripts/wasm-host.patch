@@ -1,10 +1,13 @@
-diff --git a/crates/web/src/web/chart.rs b/crates/web/src/web/chart.rs
---- a/crates/web/src/web/chart.rs
-+++ b/crates/web/src/web/chart.rs
-@@ -1774,6 +1774,161 @@
- 
-     /// Process pending pool maintenance and draw only when visual state is
-     /// dirty. A clean rAF tick returns before touching the pool or surface.
+diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
+--- a/crates/web/src/web/chart/frame.rs
++++ b/crates/web/src/web/chart/frame.rs
+@@ -185,6 +185,161 @@
+     pub async fn prewarm_all(&mut self) -> Result<(), JsValue> {
+         self.renderer.prewarm_all().await.map_err(js_err)?;
+         self.request_host_redraw();
++        Ok(())
++    }
++
 +    /// Format numerical category/box/radar labels from resident GPU values.
 +    /// The host supplies no retained source arrays; the public model owns formatting.
 +    pub async fn format_value_labels(&mut self) -> Result<String, JsValue> {
@@ -157,12 +160,9 @@ diff --git a/crates/web/src/web/chart.rs b/crates/web/src/web/chart.rs
 +        let chart = Chart::new(config.into_owned());
 +        self.renderer.refresh_annotations(&mut self.view, &chart, panel_rect, self.selected_annotation).map_err(js_err)?;
 +        self.redraw_pending = true;
-+        Ok(())
-+    }
-+
-     pub fn frame(&mut self) -> Result<(), JsValue> {
-         self.renderer
-             .sync_external_invalidations()
+         Ok(())
+     }
+ 
 diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
 --- a/crates/web/src/radial.rs
 +++ b/crates/web/src/radial.rs
