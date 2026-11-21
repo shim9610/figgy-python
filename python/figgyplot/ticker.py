@@ -138,8 +138,9 @@ class PlainFormatter(SignificantFormatter):
 class TimestampFormatter(SignificantFormatter):
     """Unix timestamp labels without changing source values or axis limits.
 
-    Units are s/ms/us/ns; timezone is a fixed UTC offset in minutes. Pattern
-    supports %Y %m %d %H %M %S %f and %%. None uses calendar-aware labels.
+    Units are s/ms/us/ns. Timezone is a fixed UTC offset in minutes.
+    Use step to fix the calendar period and period_labels to center labels.
+    An origin with a prefix or labels gives relative or custom period labels.
     """
 
     def __init__(
@@ -151,6 +152,12 @@ class TimestampFormatter(SignificantFormatter):
         fractional_digits=None,
         calendar=True,
         precision=3,
+        step=None,
+        week_start="monday",
+        period_labels=False,
+        origin=None,
+        prefix=None,
+        labels=None,
     ):
         super().__init__(precision)
         if unit not in ("s", "ms", "us", "ns"):
@@ -171,19 +178,46 @@ class TimestampFormatter(SignificantFormatter):
             import re
 
             if any(
-                not token or token not in "YmdHMSf%"
+                not token or token not in "YmbdHMSf%"
                 for token in re.findall(r"%(.)?", pattern)
             ):
                 raise ValueError(
-                    "supported timestamp patterns are %Y %m %d %H %M %S %f and %%"
+                    "supported timestamp patterns are %Y %m %b %d %H %M %S %f and %%"
                 )
         if not isinstance(calendar, bool):
             raise TypeError("calendar must be bool")
         self.pattern, self.unit, self.timezone = pattern, unit, int(timezone)
         self.fractional_digits, self.calendar = fractional_digits, bool(calendar)
+        if step not in (None, "day", "week", "month", "quarter", "year"):
+            raise ValueError("step must be day, week, month, quarter or year")
+        if week_start not in (
+            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+        ):
+            raise ValueError("week_start must name a weekday")
+        if not isinstance(period_labels, bool):
+            raise TypeError("period_labels must be bool")
+        if step is None and (period_labels or origin is not None):
+            raise ValueError("period labels and an origin require a calendar step")
+        if origin is None and (prefix is not None or labels is not None):
+            raise ValueError("relative and custom labels require an origin")
+        if origin is not None:
+            if pattern is not None or (prefix is not None and labels is not None):
+                raise ValueError("choose a pattern, relative labels or custom labels")
+            if not isinstance(origin, (int, np.integer)) or not -(2**63) <= origin < 2**63:
+                raise ValueError("origin must be a signed 64-bit timestamp")
+            origin = int(origin)
+        if prefix is not None and not isinstance(prefix, str):
+            raise TypeError("prefix must be a string")
+        if isinstance(labels, (str, bytes)):
+            raise TypeError("labels must be a sequence of strings")
+        self.step, self.week_start = step, week_start
+        self.period_labels, self.origin, self.prefix = period_labels, origin, prefix
+        self.labels = None if labels is None else list(labels)
+        if self.labels is not None and not all(isinstance(value, str) for value in self.labels):
+            raise TypeError("labels must contain strings")
 
     def _format(self):
-        return {
+        result = {
             "Timestamp": dict(
                 unit={
                     "s": "Seconds",
@@ -201,3 +235,16 @@ class TimestampFormatter(SignificantFormatter):
                 tick_policy="AutoCalendar" if self.calendar else "NumericSpacing",
             )
         }
+        spec = result["Timestamp"]
+        if self.step == "week":
+            spec["step"] = {"Week": {"start": self.week_start.title()}}
+        elif self.step is not None:
+            spec["step"] = self.step.title()
+        if self.period_labels:
+            spec["period_labels"] = True
+        if self.origin is not None:
+            if self.labels is None:
+                spec["label"] = {"Relative": {"origin": self.origin, "prefix": self.prefix or ""}}
+            else:
+                spec["label"] = {"Custom": {"origin": self.origin, "labels": self.labels}}
+        return result

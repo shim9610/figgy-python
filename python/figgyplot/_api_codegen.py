@@ -71,12 +71,26 @@ def _formatter_expression(label, names):
     }[spec.get("unit", "Seconds")]
     zone = spec.get("timezone", "Utc")
     offset = 0 if zone == "Utc" else zone["FixedOffsetMinutes"]
-    pattern = spec.get("label", "Auto")
-    pattern = None if pattern == "Auto" else pattern["Pattern"]
+    label_mode = spec.get("label", "Auto")
+    pattern = label_mode.get("Pattern") if isinstance(label_mode, dict) else None
     fractional = spec.get("fractional", "Auto")
     fractional = None if fractional == "Auto" else fractional["Fixed"]
     calendar = spec.get("tick_policy", "AutoCalendar") == "AutoCalendar"
-    return f"{names['TimestampFormatter']}({pattern!r}, unit={unit!r}, timezone={offset!r}, fractional_digits={fractional!r}, calendar={calendar!r}, precision={precision!r})"
+    options = dict(unit=unit, timezone=offset, fractional_digits=fractional,
+                   calendar=calendar, precision=precision)
+    step = spec.get("step")
+    if isinstance(step, dict):
+        options.update(step="week", week_start=step["Week"]["start"].lower())
+    elif step is not None:
+        options["step"] = step.lower()
+    if spec.get("period_labels"):
+        options["period_labels"] = True
+    if isinstance(label_mode, dict):
+        for mode in ("Relative", "Custom"):
+            if mode in label_mode:
+                options.update(label_mode[mode])
+    args = [repr(pattern), *(f"{key}={value!r}" for key, value in options.items())]
+    return f"{names['TimestampFormatter']}({', '.join(args)})"
 
 
 def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):

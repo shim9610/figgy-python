@@ -63,6 +63,23 @@ def test_timestamp_formatter_preserves_values_domain_and_complete_format(backend
             TimestampFormatter(calendar="false")
 
 
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("formatter", [
+    TimestampFormatter("%b", step="month", period_labels=True),
+    TimestampFormatter(step="week", week_start="sunday", origin=0, prefix="Week "),
+    TimestampFormatter(step="day", origin=0, labels=["Start", "Review"]),
+])
+def test_calendar_period_formatter_replays_exact_options(backend, formatter):
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        for figure in (source, target):
+            figure.axes[0].plot([0, 86400], [1, 2], id="signal")
+        source.axes[0].xaxis.set_major_formatter(formatter)
+        exec(source.to_code(), {"fig": target})
+        for figure in (source, target):
+            label = figure.get_settings()["config"]["bottom_x"]["label_style"]
+            assert label["format"] == formatter._format()
+
+
 @pytest.mark.parametrize("kind", ["categorical", "boxplot", "radial", "radar"])
 @pytest.mark.parametrize("backend", ["native", "webgpu"])
 def test_bounded_style_roundtrip_retains_categories_values_and_ids(kind, backend):
