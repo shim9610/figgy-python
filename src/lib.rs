@@ -1835,9 +1835,15 @@ impl FigureAccess<'_> {
         }
         let picked = py.detach(|| {
             self.renderer.enable_gpu_picking().map_err(runtime)?;
+            let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
+            let mut view = self
+                .renderer
+                .create_chart_view(&chart, chart.config().chart_area.0)
+                .map_err(runtime)?;
+            self.prepare_pick_view(&mut view)?;
             let request = GpuPickRequest {
                 canvas_position_px: [x, y],
-                display_panel_px: self.data.chart.config().chart_area.0,
+                display_panel_px: self.data.chart.config().document_area(),
                 display_scale: 1.0,
                 max_distance_px: 6.0,
             };

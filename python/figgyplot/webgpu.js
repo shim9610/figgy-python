@@ -316,19 +316,26 @@ export function render({model,el}) {
   async function pickPanelCandidates(point,index){
     const config=JSON.parse(chart.get_config()),series=JSON.parse(chart.get_series()),hits=[],excluded=new Set();
     const owner=id=>{for(let i=0;i<=(config.subplots?.length??0);i++){const cfg=i?config.subplots[i-1].config:config;if(i&&!(config.subplots[i-1].series??[]).includes(id))continue;if(!i&&(config.subplots??[]).some(p=>(p.series??[]).includes(id)))continue;const o=(cfg.overlays??[]).findIndex(o=>(o.series??[]).includes(id));return o<0?baseLayer(i):i?{SubplotOverlay:[i-1,o]}:{Overlay:o};}return 'Base';};
-    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)).map(v=>{const item=clone(v);for(const style of Object.values(item.render_type))if(style.line)style.line.fill=null;return item;});
+    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)).map(v=>{
+      const item=clone(v);
+      for(const style of Object.values(item.render_type)){
+        if(excluded.has(style.line?.fill?.ToSeries))style.line.fill=null;
+      }
+      return item;
+    });
     try{
       chart.set_picked_data('null');
       for(const layer of layersInPanel(index).reverse()){
         chart.set_active_layer(JSON.stringify(probeLayer(layer,point)));
         while(series.some(v=>!excluded.has(v.series_id)&&sameLayer(owner(v.series_id),layer))){
+          await chart.prepare_data_pick();
           const value=await chart.pick_data(...point,6);if(!value)break;
-          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>!['distance_px','label_id','vertex_index'].includes(k)));
+          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>!['distance_px','extent_px','label_id','vertex_index'].includes(k)));
           // Pick answers use `index`; persistent Feynman selections use typed row keys.
           if(ref.kind==='feynman_vertex'){ref.vertex_index=ref.index;delete ref.index;}
           else if(ref.kind==='feynman_propagator'){ref.propagator_index=ref.index;delete ref.index;}
           if(excluded.has(ref.series_id))throw Error('Picker repeated an excluded series');
-          excluded.add(ref.series_id);hits.push({layer,ref,distance:identity.distance_px});
+          excluded.add(ref.series_id);hits.push({layer:owner(ref.series_id),ref,distance:identity.distance_px});
           chart.set_series(JSON.stringify(remaining()));
         }
       }

@@ -756,8 +756,13 @@ export class FiggyChart {
      */
     apply_axis_preset(preset: AxisPreset): void;
     /**
-     * Switch the series color rotation: recolors every series in order,
-     * rebuilds their GPU styles, and keeps legend swatches in sync.
+     * Switch the series color rotation: applies the palette to the chart
+     * (`Config::apply_palette`, #357), so series `i` takes the cycle's
+     * colour `i` in every palette-coloured part (a field, an image, an
+     * energy-level or a Feynman diagram keeps its colours), rebuilds the
+     * GPU styles, and redraws the legend symbols of the base chart, its
+     * overlays and its subplots. Later `add_*_series` calls continue the
+     * cycle.
      */
     apply_color_cycle(cycle: ColorCycle): void;
     /**
@@ -1214,10 +1219,13 @@ export class FiggyChart {
      * and the z axis of a 3D chart, from the columns' cached statistics
      * with 5% padding. A chart starts at a `0..1` placeholder range; this
      * is the call for a first plot. Synchronous, and independent of the
-     * active layer. A layer without series keeps its ranges. A streamed
-     * source and a monotonic chart are refused, and a refusal changes
-     * nothing. `auto_fit_all(padding)` instead measures the active
-     * layer's drawn extents (error bar ends included) on the GPU.
+     * active layer. A layer without series keeps its ranges. Then the
+     * scale of every auto-scaled vector series is fitted to the spacing
+     * of its arrows and its `auto_scale` flag consumed (#357), so the
+     * stored series say how long the arrows draw. A streamed source and a
+     * monotonic chart are refused, and a refusal changes nothing.
+     * `auto_fit_all(padding)` instead measures the active layer's drawn
+     * extents (error bar ends included) on the GPU.
      * JS: `chart.fit_ranges()`
      */
     fit_ranges(): void;
@@ -1498,14 +1506,19 @@ export class FiggyChart {
      */
     pick_data(x: number, y: number, max_distance_px: number): Promise<FiggyJson | undefined>;
     /**
-     * Pick the nearest visible data primitive to canvas pixel `(x, y)`.
-     * Scatter hits use the visible marker size, including per-point style
-     * mapping; error-bar stems and caps name their point; line strokes and
-     * the inside of a line's fill snap to the nearest endpoint data point on
-     * the hit segment.
+     * Pick at canvas pixel `(x, y)` (#381): a hit when the chart's drawn
+     * data has ink within `max_distance_px` of it and the topmost series
+     * that drew the nearest inked pixel has point data, naming that
+     * series' datum nearest to the cursor. Ink of a body series (bars,
+     * bins, cells) answers no point hit; `pick_data` answers its typed hit.
      * Resolves to a JSON string
-     * `{ source_id, series_id, point_index, distance_px }`, or
-     * `undefined` when no visible primitive is within `max_distance_px`.
+     * `{ source_id, series_id, point_index, distance_px, nearest }`:
+     * `nearest` lists every pickable series' datum nearest to the cursor
+     * (`{ layer, source_id, series_id, point_index, distance_px }`), and
+     * when no drawn ink is within `max_distance_px` the point fields are
+     * `null` and `nearest` is still filled (#381). A streamed display's
+     * pick resolves to `{ source_id, series_id, point_index, distance_px }`
+     * or `undefined` on a miss, as before.
      * On a chart that draws value labels a label under the pointer wins
      * (it is drawn over the data): the hit then names the label's series,
      * its category as `point_index`, and its `label_id`
@@ -1567,6 +1580,11 @@ export class FiggyChart {
      */
     pointer_to_anchor(x: number, y: number, kind: string): FiggyJson;
     /**
+     * Refresh the registered chart's data and pick masks without presenting it.
+     * A host can probe temporary series without replacing the canvas contents.
+     */
+    prepare_data_pick(): Promise<void>;
+    /**
      * Refresh renderer-owned annotation geometry without submitting a frame.
      */
     prepare_interaction(): void;
@@ -1593,6 +1611,21 @@ export class FiggyChart {
      * JS: `if (hit?.kind?.startsWith("feynman_")) chart.press_feynman(hit.series_id, hit.kind, hit.index, hit.part);`
      */
     press_feynman(series_id: string, kind: string, index: number, part?: string | null): boolean;
+    /**
+     * Press on a dependency link (#357): link `index` of the range link
+     * series `series_id`, as a `pick_data` hit names it (a histogram bin of
+     * that series). The link becomes the data selection and the drag
+     * starts: `on_move` moves its exit along the predecessor's edge
+     * (`drag_link_exit`, moving a shared trunk as one and snapping to the
+     * default within 3 px) and `on_release` ends it. `extent_px` is the
+     * hit's `extent_px`, the link's predecessor's drawn length in canvas
+     * pixels: the exit stops at the bar's end, so dragging back moves it
+     * at once; without it only the draw stops the exit. Returns `false`
+     * and changes nothing for an id or index that names no link.
+     * JS: `const hit = JSON.parse(await chart.pick_data(x, y, 6));`
+     * `if (hit?.kind === "histogram_bin") chart.press_range_link(hit.series_id, hit.bin_index, hit.extent_px);`
+     */
+    press_range_link(series_id: string, index: number, extent_px?: number | null): boolean;
     /**
      * Press on a value label: the label a `pick_point` or `pick_data` hit
      * names under the pointer, by its `label_id`
@@ -2028,6 +2061,14 @@ export class FiggyChart {
      * The resulting explicit values remain the series SSoT.
      */
     set_contour_nice_levels(series_id: string, target_count: number, use_colormap_colors: boolean): number;
+    /**
+     * Set the exit offset of link `index` of the range link series
+     * `series_id` (#357), in logical pixels from its predecessor's start;
+     * `undefined`, 0 or a non-finite value restores the default exit.
+     * Returns `false` and changes nothing for an unknown series, an index
+     * past its links or a negative offset.
+     */
+    set_link_exit_offset(series_id: string, index: number, offset?: number | null): boolean;
     /**
      * The full call of monotonic group `group` (#271): every series of
      * the chart that names the group is reduced in full from `data`, its
@@ -2833,9 +2874,11 @@ export interface InitOutput {
     readonly figgychart_pipelines_ready: (a: number) => any;
     readonly figgychart_place_feynman_vertices: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_pointer_to_anchor: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly figgychart_prepare_data_pick: (a: number) => any;
     readonly figgychart_prepare_interaction: (a: number) => [number, number];
     readonly figgychart_press_energy_label: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly figgychart_press_feynman: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
+    readonly figgychart_press_range_link: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly figgychart_press_value_label: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_prewarm_all: (a: number) => any;
     readonly figgychart_prewarm_all_with_progress: (a: number, b: any) => any;
@@ -2883,6 +2926,7 @@ export interface InitOutput {
     readonly figgychart_set_colorbar_title: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_config: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_contour_nice_levels: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly figgychart_set_link_exit_offset: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly figgychart_set_monotonic: (a: number, b: number, c: number, d: number, e: number, f: any, g: any, h: number, i: number, j: number) => [number, number, number, number];
     readonly figgychart_set_monotonic_document: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgychart_set_picked_data: (a: number, b: number, c: number) => [number, number];
@@ -2940,11 +2984,11 @@ export interface InitOutput {
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__298: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__299: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__301: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__302: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__297: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__300: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

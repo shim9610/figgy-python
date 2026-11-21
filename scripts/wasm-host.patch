@@ -1,11 +1,31 @@
 diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
 --- a/crates/web/src/web/chart/frame.rs
 +++ b/crates/web/src/web/chart/frame.rs
-@@ -185,6 +185,161 @@
+@@ -185,6 +185,181 @@
      pub async fn prewarm_all(&mut self) -> Result<(), JsValue> {
          self.renderer.prewarm_all().await.map_err(js_err)?;
          self.request_host_redraw();
 +        Ok(())
++    }
++
++    /// Refresh the registered chart's data and pick masks without presenting it.
++    /// A host can probe temporary series without replacing the canvas contents.
++    pub async fn prepare_data_pick(&mut self) -> Result<(), JsValue> {
++        loop {
++            self.renderer
++                .prepare_registered(&mut [RegisteredChartDrawItem {
++                    chart_id: self.chart_id,
++                    view: &mut self.view,
++                }])
++                .map_err(js_err)?;
++            if self.renderer.frame_complete() {
++                return Ok(());
++            }
++            if !self.renderer.compiles_pending() {
++                return Err(js_err("pick mask is waiting for a missing draw pipeline"));
++            }
++            self.renderer.compile_progress().await;
++        }
 +    }
 +
 +    /// Format numerical category/box/radar labels from resident GPU values.

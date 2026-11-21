@@ -154,13 +154,12 @@ pub(super) struct DataHit {
     pub reference: renderer::config::PickedDataRef,
     pub distance: f32,
 }
-// Fills are not pick primitives. Removing them from a temporary picker registry
-// keeps cross-series fills valid while already-found series are excluded.
+// A fill to an excluded series cannot be drawn by the temporary registry.
 fn picker_series(
     input: &[SeriesConfig],
     excluded: &std::collections::HashSet<String>,
 ) -> Vec<SeriesConfig> {
-    use renderer::data_config::DataRenderType as T;
+    use renderer::data_config::{DataRenderType as T, LineFill};
     input
         .iter()
         .filter(|s| !excluded.contains(&s.series_id))
@@ -169,7 +168,9 @@ fn picker_series(
             match &mut s.render_type {
                 T::Xy(renderer::XySeries {
                     line: Some(line), ..
-                }) => line.fill = None,
+                }) if matches!(&line.fill, Some(LineFill::ToSeries(target)) if excluded.contains(target.as_str())) => {
+                    line.fill = None;
+                }
                 _ => {}
             }
             s
@@ -177,6 +178,16 @@ fn picker_series(
         .collect()
 }
 impl FigureAccess<'_> {
+    pub(super) fn prepare_pick_view(&mut self, view: &mut renderer::ChartView) -> PyResult<()> {
+        self.renderer
+            .prepare_registered(&mut [renderer::RegisteredChartDrawItem {
+                chart_id: self.data.chart_id,
+                view,
+            }])
+            .map_err(runtime)?;
+        Ok(())
+    }
+
     /// Enumerate all nearby series, including coincident series on the same
     /// axis. Only renderer metadata and compact pick identities change. The
     /// authoritative document, columns, legend and order are restored exactly.
@@ -188,18 +199,30 @@ impl FigureAccess<'_> {
         self.renderer.enable_gpu_picking().map_err(runtime)?;
         let original = self.data.chart.config().clone();
         let original_gpu = gpu::config(self.data.figure_id, &original);
-        let displayed = renderer::place_document(
+        let mut displayed = renderer::place_document(
             &original_gpu,
             request.display_scale,
             request.display_panel_px,
         );
         let series = self.gpu_series(&self.data.series);
-        let mut probe = original_gpu.clone();
-        probe.picked_data = None;
+        // The picker reads ink in the same physical placement in which it was
+        // recorded. Desktop uses its own document placement within the window.
+        displayed.layout_state = renderer::LayoutState::Fixed;
+        displayed.picked_data = None;
+        let chart = Chart::new(displayed.clone());
+        let mut view = self
+            .renderer
+            .create_chart_view(&chart, displayed.chart_area.0)
+            .map_err(runtime)?;
+        let request = GpuPickRequest {
+            display_panel_px: displayed.document_area(),
+            display_scale: 1.,
+            ..request
+        };
 
         let result = (|| {
             self.renderer
-                .set_chart_config(self.data.chart_id, probe)
+                .set_chart_config(self.data.chart_id, displayed.clone())
                 .map_err(runtime)?;
             let mut hits = vec![];
             let mut excluded = std::collections::HashSet::new();
@@ -226,6 +249,7 @@ impl FigureAccess<'_> {
                     {
                         break;
                     }
+                    self.prepare_pick_view(&mut view)?;
                     let ticket = self
                         .renderer
                         .pick_chart_data(self.data.chart_id, request)
@@ -238,9 +262,10 @@ impl FigureAccess<'_> {
                     if !excluded.insert(reference.series_id().to_owned()) {
                         return Err(runtime("picker repeated an excluded series"));
                     }
+                    let hit_layer = original_gpu.layer_of_series(reference.series_id());
                     gpu::local_selection(self.data.figure_id, &mut reference);
                     hits.push(DataHit {
-                        layer,
+                        layer: hit_layer,
                         reference,
                         distance: pick.distance_px(),
                     });
