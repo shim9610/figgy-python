@@ -19,7 +19,7 @@ constructor accepts it to give a series a stable address for later edits.
 | --- | --- |
 | Lines and points | `plot`, `scatter`, `step`, `stem`, `errorbar`, `fill_between` |
 | Categories and distributions | `bar`, `barh`, `hist`, `stairs`, `boxplot`, `bxp`, `violinplot`, `raincloud` |
-| Intervals and financial data | `range_bars`, `broken_barh`, `waterfall`, `candlestick` |
+| Intervals and financial data | `range_bars`, `range_links`, `broken_barh`, `waterfall`, `candlestick` |
 | Fields and flow | `imshow`, `imshow_rgb`, `contour`, `contourf`, `hexbin`, `quiver`, `streamplot`, `streamlines` |
 | Meshes and 3-D data | `tripcolor`, `tricontour`, `tricontourf`, `plot_surface`, `plot_trisurf`, `plot3D`, `scatter3D`, `quiver3D` |
 | Other coordinate systems | `radar`, `rose`, `ternary`, `parallel_coordinates` |
@@ -44,6 +44,19 @@ with fg.Figure(backend="native") as fig:
 `streamlines(x, y)` accepts precomputed paths with NaN separators. Violin density
 estimation, hexagonal bin aggregation and box statistics are also host operations;
 the resulting columns are drawn by the common renderer.
+
+Use `range_links` to connect rows in a range-bar series on the same axes. The
+indices are zero-based and follow the order of the data passed to `range_bars`.
+
+```python
+tasks = ax.range_bars([0, 1], [0, 3], [2, 6], orientation="horizontal")
+dependencies = ax.range_links(tasks, [(0, 1)], color="navy")
+dependencies.set(links=[{"from": 0, "to": 1, "exit_offset": 12}])
+```
+
+Drag a dependency in either editor to move its exit along the value axis. The
+Properties panel also accepts the link list as JSON. The Python API expresses
+`exit_offset` in points, while the editor uses logical pixels.
 
 Mesh calls require explicit integer `triangles` of shape `(N, 3)`. `tripcolor`
 uses one value per vertex with `shading="gouraud"`, or one value per triangle with
@@ -137,6 +150,15 @@ Run `python examples/renderer_019.py --formats png svg pdf` to export the exampl
 `ax.twinx()` provides the converse. Axis units, discontinuities and probability
 paper are available through `set_axis_unit`, `set_axis_breaks` and
 `set_probability_scale`. `view_init`, `set_zlim` and `set_zlabel` edit a 3-D view.
+
+`ax.set_line_offsets([first, second], y=5)` places successive line series five
+units apart in Y. Pass artists or series IDs in the desired order. X and Y
+steps use data units on linear axes and decades on logarithmic axes. In the
+panel inspector, edit **Line offsets**. Pass `None` to clear the offsets in
+Python, or enter `null` in the inspector.
+
+The tick-label inspector exposes calendar steps, the start weekday, period
+labels, and relative or custom labels when the number format is **Timestamp**.
 
 ## PNG, SVG and PDF
 

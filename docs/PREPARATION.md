@@ -56,8 +56,11 @@ compile their pipelines asynchronously and also await the first GPU frame.
 The browser sizes the surface to its displayed CSS size and device pixel ratio
 before awaiting the frame, repeating this if the display size changes during
 preparation. Ready therefore covers the displayed surface without immediately
-submitting a redundant, unawaited frame. Preparation failures remain visible
-in the status and propagate to Python. The browser shows upstream stage progress.
+submitting a redundant, unawaited frame. The browser shows upstream stage progress.
+If the renderer reports a missing shader prewarm contract, preparation still
+waits for the displayed frame and returns `prewarm_complete=False` with the
+renderer message in `prewarm_warning`. Other preparation failures appear in the
+status and propagate to Python.
 Preparation and renderer reads/mutations, including picking and export, are
 serialized to protect the WASM chart. Choosing an inspector target immediately
 renders its controls from the last accepted settings without borrowing the chart;
