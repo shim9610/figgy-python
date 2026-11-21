@@ -1,6 +1,7 @@
 """Stable document addresses and grid placement, independent of GPU storage."""
 from collections.abc import Mapping
 import copy
+import json
 import math
 import uuid
 
@@ -102,8 +103,14 @@ def validate(state):
             raise ValueError('placement references an unknown grid slot')
         if len(set(placement.values())) != len(placement):
             raise ValueError('a subplot cannot occupy multiple slots')
-        if set(placement.values()) != {p['id'] for p in panels}:
-            raise ValueError('each subplot needs exactly one slot')
+        placed = set(placement.values())
+        panel_ids = {p['id'] for p in panels}
+        insets = {
+            p['id'] for p, subplot in zip(panels[1:], state['config'].get('subplots', []))
+            if subplot.get('anchor') is not None
+        }
+        if not panel_ids - insets <= placed <= panel_ids:
+            raise ValueError('each grid panel needs exactly one slot')
         dimensions = (len(layout['grid']), len(layout['grid'][0]))
         for key, count in zip(('row_weights', 'column_weights'), dimensions):
             weights = layout[key]
@@ -328,6 +335,9 @@ def place_grid(state):
     xs = positions(layout['column_weights'], width)
     ys = positions(layout['row_weights'], height)
     configs = panel_configs(state)
+    before = json.dumps(state['config']) if any(
+        p.get('anchor') for p in state['config'].get('subplots', [])
+    ) else None
     for slot, panel in layout['placement'].items():
         r0, c0, r1, c1 = slots[slot]
         rect = dict(x=round(xs[c0]), y=round(ys[r0]),
@@ -336,6 +346,9 @@ def place_grid(state):
         if min(rect['width'], rect['height']) < 100:
             raise ValueError('grid panels must be at least 100 logical pixels per dimension')
         configs[panel]['chart_area'] = rect
+    if before is not None:
+        from ._native import follow_insets_json
+        state['config'] = json.loads(follow_insets_json(before, json.dumps(state['config'])))
 
 
 class Subplot:
@@ -352,9 +365,50 @@ class Subplot:
 
     def set_rect(self, x, y, width, height):
         state = self.figure.get_settings()
-        panel_config(state, self.id)['chart_area'] = dict(x=x, y=y, width=width, height=height)
+        from ._native import reposition_panel_json
+        index = panel_index(state, self.id)
+        area = dict(x=x, y=y, width=width, height=height)
+        state['config'] = json.loads(reposition_panel_json(
+            json.dumps(state['config']), index, json.dumps(area)
+        ))
         state['identity']['layout'] = None
         self.figure.apply_settings(state)
+        return self
+
+    def set_text_scale(self, mode):
+        """Choose 'auto' for proportional text or 'fixed' for stored text sizes."""
+        mode = str(mode).title()
+        if mode not in ('Auto', 'Fixed'):
+            raise ValueError("text scale must be 'auto' or 'fixed'")
+        self.figure.edit_property('panel/' + self.id, 'Inset/Text scale', mode)
+        return self
+
+    def set_inset_marker(self, window=..., *, color=None, linewidth=None,
+                         connectors=None, visible=True):
+        """Mark an inset's range on the parent using data-space X and Y bounds."""
+        from .figure import _color
+
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            index = panel_index(state, self.id)
+            if not index:
+                raise ValueError("an inset marker belongs to a subplot")
+            subplot = state['config']['subplots'][index - 1]
+            if visible:
+                marker = subplot.setdefault('marker', {})
+                if window is not ...:
+                    marker['window'] = window
+                if connectors is not None:
+                    marker['connectors'] = bool(connectors)
+                if color is not None or linewidth is not None:
+                    line = marker.setdefault('line', {})
+                    if color is not None:
+                        line['color'] = _color(color)
+                    if linewidth is not None:
+                        line['width'] = float(linewidth) * self.figure.dpi / 72
+            else:
+                subplot.pop('marker', None)
+            self.figure.apply_settings(state)
         return self
 
 

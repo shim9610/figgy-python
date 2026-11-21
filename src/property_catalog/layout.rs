@@ -38,6 +38,53 @@ pub(super) fn fields(out: &mut Vec<Field>, state: &Value, node: &navigation::Nod
             "Line series and offsets",
         );
     }
+    if let Some(index) = object_subplot(node.layer) {
+        let path = format!("/config/subplots/{index}");
+        let subplot = state.pointer(&path).unwrap();
+        optional::choice(
+            out,
+            "Inset/Text scale",
+            &format!("{path}/text_scale"),
+            "Inset",
+            "Text scale",
+            subplot.get("text_scale").cloned().unwrap_or(json!("Auto")),
+            vec![json!("Auto"), json!("Fixed")],
+        );
+        let marker = subplot.get("marker");
+        field(
+            out,
+            json!(marker.is_some()),
+            &format!("{path}/marker"),
+            "Inset marker",
+            "enabled",
+            "Show magnified region",
+        );
+        if let Some(marker) = marker {
+            field(
+                out,
+                marker["window"].clone(),
+                &format!("{path}/marker/window"),
+                "Inset marker",
+                "window",
+                "Data bounds (null uses inset limits)",
+            );
+            walk(
+                out,
+                &marker["line"],
+                &format!("{path}/marker/line"),
+                "Inset marker",
+                "line",
+            );
+            field(
+                out,
+                marker["connectors"].clone(),
+                &format!("{path}/marker/connectors"),
+                "Inset marker",
+                "connectors",
+                "Show connectors",
+            );
+        }
+    }
     let path = bounded.map_or_else(
         || panel_path(node.layer),
         |kind| format!("/{kind}/decorations"),
@@ -85,13 +132,72 @@ pub(super) fn fields(out: &mut Vec<Field>, state: &Value, node: &navigation::Nod
     }
 }
 
+fn object_subplot(layer: renderer::LayerRef) -> Option<usize> {
+    match layer {
+        renderer::LayerRef::Subplot(i) => Some(i),
+        _ => None,
+    }
+}
+
+#[pyfunction]
+pub(crate) fn reposition_panel_json(config: &str, panel: usize, area: &str) -> PyResult<String> {
+    let mut config: Config = crate::parse(config)?;
+    reposition_panel(&mut config, panel, crate::parse(area)?)?;
+    serde_json::to_string(&config).map_err(runtime)
+}
+
+pub(super) fn reposition_panel(
+    config: &mut Config,
+    panel: usize,
+    area: renderer::layout::ChartArea,
+) -> PyResult<()> {
+    if panel == 0 {
+        let before = config.clone();
+        config.chart_area = area;
+        config.follow_parent_areas(&before, None);
+    } else {
+        config
+            .set_subplot_area(panel - 1, area)
+            .map_err(|e| invalid(format!("{e:?}")))?;
+    }
+    Ok(())
+}
+
+pub(super) fn carry_insets(result: &mut Value, before: &Config) -> PyResult<()> {
+    if !before.has_insets() {
+        return Ok(());
+    }
+    let mut config: Config = serde_json::from_value(result["config"].clone()).map_err(invalid)?;
+    config.follow_parent_areas(before, None);
+    result["config"] = serde_json::to_value(config).map_err(runtime)?;
+    Ok(())
+}
+
+#[pyfunction]
+pub(crate) fn follow_insets_json(before: &str, after: &str) -> PyResult<String> {
+    let before: Config = crate::parse(before)?;
+    let mut after: Config = crate::parse(after)?;
+    after.follow_parent_areas(&before, None);
+    serde_json::to_string(&after).map_err(runtime)
+}
+
 pub(super) fn apply(
     result: &mut Value,
     object: &Object,
     field: &Field,
     value: &Value,
 ) -> PyResult<bool> {
+    if field.id == "Inset marker/enabled" {
+        let index = object_subplot(object.layer).ok_or_else(|| invalid("inset panel changed"))?;
+        let marker = value
+            .as_bool()
+            .ok_or_else(|| invalid("marker visibility must be boolean"))?;
+        result["config"]["subplots"][index]["marker"] =
+            if marker { json!({}) } else { Value::Null };
+        return Ok(true);
+    }
     if field.group == "Figure size" {
+        let before: Config = serde_json::from_value(result["config"].clone()).map_err(invalid)?;
         let size = value
             .as_u64()
             .filter(|v| (100..=16384).contains(v))
@@ -103,6 +209,7 @@ pub(super) fn apply(
         if result["identity"]["layout"].is_object() {
             result["identity"]["layout"]["size"][dimension] = json!(size);
             reflow_grid(result)?;
+            return Ok(true);
         } else {
             let old = field.value.as_f64().unwrap();
             for config in std::iter::once(&mut result["config"]) {
@@ -121,6 +228,7 @@ pub(super) fn apply(
                 }
             }
         }
+        carry_insets(result, &before)?;
         return Ok(true);
     }
     if field.id == "Plot area/automatic" {
@@ -149,6 +257,7 @@ pub(super) fn apply(
         return Err(invalid("Plot dimensions must be positive"));
     }
     if field.path.starts_with("/config") {
+        let before: Config = serde_json::from_value(result["config"].clone()).map_err(invalid)?;
         let path = panel_path(object.layer);
         let mut config: Config =
             serde_json::from_value(result.pointer(&path).unwrap().clone()).map_err(invalid)?;
@@ -188,6 +297,7 @@ pub(super) fn apply(
             .as_object_mut()
             .unwrap()
             .remove("layout_state");
+        carry_insets(result, &before)?;
     } else {
         let (parent, key) = field.path.rsplit_once('/').unwrap();
         result.pointer_mut(parent).unwrap()[key] =

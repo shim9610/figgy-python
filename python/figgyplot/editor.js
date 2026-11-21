@@ -115,7 +115,7 @@ export function render({ model, el }) {
     properties();
     root.querySelector("[data-code]").value = current.code;
     const settings = root.querySelector("[data-settings]");
-    if (document.activeElement !== settings) settings.value = JSON.stringify(current.settings, null, 2);
+    if (document.activeElement !== settings) settings.value = current.settings_json ?? JSON.stringify(current.settings, null, 2);
     const image = model.get("image");
     if (image && image.byteLength !== 0 && image !== imageRef) {
       imageRef = image; const token = ++decode;
@@ -160,7 +160,7 @@ export function render({ model, el }) {
   root.querySelector("[data-fit]").addEventListener("click", () => dispatch({action: "fit"}));
   for(const action of ['undo','redo'])root.querySelector(`[data-${action}]`).addEventListener('click',()=>dispatch({action}));
   root.querySelector("[data-apply]").addEventListener("click", () => {
-    try { dispatch({action: "settings", settings: JSON.parse(root.querySelector("[data-settings]").value)}); }
+    try { dispatch({action: "settings", settings_json: root.querySelector("[data-settings]").value}); }
     catch (e) { error.textContent = e.message; }
   });
   root.querySelector("[data-copy]").addEventListener("click", async () => {

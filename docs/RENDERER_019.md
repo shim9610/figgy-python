@@ -4,7 +4,7 @@ This development integration awaits the official upstream 0.19 release and final
 package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/87c36bf98ee26b4af23471140f962d39cccbe4f4)
+[integration revision](https://github.com/shim9610/figgy/commit/c200678f874682b629564b0af7f732d3c84310fc)
 for renderer `0.19.0-beta.2` and model `0.13.0-beta.2`. Settings identify this
 integration as `0.19.0`. Rebuild the browser module with `scripts/build-wasm.sh`
 when changing the pin.
@@ -53,6 +53,10 @@ tasks = ax.range_bars([0, 1], [0, 3], [2, 6], orientation="horizontal")
 dependencies = ax.range_links(tasks, [(0, 1)], color="navy")
 dependencies.set(links=[{"from": 0, "to": 1, "exit_offset": 12}])
 ```
+
+An index outside the source bars raises `ValueError`. Copy Python preserves
+the destination's bar binding and dependency pairs. Matching pairs can receive
+the copied exit offset.
 
 Drag a dependency in either editor to move its exit along the value axis. The
 Properties panel also accepts the link list as JSON. The Python API expresses
@@ -104,9 +108,12 @@ restore renderer placement and automatic bends. `set_momentum(None)` clears a
 propagator momentum arrow. `get_position()` returns the
 stored override or `None`; it does not calculate a provisional layout.
 
-Individual propagators support stroke overrides. Energy strokes share the
-series style; use `levels.set_style(level={...}, transition={...})` for those
-public model fields. These methods do not infer atomic or particle physics.
+Individual propagators support stroke overrides. Use
+`levels.transition("line-id").set_color("red")` for one energy transition and
+`levels.set_wavelength_colors("angstrom")` to use wavelength colors across
+the diagram. Pass the unit used by the source wavelengths. The editor can
+enable either color mode and change its settings. Transition line widths use
+the diagram's series style.
 
 `read_nist` reads NIST Atomic Spectra Database CSV files, CSV text, text streams
 or tables. It preserves the exported energy/wavelength units, qualifiers,
@@ -159,6 +166,14 @@ Python, or enter `null` in the inspector.
 
 The tick-label inspector exposes calendar steps, the start weekday, period
 labels, and relative or custom labels when the number format is **Timestamp**.
+Edit the origin as a signed integer in the formatter's selected unit.
+
+`ax.inset_axes([.55, .3, .4, .45], id="zoom")` adds a panel in the parent
+plot. Bounds are left, bottom, width and height in axes fractions. The inset
+keeps that placement when the parent plot moves or resizes. Use
+`zoom.subplot.set_text_scale("fixed")` to retain the stored text size and
+`zoom.subplot.set_inset_marker()` to indicate the magnified data range and draw
+connectors. Both options are available in the inset's properties.
 
 ## PNG, SVG and PDF
 
@@ -219,6 +234,8 @@ construction (`chart_add`), inspection and editing (`figure_get`, `figure_patch`
 themes and layout (`figure_theme`, `figure_layout`), file output (`figure_export`)
 and resource release (`figure_close`). Chart construction uses the Python method
 arguments and validation. Tools do not evaluate arbitrary Python code.
+Use `figure_inset` to add an inset, `figure_editor_properties` to discover an
+object's editable fields, and `figure_edit_property` to apply one of them.
 
 ## Named category-chart editing
 

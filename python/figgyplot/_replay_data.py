@@ -1,6 +1,7 @@
 """Protect destination scientific data when replaying exported appearance."""
 
 import copy
+from collections import deque
 
 
 def _bindings(spec):
@@ -80,7 +81,8 @@ def preserve_data(source, destination):
                 body[key] = _records(
                     body.get(key, []),
                     old_body.get(key, []),
-                    visual=("label", "label_offset", "x_offset"),
+                    visual=("label", "label_offset", "x_offset", "color") if key == "transitions"
+                    else ("label", "label_offset", "x_offset"),
                     topology=("column", "lower", "upper", "first", "last"),
                 )
             if body.get("source") != old_body.get("source"):
@@ -107,6 +109,25 @@ def preserve_data(source, destination):
                 ),
                 topology=("from", "to", "particle"),
             )
+        elif kind == "RangeLinks":
+            # Offsets style matched links. The destination owns its bar binding
+            # and endpoints, including links without a counterpart in the source.
+            offsets = {}
+            if body["bars"] == old_body["bars"]:
+                for link in body.get("links", []):
+                    offsets.setdefault((link["from"], link["to"]), deque()).append(
+                        link.get("exit_offset")
+                    )
+            body["bars"] = old_body["bars"]
+            body["links"] = copy.deepcopy(old_body.get("links", []))
+            for link in body["links"]:
+                matches = offsets.get((link["from"], link["to"]))
+                if matches:
+                    offset = matches.popleft()
+                    if offset is None:
+                        link.pop("exit_offset", None)
+                    else:
+                        link["exit_offset"] = offset
         elif _bindings(spec) != _bindings(current):
             raise ValueError(
                 "appearance replay requires matching source column bindings"

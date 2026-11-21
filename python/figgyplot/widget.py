@@ -10,6 +10,26 @@ from .editor import EditorSession
 from .figure import _display_texts
 
 
+def _calendar_origins(value, encode):
+    """Carry timestamp i64 values across the JavaScript link as decimal text."""
+    if isinstance(value, list):
+        return [_calendar_origins(item, encode) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {key: _calendar_origins(item, encode) for key, item in value.items()}
+    timestamp = result.get("Timestamp")
+    if isinstance(timestamp, dict) and isinstance(timestamp.get("label"), dict):
+        for mode in ("Relative", "Custom"):
+            label = timestamp["label"].get(mode)
+            if isinstance(label, dict):
+                origin = label.get("origin")
+                if encode and type(origin) is int:
+                    label["origin"] = str(origin)
+                elif not encode and isinstance(origin, str):
+                    label["origin"] = int(origin, 10)
+    return result
+
+
 class PNGFigureWidget(anywidget.AnyWidget):
     _esm = Path(__file__).with_name("editor.js")
     _css = Path(__file__).with_name("editor.css")
@@ -29,7 +49,8 @@ class PNGFigureWidget(anywidget.AnyWidget):
         if self._handling:
             return
         with self.hold_sync():
-            self.state = self._editor.snapshot()
+            state = self._editor.snapshot()
+            self.state = dict(state, settings_json=json.dumps(state["settings"], indent=2))
             self.image = self._editor.image
 
     def _command(self, widget, content, buffers):
@@ -37,7 +58,7 @@ class PNGFigureWidget(anywidget.AnyWidget):
         try:
             state = self._editor.dispatch(content)
             with self.hold_sync():
-                self.state = state
+                self.state = dict(state, settings_json=json.dumps(state["settings"], indent=2))
                 self.image = self._editor.image
         finally:
             self._handling = False
@@ -125,7 +146,7 @@ class FigureWidget(anywidget.AnyWidget):
             from ._codegen import editor_code_payload
             from ._native import object_outline_json, bounded_view_json
             catalog=self.figure._editor_catalog_transport()
-            self.state = {"settings": settings, "revision": self.figure.revision, "dpi": self.figure.dpi,
+            self.state = {"settings": _calendar_origins(settings, encode=True), "revision": self.figure.revision, "dpi": self.figure.dpi,
                           **editor_code_payload(settings,self.figure._default_config,self.figure.dpi),
                           "edit_history": self.figure.edit_history,
                           "property_catalog": catalog['objects'],
@@ -209,7 +230,7 @@ class FigureWidget(anywidget.AnyWidget):
             self._handling = True
             error = ""
             try:
-                self.figure.apply_settings(content["settings"], expected_revision=content["revision"])
+                self.figure.apply_settings(_calendar_origins(content["settings"], encode=False), expected_revision=content["revision"])
             except Exception as exc:
                 error = str(exc)
             finally:
@@ -218,7 +239,7 @@ class FigureWidget(anywidget.AnyWidget):
             self.send({"action": "ack", "client": content.get("client"), "sequence": content["sequence"], "state": self.state, "error": error})
         elif action == "rejected":
             if content["revision"] == self.figure.revision:
-                self.figure.apply_settings(content["settings"], expected_revision=content["revision"])
+                self.figure.apply_settings(_calendar_origins(content["settings"], encode=False), expected_revision=content["revision"])
             self.browser_info = dict(self.browser_info, settings_error=content["error"])
         elif action == "result":
             pending = self._pending.pop(content.get("id"), None)

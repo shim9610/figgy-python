@@ -9,7 +9,7 @@ import inspect
 import json
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from .figure import Figure
 
@@ -212,6 +212,27 @@ def figure_layout(id: str, grid: Optional[list[list[str]]] = None):
     return fig.get_settings()
 
 
+def figure_inset(id: str, bounds: list[float], panel: Optional[str] = None,
+                 inset_id: Optional[str] = None):
+    """Create an anchored inset using left, bottom, width and height in parent axes fractions."""
+    fig = _figure(id)
+    parent = fig.subplots[panel].axes if panel is not None else fig.axes[0]
+    inset = parent.inset_axes(bounds, id=inset_id)
+    return dict(panel=inset.subplot_id, settings=fig.get_settings())
+
+
+def figure_editor_properties(id: str, object_id: Optional[str] = None):
+    """List editable objects or describe one object's typed editor properties."""
+    return _figure(id).editor_properties(object_id)
+
+
+def figure_edit_property(id: str, object_id: str, property_id: str, value: Any):
+    """Apply a typed editor property, such as inset marker visibility or text scale."""
+    fig = _figure(id)
+    fig.edit_property(object_id, property_id, value)
+    return fig.get_settings()
+
+
 def figure_export(id: str, path: str, format: Optional[str] = None, scale: float = 1.0):
     """Export the complete document to a local PNG, SVG or PDF file."""
     fig = _figure(id)
@@ -245,6 +266,9 @@ def create_server():
         figure_patch,
         figure_theme,
         figure_layout,
+        figure_inset,
+        figure_editor_properties,
+        figure_edit_property,
         figure_export,
         figure_close,
     ):

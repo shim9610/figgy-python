@@ -26,6 +26,13 @@ pub(super) fn expanded(kind: &str, body: &Value, rich: &Value) -> Value {
         }
     }
     fill(&mut out, &defaults);
+    if kind == "EnergyLevels"
+        && out["style"]["transition"]
+            .get("color_by_wavelength")
+            .is_none()
+    {
+        out["style"]["transition"]["color_by_wavelength"] = Value::Null;
+    }
     let momentum: renderer::feynman::MomentumArrow =
         serde_json::from_value(json!({"label": rich})).unwrap();
     let momentum_defaults = json!({"side":momentum.side,"reversed":momentum.reversed,"label_offset":momentum.label_offset});
@@ -63,6 +70,9 @@ pub(super) fn expanded(kind: &str, body: &Value, rich: &Value) -> Value {
                     if row["momentum"].is_object() {
                         fill(&mut row["momentum"], &momentum_defaults);
                     }
+                }
+                if kind == "EnergyLevels" && list == "transitions" && row.get("color").is_none() {
+                    row["color"] = Value::Null;
                 }
                 if row.get("label").is_none_or(Value::is_null) {
                     let mut label = rich.clone();
@@ -132,6 +142,54 @@ pub(super) fn fields(
     group: &str,
     relative: &str,
 ) -> bool {
+    if energy_optional(path) {
+        let spectral = path.ends_with("/color_by_wavelength");
+        field(
+            out,
+            json!(!value.is_null()),
+            path,
+            group,
+            &format!("{relative}/enabled"),
+            if spectral {
+                "Color arrows by wavelength"
+            } else {
+                "Override transition color"
+            },
+        );
+        if !value.is_null() {
+            if spectral {
+                optional::choice(
+                    out,
+                    &format!("{group}/{relative}/unit"),
+                    &format!("{path}/unit"),
+                    group,
+                    "Wavelength unit",
+                    value["unit"].clone(),
+                    vec![json!("Nm"), json!("Angstrom"), json!("Um")],
+                );
+                for region in ["ultraviolet", "infrared"] {
+                    field(
+                        out,
+                        value[region].clone(),
+                        &format!("{path}/{region}"),
+                        group,
+                        &format!("{relative}/{region}"),
+                        &human(region),
+                    );
+                }
+            } else {
+                field(
+                    out,
+                    value.clone(),
+                    path,
+                    group,
+                    relative,
+                    "Transition color",
+                );
+            }
+        }
+        return true;
+    }
     if !path.contains("/Feynman/") {
         return false;
     }
@@ -222,12 +280,53 @@ pub(super) fn fields(
     true
 }
 
+fn energy_optional(path: &str) -> bool {
+    path.ends_with("/EnergyLevels/style/transition/color_by_wavelength")
+        || path
+            .split_once("/EnergyLevels/transitions/")
+            .is_some_and(|(_, tail)| tail.split_once('/').is_some_and(|(_, key)| key == "color"))
+}
+
+#[pyfunction]
+pub(crate) fn spectral_colors_json() -> PyResult<String> {
+    serde_json::to_string(&renderer::energy_levels::SpectralColors::default()).map_err(runtime)
+}
+
 pub(super) fn apply(
     state: &mut Value,
     field: &Field,
     value: &Value,
     layer: renderer::LayerRef,
 ) -> PyResult<bool> {
+    if field.id.ends_with("/enabled") && energy_optional(&field.path) {
+        prepare_edit(state, &field.path, layer)?;
+        let (parent, key) = field.path.rsplit_once('/').unwrap();
+        let next = if !value
+            .as_bool()
+            .ok_or_else(|| invalid("override must be boolean"))?
+        {
+            Value::Null
+        } else if key == "color_by_wavelength" {
+            json!(renderer::energy_levels::SpectralColors::default())
+        } else {
+            let (root, _) = field.path.split_once("/transitions/").unwrap();
+            state
+                .pointer(&format!("{root}/style/transition/color"))
+                .cloned()
+                .unwrap_or_else(|| {
+                    json!(
+                        renderer::energy_levels::EnergyLevelSeries::default()
+                            .style
+                            .transition
+                            .color
+                    )
+                })
+        };
+        state
+            .pointer_mut(parent)
+            .ok_or_else(|| invalid("transition style changed"))?[key] = next;
+        return Ok(true);
+    }
     if !field.path.contains("/Feynman/") {
         return Ok(false);
     }

@@ -2,8 +2,8 @@
 //! Descriptions are derived from accepted SSOT; they are not a second model.
 use super::*;
 use renderer::annotation::AnnotationSpace;
-mod diagrams;
-mod layout;
+pub(crate) mod diagrams;
+pub(crate) mod layout;
 mod links;
 mod optional;
 
@@ -227,12 +227,26 @@ fn json_field(path: &str) -> bool {
         "/RangeLinks/links",
         "/Timestamp/label/Custom/labels",
         "/line_offsets",
+        "/marker/window",
     ]
     .iter()
     .any(|suffix| path.ends_with(suffix))
 }
 
-fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: &str, label: &str) {
+fn field(
+    out: &mut Vec<Field>,
+    mut value: Value,
+    path: &str,
+    group: &str,
+    relative: &str,
+    label: &str,
+) {
+    if path.contains("/Timestamp/label/")
+        && path.ends_with("/origin")
+        && let Some(origin) = value.as_i64()
+    {
+        value = json!(origin.to_string());
+    }
     let options = if value.is_string() {
         choices(path, &value)
     } else {
@@ -1327,11 +1341,11 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                         label: format!("Chart in slot {slot}"),
                         kind: "choice".into(),
                         value: value.clone(),
-                        choices: state["identity"]["panels"]
-                            .as_array()
+                        choices: layout["placement"]
+                            .as_object()
                             .unwrap()
-                            .iter()
-                            .map(|v| v["id"].clone())
+                            .values()
+                            .cloned()
                             .collect(),
                         integer: false,
                     });
@@ -1757,7 +1771,13 @@ pub(crate) fn apply(
     }
     diagrams::prepare_edit(&mut result, &field.path, object.layer)?;
     let (parent, key) = field.path.rsplit_once('/').unwrap();
-    let value = if field.id.starts_with("Coordinates/") && field.id != "Coordinates/axis" {
+    let value = if field.path.contains("/Timestamp/label/") && key == "origin" {
+        let origin = value
+            .as_i64()
+            .or_else(|| value.as_str()?.parse().ok())
+            .ok_or_else(|| invalid("calendar origin must be a signed 64-bit integer"))?;
+        json!(origin)
+    } else if field.id.starts_with("Coordinates/") && field.id != "Coordinates/axis" {
         crate::annotation_edit::convert(
             state,
             result
@@ -1971,6 +1991,17 @@ pub(crate) fn apply(
     }
     if field.group == "Panel geometry" {
         result["identity"]["layout"] = Value::Null;
+        if parent == format!("{}/chart_area", panel_path(object.layer)) {
+            let area =
+                serde_json::from_value(result.pointer(parent).unwrap().clone()).map_err(invalid)?;
+            let mut config = state.config.clone();
+            layout::reposition_panel(
+                &mut config,
+                crate::interaction::panel_index(object.layer),
+                area,
+            )?;
+            result["config"] = serde_json::to_value(config).map_err(runtime)?;
+        }
     }
     if field.path.starts_with("/radial/")
         && matches!(
@@ -2017,6 +2048,7 @@ fn ensure_colorbar(
     Ok(())
 }
 fn reflow_grid(state: &mut Value) -> PyResult<()> {
+    let before: Config = serde_json::from_value(state["config"].clone()).map_err(invalid)?;
     let layout = &state["identity"]["layout"];
     let gap = layout["gap"]
         .as_f64()
@@ -2108,7 +2140,7 @@ fn reflow_grid(state: &mut Value) -> PyResult<()> {
         };
         *state.pointer_mut(&path).unwrap() = rect;
     }
-    Ok(())
+    layout::carry_insets(state, &before)
 }
 #[pyfunction]
 #[pyo3(signature=(settings,object_id=None,compact=false))]

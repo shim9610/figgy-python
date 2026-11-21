@@ -110,6 +110,33 @@ class DiagramArtist(Artist):
 
         return self._edit_diagram(edit)
 
+    def set_wavelength_colors(self, unit="nm", *, ultraviolet=None, infrared=None):
+        """Color transition arrows by wavelength. Pass None to restore series colors."""
+        from ._native import spectral_colors_json
+
+        def edit(body, tag):
+            if tag != "EnergyLevels":
+                raise AttributeError("wavelength colors require an energy-level diagram")
+            transition = body.setdefault("style", {}).setdefault("transition", {})
+            if unit is None:
+                transition.pop("color_by_wavelength", None)
+                return
+            try:
+                wire = {
+                    "nm": "Nm", "angstrom": "Angstrom", "å": "Angstrom",
+                    "um": "Um", "µm": "Um", "μm": "Um",
+                }[unit.strip().lower()]
+            except (AttributeError, KeyError):
+                raise ValueError("wavelength unit must be nm, angstrom or um") from None
+            colors = copy.deepcopy(transition.get("color_by_wavelength") or json.loads(spectral_colors_json()))
+            colors["unit"] = wire
+            for key, value in (("ultraviolet", ultraviolet), ("infrared", infrared)):
+                if value is not None:
+                    colors[key] = _color(value)
+            transition["color_by_wavelength"] = colors
+
+        return self._edit_diagram(edit)
+
     def set(self, **properties):
         properties = {
             dict(c="color", lw="linewidth").get(k, k): v for k, v in properties.items()
@@ -397,10 +424,10 @@ class DiagramElement:
         return self._edit(edit)
 
     def set_style(self, *, color=..., linewidth=...):
-        if self.collection != "propagators":
-            raise AttributeError(
-                "individual stroke overrides require a propagator; energy strokes use diagram.set_style()"
-            )
+        if self.collection not in ("propagators", "transitions"):
+            raise AttributeError("stroke overrides require a transition or propagator")
+        if self.collection == "transitions" and linewidth is not ...:
+            raise AttributeError("transition widths belong to diagram.set_style()")
 
         def edit(row, body, tag):
             if color is not ...:
@@ -423,7 +450,7 @@ class DiagramElement:
         return self.set_style(linewidth=linewidth)
 
     def reset_style(self):
-        return self.set_style(color=None, linewidth=None)
+        return self.set_color(None) if self.collection == "transitions" else self.set_style(color=None, linewidth=None)
 
     def select(self, *, label=False):
         with self.artist.figure._lock:

@@ -146,6 +146,40 @@ pub(super) fn validate_columns(series: &[SeriesConfig], names: &HashSet<String>)
     Ok(())
 }
 
+pub(super) fn validate_range_link_rows(
+    series: &[SeriesConfig],
+    count: impl Fn(&str) -> Option<usize>,
+) -> PyResult<()> {
+    for spec in series {
+        let Some(links) = spec.render_type.range_links() else {
+            continue;
+        };
+        let Some(bars) = series.iter().find(|s| s.series_id == links.bars) else {
+            return Err(invalid(format!("unknown range bar series: {}", links.bars)));
+        };
+        let Some(range) = bars.render_type.range_bars() else {
+            return Err(invalid(format!("{} is not a range bar series", links.bars)));
+        };
+        let Some(rows) = [&bars.x_column, &bars.y_column, &range.start]
+            .into_iter()
+            .map(|id| count(id))
+            .collect::<Option<Vec<_>>>()
+            .and_then(|counts| counts.into_iter().min())
+        else {
+            continue;
+        };
+        for link in &links.links {
+            if link.from as usize >= rows || link.to as usize >= rows {
+                return Err(invalid(format!(
+                    "range link {} → {} is outside series {} ({} rows)",
+                    link.from, link.to, links.bars, rows,
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Identity {
@@ -297,7 +331,11 @@ pub(super) fn validate_identity(
             }
         }
         let placed: HashSet<_> = layout.placement.values().map(String::as_str).collect();
-        if placed != panel_ids
+        let missing_slot = meta.panels.iter().enumerate().any(|(i, p)| {
+            !placed.contains(p.id.as_str()) && (i == 0 || config.subplots[i - 1].anchor.is_none())
+        });
+        if missing_slot
+            || !placed.is_subset(&panel_ids)
             || placed.len() != layout.placement.len()
             || layout
                 .placement

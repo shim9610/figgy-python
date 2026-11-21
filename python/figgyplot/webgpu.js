@@ -12,6 +12,16 @@ async function loadKernel(model) {
   return kernelModule;
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
+// Only timestamp labels have an integer "origin" in the renderer document.
+// Match complete JSON strings so quoted user text is never rewritten.
+const calendarOriginTokens=/"origin"(\s*:\s*)("-?\d+"|-?\d+(?=\s*[,}]))|"(?:\\.|[^"\\])*"/g;
+function calendarOriginWire(json, quoted){
+  return json.replace(calendarOriginTokens,(token,separator,origin)=>{
+    if(origin===undefined)return token;
+    const digits=origin.startsWith('"')?origin.slice(1,-1):origin;
+    return '"origin"'+separator+(quoted?'"'+digits+'"':digits);
+  });
+}
 const clone = value => JSON.parse(JSON.stringify(value));
 // Property retries compare actual before/after SSOT leaves, never guessed setter effects.
 const owns=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
@@ -1234,7 +1244,7 @@ export function render({model,el}) {
     enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
       dirty=true;commit();});
   });
-  root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
+  root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(calendarOriginWire(root.querySelector('[data-settings]').value,true)));commit();}));
   root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
   root.querySelector('[data-close-properties]').addEventListener('click',()=>showProperties(false));
   root.querySelector('[data-select]').addEventListener('click',()=>{cancelDrawing();layoutMode(false);});
@@ -1417,6 +1427,12 @@ export function render({model,el}) {
     canvas.width=documentWidth;canvas.height=documentHeight;
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
     chart=kind?await module.FiggyBoundedChart.create(canvas,kind,JSON.stringify(local[kind]),local.config.chart_area.width,local.config.chart_area.height):await module.FiggyChart.create(canvas);if(!kind)chart.set_pool_auto_growth(true);
+    if(!kind){
+      const getConfig=chart.get_config.bind(chart),setConfig=chart.set_config.bind(chart),setState=chart.set_host_state.bind(chart);
+      chart.get_config=()=>calendarOriginWire(getConfig(),true);
+      chart.set_config=config=>setConfig(calendarOriginWire(config,false));
+      chart.set_host_state=(config,series)=>setState(calendarOriginWire(config,false),series);
+    }
     if(disposed)return;
     const manifest=model.get('manifest'),buffers=model.get('columns');
     if(manifest.length!==buffers.length)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
@@ -1433,8 +1449,20 @@ export function render({model,el}) {
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
     for(const [id,entry]of composites){if(entry.kind==='record')chart.register_record(id,entry.fields);else if(entry.kind==='ragged')chart.register_ragged(id,entry.fields.values,entry.fields.offsets);else if(entry.kind==='triangles')chart.register_triangles(id,entry.fields.indices);}
-    if(!kind){chart.set_host_state(JSON.stringify(local.config),JSON.stringify(local.series));
-    clearColor(local.background);}
+    if(!kind){
+      const config=JSON.stringify(local.config);
+      if(local.series.some(series=>series.render_type.RangeLinks)){
+        // A compiled link must never reach an incomplete frame without its
+        // bars. Give the bar pipelines a chance to finish before adding links.
+        const base=clone(local.config);
+        delete base.picked_data;
+        const withoutLinks=local.series.filter(series=>!series.render_type.RangeLinks);
+        chart.set_host_state(JSON.stringify(base),JSON.stringify(withoutLinks));
+        await chart.prepare_data_pick();
+      }
+      chart.set_host_state(config,JSON.stringify(local.series));
+      clearColor(local.background);
+    }
     properties();
     // Ready covers the displayed surface, including a resize during compilation.
     // Do not immediately submit a second, unawaited frame at another resolution.

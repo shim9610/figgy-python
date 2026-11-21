@@ -537,3 +537,89 @@ def test_calendar_steps_and_labels_are_editable_in_the_typed_catalog(backend):
         assert timestamp().get('step') is None
         assert not timestamp().get('period_labels')
         assert timestamp().get('label', 'Auto') == 'Auto'
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_range_link_validation_and_appearance_replay_preserve_destination_topology(backend):
+    def setup(fig, links):
+        ax = fig.axes[0]
+        ax.range_bars([0, 1, 2], [0, 3, 5], [2, 4, 7], orientation='horizontal', id='tasks')
+        return ax, ax.range_links('tasks', links, id='deps')
+
+    def rows(fig):
+        return fig.get_settings()['series'][-1]['render_type']['RangeLinks']['links']
+
+    with fg.Figure(backend=backend, dpi=72) as source, fg.Figure(backend=backend, dpi=72) as destination:
+        setup(source, [{'from': 0, 'to': 1, 'exit_offset': 12}, (1, 0)])
+        ax, links = setup(destination, [(1, 2), (0, 1)])
+        before = destination.get_settings()
+        with pytest.raises(ValueError, match='outside series tasks'):
+            ax.range_links('tasks', [(0, 42)], id='invalid')
+        with pytest.raises(ValueError, match='outside series tasks'):
+            links.set(links=[(42, 0)])
+        with pytest.raises(ValueError, match='outside series tasks'):
+            edit(destination, 'deps', 'Appearance/links', [{'from': 0, 'to': 42}])
+        assert destination.get_settings() == before
+        exec(source.to_code(), {'fig': destination})
+        assert rows(destination) == [{'from': 1, 'to': 2}, {'from': 0, 'to': 1, 'exit_offset': 12}]
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_anchored_inset_can_share_a_grid_and_follow_parent_edits(backend):
+    with fg.Figure(backend=backend, figsize=(12, 7), grid=[['a', 'b']]) as fig:
+        ax = fig.subplots['a'].axes
+        ax.plot([0, 1], [0, 1])
+        inset = ax.inset_axes([.35, .15, .55, .55], id='zoom')
+        inset.plot([0, 1], [0, 1])
+        inset.subplot.set_text_scale('fixed').set_inset_marker(linewidth=2)
+        owner = 'panel/zoom'
+        fig.edit_property(owner, 'Inset marker/window', [[.1, .8], [.2, .8]])
+        fig.edit_property(owner, 'Inset marker/connectors', False)
+
+        def model():
+            return fig.get_settings()['config']['subplots'][-1]
+
+        before = model()
+        assert before['text_scale'] == 'Fixed'
+        assert before['marker']['window'] == [[.1, .8], [.2, .8]]
+        assert not before['marker']['connectors']
+        left, bottom, width, height = ax.get_position().bounds
+        ax.set_position([left + .015, bottom, width - .03, height])
+        assert model()['anchor'] == before['anchor']
+        assert model()['config']['chart_area'] != before['config']['chart_area']
+        previously = model()['config']['chart_area']
+        fig.set_layout([['a', 'b']], column_weights=[3, 2])
+        assert model()['config']['chart_area'] != previously
+        assert fig.subplots.placement == {'a': 'a', 'b': 'b'}
+        current = model()
+        moved_x = current["config"]["chart_area"]["x"] - 14
+        fig.edit_property(owner, "Panel geometry/x", moved_x)
+        assert model()["config"]["chart_area"]["x"] == moved_x
+        assert model()["anchor"]["frame"] != current["anchor"]["frame"]
+        if backend == 'native':
+            assert fig.to_png().startswith(b'\x89PNG')
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_transition_color_and_wavelength_controls_start_disabled(backend):
+    with fg.Figure(backend=backend) as fig:
+        diagram = fig.axes[0].energy_levels(
+            [{'id': 'g', 'column': 'S', 'energy': 0}, {'id': 'e', 'column': 'P', 'energy': 3}],
+            transitions=[{'id': 't', 'lower': 'g', 'upper': 'e', 'wavelength': 530}],
+            id='spectra',
+        )
+        transition = diagram.transition('t')
+        transition.set_color('red')
+        assert transition.get()['color']['r'] == 1
+        transition.reset_style()
+        assert 'color' not in transition.get()
+        diagram.set_wavelength_colors('angstrom')
+        body = fig.get_settings()['series'][0]['render_type']['EnergyLevels']
+        assert body['style']['transition']['color_by_wavelength']['unit'] == 'Angstrom'
+        diagram.set_wavelength_colors(None)
+        edit(fig, 'spectra', 'Appearance/style/transition/color_by_wavelength/enabled', True)
+        edit(fig, 'spectra', 'Appearance/style/transition/color_by_wavelength/unit', 'Um')
+        edit(fig, 'spectra', 'Appearance/transitions/0/color/enabled', True)
+        assert transition.get()['color']['a'] == 1
+        edit(fig, 'spectra', 'Appearance/transitions/0/color/enabled', False)
+        assert 'color' not in transition.get()

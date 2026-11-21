@@ -8,6 +8,7 @@ pub struct NotebookFigure {
     chart: Chart,
     series: Vec<SeriesConfig>,
     columns: HashMap<String, renderer::chart::FitExtent>,
+    column_lengths: HashMap<String, usize>,
     edge_samples: HashMap<String, renderer::chart::FitExtent>,
     center_cells: HashMap<String, renderer::chart::FitExtent>,
     revision: u64,
@@ -38,6 +39,7 @@ impl NotebookFigure {
             chart: Chart::new(config),
             series: vec![],
             columns: HashMap::new(),
+            column_lengths: HashMap::new(),
             edge_samples: HashMap::new(),
             center_cells: HashMap::new(),
             revision: 0,
@@ -60,16 +62,28 @@ impl NotebookFigure {
         if self.columns.contains_key(id) {
             return Err(invalid("column ID already exists"));
         }
-        let (ext, samples, cells) = if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
-            let a = a.as_slice().map_err(invalid)?;
-            (extent(a)?, edge_sample_extent(a), center_cell_extent(a))
-        } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
-            let a = a.as_slice().map_err(invalid)?;
-            (extent(a)?, edge_sample_extent(a), center_cell_extent(a))
-        } else {
-            return Err(invalid("expected contiguous f32/f64"));
-        };
+        let (ext, samples, cells, count) =
+            if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
+                let a = a.as_slice().map_err(invalid)?;
+                (
+                    extent(a)?,
+                    edge_sample_extent(a),
+                    center_cell_extent(a),
+                    a.len(),
+                )
+            } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
+                let a = a.as_slice().map_err(invalid)?;
+                (
+                    extent(a)?,
+                    edge_sample_extent(a),
+                    center_cell_extent(a),
+                    a.len(),
+                )
+            } else {
+                return Err(invalid("expected contiguous f32/f64"));
+            };
         self.columns.insert(id.into(), ext);
+        self.column_lengths.insert(id.into(), count);
         self.edge_samples.insert(id.into(), samples);
         self.center_cells.insert(id.into(), cells);
         Ok(())
@@ -92,11 +106,12 @@ impl NotebookFigure {
         self.columns.insert(id.into(), extent);
         self.edge_samples.insert(id.into(), extent);
         self.center_cells.insert(id.into(), extent);
-        let _ = count;
+        self.column_lengths.insert(id.into(), count);
         Ok(())
     }
     fn remove_column(&mut self, id: &str) {
         self.columns.remove(id);
+        self.column_lengths.remove(id);
         self.edge_samples.remove(id);
         self.center_cells.remove(id);
     }
@@ -117,7 +132,11 @@ impl NotebookFigure {
             return Err(invalid("unregistered source columns"));
         }
         self.series.push(s);
-        if let Err(error) = validate_draw_style(self.chart.config(), &self.series) {
+        if let Err(error) = validate_draw_style(self.chart.config(), &self.series).and_then(|()| {
+            identity::validate_range_link_rows(&self.series, |id| {
+                self.column_lengths.get(id).copied()
+            })
+        }) {
             self.series.pop();
             return Err(error);
         }
@@ -275,6 +294,7 @@ impl NotebookFigure {
         }
         validate_draw_style(&s.config, &s.series)?;
         validate_columns(&s.series, &self.columns.keys().cloned().collect())?;
+        identity::validate_range_link_rows(&s.series, |id| self.column_lengths.get(id).copied())?;
         for series in &s.series {
             validate_model_numbers(series, "series")?;
         }

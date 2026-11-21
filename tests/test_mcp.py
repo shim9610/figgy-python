@@ -40,6 +40,9 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                     "chart_add",
                     "figure_theme",
                     "figure_layout",
+                    "figure_inset",
+                    "figure_editor_properties",
+                    "figure_edit_property",
                     "figure_export",
                     "figure_close",
                 } <= {t.name for t in listing.tools}
@@ -60,6 +63,13 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                 links = await call("chart_add", {"id": id, "kind": "range_links",
                                                  "args": ["tasks", [[0, 1]]], "options": {"id": "dependencies"}})
                 assert links["settings"]["series"][-1]["render_type"]["RangeLinks"]["links"] == [{"from": 0, "to": 1}]
+                inset = await call("figure_inset", {"id": id, "bounds": [.4, .2, .5, .5], "inset_id": "zoom"})
+                assert inset["panel"] == "zoom"
+                fields = await call("figure_editor_properties", {"id": id, "object_id": "panel/zoom"})
+                assert any(field["id"] == "Inset/Text scale" for field in fields["fields"])
+                edited = await call("figure_edit_property", {"id": id, "object_id": "panel/zoom",
+                                                              "property_id": "Inset/Text scale", "value": "Fixed"})
+                assert edited["config"]["subplots"][0]["text_scale"] == "Fixed"
                 await call("figure_close", {"id": id})
                 made = await call("figure_create", {"figsize": [4, 3], "dpi": 72})
                 id = made["id"]

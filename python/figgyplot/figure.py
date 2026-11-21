@@ -328,7 +328,9 @@ class Figure(FigureMethods):
                 # The empty initial panel may take the first explicit identity.
                 old[0]['id'] = ids[0]
                 old_ids = [ids[0]]
-            if set(old_ids) - set(ids):
+            inset_ids = {p['id'] for p, subplot in zip(old[1:], state['config'].get('subplots', []))
+                         if subplot.get('anchor') is not None}
+            if set(old_ids) - set(ids) - inset_ids:
                 raise ValueError('layout cannot silently remove existing subplots')
             for panel_id in ids:
                 if panel_id in old_ids:

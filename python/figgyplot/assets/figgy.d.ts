@@ -2241,7 +2241,9 @@ export class FiggyChart {
      * anywhere, inside the parent chart (an inset), over another panel or
      * beside every one. The subplot's plot must fit in the frame; an error
      * leaves the document unchanged. A pointer drag on the frame does the
-     * same on the base layer.
+     * same on the base layer. The insets nested in this subplot's plot
+     * move with it, and an inset follows later moves and resizes of the
+     * plot it is nested in from where it was put (#392).
      * JS: `chart.set_subplot_area(0, 120, 80, 320, 240);`
      */
     set_subplot_area(index: number, x: number, y: number, width: number, height: number): void;

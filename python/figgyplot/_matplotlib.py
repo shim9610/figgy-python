@@ -1393,13 +1393,54 @@ class AxesMethods:
             raise ValueError("invalid panel position")
         state = self.figure.get_settings()
         w, h = canvas_size(state)
-        self._config(state)["chart_area"] = dict(
+        from ._document import panel_index
+        from ._native import reposition_panel_json
+        rect = dict(
             x=round(left * w),
             y=round((1 - bottom - height) * h),
             width=round(width * w),
             height=round(height * h),
         )
+        state["config"] = json.loads(reposition_panel_json(
+            json.dumps(state["config"]), panel_index(state, self.subplot_id), json.dumps(rect)
+        ))
         self.figure.apply_settings(state)
+
+    def inset_axes(self, bounds, *, id=None):
+        """Add an inset using (left, bottom, width, height) in axes fractions."""
+        from . import _document, _style_runtime
+
+        left, bottom, width, height = map(float, bounds)
+        if not (0 <= left < left + width <= 1 and 0 <= bottom < bottom + height <= 1):
+            raise ValueError("inset bounds must fit within the parent axes")
+        fig = self.figure
+        with fig._lock:
+            fig._require_cartesian()
+            state = fig.get_settings()
+            if self.overlay_id:
+                raise ValueError("add insets to the primary axes of a panel")
+            parent = _document.panel_index(state, self.subplot_id)
+            x, y, w, h = self._plot_rectangle(state)
+            top = 1 - bottom - height
+            panel_id = _document.identifier(id or f"{self.subplot_id}/inset{len(state['identity']['panels'])}")
+            if panel_id in _document.panel_configs(state):
+                raise ValueError(f"subplot ID already exists: {panel_id}")
+            config = copy.deepcopy(fig._default_config)
+            for key in ("subplots", "overlays", "annotations", "active_layer"):
+                config.pop(key, None)
+            x0, x1 = round(x + w * left), round(x + w * (left + width))
+            y0, y1 = round(y + h * top), round(y + h * (1 - bottom))
+            config["chart_area"] = dict(x=x0, y=y0, width=x1-x0, height=y1-y0)
+            state["config"].setdefault("subplots", []).append(dict(
+                config=config, series=[], anchor=dict(
+                    parent={"Subplot": parent - 1} if parent else "Parent",
+                    frame=[[left, left + width], [top, 1 - bottom]],
+                ),
+            ))
+            state["identity"]["panels"].append(dict(id=panel_id, overlays=[]))
+            _style_runtime.containers(fig, state, panel_ids=[panel_id])
+            fig.apply_settings(state)
+        return fig.subplots[panel_id].axes
 
     @property
     def transAxes(self):
@@ -2114,6 +2155,9 @@ class FigureMethods:
             layout["size"] = [new_w, new_h]
             place_grid(state)
         else:
+            from ._native import follow_insets_json
+
+            before = json.dumps(state["config"])
             for cfg in [state["config"]] + [
                 p["config"] for p in state["config"].get("subplots", [])
             ]:
@@ -2125,6 +2169,7 @@ class FigureMethods:
                     ("height", new_h / old_h),
                 ]:
                     area[key] = round(area[key] * scale)
+            state["config"] = json.loads(follow_insets_json(before, json.dumps(state["config"])))
         self.apply_settings(state)
 
 

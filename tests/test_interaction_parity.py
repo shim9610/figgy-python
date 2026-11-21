@@ -4011,3 +4011,70 @@ display(fig.widget())
         click_button(page, '[data-fit]')
         execute("await fig.sync(); assert fig.get_settings()['config']['bottom_x']['max'] < 8")
         assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
+def test_jupyter_title_and_calendar_origin_edits_preserve_i64(tmp_path):
+    epoch = 1700000000000000093
+    source = f"""
+import figgyplot as fg
+from figgyplot.ticker import TimestampFormatter
+fig, ax = fg.subplots(backend='webgpu')
+epoch = {epoch}
+ax.plot([float(epoch), float(epoch + 86400 * 10**9)], [0, 1], id='signal')
+ax.xaxis.set_major_formatter(TimestampFormatter(unit='ns', origin=epoch, step='day', prefix='Day '))
+ax.set_title('Before')
+def origin():
+    return fig.get_settings()['config']['bottom_x']['label_style']['format']['Timestamp']['label']['Relative']['origin']
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        origin_path = '.config.bottom_x.label_style.format.Timestamp.label.Relative.origin'
+        assert page.evaluate(ROOT + '.snapshot()' + origin_path) == str(epoch)
+        click_button(page, '[data-properties]')
+        ObjectNavigator(page).choose('chart_title')
+        title = page.locator('[data-fields] input[data-property=text]')
+        title.fill('After');title.press('Tab')
+        execute("await fig.sync(); assert origin() == epoch and ax.get_title() == 'After'")
+        ObjectNavigator(page).choose('tick_labels_bottom')
+        section = page.locator('details[data-property-section="Layout and appearance"]')
+        if not section.evaluate('(el) => el.open'):
+            section.locator('summary').click()
+        field = page.locator('[data-catalog-field="Layout and appearance/format/Timestamp/label/Relative/origin"]')
+        field.fill(str(epoch + 11));field.press('Tab')
+        execute("await fig.sync(); assert origin() == epoch + 11")
+        assert page.evaluate(ROOT + '.snapshot()' + origin_path) == str(epoch + 11)
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
+def test_jupyter_inset_marker_and_parent_geometry_are_editable(tmp_path):
+    source = """
+import figgyplot as fg
+fig, ax = fg.subplots(backend='webgpu')
+ax.plot([0, 1], [0, 1])
+zoom = ax.inset_axes([.35, .15, .55, .55], id='zoom')
+zoom.plot([0, 1], [1, 0])
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        click_button(page, '[data-properties]')
+        navigator = ObjectNavigator(page)
+        navigator.panel('zoom')
+        for section_name in ('Inset', 'Inset marker'):
+            section = page.locator(f'details[data-property-section="{section_name}"]')
+            if not section.evaluate('(el) => el.open'):
+                section.locator('summary').click()
+        page.locator('[data-catalog-field="Inset/Text scale"]').select_option('Fixed')
+        page.locator('[data-catalog-field="Inset marker/enabled"]').check()
+        execute("await fig.sync()")
+        before = page.evaluate(ROOT + '.snapshot().config.subplots[0]')
+        assert before['text_scale'] == 'Fixed' and before['marker']['connectors']
+        navigator.panel('main')
+        width = page.locator('[data-layout-component=width]')
+        width.fill(str(int(float(width.input_value())) - 60));width.press('Tab')
+        execute("await fig.sync()")
+        after = page.evaluate(ROOT + '.snapshot().config.subplots[0]')
+        assert after['anchor'] == before['anchor']
+        assert after['config']['chart_area'] != before['config']['chart_area']
+        assert not page.locator('.figgy-error').inner_text()

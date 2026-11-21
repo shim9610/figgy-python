@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 
 from .figure import _display_texts
 
@@ -67,7 +68,8 @@ class EditorSession:
                     fig.select_object(message["target"])
                     self.handle = None
                 elif action == "settings":
-                    fig.apply_settings(message["settings"], expected_revision=message["revision"])
+                    settings = json.loads(message["settings_json"]) if "settings_json" in message else message["settings"]
+                    fig.apply_settings(settings, expected_revision=message["revision"])
                 elif action == "fit":
                     fig.fit()
                 elif action in ('undo', 'redo', 'reset_edits'):
