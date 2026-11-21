@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import pytest
 from figgyplot import text_segments
 
@@ -21,7 +22,11 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
         params = StdioServerParameters(
             command=sys.executable, args=["-m", "figgyplot.mcp"], env=env
         )
-        async with stdio_client(params) as (read, write):
+        with tempfile.TemporaryFile(mode="w+") as stderr:
+            await check(params, stderr)
+
+    async def check(params, stderr):
+        async with stdio_client(params, errlog=stderr) as (read, write):
             async with ClientSession(read, write) as client:
                 await client.initialize()
                 listing = await client.list_tools()
@@ -45,6 +50,13 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                 caps = await call("capabilities", {})
                 assert "sunburst" in caps["charts"] and "tricontourf" in caps["charts"]
                 assert "imshow_rgb" in caps["charts"] and "uint32" in caps["dtypes"]
+                id = (await call("figure_create", {}))["id"]
+                await call("chart_add", {"id": id, "kind": "range_bars", "args": [[0, 1], [0, 1], [1, 2]],
+                                         "options": {"id": "tasks", "orientation": "horizontal"}})
+                links = await call("chart_add", {"id": id, "kind": "range_links",
+                                                 "args": ["tasks", [[0, 1]]], "options": {"id": "dependencies"}})
+                assert links["settings"]["series"][-1]["render_type"]["RangeLinks"]["links"] == [{"from": 0, "to": 1}]
+                await call("figure_close", {"id": id})
                 made = await call("figure_create", {"figsize": [4, 3], "dpi": 72})
                 id = made["id"]
                 await call(

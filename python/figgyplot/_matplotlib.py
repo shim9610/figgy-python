@@ -1006,7 +1006,10 @@ class ArtistMethods:
         )
 
     def get_linewidth(self):
-        body = self._body(self.figure.get_settings())
+        render_type = self._spec(self.figure.get_settings())["render_type"]
+        if "RangeLinks" in render_type:
+            return render_type["RangeLinks"]["width"] * 72 / self.figure.dpi
+        body = next(iter(render_type.values()))
         style = body.get('style', {})
         if 'outline_width' in style:
             return style['outline_width'] * 72 / self.figure.dpi

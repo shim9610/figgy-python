@@ -693,6 +693,9 @@ fn positive_data_bounds(
         return Err(invalid("log bounds axis must be x, y or z"));
     }
     for s in series {
+        if s.render_type.range_links().is_some() {
+            continue;
+        }
         if s.is_dataless() {
             if axis == "y" {
                 if let Some(levels) = s.render_type.energy_levels() {
@@ -1454,7 +1457,8 @@ impl FigureAccess<'_> {
                 )
             })
         {
-            let specs = gpu::series(self.data.figure_id, &self.data.series);
+            let mut specs = gpu::series(self.data.figure_id, &self.data.series);
+            specs.retain(|s| s.render_type.range_links().is_none());
             let mut chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
             let config = chart.config().clone();
             let mut layers = vec![renderer::LayerRef::Base];

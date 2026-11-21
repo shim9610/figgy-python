@@ -59,6 +59,17 @@ impl FigureAccess<'_> {
         let body = wire.as_object().unwrap().values().next().unwrap();
         match reference {
             PickedDataRef::HistogramBin { bin_index, .. }
+                if series.render_type.range_links().is_some() =>
+            {
+                let row = body["links"]
+                    .get(*bin_index)
+                    .ok_or_else(|| invalid("selected link no longer exists"))?;
+                result["index"] = json!(bin_index);
+                result["from"] = row["from"].clone();
+                result["to"] = row["to"].clone();
+                result["exit_offset"] = row["exit_offset"].clone();
+            }
+            PickedDataRef::HistogramBin { bin_index, .. }
                 if series.render_type.energy_levels().is_some() =>
             {
                 let row = body["levels"]

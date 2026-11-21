@@ -2062,6 +2062,10 @@ export class FiggyChart {
      */
     set_contour_nice_levels(series_id: string, target_count: number, use_colormap_colors: boolean): number;
     /**
+     * Install coupled chart metadata in one renderer transaction.
+     */
+    set_host_state(config: string, series: string): void;
+    /**
      * Set the exit offset of link `index` of the range link series
      * `series_id` (#357), in logical pixels from its predecessor's start;
      * `undefined`, 0 or a non-finite value restores the default exit.
@@ -2926,6 +2930,7 @@ export interface InitOutput {
     readonly figgychart_set_colorbar_title: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_config: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_set_contour_nice_levels: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly figgychart_set_host_state: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgychart_set_link_exit_offset: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly figgychart_set_monotonic: (a: number, b: number, c: number, d: number, e: number, f: any, g: any, h: number, i: number, j: number) => [number, number, number, number];
     readonly figgychart_set_monotonic_document: (a: number, b: number, c: number, d: number, e: number) => [number, number];
@@ -2984,11 +2989,11 @@ export interface InitOutput {
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__301: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__302: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__303: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__300: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__301: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

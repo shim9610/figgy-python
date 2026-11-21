@@ -38,6 +38,33 @@ def _rows(data):
     return [np.asarray(row) for row in data]
 
 
+def _range_link_rows(links, dpi):
+    from ._validation import number
+
+    rows = []
+    for link in links:
+        if hasattr(link, "keys"):
+            row = dict(link)
+        else:
+            predecessor, successor = link
+            row = {"from": predecessor, "to": successor}
+        if not {"from", "to"} <= row.keys() or row.keys() - {"from", "to", "exit_offset"}:
+            raise ValueError("links require from and to row indices")
+        for key in ("from", "to"):
+            value = row[key]
+            if (
+                isinstance(value, (bool, np.bool_))
+                or not isinstance(value, (int, np.integer))
+                or not 0 <= value < 2**32
+            ):
+                raise ValueError("link row indices must be unsigned 32-bit integers")
+            row[key] = int(value)
+        if row.get("exit_offset") is not None:
+            row["exit_offset"] = number(row["exit_offset"], "exit_offset") * dpi / 72
+        rows.append(row)
+    return rows
+
+
 class AdvancedMethods:
     def _sid(self, id=None):
         return _document.identifier(id or f"series_{self.figure._next_series}")
@@ -400,6 +427,55 @@ class AdvancedMethods:
             color=color,
             id=id,
         )
+
+    def range_links(
+        self, bars, links, *, color=None, width=None, head=None, inset=None, id=None
+    ):
+        """Connect range-bar rows using zero-based (predecessor, successor) pairs.
+
+        Pass the range-bar artist or its ID. Link mappings can specify ``from``,
+        ``to``, and ``exit_offset``. Width, head, inset and exit offset use points.
+        Use the returned artist's ``set(links=...)`` to replace the connections.
+        """
+        from .figure import _color
+        from ._validation import number
+
+        parent = getattr(bars, "id", bars)
+        with self.figure._lock:
+            series = self._owned_series(self.figure.get_settings())
+            if getattr(bars, "figure", self.figure) is not self.figure or not any(
+                s["series_id"] == parent and "RangeBars" in s["render_type"]
+                for s in series
+            ):
+                raise ValueError("bars must name a range-bar series on these axes")
+            spec = template("range_links")
+            spec["series_id"] = self._sid(id)
+            body = spec["render_type"]["RangeLinks"]
+            body.update(bars=parent, links=_range_link_rows(links, self.figure.dpi))
+            if color is not None:
+                body["color"] = _color(color)
+            for key, value in (("width", width), ("head", head), ("inset", inset)):
+                if value is not None:
+                    body[key] = number(value, key) * self.figure.dpi / 72
+            return self._install_series([spec])
+
+    def set_line_offsets(self, series=None, *, x=0, y=0):
+        """Stack line series by steps in data units, or decades on log axes."""
+        if self.overlay_id:
+            raise ValueError("line offsets belong to a panel, not an overlay")
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            config = self._config(state)
+            if series is None:
+                config.pop("line_offsets", None)
+            else:
+                config["line_offsets"] = {
+                    "series": [getattr(item, "id", item) for item in series],
+                    "step_x": float(x),
+                    "step_y": float(y),
+                }
+            self.figure.apply_settings(state)
+        return self
 
     def waterfall(self, labels, values, *, color="black", id=None):
         values = np.asarray(values)

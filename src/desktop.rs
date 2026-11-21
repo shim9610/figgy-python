@@ -130,7 +130,7 @@ struct SurfaceWindow {
     handle: Option<String>,
     dragging: bool,
     panning: bool,
-    diagram_drag: Option<renderer::config::PickedDataRef>,
+    diagram_drag: Option<(renderer::config::PickedDataRef, Option<f32>)>,
     pan_moved: bool,
     drag_origin: (f32, f32),
     chart_pressed: bool,
@@ -730,7 +730,7 @@ impl SurfaceWindow {
             WindowEvent::CursorMoved { position, .. } => {
                 let old = self.cursor;
                 self.cursor = (position.x as f32, position.y as f32);
-                if let Some(reference) = self.diagram_drag.as_ref() {
+                if let Some((reference, extent)) = self.diagram_drag.as_ref() {
                     let distance = (self.cursor.0 - self.drag_origin.0)
                         .hypot(self.cursor.1 - self.drag_origin.1);
                     if self.pan_moved || distance >= 3. {
@@ -739,6 +739,7 @@ impl SurfaceWindow {
                             reference,
                             (self.cursor.0 - old.0) / scale,
                             (self.cursor.1 - old.1) / scale,
+                            *extent,
                         )?;
                         self.last_input = Some(input_received);
                         self.window.request_redraw();
@@ -975,7 +976,15 @@ impl SurfaceWindow {
                                 | renderer::config::PickedDataRef::FeynmanPropagator { .. }
                                 | renderer::config::PickedDataRef::FeynmanLabel { .. }
                                 | renderer::config::PickedDataRef::ValueLabel { .. } => {
-                                    Some(p.reference.clone())
+                                    Some((p.reference.clone(), None))
+                                }
+                                renderer::config::PickedDataRef::HistogramBin { .. }
+                                    if c.data.series.iter().any(|s| {
+                                        s.series_id == p.reference.series_id()
+                                            && s.render_type.range_links().is_some()
+                                    }) =>
+                                {
+                                    Some((p.reference.clone(), p.extent.map(|v| v / scale)))
                                 }
                                 _ => None,
                             });

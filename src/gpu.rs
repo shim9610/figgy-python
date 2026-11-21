@@ -184,6 +184,11 @@ pub fn local_selection(figure: u64, reference: &mut renderer::config::PickedData
 
 pub fn config(figure: u64, input: &Config) -> Config {
     let mut result = input.clone();
+    if let Some(offsets) = &mut result.line_offsets {
+        for id in &mut offsets.series {
+            *id = column_id(figure, id);
+        }
+    }
     if let Some(data) = &mut result.picked_data {
         for reference in &mut data.refs {
             let id = selection_series(reference);
@@ -266,6 +271,9 @@ pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
             let mut value = serde_json::to_value(s).expect("valid series model");
             remap(&mut value, &columns, figure, "");
             value["series_id"] = json!(column_id(figure, &s.series_id));
+            if let Some(links) = s.render_type.range_links() {
+                value["render_type"]["RangeLinks"]["bars"] = json!(column_id(figure, &links.bars));
+            }
             if let Some(line) = value["render_type"]
                 .as_object_mut()
                 .and_then(|v| v.values_mut().next())
@@ -283,6 +291,13 @@ pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
 pub fn local_config(figure: u64, input: &Config) -> Config {
     let mut result = input.clone();
     let prefix = format!("figgy/{figure}/");
+    if let Some(offsets) = &mut result.line_offsets {
+        for id in &mut offsets.series {
+            if let Some(local) = id.strip_prefix(&prefix) {
+                *id = local.to_owned();
+            }
+        }
+    }
     if let Some(p) = &mut result.picked_data {
         for r in &mut p.refs {
             local_selection(figure, r);

@@ -26,6 +26,8 @@ pub(super) fn fit(
         let mut y = FitExtent::EMPTY;
         for (spec, extent) in series.iter().zip(extents) {
             let (fit_x, fit_y) = config.series_fit_roles(layer, &spec.series_id);
+            let (member_x, member_y) =
+                Chart::line_offset_fit_extents(config, &spec.series_id, extent[0], extent[1]);
             if let renderer::DataRenderType::Xy(xy) = &spec.render_type {
                 if let Some(stem) = &xy.stem {
                     if stem.direction == renderer::data_config::CategoryBarDirection::Horizontal {
@@ -38,10 +40,10 @@ pub(super) fn fit(
                 }
             }
             if fit_x {
-                x.union(&extent[0]);
+                x.union(&member_x);
             }
             if fit_y {
-                y.union(&extent[1]);
+                y.union(&member_y);
                 if let renderer::DataRenderType::Xy(renderer::XySeries {
                     line: Some(line), ..
                 }) = &spec.render_type

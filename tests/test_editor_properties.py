@@ -471,3 +471,69 @@ def test_radial_detail_slice_commands_resolve_the_selected_group(backend):
         assert after['radial']['split']['children'][0]==before['radial']['split']['children'][0]
         assert after['radial']['slices']==before['radial']['slices']
         fig.undo();fig.undo();fig.undo();assert fig.get_settings()==before
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_range_links_and_line_offsets_edit_without_column_uploads(backend):
+    with fg.Figure(backend=backend, dpi=72) as fig:
+        ax = fig.axes[0]
+        bars = ax.range_bars([0, 1], [0, 2], [1, 3], orientation='horizontal', id='tasks')
+        links = ax.range_links(bars, [], id='dependencies')
+        uploads = fig.info.get('column_uploads')
+        edit(fig, links.id, 'Appearance/links', [{'from': 0, 'to': 1}])
+        links.set(links=[{'from': 1, 'to': 0, 'exit_offset': 16}], linewidth=3)
+        style = fig.get_settings()['series'][-1]['render_type']['RangeLinks']
+        assert style['links'] == [{'from': 1, 'to': 0, 'exit_offset': 16}]
+        assert style['width'] == links.get_linewidth() == 3
+        assert fig.info.get('column_uploads') == uploads
+        if backend == 'native':
+            assert fig.to_png().startswith(b'\x89PNG')
+
+    with fg.Figure(backend=backend, grid=[['left', 'right']]) as fig:
+        ax = fig.subplots['right'].axes
+        first, = ax.plot([0, 1], [0, 1], id='first')
+        second, = ax.plot([0, 1], [0, 1], id='second')
+        ax.set_line_offsets([first, second], y=5)
+        owner = next(o for o in fig.editor_properties()
+                     if any(v['path'].endswith('/subplots/0/config/line_offsets') for v in o['fields']))
+        assert fig.get_settings()['config']['subplots'][0]['config']['line_offsets'] == {
+            'series': ['first', 'second'], 'step_y': 5.0,
+        }
+        ax.fit()
+        assert fig.get_settings()['config']['subplots'][0]['config']['left_y']['max'] >= 6
+        if backend == 'native':
+            assert fig.to_png().startswith(b'\x89PNG')
+        fig.edit_property(owner['id'], 'Line offsets/settings', None)
+        assert 'line_offsets' not in fig.get_settings()['config']['subplots'][0]['config']
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_calendar_steps_and_labels_are_editable_in_the_typed_catalog(backend):
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot([0, 86400], [1, 2])
+        target = 'tick_labels_bottom'
+        field = 'Layout and appearance/format'
+        edit(fig, target, field, 'Timestamp')
+
+        def change(key, value):
+            return edit(fig, target, field + '/Timestamp/' + key, value)
+
+        def timestamp():
+            return fig.get_settings()['config']['bottom_x']['label_style']['format']['Timestamp']
+
+        change('step/mode', 'Week')
+        change('step/Week/start', 'Sunday')
+        change('period_labels', True)
+        change('label/mode', 'Relative')
+        change('label/Relative/prefix', 'Week ')
+        assert timestamp()['step'] == {'Week': {'start': 'Sunday'}}
+        assert timestamp()['label']['Relative']['prefix'] == 'Week '
+        assert timestamp()['period_labels'] is True
+        change('label/mode', 'Custom')
+        change('label/Custom/labels', ['First', 'Second'])
+        change('label/Custom/labels', ['Edited'])
+        assert timestamp()['label']['Custom']['labels'] == ['Edited']
+        change('step/mode', 'None')
+        assert timestamp().get('step') is None
+        assert not timestamp().get('period_labels')
+        assert timestamp().get('label', 'Auto') == 'Auto'

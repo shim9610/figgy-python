@@ -111,6 +111,7 @@ impl NotebookFigure {
             return Err(invalid("series IDs must be unique"));
         }
         if !s.is_dataless()
+            && s.render_type.range_links().is_none()
             && (!self.columns.contains_key(&s.x_column) || !self.columns.contains_key(&s.y_column))
         {
             return Err(invalid("unregistered source columns"));

@@ -1,10 +1,29 @@
 diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
 --- a/crates/web/src/web/chart/frame.rs
 +++ b/crates/web/src/web/chart/frame.rs
-@@ -185,6 +185,181 @@
+@@ -185,6 +185,200 @@
      pub async fn prewarm_all(&mut self) -> Result<(), JsValue> {
          self.renderer.prewarm_all().await.map_err(js_err)?;
          self.request_host_redraw();
++        Ok(())
++    }
++
++    /// Install coupled chart metadata in one renderer transaction.
++    pub fn set_host_state(&mut self, config: &str, series: &str) -> Result<(), JsValue> {
++        let mut config: renderer::Config = serde_json::from_str(config).map_err(js_err)?;
++        let series: Vec<SeriesConfig> = serde_json::from_str(series).map_err(js_err)?;
++        for item in &series {
++            self.ensure_columns_exist(item)?;
++        }
++        self.renderer.preflight_chart_styles(&series).map_err(js_err)?;
++        let managed = self.follow_config_legend(&mut config, &series)?;
++        let config = Chart::new(config).config().clone();
++        let len = series.len();
++        self.replace_chart_state(config, series)?;
++        if managed {
++            self.legend_auto_managed = false;
++        }
++        self.color_seq = self.color_seq.max(len);
 +        Ok(())
 +    }
 +

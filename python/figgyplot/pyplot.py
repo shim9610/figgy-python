@@ -81,6 +81,8 @@ def streamlines(*args, **kwargs): return gca().streamlines(*args, **kwargs)
 def streamplot(*args, **kwargs): return gca().streamplot(*args, **kwargs)
 
 def range_bars(*args, **kwargs): return gca().range_bars(*args, **kwargs)
+def range_links(*args, **kwargs): return gca().range_links(*args, **kwargs)
+def set_line_offsets(*args, **kwargs): return gca().set_line_offsets(*args, **kwargs)
 
 def broken_barh(*args, **kwargs): return gca().broken_barh(*args, **kwargs)
 

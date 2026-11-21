@@ -316,7 +316,7 @@ export function render({model,el}) {
   async function pickPanelCandidates(point,index){
     const config=JSON.parse(chart.get_config()),series=JSON.parse(chart.get_series()),hits=[],excluded=new Set();
     const owner=id=>{for(let i=0;i<=(config.subplots?.length??0);i++){const cfg=i?config.subplots[i-1].config:config;if(i&&!(config.subplots[i-1].series??[]).includes(id))continue;if(!i&&(config.subplots??[]).some(p=>(p.series??[]).includes(id)))continue;const o=(cfg.overlays??[]).findIndex(o=>(o.series??[]).includes(id));return o<0?baseLayer(i):i?{SubplotOverlay:[i-1,o]}:{Overlay:o};}return 'Base';};
-    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)).map(v=>{
+    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)&&!excluded.has(v.render_type.RangeLinks?.bars)).map(v=>{
       const item=clone(v);
       for(const style of Object.values(item.render_type)){
         if(excluded.has(style.line?.fill?.ToSeries))style.line.fill=null;
@@ -335,11 +335,14 @@ export function render({model,el}) {
           if(ref.kind==='feynman_vertex'){ref.vertex_index=ref.index;delete ref.index;}
           else if(ref.kind==='feynman_propagator'){ref.propagator_index=ref.index;delete ref.index;}
           if(excluded.has(ref.series_id))throw Error('Picker repeated an excluded series');
-          excluded.add(ref.series_id);hits.push({layer:owner(ref.series_id),ref,distance:identity.distance_px});
+          excluded.add(ref.series_id);hits.push({layer:owner(ref.series_id),ref,distance:identity.distance_px,extent:identity.extent_px});
+          // Removing a member would move the other series to different offsets.
+          if(panelConfig(index).line_offsets)break;
           chart.set_series(JSON.stringify(remaining()));
         }
+        if(hits.length&&panelConfig(index).line_offsets)break;
       }
-    }finally{try{chart.set_series(JSON.stringify(series));}finally{chart.set_config(JSON.stringify(config));}}
+    }finally{chart.set_host_state(JSON.stringify(config),JSON.stringify(series));}
     hits.sort((a,b)=>a.distance-b.distance);stats.last_pick_candidates=hits.map(h=>({layer:h.layer,series:h.ref.series_id,distance:h.distance}));stats.last_pick_position=point;
     return hits;
   }
@@ -597,9 +600,9 @@ export function render({model,el}) {
         }
       }
       if(JSON.stringify(settings.series)===JSON.stringify(old.series)){chart.set_config(JSON.stringify(settings.config));}
-      else{chart.set_picked_data('null');chart.set_series('[]');const staging=clone(settings.config);delete staging.picked_data;delete staging.picked_points;chart.set_config(JSON.stringify(staging));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));}clearColor(settings.background);checkNumericConversion(settings,{...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())});
+      else{chart.set_host_state(JSON.stringify(settings.config),JSON.stringify(settings.series));}clearColor(settings.background);checkNumericConversion(settings,{...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())});
     }
-    catch(e){chart.set_series('[]');chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));clearColor(old.background);local=old;throw e;}
+    catch(e){chart.set_host_state(JSON.stringify(old.config),JSON.stringify(old.series));clearColor(old.background);local=old;throw e;}
     if(valueLabelSignature(settings)!==valueLabelSignature(old))pendingValueLabels=true;
     local={...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};dirty=true;error.textContent='';
   }
@@ -1046,11 +1049,12 @@ export function render({model,el}) {
         if(field.kind==='choice')for(const value of field.choices_ref==='columns'?[...field.choices,...propertyColumns]:field.choices){const option=document.createElement('option');option.value=value;option.textContent=field.group==='Shared axes'&&value===''?'Independent':field.id.endsWith('/source')||field.id.startsWith('Figure grid/slot/')?value:caption(value);input.append(option);}
         if(field.kind==='boolean'){input.type='checkbox';input.checked=field.value;}
         else if(field.kind==='color'){input.type='color';input.value='#'+['r','g','b'].map(k=>Math.round(field.value[k]*255).toString(16).padStart(2,'0')).join('');}
-        else{if(input.tagName==='INPUT')input.type=field.kind==='number'?'number':'text';input.value=field.kind==='numbers'?field.value.join(', '):field.value;if(field.kind==='number')input.step=field.integer?'1':'any';}
+        else{if(input.tagName==='INPUT')input.type=field.kind==='number'?'number':'text';input.value=field.kind==='json'?JSON.stringify(field.value):field.kind==='numbers'?field.value.join(', '):field.value;if(field.kind==='number')input.step=field.integer?'1':'any';}
         function submit(){try{
           let value=field.kind==='boolean'?input.checked:field.kind==='number'?Number(input.value):field.kind==='numbers'?input.value.split(/[,;\s]+/).filter(Boolean).map(Number):input.value;
           if(field.kind==='color')value={...base,...Object.fromEntries(['r','g','b'].map((k,i)=>[k,parseInt(input.value.slice(1+i*2,3+i*2),16)/255]))};
-          if((typeof value==='number'&&!Number.isFinite(value))||(Array.isArray(value)&&value.some(v=>!Number.isFinite(v))))throw Error('Enter finite numbers');
+          if(field.kind==='json')value=JSON.parse(input.value);
+          if((typeof value==='number'&&!Number.isFinite(value))||(field.kind==='numbers'&&value.some(v=>!Number.isFinite(v))))throw Error('Enter finite numbers');
           replayEdit('property',{object_id:object.id,property_id:field.id,value,base_value:()=>base}).then(result=>{if(result?.ok&&result.value!==undefined)base=clone(result.value);});
         }catch(e){fail(e);}}
         if(field.kind==='choice'){input.title=input.value;input.addEventListener('change',()=>input.title=input.value);}
@@ -1187,11 +1191,29 @@ export function render({model,el}) {
     else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
       const request={requestId:message.id,action:message.action};trace('request.received',request);
       // Do not block the serialized queue while waiting for an ack processed by it.
-      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await controlQueue;await queue;trace('request.queue_drained',request);await flush();trace('request.edits_acknowledged',request);let result=null;
+      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await controlQueue;await queue;trace('request.queue_drained',request);await enqueue(formatPendingLabels,true);await flush();trace('request.edits_acknowledged',request);let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
-          const start=performance.now(),stages=[];status.textContent='Preparing…';trace('prepare.started',request);
-          try{await waitForFrame();if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);trace('prepare.prewarm',{...request,event});status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';trace('prepare.completed',request);
-            return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
+          const start=performance.now(),stages=[];let prewarmWarning=null;
+          status.textContent='Preparing…';trace('prepare.started',request);
+          try{
+            await waitForFrame();
+            if(!kind){
+              try{
+                await chart.prewarm_all_with_progress(event=>{stages.push(event);trace('prepare.prewarm',{...request,event});});
+              }catch(e){
+                const reason=String(e);
+                // The pinned engine can lack a contract for an unused shader.
+                // Still require successful rendering of the displayed document.
+                if(!/Missing checked (render|compute) prewarm contract for shader [0-9a-f]+/.test(reason))throw e;
+                prewarmWarning=reason;
+                trace('prepare.prewarm_incomplete',{...request,reason});
+              }
+            }
+            await readyDisplayedFrame();
+            stages.push({scope:kind??'cartesian',stage:'first-frame',phase:'Ready'});
+            status.textContent='Ready';trace('prepare.completed',request);
+            return {backend:'webgpu',ready:true,prewarm_complete:prewarmWarning===null,prewarm_warning:prewarmWarning,
+              elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
           }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
         // sync() acknowledges accepted edits; GPU presentation belongs to prepare/export.
@@ -1206,7 +1228,7 @@ export function render({model,el}) {
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{const format=exportFormat.value;exporting(1,format).then(data=>{const url=URL.createObjectURL(new Blob([data],{type:{png:'image/png',svg:'image/svg+xml',pdf:'application/pdf'}[format]}));const a=document.createElement('a');a.href=url;a.download='figure.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}).catch(fail);});
   root.querySelector('[data-fit]').addEventListener('click',async()=>{
-    if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>Object.values(s.render_type)[0].line?.fill))){
+    if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||Object.values(s.render_type)[0].line?.fill))){
       try{await queue;await flush();model.send({action:'fit',revision});}catch(e){fail(e);}return;
     }
     enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
@@ -1314,13 +1336,17 @@ export function render({model,el}) {
         const previousPick=JSON.parse(chart.get_config()).picked_data?.refs?.[0];
         chart.on_press(-100,-100);chart.on_release();const picks=await pickPanelCandidates(point,index);
         if(picks.length>1){gesture.choices=picks.map(dataChoice);return;}
-        const picked=picks[0],old=previousPick,same=picked&&!picked.ref.kind.startsWith('feynman_')&&picked.ref.kind!=='value_label'&&equalValue({...picked.ref,source_id:picked.ref.source_id??null},{...old,source_id:old?.source_id??null});
+        const picked=picks[0],old=previousPick;
+        const rangeLink=picked?.ref.kind==='histogram_bin'&&local.series.some(s=>s.series_id===picked.ref.series_id&&s.render_type.RangeLinks);
+        const same=picked&&!rangeLink&&!picked.ref.kind.startsWith('feynman_')&&picked.ref.kind!=='value_label'&&equalValue({...picked.ref,source_id:picked.ref.source_id??null},{...old,source_id:old?.source_id??null});
         if(picked)setPointerLayer(picked.layer);
         selected=same?null:picked?.ref.series_id??null;
         chart.set_picked_data(JSON.stringify(!same&&picked?{refs:[picked.ref]}:null));
         if(picked?.ref.kind.startsWith('feynman_')){
           const ref=picked.ref;
           gesture.diagram=chart.press_feynman(ref.series_id,ref.kind,ref.vertex_index??ref.propagator_index??ref.index,ref.part);
+        }else if(rangeLink){
+          gesture.diagram=chart.press_range_link(picked.ref.series_id,picked.ref.bin_index,picked.extent);
         }else if(picked?.ref.kind==='value_label'){
           const ref=picked.ref;
           gesture.diagram=ref.part?chart.press_energy_label(ref.series_id,ref.part,ref.category_index):chart.press_value_label(`series:${ref.series_id}:label:${ref.category_index}`);
@@ -1392,13 +1418,15 @@ export function render({model,el}) {
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
     chart=kind?await module.FiggyBoundedChart.create(canvas,kind,JSON.stringify(local[kind]),local.config.chart_area.width,local.config.chart_area.height):await module.FiggyChart.create(canvas);if(!kind)chart.set_pool_auto_growth(true);
     if(!kind){
-      const getConfig=chart.get_config.bind(chart),setConfig=chart.set_config.bind(chart);
+      const getConfig=chart.get_config.bind(chart),setConfig=chart.set_config.bind(chart),setState=chart.set_host_state.bind(chart);
       let projectedColorbar=false;
-      chart.set_config=json=>{
+      function project(json,install){
         const config=JSON.parse(json);let projected=false;
         if(!config.colorbar){const bar=config.subplots?.find(p=>p.config.colorbar)?.config.colorbar;if(bar){config.colorbar={...clone(bar),visible:false};projected=true;}}
-        setConfig(JSON.stringify(config));projectedColorbar=projected;
-      };
+        install(JSON.stringify(config));projectedColorbar=projected;
+      }
+      chart.set_config=json=>project(json,setConfig);
+      chart.set_host_state=(json,series)=>project(json,config=>setState(config,series));
       chart.get_config=()=>{const config=JSON.parse(getConfig());if(projectedColorbar)delete config.colorbar;return JSON.stringify(config);};
     }
 
@@ -1418,7 +1446,7 @@ export function render({model,el}) {
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
     for(const [id,entry]of composites){if(entry.kind==='record')chart.register_record(id,entry.fields);else if(entry.kind==='ragged')chart.register_ragged(id,entry.fields.values,entry.fields.offsets);else if(entry.kind==='triangles')chart.register_triangles(id,entry.fields.indices);}
-    if(!kind){chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
+    if(!kind){chart.set_host_state(JSON.stringify(local.config),JSON.stringify(local.series));
     clearColor(local.background);}
     properties();
     // Ready covers the displayed surface, including a resize during compilation.

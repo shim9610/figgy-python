@@ -222,13 +222,25 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
     };
     values.iter().map(|v| json!(v)).collect()
 }
+fn json_field(path: &str) -> bool {
+    [
+        "/RangeLinks/links",
+        "/Timestamp/label/Custom/labels",
+        "/line_offsets",
+    ]
+    .iter()
+    .any(|suffix| path.ends_with(suffix))
+}
+
 fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: &str, label: &str) {
     let options = if value.is_string() {
         choices(path, &value)
     } else {
         vec![]
     };
-    let kind = if !options.is_empty() {
+    let kind = if json_field(path) {
+        "json"
+    } else if !options.is_empty() {
         "choice"
     } else if value.is_boolean() {
         "boolean"
@@ -297,12 +309,56 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
             "Number format",
         );
         if let Some(timestamp) = value.get("Timestamp") {
+            let mut timestamp = timestamp.clone();
+            let spec = timestamp.as_object_mut().unwrap();
+            spec.entry("step").or_insert(Value::Null);
+            spec.entry("period_labels").or_insert(json!(false));
             walk(
                 out,
-                timestamp,
+                &timestamp,
                 &format!("{path}/Timestamp"),
                 group,
                 &format!("{relative}/Timestamp"),
+            );
+        }
+        return;
+    }
+    if path.ends_with("/Timestamp/step") {
+        let mode = if value.is_null() {
+            "None"
+        } else {
+            label_format_name(value)
+        };
+        optional::choice(
+            out,
+            &format!("{group}/{relative}/mode"),
+            path,
+            group,
+            "Calendar step",
+            json!(mode),
+            ["None", "Day", "Week", "Month", "Quarter", "Year"]
+                .map(|name| json!(name))
+                .to_vec(),
+        );
+        if let Some(start) = value.pointer("/Week/start") {
+            optional::choice(
+                out,
+                &format!("{group}/{relative}/Week/start"),
+                &format!("{path}/Week/start"),
+                group,
+                "Week starts on",
+                start.clone(),
+                [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                ]
+                .map(|name| json!(name))
+                .to_vec(),
             );
         }
         return;
@@ -315,7 +371,15 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
                 "FixedOffsetMinutes",
                 vec![json!("Utc"), json!("FixedOffsetMinutes")],
             ),
-            "label" => ("Pattern", vec![json!("Auto"), json!("Pattern")]),
+            "label" => (
+                "Pattern",
+                vec![
+                    json!("Auto"),
+                    json!("Pattern"),
+                    json!("Relative"),
+                    json!("Custom"),
+                ],
+            ),
             _ => ("Fixed", vec![json!("Auto"), json!("Fixed")]),
         };
         optional::choice(
@@ -324,7 +388,11 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
             path,
             group,
             &human(path.rsplit('/').next().unwrap()),
-            json!(value.as_str().unwrap_or(tag)),
+            json!(if value.is_object() {
+                label_format_name(value)
+            } else {
+                value.as_str().unwrap_or(tag)
+            }),
             options,
         );
         if value.is_object() {
@@ -375,7 +443,10 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
                 },
             );
         }
-    } else if value.is_array() && !value.as_array().unwrap().iter().all(Value::is_number) {
+    } else if !json_field(path)
+        && value.is_array()
+        && !value.as_array().unwrap().iter().all(Value::is_number)
+    {
         for (i, child) in value.as_array().unwrap().iter().enumerate() {
             walk(
                 out,
@@ -679,11 +750,14 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
         );
         for (kind, style) in series["render_type"].as_object().unwrap() {
             let root = format!("/series/{index}/render_type/{kind}");
-            let expanded = diagrams::expanded(
+            let mut expanded = diagrams::expanded(
                 kind,
                 style,
                 state.pointer(&format!("{panel}/legend/content")).unwrap(),
             );
+            if kind == "RangeLinks" && expanded["links"].is_null() {
+                expanded["links"] = json!([]);
+            }
             for (key, value) in expanded.as_object().unwrap() {
                 if ["components", "err_x", "err_y", "yErr"].contains(&key.as_str()) {
                     continue;
@@ -708,6 +782,7 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     "CategoryBars"
                         | "BoxPlot"
                         | "RangeBars"
+                        | "RangeLinks"
                         | "Radar"
                         | "Ternary"
                         | "Parallel"
@@ -1476,6 +1551,8 @@ impl editor::Editor {
                                         .map(Value::to_string)
                                         .collect::<Vec<_>>()
                                         .join(", ")
+                                } else if field.kind == "json" {
+                                    value.to_string()
                                 } else {
                                     value.as_str().unwrap_or("").to_owned()
                                 };
@@ -1495,6 +1572,8 @@ impl editor::Editor {
                                             })
                                             .collect::<PyResult<Vec<_>>>()
                                             .map(Value::Array)
+                                    } else if field.kind == "json" {
+                                    serde_json::from_str(text).map_err(invalid)
                                     } else {
                                     Ok(json!(text))
                                     };

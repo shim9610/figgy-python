@@ -720,6 +720,11 @@ class Figure(FigureMethods):
                         style['style']['outline_width'] = float(value)*self.dpi/72
                     elif key == 'linewidth' and 'Radar' in series['render_type']:
                         style['style']['line_width_px'] = float(value)*self.dpi/72
+                    elif key == 'links' and 'RangeLinks' in series['render_type']:
+                        from ._advanced import _range_link_rows
+                        style['links'] = _range_link_rows(value, self.dpi)
+                    elif key in ('linewidth', 'head', 'inset') and 'RangeLinks' in series['render_type']:
+                        style['width' if key == 'linewidth' else key] = float(value)*self.dpi/72
                     elif key == 'linewidth' and 'Vector' in series['render_type']:
                         style['style']['width_px'] = float(value)*self.dpi/72
                     elif key == 'linewidth' and 'bar' in style:
@@ -1225,7 +1230,10 @@ class Figure(FigureMethods):
         """Prepare a mounted browser GPU, or call native prepare().
 
         Browser reports include initialization/upload time if deferred and a
-        separate prewarm_ms. No PNG is generated. This is process/view-local
+        separate prewarm_ms. If the renderer has no checked prewarm contract
+        for a scene shader, the browser can still draw the first frame and
+        reports ``prewarm_complete=False`` with ``prewarm_warning``. No PNG is
+        generated. This is process/view-local
         preparation, not a persistent shader cache or install-time compilation.
         """
         timeout = _timeout(timeout)

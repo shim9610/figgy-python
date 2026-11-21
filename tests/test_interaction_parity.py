@@ -3932,3 +3932,81 @@ else:
         click_button(page,'[data-undo]');page.evaluate(ROOT+'.flush()')
         assert persistent(page.evaluate(ROOT+'.testRendererState()'))==persistent(before)
         assert page.evaluate(ROOT+'.stats.column_uploads')==uploads and not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_gantt_dependency_exit_drag_reaches_accepted_state(tmp_path, backend):
+    from io import BytesIO
+    from PIL import Image
+
+    def point(image):
+        red, green, blue = np.asarray(image)[:, :, :3].transpose(2, 0, 1)
+        rows, columns = np.where((red > 220) & (blue > 220) & (green < 50))
+        assert len(rows) > 30
+        # The midpoint on the dependency stroke is away from either bar and
+        # remains a hit at a smaller display scale.
+        center = (rows.min() + rows.max()) / 2
+        at = abs(rows - center) <= 2
+        return float(np.median(columns[at])), float(np.median(rows[at]))
+
+    def settings(state):
+        return next(s for s in state['series'] if s['series_id'] == 'deps')['render_type']['RangeLinks']['links']
+
+    if backend == 'native':
+        with figgy.Figure(backend=backend) as fig:
+            ax = fig.axes[0]
+            bars = ax.range_bars([0, 1], [0, 5], [2, 7], orientation='horizontal', color='black', id='tasks')
+            ax.range_links(bars, [(0, 1)], color='#ff00ff', width=4, id='deps')
+            ax.set_xlim(-1, 8);ax.set_ylim(-1, 2)
+            logical = point(fig.render_rgba())
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle)
+                drag_native(inputs, native_point(inputs.info(), logical), (24, 0))
+                changed = settings(fig.get_settings())[0]
+                assert changed['exit_offset'] > 0
+                assert (changed['from'], changed['to']) == (0, 1)
+                assert not inputs.info()['error']
+                inputs.click('undo')
+                assert settings(fig.get_settings()) == [{'from': 0, 'to': 1}]
+            finally:
+                handle.close();Inputs.pump()
+        return
+
+    source = """
+import figgyplot as fg
+fig, ax = fg.subplots(backend='webgpu')
+bars = ax.range_bars([0, 1], [0, 5], [2, 7], orientation='horizontal', color='black', id='tasks')
+ax.range_links(bars, [(0, 1)], color='#ff00ff', width=4, id='deps')
+ax.set_xlim(-1, 8)
+ax.set_ylim(-1, 2)
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        check_display_frame_ready(page)
+        canvas = page.locator('.figgy-editor canvas')
+        x, y = point(Image.open(BytesIO(canvas.screenshot())).convert('RGB'))
+        rect = canvas.bounding_box()
+        x, y = x + rect['x'], y + rect['y']
+        page.mouse.move(x, y);page.mouse.down()
+        page.mouse.move(x + 24, y, steps=3);page.mouse.up()
+        page.evaluate(ROOT+'.flush()')
+        state = json.loads(execute('import json;await fig.sync();print(json.dumps(fig.get_settings()))'))
+        changed = settings(state)[0]
+        assert changed['exit_offset'] > 0
+        assert (changed['from'], changed['to']) == (0, 1)
+        click_button(page, '[data-undo]')
+        page.evaluate(ROOT+'.flush()')
+        assert settings(page.evaluate(ROOT+'.snapshot()')) == [{'from': 0, 'to': 1}]
+        # The inspector edits the complete list while keeping the bar source resident.
+        if page.locator('.figgy-properties').is_hidden():
+            click_button(page, '[data-properties]')
+        ObjectNavigator(page).choose('deps')
+        links = page.locator('[data-catalog-field="Appearance/links"]')
+        links.fill('[{"from":1,"to":0,"exit_offset":18}]');links.press('Tab')
+        execute('await fig.sync()')
+        assert settings(page.evaluate(ROOT+'.snapshot()')) == [{'from': 1, 'to': 0, 'exit_offset': 18}]
+        click_button(page, '[data-fit]')
+        execute("await fig.sync(); assert fig.get_settings()['config']['bottom_x']['max'] < 8")
+        assert not page.locator('.figgy-error').inner_text()

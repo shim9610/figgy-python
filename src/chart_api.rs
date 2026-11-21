@@ -16,6 +16,7 @@ pub fn series_template_json(kind: &str) -> PyResult<String> {
         "category_bars" => SeriesConfig::category_bars("s", "x", "y"),
         "box_plot" => SeriesConfig::box_plot("s", "x", "y"),
         "range_bars" => SeriesConfig::range_bars("s", "x", "start", "y"),
+        "range_links" => SeriesConfig::range_links("s", "bars", []),
         "radar" => SeriesConfig::radar("s", "x", "y"),
         "ternary" => SeriesConfig::ternary("s", "x", "y", "c"),
         "parallel" => SeriesConfig::parallel("s", ["x", "y"]),

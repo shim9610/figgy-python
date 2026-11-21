@@ -314,7 +314,8 @@ pub(super) fn bounded_series(
     }
 }
 pub(super) fn apply(result: &mut Value, field: &Field, value: &Value) -> PyResult<bool> {
-    let timestamp = field.path.contains("/Timestamp/") && field.id.ends_with("/mode");
+    let timestamp = field.path.contains("/Timestamp/")
+        && (field.id.ends_with("/mode") || field.path.ends_with("/period_labels"));
     let entry_override = field.id.contains("/override/")
         && (field.group.starts_with("Marker ") || field.group.starts_with("Error-bar "));
     let special = timestamp
@@ -359,11 +360,40 @@ pub(super) fn apply(result: &mut Value, field: &Field, value: &Value) -> PyResul
             Value::Null
         }
     } else if timestamp {
-        match value.as_str().unwrap_or("") {
-            "FixedOffsetMinutes" => json!({"FixedOffsetMinutes":0}),
-            "Pattern" => json!({"Pattern":"%Y-%m-%d"}),
-            "Fixed" => json!({"Fixed":3}),
-            _ => value.clone(),
+        let spec = result
+            .pointer_mut(parent)
+            .ok_or_else(|| invalid("timestamp format changed"))?;
+        if key == "step" {
+            if value == "None" {
+                spec["period_labels"] = json!(false);
+                if spec["label"].is_object()
+                    && (spec["label"].get("Relative").is_some()
+                        || spec["label"].get("Custom").is_some())
+                {
+                    spec["label"] = json!("Auto");
+                }
+            }
+            match value.as_str() {
+                Some("None") => Value::Null,
+                Some("Week") => json!({"Week":{"start":"Monday"}}),
+                _ => value.clone(),
+            }
+        } else {
+            if (value == "Relative"
+                || value == "Custom"
+                || (key == "period_labels" && value == true))
+                && spec["step"].is_null()
+            {
+                spec["step"] = json!("Day");
+            }
+            match value.as_str().unwrap_or("") {
+                "FixedOffsetMinutes" => json!({"FixedOffsetMinutes":0}),
+                "Pattern" => json!({"Pattern":"%Y-%m-%d"}),
+                "Fixed" => json!({"Fixed":3}),
+                "Relative" => json!({"Relative":{"origin":0,"prefix":""}}),
+                "Custom" => json!({"Custom":{"origin":0,"labels":[]}}),
+                _ => value.clone(),
+            }
         }
     } else if field.id == "Selected item/custom" {
         let family = field.path.split('/').nth(1).unwrap();

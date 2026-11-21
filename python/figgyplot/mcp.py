@@ -37,6 +37,7 @@ CHART_METHODS = (
     "streamlines",
     "streamplot",
     "range_bars",
+    "range_links",
     "broken_barh",
     "waterfall",
     "candlestick",

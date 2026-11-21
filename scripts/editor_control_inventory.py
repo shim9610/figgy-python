@@ -47,6 +47,9 @@ def build(fig, case):
         ax.bar(["A", "B"], [3, 5])
     elif case == "boxplot":
         ax.boxplot([[1, 2, 3], [2, 4, 6]])
+    elif case == "range_links":
+        bars = ax.range_bars([0, 1], [0, 2], [1, 3], orientation="horizontal", id="tasks")
+        ax.range_links(bars, [(0, 1)], id="dependencies")
     else:
         ax.radar(["A", "B", "C"], [[2, 3, 4]])
     if case != "panels":
@@ -58,7 +61,7 @@ def build(fig, case):
 
 def rows():
     inventory = set()
-    for case in ("line", "mapped_points", "histogram", "errors", "contour", "field", "vector_points", "vector_grid", "polar", "panels", "radial", "radial_split", "categorical", "boxplot", "radar"):
+    for case in ("line", "mapped_points", "histogram", "errors", "contour", "field", "vector_points", "vector_grid", "polar", "panels", "radial", "radial_split", "categorical", "boxplot", "radar", "range_links"):
         with fg.Figure(backend="webgpu", id="inventory", **({"grid": [["left", "right"]]} if case == "panels" else {})) as fig:
             build(fig, case)
 
@@ -109,6 +112,9 @@ def rows():
                 for prop,value in [('timezone/mode','FixedOffsetMinutes'),('label/mode','Pattern'),('fractional/mode','Fixed')]:
                     command(owner['id'],field['id']+'/Timestamp/'+prop,value)
                 collect()
+                for prop, value in [('step/mode', 'Week'), ('label/mode', 'Relative'), ('label/mode', 'Custom')]:
+                    command(owner['id'], field['id']+'/Timestamp/'+prop, value)
+                    collect()
     grouped = {}
     for row in inventory:
         grouped.setdefault(row[1:], set()).add(row[0])

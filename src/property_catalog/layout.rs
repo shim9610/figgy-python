@@ -26,6 +26,18 @@ pub(super) fn fields(out: &mut Vec<Field>, state: &Value, node: &navigation::Nod
     if node.kind != "panel" {
         return;
     }
+    if bounded.is_none() {
+        let panel = panel_path(node.layer);
+        let path = format!("{panel}/line_offsets");
+        field(
+            out,
+            state.pointer(&path).cloned().unwrap_or(Value::Null),
+            &path,
+            "Line offsets",
+            "settings",
+            "Line series and offsets",
+        );
+    }
     let path = bounded.map_or_else(
         || panel_path(node.layer),
         |kind| format!("/{kind}/decorations"),

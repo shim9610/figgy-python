@@ -153,6 +153,7 @@ pub(super) struct DataHit {
     pub layer: LayerRef,
     pub reference: renderer::config::PickedDataRef,
     pub distance: f32,
+    pub extent: Option<f32>,
 }
 // A fill to an excluded series cannot be drawn by the temporary registry.
 fn picker_series(
@@ -162,7 +163,10 @@ fn picker_series(
     use renderer::data_config::{DataRenderType as T, LineFill};
     input
         .iter()
-        .filter(|s| !excluded.contains(&s.series_id))
+        .filter(|s| {
+            !excluded.contains(&s.series_id)
+                && !s.render_type.range_links().is_some_and(|link| excluded.contains(&link.bars))
+        })
         .cloned()
         .map(|mut s| {
             match &mut s.render_type {
@@ -199,6 +203,7 @@ impl FigureAccess<'_> {
         self.renderer.enable_gpu_picking().map_err(runtime)?;
         let original = self.data.chart.config().clone();
         let original_gpu = gpu::config(self.data.figure_id, &original);
+        let offset_panel = panel(&original, index).line_offsets.is_some();
         let mut displayed = renderer::place_document(
             &original_gpu,
             request.display_scale,
@@ -259,6 +264,10 @@ impl FigureAccess<'_> {
                         break;
                     };
                     let mut reference = pick.to_ref();
+                    let extent = match &pick {
+                        renderer::PickedData::HistogramBin { extent_px, .. } => *extent_px,
+                        _ => None,
+                    };
                     if !excluded.insert(reference.series_id().to_owned()) {
                         return Err(runtime("picker repeated an excluded series"));
                     }
@@ -268,10 +277,17 @@ impl FigureAccess<'_> {
                         layer: hit_layer,
                         reference,
                         distance: pick.distance_px(),
+                        extent,
                     });
+                    if offset_panel {
+                        break;
+                    }
                     self.renderer
                         .set_chart_series(self.data.chart_id, picker_series(&series, &excluded))
                         .map_err(runtime)?;
+                }
+                if offset_panel && !hits.is_empty() {
+                    break;
                 }
             }
             hits.sort_by(|a, b| a.distance.total_cmp(&b.distance));
@@ -300,14 +316,35 @@ impl FigureAccess<'_> {
         reference: &renderer::config::PickedDataRef,
         dx: f32,
         dy: f32,
+        extent: Option<f32>,
     ) -> PyResult<()> {
         use renderer::config::PickedDataRef as R;
         let id = reference.series_id();
         let mut next = self.snapshot();
+        let layer = next.config.layer_of_series(id);
+        let overlay = match layer {
+            LayerRef::Overlay(i) | LayerRef::SubplotOverlay(_, i) => Some(i),
+            _ => None,
+        };
+        let (x, y) = next.config.series_chart(id).scaling_axes(overlay);
+        let horizontal = next.config.bar_groups_of(layer).direction
+            == renderer::CategoryBarDirection::Horizontal;
+        let along = if horizontal {
+            if x.inverted { -dx } else { dx }
+        } else if y.inverted {
+            dy
+        } else {
+            -dy
+        };
         let Some(series) = next.series.iter_mut().find(|s| s.series_id == id) else {
             return Ok(());
         };
-        let moved = if let R::FeynmanLabel { part, index, .. } = reference {
+        let moved = if let R::HistogramBin { bin_index, .. } = reference {
+            let Some(links) = series.render_type.range_links_mut() else {
+                return Ok(());
+            };
+            links.drag_link_exit(*bin_index, along, extent)
+        } else if let R::FeynmanLabel { part, index, .. } = reference {
             let Some(diagram) = series.render_type.feynman_mut() else {
                 return Ok(());
             };
