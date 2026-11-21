@@ -1417,19 +1417,6 @@ export function render({model,el}) {
     canvas.width=documentWidth;canvas.height=documentHeight;
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
     chart=kind?await module.FiggyBoundedChart.create(canvas,kind,JSON.stringify(local[kind]),local.config.chart_area.width,local.config.chart_area.height):await module.FiggyChart.create(canvas);if(!kind)chart.set_pool_auto_growth(true);
-    if(!kind){
-      const getConfig=chart.get_config.bind(chart),setConfig=chart.set_config.bind(chart),setState=chart.set_host_state.bind(chart);
-      let projectedColorbar=false;
-      function project(json,install){
-        const config=JSON.parse(json);let projected=false;
-        if(!config.colorbar){const bar=config.subplots?.find(p=>p.config.colorbar)?.config.colorbar;if(bar){config.colorbar={...clone(bar),visible:false};projected=true;}}
-        install(JSON.stringify(config));projectedColorbar=projected;
-      }
-      chart.set_config=json=>project(json,setConfig);
-      chart.set_host_state=(json,series)=>project(json,config=>setState(config,series));
-      chart.get_config=()=>{const config=JSON.parse(getConfig());if(projectedColorbar)delete config.colorbar;return JSON.stringify(config);};
-    }
-
     if(disposed)return;
     const manifest=model.get('manifest'),buffers=model.get('columns');
     if(manifest.length!==buffers.length)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');

@@ -3471,6 +3471,7 @@ right.set_title('Mapped values')
         first=round((width-44)*2/3);start=round((width-44)*2/3+44)
         assert layout['gap']==44 and layout['column_weights']==[2,1]
         assert state['config']['chart_area']==dict(x=0,y=0,width=first,height=height)
+        assert not state['config'].get('colorbar')
         panel=state['config']['subplots'][0]['config']
         assert panel['chart_area']==dict(x=start,y=0,width=width-start,height=height)
         assert panel['colorbar']['gap_px']==17

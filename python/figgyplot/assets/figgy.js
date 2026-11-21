@@ -3263,10 +3263,15 @@ export class FiggyChart {
         }
     }
     /**
-     * Pick the nearest visible data primitive at canvas pixel `(x, y)`;
-     * equal-distance hits follow chart paint order.
-     * Unlike `pick_point`, this includes histogram bins, canonical heatmap
-     * cells and contour levels. The tagged result contains only stable
+     * Pick at canvas pixel `(x, y)` (#381, #399): the series that owns
+     * the drawn ink nearest to the cursor decides. A point-data owner
+     * answers its datum nearest to the cursor, a body or fill owner its
+     * typed hit; value labels and DataLess series, which draw no ink
+     * mask, answer by their typed hit. Unlike `pick_point`, this includes
+     * histogram bins, canonical heatmap cells and contour levels.
+     * `distance_px` is the distance to the picked datum and can exceed
+     * `max_distance_px`. Before the chart's first drawn frame nothing is
+     * picked. The tagged result contains only stable
      * source/series indices plus `distance_px`; values and geometry stay
      * in the renderer's GPU-backed SSoT. Resolves to `undefined` on miss.
      *
@@ -3563,7 +3568,7 @@ export class FiggyChart {
         return ret;
     }
     /**
-     * Compile the exact GPU picker and prepare it for the current chart.
+     * Compile the GPU picker and prepare it for the current chart.
      * Repeated calls, including retries, reuse renderer-owned state.
      * @returns {Promise<void>}
      */
@@ -7353,7 +7358,7 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1367, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1214, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_);
             return ret;
         },
