@@ -182,6 +182,23 @@ def test_notebook_extraction_waits_for_barrier():
         assert ''.join(s['text'] for s in token.text['panels'][0]['titles'])=='Accepted after barrier'
 
 
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_style_replaces_structured_tick_formats_and_resets_omitted_options(backend):
+    from figgyplot.ticker import AutoFormatter, TimestampFormatter
+
+    with fg.Figure(backend=backend) as source, fg.Figure(backend=backend) as target:
+        source_axis = source.axes[0].xaxis
+        target_axis = target.axes[0].xaxis
+        target_axis.set_major_formatter(TimestampFormatter("%b", step="month"))
+        for formatter in (AutoFormatter(uniform_decimals=False), AutoFormatter()):
+            source_axis.set_major_formatter(formatter)
+            token = fg.StyleToken.from_dict(source.extract_style().to_dict())
+            target.apply_style(token)
+            source_format = source.get_settings()["config"]["bottom_x"]["label_style"]["format"]
+            target_format = target.get_settings()["config"]["bottom_x"]["label_style"]["format"]
+            assert target_format == source_format
+
+
 @pytest.mark.parametrize('backend',BACKENDS)
 def test_layout_topology_mapping_preserves_physical_plot_margins(backend):
     with fg.Figure(backend=backend,grid=[['left','right']]) as source,fg.Figure(backend=backend,grid=[['a'],['b']],figsize=(12,8)) as target:

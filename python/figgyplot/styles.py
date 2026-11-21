@@ -34,7 +34,7 @@ RICH = dict(color=RGBA, font_size=True, font=True, align=True)
 TITLE = dict(text=RICH, visible=True, offset_x=True, offset_y=True, top_margin=True)
 LABEL = dict(visible=True, color=RGBA, font_size=True, label_visible=True,
              label_font=True, label_offset_x=True, label_offset_y=True,
-             format=True, significant_digits=True)
+             format='json', significant_digits=True)
 AXIS = dict(label_style=LABEL, title_option=TITLE, tick=True, out_margin=True,
             line_offset=True, line_visible=True, line_color=RGBA, line_width=True,
             line_style=True, major_tick_length=True, minor_tick_length=True, minor_count=True)
@@ -185,7 +185,9 @@ def _units(value, multiplier):
 
 def _merge(target, patch):
     for k,v in patch.items():
-        if isinstance(v,dict) and isinstance(target.get(k),dict):_merge(target[k],v)
+        # Formats are complete renderer enum values, with optional defaults
+        # omitted from their serialized payload.
+        if k != 'format' and isinstance(v,dict) and isinstance(target.get(k),dict):_merge(target[k],v)
         else:target[k]=copy.deepcopy(v)
 
 

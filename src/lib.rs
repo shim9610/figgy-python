@@ -363,7 +363,8 @@ impl FigureAccess<'_> {
             // Exports at another scale rasterize without a ChartView, so derive
             // this revision's tick warnings from a view of the document itself.
             if self.data.warnings_revision != Some(self.data.revision) {
-                let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
+                let chart =
+                    Chart::as_given(gpu::config(self.data.figure_id, self.data.chart.config()));
                 let view = self
                     .renderer
                     .create_chart_view(&chart, chart.config().chart_area.0)
@@ -373,7 +374,7 @@ impl FigureAccess<'_> {
             return pollster::block_on(
                 self.renderer.export_rgba(
                     renderer::ExportSource::Chart {
-                        chart: &Chart::new(gpu::config(
+                        chart: &Chart::as_given(gpu::config(
                             self.data.figure_id,
                             self.data.chart.config(),
                         )),
@@ -400,7 +401,7 @@ impl FigureAccess<'_> {
             height: (original.height as f32 * scale).round().max(1.) as u32,
         };
         config = renderer::place_document(&config, 1., rect);
-        let chart = Chart::new(config);
+        let chart = Chart::as_given(config);
         if rect.width > self.renderer.device().limits().max_texture_dimension_2d
             || rect.height > self.renderer.device().limits().max_texture_dimension_2d
         {
@@ -1219,7 +1220,7 @@ impl FigureAccess<'_> {
                     gpu::series(self.data.figure_id, &old.series),
                 )
                 .map_err(runtime)?;
-            self.data.chart = Chart::new(old.config);
+            self.data.chart = Chart::as_given(old.config);
             self.data.series = old.series;
             self.data.revision = revision;
             self.data.history = history;
@@ -1243,14 +1244,15 @@ impl FigureAccess<'_> {
             self.format_value_labels(&config, &mut series)?;
             validate_config(&config)?;
             validate_draw_style(&config, &series)?;
+            let chart = Chart::new(config);
             self.renderer
                 .set_chart_state(
                     self.data.chart_id,
-                    gpu::config(self.data.figure_id, &config),
+                    gpu::config(self.data.figure_id, chart.config()),
                     gpu::series(self.data.figure_id, &series),
                 )
                 .map_err(invalid)?;
-            self.data.chart = Chart::new(config);
+            self.data.chart = chart;
             self.refresh_addresses();
             self.data.series = series;
             self.fit(py, 0.05)
@@ -1263,7 +1265,7 @@ impl FigureAccess<'_> {
                     gpu::series(self.data.figure_id, &previous.series),
                 )
                 .map_err(runtime)?;
-            self.data.chart = Chart::new(previous.config);
+            self.data.chart = Chart::as_given(previous.config);
             self.data.series = previous.series;
             self.data.revision = revision;
             self.data.history = history;
@@ -1340,7 +1342,8 @@ impl FigureAccess<'_> {
             identity::refresh_legends(&mut next.config, &next.series);
         }
         let radial_changed = document.as_ref() != self.data.document.as_ref().map(|r| &r.chart);
-        if next.config == *self.data.chart.config()
+        let chart = Chart::new(next.config);
+        if chart.config() == self.data.chart.config()
             && !series_changed
             && !radial_changed
             && next.background == self.data.background
@@ -1354,11 +1357,11 @@ impl FigureAccess<'_> {
         self.renderer
             .set_chart_state(
                 self.data.chart_id,
-                gpu::config(self.data.figure_id, &next.config),
+                gpu::config(self.data.figure_id, chart.config()),
                 gpu::series(self.data.figure_id, &next.series),
             )
             .map_err(invalid)?;
-        self.data.chart = Chart::new(next.config);
+        self.data.chart = chart;
         self.refresh_addresses();
         self.data.series = next.series;
         self.data.background = next.background;
@@ -1835,7 +1838,7 @@ impl FigureAccess<'_> {
         }
         let picked = py.detach(|| {
             self.renderer.enable_gpu_picking().map_err(runtime)?;
-            let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
+            let chart = Chart::as_given(gpu::config(self.data.figure_id, self.data.chart.config()));
             let mut view = self
                 .renderer
                 .create_chart_view(&chart, chart.config().chart_area.0)

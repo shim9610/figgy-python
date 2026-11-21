@@ -174,7 +174,7 @@ jobs:
             trap 'kill "$wm_pid" 2>/dev/null || true' EXIT
             # Collect the entire suite; execute each node ID on one runner.
             # The required integration job audits exact JUnit execution IDs.
-            .venv/bin/python scripts/run_ci_tests.py -x -vv --capture=tee-sys --durations=30 \
+            .venv/bin/python scripts/run_ci_tests.py -vv --capture=tee-sys --durations=30 \
               --ci-shard-count=4 --ci-shard-index="$CI_SHARD" \
               --basetemp=ci-results/full --junitxml=ci-results/junit.xml \
               2>&1 | tee ci-results/full.log

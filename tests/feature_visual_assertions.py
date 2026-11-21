@@ -49,6 +49,8 @@ def populate(figure, feature):
         ax.set_xlim(0,4);ax.set_ylim(0,4)
     state = figure.get_settings()
     config = state['config']
+    # The pixel oracle specifies an absolute plot rectangle in this document.
+    config['layout_state'] = 'fixed'
     config['chart_title'].update(visible=False,top_margin=0)
     for key, margin in (('top_x',100),('bottom_x',100),('left_y',100),('right_y',460)):
         axis = config[key]
