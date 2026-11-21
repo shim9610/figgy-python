@@ -3,9 +3,7 @@
 import asyncio
 import json
 import os
-from pathlib import Path
 import sys
-import tempfile
 import pytest
 from figgyplot import text_segments
 
@@ -16,14 +14,20 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
     from mcp.client.stdio import stdio_client
 
     async def scenario():
-        env = dict(
-            os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "python")
-        )
+        # Run the package installed for pytest, including its native extension.
+        # A source checkout on PYTHONPATH can hide an installed wheel in CI.
         params = StdioServerParameters(
-            command=sys.executable, args=["-m", "figgyplot.mcp"], env=env
+            command=sys.executable, args=["-m", "figgyplot.mcp"], env=os.environ.copy()
         )
-        with tempfile.TemporaryFile(mode="w+") as stderr:
-            await check(params, stderr)
+        stderr_path = tmp_path / "mcp-stderr.log"
+        with stderr_path.open("w+", encoding="utf-8", errors="replace") as stderr:
+            try:
+                await check(params, stderr)
+            except Exception:
+                stderr.seek(0)
+                if log := stderr.read():
+                    print(log, end="", file=sys.stderr)
+                raise
 
     async def check(params, stderr):
         async with stdio_client(params, errlog=stderr) as (read, write):
