@@ -168,8 +168,14 @@ pub(super) fn apply(
                 }
             }
         }
+        config.layout_state = renderer::LayoutState::Fixed;
         config.validate().map_err(|e| invalid(format!("{e:?}")))?;
         *result.pointer_mut(&path).unwrap() = serde_json::to_value(config).unwrap();
+        // The document-level fitter also recomputes subplot margins.
+        result["config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("layout_state");
     } else {
         let (parent, key) = field.path.rsplit_once('/').unwrap();
         result.pointer_mut(parent).unwrap()[key] =

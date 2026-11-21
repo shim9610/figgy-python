@@ -280,6 +280,7 @@ class CoordinateChartAppearance:
         )
 
     def set_plot_bounds(self, bounds=None):
+        """Set a fixed plot rectangle in points, or return to fitted layout."""
         if bounds is None:
             from ._native import transform_settings_json
 
@@ -289,6 +290,7 @@ class CoordinateChartAppearance:
                     transform_settings_json(json.dumps(state), "layout", "")
                 )
                 result = self.axes._config(fitted)
+                cfg["layout_state"] = "fitted"
                 for side in ("bottom_x", "top_x", "left_y", "right_y"):
                     cfg[side]["out_margin"] = result[side]["out_margin"]
                 for old, new in zip(

@@ -55,10 +55,16 @@ def test_bounded_plot_geometry_can_return_to_automatic(backend,family):
         elif family=='boxplot':ax.boxplot([[1,2,3],[2,4,6]])
         elif family=='radial':ax.donut([2,3,4])
         else:ax.bar(['A','B','C'],[2,3,4])
-        fig.tight_layout();before=fig.get_settings()
+        if family=='radial':fig.tight_layout()
+        else:ax.chart.set_plot_bounds()
+        before=fig.get_settings()
+        if family!='radial':
+            assert before['config']['layout_state']=='fitted'
         edit(fig,'data_area','Plot area/bounds',[70,60,500,400])
         bounds=next(f['value'] for f in object_for(fig,'data_area')['fields'] if f['id']=='Plot area/bounds')
         assert bounds==[70,60,500,400]
+        if family!='radial':
+            assert fig.get_settings()['config'].get('layout_state','fixed')=='fixed'
         assert fig.get_settings()['series']==before['series']
         if family=='radial':edit(fig,'data_area','Plot area/automatic',True)
         else:ax.chart.set_plot_bounds()
@@ -85,6 +91,19 @@ def test_targeted_ui_comments_are_durable_and_separate_from_ssot(tmp_path):
         feedback=session.feedback(session.events()[0]['work_id'])['round']['documents']['plot']
         assert feedback['approval']['settings']==before and not feedback['approval']['changes']
         assert any(c['target']==target and c['text']==comments[0]['text'] for c in feedback['comments'])
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_manual_subplot_bounds_survive_document_fitting(backend):
+    with fg.Figure(backend=backend, grid=[["left", "right"]]) as figure:
+        right = figure.subplots["right"].axes
+        right.bar(["A", "B"], [2, 3])
+        figure.configure(config={"layout_state": "fitted"})
+        bounds = [50, 60, 300, 400]
+        figure.edit_property("panel/right", "Plot area/bounds", bounds)
+        figure.subplots["left"].axes.set_title("Later title on the other panel")
+        fields = figure.editor_properties("panel/right")["fields"]
+        assert next(field["value"] for field in fields if field["id"] == "Plot area/bounds") == bounds
 
 
 def test_subscription_returns_only_after_the_complete_batch(tmp_path):
