@@ -58,10 +58,26 @@ class ChartMethods:
         _merge(chart, properties)
         if 'title' in properties and 'chart_title' not in properties:
             _chart_text.set_title_text(chart, properties['title'])
+        inherited_font = False
         if fig._style_defaults is not None:
             state = fig.get_settings()
             state[kind] = chart
             chart = _style_runtime.bounded(fig, state, kind)[kind]
+            appearance = fig._style_defaults.appearance
+            inherited_font = (
+                'font_size' in appearance.get('typography', {})
+                or 'font_size' in appearance.get('bounded', {}).get(kind, {})
+            )
+        if (
+            chart.get('text_sizes') is not None
+            and 'text_sizes' not in properties
+            and ('font_size' in properties or inherited_font)
+        ):
+            # The sized renderer document overrides the shared legacy font.
+            # Keep the explicit or inherited font when no role sizes were supplied.
+            size = min(32., max(8., float(chart['font_size'])))
+            chart['text_sizes'] = dict(title=1.5 * size, axis_title=size,
+                                       tick_label=size, legend=size)
         return self._install_legacy_chart(kind, chart)
 
     @_style_runtime.styled

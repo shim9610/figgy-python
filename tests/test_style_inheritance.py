@@ -295,6 +295,17 @@ def test_default_equal_font_and_bounded_style_overrides():
         close_color(body(fig)['color'],_color('black'))
 
 
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_boxplot_explicit_text_sizes_take_precedence_over_shared_font(backend):
+    sizes = dict(title=24, axis_title=16, tick_label=13, legend=12)
+    with fg.Figure(backend=backend, style="publication.nature") as figure:
+        figure.axes[0].boxplot([1, 2, 3], font_size=18, text_sizes=sizes)
+        config = figure.get_settings()["config"]
+        assert config["bottom_x"]["label_style"]["font_size"] == 13
+        assert config["left_y"]["title_option"]["text"]["font_size"] == 16
+        assert config["legend"]["content"]["font_size"] == 12
+
+
 @pytest.mark.parametrize('theme',['light','dark'])
 @pytest.mark.parametrize('density',['compact','comfortable'])
 def test_task_variants_contrast_and_print_guards(theme,density):
