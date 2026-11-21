@@ -1,0 +1,20 @@
+{
+  "run_url": "https://github.com/shim9610/figgy-python/actions/runs/39762726735",
+  "failed_job_id": 119773577339,
+  "failed_test": "tests/test_radial_desktop.py::test_radial_native_edit_copy_selection_and_no_readback",
+  "before": {
+    "layout_mode": false,
+    "selected": null,
+    "title_input": false,
+    "plot_width_input": true
+  },
+  "after": {
+    "layout_mode": false,
+    "selected": null,
+    "title_input": true,
+    "plot_width_input": true
+  },
+  "mode_switch_complete_ssot_unchanged": true,
+  "local_ui_cases_passed": 12,
+  "previously_unexecuted_cases_passed": 48
+}

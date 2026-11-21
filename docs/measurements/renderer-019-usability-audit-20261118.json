@@ -1,0 +1,172 @@
+{
+  "date": "2026-11-18",
+  "timezone": "Asia/Seoul",
+  "implementation_commit": "51b434831c0383d4c434fe869ebf306d2c9c2d33",
+  "renderer_commit": "f5f611c4532b037f8c3b3087fab22a9f47852343",
+  "release_ready": false,
+  "status": "adapter changes verified; two upstream blockers remain",
+  "environment": {
+    "native": "Linux X11/Xvfb, Mesa Vulkan",
+    "browser": "actual JupyterLab, Chromium 154 Vulkan SwiftShader",
+    "windows_macos_tested": false,
+    "physical_gpu_performance_tested": false
+  },
+  "full_suite": {
+    "file": "full-f5-final-20261118.log",
+    "sha256": "5204fa0392a68d26d961f54a4cebff43ec0de48d8d85b2e30361ab50a0a8122d",
+    "summary": "1823 passed, 201 skipped, 3 xfailed in 265.44s (0:04:25)",
+    "passed": 1823,
+    "failed": 0,
+    "skipped": 201,
+    "strict_xfailed": 3
+  },
+  "api": {
+    "file": "diagram-api-f5-final.log",
+    "sha256": "e3d4773e8b37d1dedf4495c1ac09b3d73240ff4490505297950d935721d6e098",
+    "summary": "41 passed in 2.37s",
+    "passed": 41
+  },
+  "preflight": {
+    "file": "preflight-f5-installed-final.log",
+    "sha256": "808452cfaed5f3d17196411d874510c5f30cb0d060b01a0e9281bd860afd3374",
+    "summary": "110 passed in 5.28s",
+    "passed": 110
+  },
+  "builds": {
+    "native": {
+      "file": "upstream-f5-native-build.log",
+      "sha256": "fa8c5e2a8bc0b51e2a429966798efa3a9a47218f339e5e6b1fdd0f9e077d15dd",
+      "summary": "\ud83d\udee0 Installed figgyplot-0.4.0"
+    },
+    "wasm": {
+      "file": "upstream-f5-wasm-build.log",
+      "sha256": "c26622c5e3c2b6c2a895f4c15d263e44914dfb60f4dace1d025995b69dce1995",
+      "summary": "    Finished `release` profile [optimized] target(s) in 3m 45s"
+    }
+  },
+  "mcp": {
+    "file": "mcp-f5-rerun.log",
+    "sha256": "e3cec5ddf39cb9846f6d6d8e4f3654eb5428e0683e11b5fa7a8d4121fda4f194",
+    "summary": "1 passed in 9.02s",
+    "passed": 1
+  },
+  "actual_input_groups": {
+    "counts_must_not_be_summed": "Runs overlap and include checks before and after the upstream pin update. The complete host collection is not green because the browser radar pointer case exceeds its budget.",
+    "diagram_and_value_label_drag": {
+      "unique_passed": 12,
+      "initial": {
+        "file": "diagram-part-gestures-20261118.log",
+        "sha256": "84ebbf6fe5d3af7da43be3528f4abbca400a69e177bb630c6aae06b28c9452e5",
+        "summary": "1 failed, 10 passed, 169 deselected in 335.70s (0:05:35)"
+      },
+      "bar_label_recheck": {
+        "file": "bar-label-gestures-fixed-20261118.log",
+        "sha256": "5e2ac236018b6844f3d5d624cc609e74ef40df6e5c8a2eca08b61495a98803db",
+        "summary": "2 passed, 179 deselected in 82.25s (0:01:22)"
+      },
+      "note": "Ten diagram cases pass in the initial run; the cell-label fixture failed. Both bar-label cases pass after adding the cell label API."
+    },
+    "diagram_record_and_repeat_point_selection": {
+      "unique_passed": 6,
+      "initial": {
+        "file": "diagram-pointer-final-20261118.log",
+        "sha256": "9438d15f17b279354d799f3685f3bb558b03b381bd91da9e410c085655915640",
+        "summary": "1 failed, 5 passed, 163 deselected in 250.12s (0:04:10)"
+      },
+      "repeat_point_recheck": {
+        "file": "point-toggle-browser-fixed.log",
+        "sha256": "0168c53bd707edcecfe872c4c37bd6496a27b4ebda0563a4871b216ec8cc9fca",
+        "summary": "1 passed, 168 deselected in 65.55s (0:01:05)"
+      }
+    },
+    "held_frame_and_keyboard": {
+      "file": "coalescing-and-keys-ui-final-20261118.log",
+      "sha256": "0aaae1125fc77cdc7216de0baa99f31d45d01ab225b971b0fc6317cf5ee058ce",
+      "summary": "5 passed, 164 deselected in 128.09s (0:02:08)",
+      "passed": 5
+    },
+    "properties_annotations_radial": {
+      "unique_passed": 17,
+      "initial": {
+        "file": "remaining-controls-20261118.log",
+        "sha256": "262405b8aacfcd8f08b0a5330434a2af35c9de7d968ca031f61806e0ae70d3e7",
+        "summary": "3 failed, 11 passed, 170 deselected in 864.46s (0:14:24)"
+      },
+      "series_browser_recheck": {
+        "file": "series-label-browser-fixed.log",
+        "sha256": "996b23dfc5a861961a93b5e650a66f7a74cf41d9bed39b3d13643321da455361",
+        "summary": "1 passed in 76.73s (0:01:16)"
+      },
+      "native_series_and_radial_recheck": {
+        "file": "native-controls-radial-final.log",
+        "sha256": "30ef7cc5871b4802e60857c9b5457fcf911541c8002a158f1f3f65f5d213c90f",
+        "summary": "4 passed in 89.99s (0:01:29)"
+      },
+      "native_feynman_recheck": {
+        "file": "native-feynman-options-fixed.log",
+        "sha256": "c477cfc04aacadd409805e2802c83e0476071118af6b9a5e07a5639aec7eca92",
+        "summary": "1 passed in 47.23s"
+      },
+      "note": "Initial eleven pass; three tests addressed collapsed sections / a clipped popup choice, then pass separately. Native retry also includes three radial tests."
+    },
+    "f5_upstream_selection_recheck": {
+      "native": {
+        "file": "energy-selection-f5-native-final.log",
+        "sha256": "4f27214b479bf9f0f6cd41991b24cd32e9d7b599bf11cc218afd0bb5b50eefd0",
+        "summary": "1 passed in 12.51s"
+      },
+      "browser": {
+        "file": "energy-source-selection-f5-browser-final.log",
+        "sha256": "a530c85f5315f719c7c29918a5ff6ade50c3beb79cd9ae70d056bb07f56a3f31",
+        "summary": "1 passed in 27.13s"
+      },
+      "note": "These repeat existing cases; browser includes source-shared strokes, transitions and labels."
+    }
+  },
+  "upstream_issues": [
+    {
+      "number": 321,
+      "url": "https://github.com/shim9610/figgy/issues/321",
+      "status": "upstream fix consumed; temporary browser fallback removed"
+    },
+    {
+      "number": 325,
+      "url": "https://github.com/shim9610/figgy/issues/325",
+      "status": "open; EnergyLevels/Ternary/Parallel mixed subplot rejection; strict xfail guards; release blocker"
+    },
+    {
+      "number": 327,
+      "url": "https://github.com/shim9610/figgy/issues/327",
+      "status": "open; first radar GPU pick exceeds 300s on software WebGPU while unrelated kernels compile; hardware latency unmeasured",
+      "evidence": "renderer-019-radar-first-pick-20261118.json"
+    }
+  ],
+  "source_sha256": {
+    "Cargo.lock": "4b81f53cbdb4e6580935ffe7a964a0b2bc215fbe3caba5a2fa24495c6abf336c",
+    "Cargo.toml": "8e593d187e17e2a30749067388d78589e9998c398f155eaa0a719751c75fcdca",
+    "python/figgyplot/__init__.py": "016bf0fcf2d36a7a11b3886d2a3b1afa5fdfc33f7189db322ecb995930c74b50",
+    "python/figgyplot/_advanced.py": "fa851a0b164dd40410f89b8be90605a7d65deb5fce6f2ee08aaef0b8ab30d31b",
+    "python/figgyplot/_coordinate_chart.py": "fdd0aebea48d494be4244513c91c46e4845a615da3d3359caead283a2c8d6753",
+    "python/figgyplot/_diagram_artist.py": "40b6ed1748a7f43dbc5eed2ac700b0adc028f3e16e5b3d542fe2d063988a12fe",
+    "python/figgyplot/_diagram_input.py": "fc0b582eb7c96e9b36849a818c0dc1ab43795541caced2ec38794411c980c8f8",
+    "python/figgyplot/_matplotlib.py": "9d2a4391f4906d52f9a1704d2b80d4ba551ff460c9469242a64105a2fb99b1cb",
+    "python/figgyplot/assets/figgy.js": "bc2dd752e0ea12ad371fae72eec1222729d1535b91d666431eb67831cfa98c0a",
+    "python/figgyplot/figure.py": "5e1707e41f3c8c6843620203481d68ce77b70fb9245fb404ef0f1fff8b251e99",
+    "python/figgyplot/notebook.py": "92e6945229c1f0760e1db18a4f86af7d0c2bcbe931d83f37083e43e5195957a7",
+    "python/figgyplot/webgpu.js": "b6cd6a93b411300a97a7dc12f2085e2a70470d3d7e4738463f4f0e63218c7ae8",
+    "scripts/build-wasm.sh": "ce18f8c588cc4fc362552eb8c714332c1f942cc5a7b109fd0f2ef405d3944771",
+    "src/desktop.rs": "4449eaad7c671cc7ec52a3637d95911b92977fda49ac548b49f67029c3b5cfde",
+    "src/interaction.rs": "4e84bcc642c072aa2fba8a1fbc8419b3f84a8684ffd658488bb1a40ef62bd502",
+    "src/navigation.rs": "e45a4860caecf443874a41137cf6f153c269413094e588c60eea26c767edeb56",
+    "src/notebook.rs": "33edf909416398682d144c34cb907951e5bd765cfcbd125860100c555bc0b251",
+    "src/property_catalog.rs": "e0324dfdf19f0ddf495cfcad34c8c22f50b6d55440cf13bc22b452deed9b265b",
+    "src/property_catalog/diagrams.rs": "efda8e0cbdae5d2d6d5d4d0f875ef6d355b3bbefda94c17daf6bed20686261dc",
+    "src/selection_019.rs": "6e01cff2a2efe143dd079421a83465001ec27c218522e9aeafe8b67ede3e7d20",
+    "tests/test_diagram_editing.py": "f70e20ac3c9af55e72299699fc1b0c6ee504a2feafb71c5a5501e4eb807a223b",
+    "tests/test_interaction_parity.py": "40cee4ab495eae54fadc8db4a54d46b511ab1b565e3f542ef214cbb0547f1332",
+    "tests/test_packaged_assets.py": "e6645b284a31428f0e8a637aac9a3a97832c3a3b18d7381d8abed417aa93ed94",
+    "tests/test_radial_desktop.py": "ac7bb799845028ce7883b3c8b6c5527ba9c7a17e068360d41bca8743760306ab",
+    "tests/test_renderer_019_features.py": "53541803579250d0230834672ec4372b453318ae9be8c7c3ce93a1d031033391"
+  },
+  "assets_provenance_sha256": "ab02a2a3192766c1f1aea8d5b3a60eb00ee168aa183fb85f9425cb70f0afafc5"
+}

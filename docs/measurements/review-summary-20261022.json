@@ -1,0 +1,168 @@
+{
+  "base_commit": "c36378ac2ed7b070d28ddbac3f6a0c44841aa0d8",
+  "wheel_sha256": "7299dc1fd69ff4f572646f78bd60ffc7cfb1694d76d5a6e1bd742f25c6c388e6",
+  "installed_package_files": 35,
+  "raw_bytes": 42610,
+  "summary_bytes": 1794,
+  "summary": {
+    "protocol": 1,
+    "view": "summary",
+    "session_id": "6429e10bb10e49d2afc125a1f55f8360",
+    "round_id": "e0b24f7d055543df8c50c8151aedecba",
+    "work_id": "320876d2241c4e8db372210e4ff98666",
+    "intent": "revise",
+    "source": {
+      "arguments": {},
+      "cwd": "/workspace/figgy-python",
+      "function": "build"
+    },
+    "figures": [
+      {
+        "id": "donut",
+        "disposition": "request_changes",
+        "intent": "revise",
+        "change_count": 0,
+        "comment_count": 1,
+        "data_changed": false,
+        "comments": [
+          {
+            "channel": "ui",
+            "id": "deef0762a9d64405aec32c19479fff96",
+            "target": null,
+            "text": "두 번째 조각의 색을 더 연하게 해주세요."
+          }
+        ],
+        "objects": [],
+        "details": {
+          "figure_id": "donut"
+        }
+      },
+      {
+        "id": "line",
+        "disposition": "accept",
+        "intent": "revise",
+        "change_count": 6,
+        "comment_count": 0,
+        "data_changed": false,
+        "comments": [],
+        "objects": [
+          {
+            "target": "panel/main/chart_title",
+            "label": "Chart title",
+            "label_truncated": false,
+            "scope": "element",
+            "change_count": 6,
+            "properties": [
+              {
+                "path": "/text/segments",
+                "kind": "rich_text",
+                "before_exists": true,
+                "after_exists": true,
+                "before": {
+                  "value": "Before",
+                  "truncated": false
+                },
+                "after": {
+                  "value": "AFTER!",
+                  "truncated": false
+                },
+                "operation_ids": [
+                  "5e6e71c18ab2c366d8eef59e5aa2b2e7c83c86b001ddd11be69d9a066674ddf9",
+                  "8bf2a7cb35307d37b3c1138ca4bbb15861c60312d69897792c8ea59f40ed6440",
+                  "27769533d82d9bccd1e07c67893b0526b9990bdcd52c9ffb5f96c770e630cecd",
+                  "a5d21f054434d4df6993123c8b9d1af54443d2bbcb00f7b8ca4609505a52684e",
+                  "74d73ba2b00ecd5d0866cfba08d7fca00798251fb1a62c8f6a26aafb5f08c071",
+                  "8de4850b699524120bb96f50e4015940272b48365d929d69b15243f5b365b145"
+                ],
+                "text_changed": true,
+                "formatting_changed": false
+              }
+            ],
+            "comments": [],
+            "details": {
+              "figure_id": "line",
+              "target": "panel/main/chart_title"
+            }
+          }
+        ],
+        "details": {
+          "figure_id": "line"
+        }
+      }
+    ],
+    "counts": {
+      "figures": 2,
+      "objects": 1,
+      "changes": 6,
+      "comments": 1
+    }
+  },
+  "exact_changes": [
+    {
+      "after": "A",
+      "after_exists": true,
+      "before": "B",
+      "before_exists": true,
+      "id": "5e6e71c18ab2c366d8eef59e5aa2b2e7c83c86b001ddd11be69d9a066674ddf9",
+      "object_id": "figure/line",
+      "op": "replace",
+      "path": "/config/chart_title/text/segments/0/text",
+      "selectors": {}
+    },
+    {
+      "after": "F",
+      "after_exists": true,
+      "before": "e",
+      "before_exists": true,
+      "id": "8bf2a7cb35307d37b3c1138ca4bbb15861c60312d69897792c8ea59f40ed6440",
+      "object_id": "figure/line",
+      "op": "replace",
+      "path": "/config/chart_title/text/segments/1/text",
+      "selectors": {}
+    },
+    {
+      "after": "T",
+      "after_exists": true,
+      "before": "f",
+      "before_exists": true,
+      "id": "27769533d82d9bccd1e07c67893b0526b9990bdcd52c9ffb5f96c770e630cecd",
+      "object_id": "figure/line",
+      "op": "replace",
+      "path": "/config/chart_title/text/segments/2/text",
+      "selectors": {}
+    },
+    {
+      "after": "E",
+      "after_exists": true,
+      "before": "o",
+      "before_exists": true,
+      "id": "a5d21f054434d4df6993123c8b9d1af54443d2bbcb00f7b8ca4609505a52684e",
+      "object_id": "figure/line",
+      "op": "replace",
+      "path": "/config/chart_title/text/segments/3/text",
+      "selectors": {}
+    },
+    {
+      "after": "R",
+      "after_exists": true,
+      "before": "r",
+      "before_exists": true,
+      "id": "74d73ba2b00ecd5d0866cfba08d7fca00798251fb1a62c8f6a26aafb5f08c071",
+      "object_id": "figure/line",
+      "op": "replace",
+      "path": "/config/chart_title/text/segments/4/text",
+      "selectors": {}
+    },
+    {
+      "after": "!",
+      "after_exists": true,
+      "before": "e",
+      "before_exists": true,
+      "id": "8de4850b699524120bb96f50e4015940272b48365d929d69b15243f5b365b145",
+      "object_id": "figure/line",
+      "op": "replace",
+      "path": "/config/chart_title/text/segments/5/text",
+      "selectors": {}
+    }
+  ]
+}

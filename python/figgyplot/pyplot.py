@@ -1,5 +1,6 @@
 """A small stateful interface familiar to matplotlib.pyplot users."""
 from .figure import Figure, subplots as _subplots
+from ._style_runtime import use_style, style_context
 
 _current = None
 
@@ -27,6 +28,7 @@ def subplots(*args, **kwargs):
 def plot(*args, **kwargs): return gca().plot(*args, **kwargs)
 def scatter(*args, **kwargs): return gca().scatter(*args, **kwargs)
 def imshow(*args, **kwargs): return gca().imshow(*args, **kwargs)
+def imshow_rgb(*args, **kwargs): return gca().imshow_rgb(*args, **kwargs)
 def pie(*args, **kwargs): return gca().pie(*args, **kwargs)
 def donut(*args, **kwargs): return gca().donut(*args, **kwargs)
 def draw_style(*args, **kwargs): return gcf().set_draw_style(*args, **kwargs)
@@ -71,3 +73,58 @@ def axhspan(*args, **kwargs): return gca().axhspan(*args, **kwargs)
 def axvspan(*args, **kwargs): return gca().axvspan(*args, **kwargs)
 def arrow(*args, **kwargs): return gca().arrow(*args, **kwargs)
 def twinx(*args, **kwargs): return gca().twinx(*args, **kwargs)
+
+def stem(*args, **kwargs): return gca().stem(*args, **kwargs)
+
+def streamlines(*args, **kwargs): return gca().streamlines(*args, **kwargs)
+
+def streamplot(*args, **kwargs): return gca().streamplot(*args, **kwargs)
+
+def range_bars(*args, **kwargs): return gca().range_bars(*args, **kwargs)
+
+def broken_barh(*args, **kwargs): return gca().broken_barh(*args, **kwargs)
+
+def waterfall(*args, **kwargs): return gca().waterfall(*args, **kwargs)
+
+def candlestick(*args, **kwargs): return gca().candlestick(*args, **kwargs)
+
+def violinplot(*args, **kwargs): return gca().violinplot(*args, **kwargs)
+
+def raincloud(*args, **kwargs): return gca().raincloud(*args, **kwargs)
+
+def rose(*args, **kwargs): return gca().rose(*args, **kwargs)
+
+def hexbin(*args, **kwargs): return gca().hexbin(*args, **kwargs)
+
+def ternary(*args, **kwargs): return gca().ternary(*args, **kwargs)
+
+def parallel_coordinates(*args, **kwargs): return gca().parallel_coordinates(*args, **kwargs)
+
+def tripcolor(*args, **kwargs): return gca().tripcolor(*args, **kwargs)
+
+def plot_surface(*args, **kwargs): return gca().plot_surface(*args, **kwargs)
+
+def plot_trisurf(*args, **kwargs): return gca().plot_trisurf(*args, **kwargs)
+
+def plot3D(*args, **kwargs): return gca().plot3D(*args, **kwargs)
+
+def scatter3D(*args, **kwargs): return gca().scatter3D(*args, **kwargs)
+
+def quiver3D(*args, **kwargs): return gca().quiver3D(*args, **kwargs)
+
+def energy_levels(*args, **kwargs): return gca().energy_levels(*args, **kwargs)
+
+def feynman(*args, **kwargs): return gca().feynman(*args, **kwargs)
+
+def sunburst(*args, **kwargs): return gca().sunburst(*args, **kwargs)
+
+def tight_layout(**kwargs): return gcf().tight_layout(**kwargs)
+def theme(name="gallery"): return gcf().set_theme(name)
+
+def twiny(*args, **kwargs): return gca().twiny(*args, **kwargs)
+
+def tricontour(*args, **kwargs): return gca().tricontour(*args, **kwargs)
+def tricontourf(*args, **kwargs): return gca().tricontourf(*args, **kwargs)
+def tick_params(*args, **kwargs): return gca().tick_params(*args, **kwargs)
+def annotate(*args, **kwargs): return gca().annotate(*args, **kwargs)
+def colorbar(mappable, **kwargs): return gcf().colorbar(mappable, **kwargs)

@@ -38,7 +38,7 @@ def test_contextual_styles_have_real_commands_and_replay(backend,kind):
         assert fig.edit_history['undo_count']==count+1
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
-        exec(fig.to_code(),{'fig':fig})
+        exec(fig.to_code(mode='exact'),{'fig':fig})
         assert fig.get_settings()==after
 
 
@@ -159,11 +159,11 @@ def test_annotation_coordinates_convert_using_the_actual_axis_contract(backend,k
         if kind=='cartesian':
             ax.plot([0,10],[0,20],id='signal');ax.set_xlim(0,10);ax.set_ylim(0,20);x,y=2,5;ratio=(.2,.75);owner='config'
         elif kind=='categorical':
-            ax.bar(['A','B'],[5,10]);x,y=0,5;ratio=(.25,2/3);owner=kind
+            ax.bar(['A','B'],[5,10]);ax.set_ylim(0,15);x,y=0,5;ratio=(.25,2/3);owner='config'
         else:
-            ax.boxplot([[1,2,3],[2,4,6]]);fig.configure_bounded('boxplot',value_range=[0,10]);x,y=0,5;ratio=(.25,.5);owner=kind
+            ax.boxplot([[1,2,3],[2,4,6]]);fig.configure_bounded('boxplot',value_range=[0,10]);x,y=0,5;ratio=(.25,.5);owner='config'
         ax.text(x,y,'Probe',coords='data',id='probe')
-        before=fig.get_settings();target='annotation:probe' if kind=='cartesian' else 'annotation_0'
+        before=fig.get_settings();target='annotation:probe'
         edit(fig,target,'Coordinates/anchor','Ratio')
         anchor=fig.get_settings()[owner]['annotations']['items'][0]['kind']['Text']['anchor']
         assert [anchor['Ratio'][key] for key in ('x','y')]==pytest.approx(ratio,abs=1e-7)
@@ -178,13 +178,12 @@ def test_annotation_order_tracks_stable_ids_and_restores_bounded_selection(backe
     with fg.Figure(backend=backend) as fig:
         ax=fig.axes[0];ax.boxplot([[1,2,3],[2,4,6]])
         ax.text(.2,.3,'First',coords='ratio',id='first');ax.text(.4,.5,'Second',coords='ratio',id='second')
-        state=fig.get_settings();state['boxplot']['active_layer']='Annotations';state['boxplot']['decorations']['selected']={'Annotation':0};fig.apply_settings(state)
-        before=fig.get_settings();stable=object_for(fig,'annotation_0')['id']
+        state=fig.get_settings();state['config']['active_layer']='Annotations';fig.apply_settings(state)
+        before=fig.get_settings();stable=object_for(fig,'annotation:first')['id']
         fig.edit_property(stable,'Annotation/order',2,expected_revision=fig.revision)
         after=fig.get_settings()
-        assert [v['id'] for v in after['boxplot']['annotations']['items']]==['second','first']
-        assert after['boxplot']['decorations']['selected']=={'Annotation':1}
-        assert fig.editor_properties(stable)['target']=='annotation_1'
+        assert [v['id'] for v in after['config']['annotations']['items']]==['second','first']
+        assert fig.editor_properties(stable)['target']=='annotation:first'
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
 
@@ -280,6 +279,16 @@ def test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance(bac
         elif family=='categorical':ax.bar(['A','B'],[3,5])
         elif family=='boxplot':ax.boxplot([[1,2,3],[2,4,6]])
         else:ax.radar(['A','B','C'],[[2,3,4]])
+        if family != 'radial':
+            sid = fig.get_settings()['series'][0]['series_id']
+            owner = object_for(fig, sid)
+            before = fig.get_settings()
+            key, value = ('Appearance/style/line_width_px',5.) if family == 'radar' else ('Appearance/style/texture_strength',.6)
+            fig.edit_property(owner['id'],key,value,expected_revision=fig.revision)
+            body = next(iter(fig.get_settings()['series'][0]['render_type'].values()))
+            assert body['style'][key.rsplit('/',1)[-1]] == pytest.approx(value)
+            fig.undo();assert fig.get_settings()==before
+            return
         owner=next(v for v in fig.editor_properties() if v['id'].startswith('bounded/series/'))
         before=fig.get_settings()
         fig.edit_property(owner['id'],'Series style/custom',True,expected_revision=fig.revision)
@@ -443,7 +452,7 @@ def test_colorbar_title_command_preserves_character_style_and_replays(backend):
         assert rich['font_size']==text['font_size']
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
-        exec(fig.to_code(),{'fig':fig});assert fig.get_settings()==after
+        exec(fig.to_code(mode='exact'),{'fig':fig});assert fig.get_settings()==after
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])

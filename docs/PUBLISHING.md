@@ -45,36 +45,50 @@ other branches before building. This does not change main's branch protection.
 
 | Component | Working tree version | Published version verified 2026-10-21 |
 | --- | --- | --- |
-| `figgy-model` | 0.12.1 | 0.12.1 |
-| `figgy-renderer` | 0.18.1 | 0.18.1 |
-| `figgyplot` | 0.3.0 | 0.3.0 |
-| `figgy` WASM wrapper | 0.15.1 | Not a crates.io package (`publish = false`) |
+| `figgy-model` | 0.13.0-beta.2 | 0.12.1 |
+| `figgy-renderer` | 0.19.0-beta.2 | 0.18.1 |
+| `figgyplot` | 0.4.0 | 0.3.0 |
+| `figgy` WASM wrapper | 0.16.0-beta.2 | Not a crates.io package (`publish = false`) |
 
 Model 0.12.1 and renderer 0.18.1 were published on 2026-10-21. Python 0.3.0 was published on
 2026-10-16 with renderer 0.17.0/model 0.11.0, as verified from its PyPI sdist.
-The migration tree still carries that package version; select a new unused
-version before building publication artifacts. Do not upload the changed source
-as 0.3.0. For future coordinated releases,
+This tree targets Python 0.4.0; its artifacts still require the complete
+TestPyPI build and installation gates before production promotion. Do not upload
+the changed source as 0.3.0. For future coordinated releases,
 publish the model before the renderer, then the Python package. Each package
-has its own version; the WASM wrapper's 0.15.1 is not the renderer version.
-The native extension consumes crates.io packages with versions and checksums
-pinned in `Cargo.lock`. The bundled WASM uses their upstream release revision
-`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d`, recorded in
-`scripts/build-wasm.sh` and `python/figgyplot/assets/provenance.json`.
+has its own version; the WASM wrapper's 0.16.0-beta.2 is not the renderer version.
+The 0.19 integration is accumulated on PR #23. It currently pins the same
+unreleased Git revision for the native renderer/model and bundled WASM; see
+[the integration guide](RENDERER_019.md) for the exact revision. The upstream
+manifests at the pinned beta.2 integration commit report renderer 0.19.0-beta.2
+and model 0.13.0-beta.2.
 
-When updating the renderer, update the registry dependency and lockfile, then
-rebuild WASM from the matching clean release checkout. The rebuild verifies the
-downloaded `.crate` checksums, `.cargo_vcs_info.json` source revision and Rust
-sources before recording provenance. Offline preflight checks that the native
-versions/checksums and WASM revision remain paired; Git/path overrides fail this
-gate. The build then applies `scripts/wasm-host.patch` to a disposable copy of
-the web host. This additive binding patch exposes non-borrowing GPU completion and renderer
-annotation preparation without waiting for display completion;
-it does not change renderer/model sources. Provenance records its hash, and
-preflight rejects a mismatched patch or changes outside the two web host files.
-Do not edit provenance by hand to bypass a source mismatch.
-Python source builds fetch the Rust dependencies from crates.io; compatible
-wheels contain the compiled extension and need neither Git nor Cargo to install.
+The [integration audit](RENDERER_019_AUDIT.md) records the editing, style, label
+formatting and physical export-size repairs and their validation. Publication
+still requires the official upstream release and matching final package pins.
+
+Release this Python update after upstream renderer 0.19 and its matching model
+are officially available. At that point:
+
+1. Include the final upstream fixes (including figgy issues #308, #309, #318, #321 and #322),
+   replace the development Git dependency with the exact published renderer
+   version, and regenerate the registry lockfile.
+2. Rebuild WASM from the matching clean release revision. Check native/model
+   versions, registry checksums, WASM revision and asset hashes together.
+3. Run the regression and real native/Jupyter host checks on that final source,
+   then merge PR #23 and build the complete distribution set through the
+   TestPyPI workflow below.
+4. Promote the verified artifacts to PyPI using the production workflow. This
+   release order is authorized; upstream publication alone does not execute
+   the workflow or bypass its artifact and installation checks.
+
+The rebuild applies `scripts/wasm-host.patch` only to a disposable web host
+copy, exposing GPU completion, interaction preparation and label formatting through
+public renderer/model APIs. Provenance records its hash; preflight rejects a mismatched
+patch or changes outside the permitted web host files. Do not edit provenance
+by hand to bypass a source mismatch. Development source builds require the
+pinned Git dependency; release source builds will fetch published Rust packages.
+Wheels contain the compiled extension and need neither Git nor Cargo to install.
 
 ## Run publication
 
@@ -85,8 +99,8 @@ wheels contain the compiled extension and need neither Git nor Cargo to install.
    packaged WASM provenance. Publishing a new Rust version does not automatically
    update these pinned dependencies or existing Python installations.
 2. Open **Actions → Publish figgyplot (manual only) → Run workflow**.
-3. Select **main**, **target `testpypi`** and the new source version set in step 1
-   (`0.3.0` is already published). Leave the run-ID input empty.
+3. Select **main**, **target `testpypi`** and version **`0.4.0`**, matching the
+   source version set in step 1. Leave the run-ID input empty.
 4. Run it. This is an actual public TestPyPI upload, not a build-only dry run.
 
 The pipeline runs these gates in order:
@@ -219,10 +233,26 @@ also confirms version 0.2.1 with 75 distribution files.
 
 The published 0.3.0 release uses figgy-renderer 0.17.0 and includes the fixes
 reported against 0.2.1; it also carries the installation instructions prepared
-as 0.2.2, which was never uploaded. The renderer 0.18 migration needs a new
-Python package version and its own TestPyPI build/upload and installation
+as 0.2.2, which was never uploaded. The renderer 0.18 migration targets Python
+0.4.0 and needs its own TestPyPI build/upload and installation
 checks before promotion. Follow the coordinated version order above while
 retaining the native/WASM source pins.
 Future description changes are package metadata: committing `PYPI_README.md`
 does not replace the uploaded release's description. Publish a new version to
 include an updated description; this documentation change does not upload one.
+
+
+Renderer 0.19 integration release checks include EnergyLevels, Ternary and
+Parallel subplots beside a Cartesian root. The beta.2 pin with the upstream
+[figgy #325](https://github.com/shim9610/figgy/issues/325) fix passes the native and
+notebook model cases and the actual Jupyter widget render.
+The energy stroke and transition selection fix from
+[figgy #321](https://github.com/shim9610/figgy/issues/321) is included in beta.2.
+The browser calls public
+`selection_details()` directly; native resolves record sources with public
+`energy_level_records`, without retaining numerical arrays.
+
+Re-run the real browser radar pointer scenario after resolving
+[figgy #327](https://github.com/shim9610/figgy/issues/327), related to #299.
+The November 18 software WebGPU measurement exceeded 300 seconds on the previous
+pin. Recheck the first click on the exact release source.

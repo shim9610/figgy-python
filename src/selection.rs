@@ -3,14 +3,28 @@ use super::*;
 use renderer::config::PickedDataRef;
 
 impl FigureAccess<'_> {
-    fn read_samples(&mut self, samples: &[(String, usize)]) -> PyResult<Vec<f64>> {
+    pub(super) fn read_samples(&mut self, samples: &[(String, usize)]) -> PyResult<Vec<f64>> {
+        let scoped = samples
+            .iter()
+            .map(|(id, index)| (gpu::column_id(self.data.figure_id, id), *index))
+            .collect::<Vec<_>>();
+        self.read_gpu_samples(&scoped, false)
+    }
+    pub(super) fn read_gpu_samples(
+        &mut self,
+        samples: &[(String, usize)],
+        indices: bool,
+    ) -> PyResult<Vec<f64>> {
+        if samples.is_empty() {
+            return Ok(Vec::new());
+        }
         let offsets = samples
             .iter()
             .map(|(column, index)| {
                 let handle = self
                     .renderer
                     .pool()
-                    .handle_for(&gpu::column_id(self.data.figure_id, column))
+                    .handle_for(column)
                     .ok_or_else(|| invalid("selected column no longer exists"))?;
                 if *index >= handle.len_values {
                     return Err(invalid("selected index is outside the column"));
@@ -46,12 +60,15 @@ impl FigureAccess<'_> {
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = tx.send(result);
         });
-        self.renderer.wait_idle();
+        self.renderer.wait_idle().map_err(runtime)?;
         rx.recv().map_err(runtime)?.map_err(runtime)?;
         let mapped = slice.get_mapped_range().map_err(runtime)?;
         let values = mapped
             .chunks_exact(8)
             .map(|p| {
+                if indices {
+                    return u32::from_le_bytes(p[..4].try_into().unwrap()) as f64;
+                }
                 f32::from_le_bytes(p[..4].try_into().unwrap()) as f64
                     + f32::from_le_bytes(p[4..].try_into().unwrap()) as f64
             })
@@ -71,6 +88,9 @@ impl FigureAccess<'_> {
             .cloned()
             .ok_or_else(|| invalid("selected series no longer exists"))?;
         let mut result = json!({"identity":reference, "series_id":series.series_id});
+        if self.selection_019(reference, &series, &mut result)? {
+            return Ok(result);
+        }
         match reference {
             PickedDataRef::Point { point_index, .. } => {
                 let style = serde_json::to_value(&series.render_type).map_err(runtime)?;
@@ -80,6 +100,10 @@ impl FigureAccess<'_> {
                     (series.y_column.clone(), *point_index),
                 ];
                 let mut fields = vec!["x", "y"];
+                if let Some(z) = &series.z_column {
+                    samples.push((z.clone(), *point_index));
+                    fields.push("z");
+                }
                 for (field, node) in [
                     (
                         "color_value",
@@ -88,6 +112,8 @@ impl FigureAccess<'_> {
                     ("size_value", &style["scatter"]["point_size_map"]["column"]),
                     ("u", &style["components"]["Points"]["u"]),
                     ("v", &style["components"]["Points"]["v"]),
+                    ("w", &style["components"]["Points"]["w"]),
+                    ("c", &style["c_column"]),
                     ("color_value", &style["style"]["color_map"]["Column"]),
                 ] {
                     if let Some(column) = node.as_str() {
@@ -100,9 +126,23 @@ impl FigureAccess<'_> {
                 for (field, value) in fields.into_iter().zip(values) {
                     result[field] = json!(value);
                 }
+                if series.render_type.radar().is_some() {
+                    self.selection_category(&series, *point_index, &mut result);
+                }
+                if let Some(parallel) = series.render_type.parallel() {
+                    let samples = parallel
+                        .columns
+                        .iter()
+                        .map(|name| (name.clone(), *point_index))
+                        .collect::<Vec<_>>();
+                    result["values"] = json!(self.read_samples(&samples)?);
+                }
             }
             PickedDataRef::HistogramBin { bin_index, .. } => {
-                let renderer::DataRenderType::Histogram { bar } = &series.render_type else {
+                let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries {
+                    bar,
+                }) = &series.render_type
+                else {
                     return Err(invalid("selected series is not a histogram"));
                 };
                 let (edges, values) = match bar.orientation {
@@ -130,7 +170,12 @@ impl FigureAccess<'_> {
                 x_index, y_index, ..
             } => {
                 let style = serde_json::to_value(&series.render_type).map_err(runtime)?;
-                let matrix = &style.as_object().unwrap().values().next().unwrap()["matrix"];
+                let body = style.as_object().unwrap().values().next().unwrap();
+                let matrix = body
+                    .get("matrix")
+                    .or_else(|| body.get("red"))
+                    .or_else(|| body["components"]["Grid"].get("u"))
+                    .ok_or_else(|| invalid("selected series has no matrix lattice"))?;
                 let across_x = matrix["orientation"] == "ColumnsAreY";
                 let column_index = if across_x { *y_index } else { *x_index };
                 let sample_index = if across_x { *x_index } else { *y_index };
@@ -163,6 +208,32 @@ impl FigureAccess<'_> {
                     values[1]
                 });
                 result["value"] = json!(values[2]);
+                if body.get("red").is_some() {
+                    let samples = ["green", "blue"]
+                        .into_iter()
+                        .map(|channel| {
+                            Ok((
+                                body[channel]["columns"][column_index]
+                                    .as_str()
+                                    .ok_or_else(|| invalid("image channel no longer exists"))?
+                                    .to_owned(),
+                                sample_index,
+                            ))
+                        })
+                        .collect::<PyResult<Vec<_>>>()?;
+                    let colors = self.read_samples(&samples)?;
+                    result["red"] = json!(values[2]);
+                    result["green"] = json!(colors[0]);
+                    result["blue"] = json!(colors[1]);
+                    result.as_object_mut().unwrap().remove("value");
+                } else if let Some(grid) = body["components"].get("Grid") {
+                    let v = grid["v"]["columns"][column_index]
+                        .as_str()
+                        .ok_or_else(|| invalid("vector grid no longer exists"))?;
+                    result["u"] = json!(values[2]);
+                    result["v"] = json!(self.read_samples(&[(v.into(), sample_index)])?[0]);
+                    result.as_object_mut().unwrap().remove("value");
+                }
             }
             _ => {}
         }
@@ -182,6 +253,29 @@ impl FigureAccess<'_> {
         else {
             return Ok(false);
         };
+        if self.data.series[position].z_column.is_some()
+            || !matches!(
+                self.data.series[position].render_type,
+                renderer::DataRenderType::Xy(_)
+                    | renderer::DataRenderType::Field(_)
+                    | renderer::DataRenderType::Histogram(..)
+            )
+        {
+            let changed = self
+                .renderer
+                .step_chart_selection(self.data.chart_id, dx, dy)
+                .map_err(runtime)?;
+            if changed {
+                let next = gpu::local_config(
+                    self.data.figure_id,
+                    self.renderer
+                        .chart_config(self.data.chart_id)
+                        .map_err(runtime)?,
+                );
+                self.commit_config(next)?;
+            }
+            return Ok(changed);
+        }
         let shift = |index: usize, delta: i32, count: usize| {
             index
                 .saturating_add_signed(delta as isize)
@@ -219,12 +313,14 @@ impl FigureAccess<'_> {
                 *point_index = shift(*point_index, dx, count);
             }
             PickedDataRef::HistogramBin {
+                half: _,
                 series_id,
                 source_id,
                 bin_index,
             } => {
-                let renderer::DataRenderType::Histogram { bar } =
-                    &self.data.series[position].render_type
+                let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries {
+                    bar,
+                }) = &self.data.series[position].render_type
                 else {
                     return Ok(false);
                 };
@@ -238,7 +334,7 @@ impl FigureAccess<'_> {
                     .iter()
                     .filter(|s| {
                         matches!(&s.render_type,
-                        renderer::DataRenderType::Histogram { bar: other }
+                        renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries { bar: other })
                         if other.orientation == bar.orientation)
                     })
                     .collect::<Vec<_>>();

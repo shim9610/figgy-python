@@ -19,6 +19,12 @@ class RecordedUploads:
         self.native.upload_column(name, array)
         self.arrays[name] = original
 
+    def upload_composite(self, kind, name, fields):
+        copied = {name+'::'+key:np.array(array,copy=True) for key,array in fields.items()}
+        self.native.upload_composite(kind,name,fields)
+        assert not set(copied).intersection(self.arrays)
+        self.arrays.update(copied)
+
 
 @contextmanager
 def record_uploads(monkeypatch):
@@ -62,14 +68,6 @@ def assert_cached_bounded(cache, checkpoint, family):
     if family == 'pie':
         expected = {f'/radial/slices/{i}/value': np.array([value])
                     for i, value in enumerate((3.,2.,1.))}
-    elif family in ('bar','radar'):
-        kind, values = ('categorical',[3.,4.]) if family=='bar' else ('radar',[1.,2.,3.])
-        expected = {f'/{kind}/series/0/values': np.array(values)}
-    elif family == 'box':
-        stats = (dict(q1=1.5,median=2.,q3=2.5,whisker_low=1.,whisker_high=3.,mean=2.,sample_count=3),
-                 dict(q1=3.,median=4.,q3=5.,whisker_low=2.,whisker_high=6.,mean=4.,sample_count=3))
-        expected = {f'/boxplot/series/0/values/{i}/{key}': np.array([value])
-                    for i, row in enumerate(stats) for key, value in row.items()}
     for key in ('bounded_data','baseline_bounded_data'):
         arrays = {name: np.load(cache / ref['file'], allow_pickle=False)
                   for name, ref in checkpoint[key].items()}
@@ -94,6 +92,7 @@ def assert_renderer_columns(figure, expected):
         native = native.native
     uploads = figure.info['column_uploads']
     for number, (name, original) in enumerate(expected.items()):
+        if '::' in name: continue  # Composite fields are checked at cache/upload and through rendered boxes/meshes.
         sid = f'recovery_readback_{number}'
         native.add_series(json.dumps(dict(series_id=sid, label=None, x_column=name, y_column=name,
             render_type={'Line': {'line': dict(line_color=dict(r=0,g=0,b=0,a=1),

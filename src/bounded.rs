@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Bounded chart hosts delegate geometry, picking and drag policy to figgy-renderer.
 use super::*;
 use renderer::{DecorationLayout, boxplot::*, categorical::*, radar::*, radial::*};
@@ -54,16 +55,16 @@ impl DocumentChart {
     pub fn set_active_layer(&mut self, layer: renderer::LayerRef) {
         match self {
             Self::Radial(c) => {
-                c.set_active_layer(layer);
+                c.active_layer = layer;
             }
             Self::Categorical(c) => {
-                c.set_active_layer(layer);
+                c.active_layer = layer;
             }
             Self::BoxPlot(c) => {
-                c.set_active_layer(layer);
+                c.active_layer = layer;
             }
             Self::Radar(c) => {
-                c.set_active_layer(layer);
+                c.active_layer = layer;
             }
         }
     }
@@ -149,75 +150,29 @@ impl DocumentChart {
         }
     }
     pub fn select_at(&mut self, frame: &DocumentFrame, point: [f32; 2], toggle: bool) {
-        match (self, frame) {
-            (Self::Radial(c), DocumentFrame::Radial(f)) => {
-                let hit = f.hit_test(point).or_else(|| {
-                    f.hit_test_at_rest(point)
-                        .filter(|t| Some(*t) == c.interaction.hovered)
-                });
-                c.interaction.selected = if toggle && hit == c.interaction.selected {
-                    None
-                } else {
-                    hit
-                };
-            }
-            (Self::Categorical(c), DocumentFrame::Categorical(f)) => {
-                let hit = f.hit_test(point);
-                c.selected = if toggle && hit == c.selected {
-                    None
-                } else {
-                    hit
-                };
-            }
-            (Self::BoxPlot(c), DocumentFrame::BoxPlot(f)) => {
-                let hit = f.hit_test(point).map(|p| p.target);
-                c.selected = if toggle && hit == c.selected {
-                    None
-                } else {
-                    hit
-                };
-            }
-            (Self::Radar(c), DocumentFrame::Radar(f)) => {
-                let hit = f.hit_test(point).map(|p| p.target);
-                c.selected = if toggle && hit == c.selected {
-                    None
-                } else {
-                    hit
-                };
-            }
-            _ => unreachable!(),
+        if let (Self::Radial(c), DocumentFrame::Radial(f)) = (self, frame) {
+            let hit = f.hit_test(point).or_else(|| {
+                f.hit_test_at_rest(point)
+                    .filter(|t| Some(*t) == c.interaction.hovered)
+            });
+            c.interaction.selected = if toggle && hit == c.interaction.selected {
+                None
+            } else {
+                hit
+            };
         }
     }
     pub fn hover(&mut self, frame: &DocumentFrame, point: Option<[f32; 2]>, dt: f32) -> bool {
-        match (self, frame) {
-            (Self::Radial(c), DocumentFrame::Radial(f)) => {
-                let hit = point.and_then(|p| {
-                    f.hit_test(p).or_else(|| {
-                        f.hit_test_at_rest(p)
-                            .filter(|t| Some(*t) == c.interaction.hovered)
-                    })
-                });
-                c.interaction.animate_hover(hit, dt, 0.16)
-            }
-            (Self::Categorical(c), DocumentFrame::Categorical(f)) => {
-                let hit = point.and_then(|p| f.hit_test(p));
-                let changed = hit != c.hovered;
-                c.hovered = hit;
-                changed
-            }
-            (Self::BoxPlot(c), DocumentFrame::BoxPlot(f)) => {
-                let hit = point.and_then(|p| f.hit_test(p)).map(|p| p.target);
-                let changed = hit != c.hovered;
-                c.hovered = hit;
-                changed
-            }
-            (Self::Radar(c), DocumentFrame::Radar(f)) => {
-                let hit = point.and_then(|p| f.hit_test(p)).map(|p| p.target);
-                let changed = hit != c.hovered;
-                c.hovered = hit;
-                changed
-            }
-            _ => unreachable!(),
+        if let (Self::Radial(c), DocumentFrame::Radial(f)) = (self, frame) {
+            let hit = point.and_then(|p| {
+                f.hit_test(p).or_else(|| {
+                    f.hit_test_at_rest(p)
+                        .filter(|t| Some(*t) == c.interaction.hovered)
+                })
+            });
+            c.interaction.animate_hover(hit, dt, 0.16)
+        } else {
+            false
         }
     }
     pub fn step(&mut self, backwards: bool) {
@@ -260,23 +215,12 @@ impl DocumentChart {
                 next(items, &mut c.selected, backwards);
             }
             Self::Radial(c) => {
-                let mut items = c
-                    .slices
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, s)| s.value > 0.)
-                    .map(|(i, _)| RadialTarget::main(i))
-                    .collect::<Vec<_>>();
-                if let Some(split) = &c.split {
-                    items.extend(
-                        split
-                            .children
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, s)| s.value > 0.)
-                            .map(|(i, _)| RadialTarget::detail(i)),
-                    );
-                }
+                let items = (0..c.group_count())
+                    .flat_map(|group| {
+                        (0..c.group_len(group)).map(move |index| RadialTarget { group, index })
+                    })
+                    .filter(|target| c.slice(*target).is_some_and(|node| node.value > 0.))
+                    .collect();
                 next(items, &mut c.interaction.selected, backwards);
             }
             Self::Categorical(c) => {
@@ -313,7 +257,7 @@ impl DocumentChart {
 
 pub(super) struct BoundedDocument {
     pub chart: DocumentChart,
-    renderer: Option<DocumentRenderer>,
+    pub(super) renderer: Option<DocumentRenderer>,
 }
 impl BoundedDocument {
     pub fn gpu_bytes(&self) -> u64 {
@@ -324,32 +268,20 @@ impl BoundedDocument {
 }
 pub(super) enum DocumentRenderer {
     Radial(RadialRenderer),
-    Categorical(CategoricalRenderer),
-    BoxPlot(BoxPlotRenderer),
-    Radar(RadarRenderer),
 }
 pub(super) enum DocumentFrame {
-    Radial(Arc<RadialFrame>),
-    Categorical(Arc<CategoricalFrame>),
-    BoxPlot(Arc<BoxPlotFrame>),
-    Radar(Arc<RadarFrame>),
+    Radial(Arc<crate::radial_compat::Frame>),
 }
 impl DocumentRenderer {
     pub fn new(gpu: RendererDevice, chart: &DocumentChart) -> PyResult<Self> {
-        Ok(match chart {
-            DocumentChart::Radial(_) => Self::Radial(
-                RadialRenderer::new(gpu, wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?,
-            ),
-            DocumentChart::Categorical(_) => Self::Categorical(
-                CategoricalRenderer::new(gpu, wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?,
-            ),
-            DocumentChart::BoxPlot(_) => Self::BoxPlot(
-                BoxPlotRenderer::new(gpu, wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?,
-            ),
-            DocumentChart::Radar(_) => Self::Radar(
-                RadarRenderer::new(gpu, wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?,
-            ),
-        })
+        match chart {
+            DocumentChart::Radial(_) => Ok(Self::Radial(
+                RadialRenderer::try_new(gpu, wgpu::TextureFormat::Rgba8Unorm).map_err(runtime)?,
+            )),
+            _ => Err(invalid(
+                "legacy charts must migrate to column-backed series",
+            )),
+        }
     }
     pub fn prepare(
         &mut self,
@@ -357,44 +289,13 @@ impl DocumentRenderer {
         size: (u32, u32),
         scale: f32,
     ) -> PyResult<DocumentFrame> {
-        let background = if chart.annotations().visible
-            && chart
-                .annotations()
-                .items
-                .iter()
-                .any(|a| a.visible && matches!(a.kind, renderer::AnnotationKind::Span { .. }))
-        {
-            renderer::annotation::FrameBackground::HostClear
-        } else {
-            renderer::annotation::FrameBackground::Opaque
+        let (Self::Radial(r), DocumentChart::Radial(c)) = (self, chart) else {
+            return Err(invalid("legacy chart requires migration"));
         };
-        match (self, chart) {
-            (Self::Radial(r), DocumentChart::Radial(c)) => {
-                r.set_background(background);
-                Ok(DocumentFrame::Radial(
-                    r.prepare(c, size, scale).map_err(runtime)?,
-                ))
-            }
-            (Self::Categorical(r), DocumentChart::Categorical(c)) => {
-                r.set_background(background);
-                Ok(DocumentFrame::Categorical(
-                    r.prepare(c, size, scale).map_err(runtime)?,
-                ))
-            }
-            (Self::BoxPlot(r), DocumentChart::BoxPlot(c)) => {
-                r.set_background(background);
-                Ok(DocumentFrame::BoxPlot(
-                    r.prepare(c, size, scale).map_err(runtime)?,
-                ))
-            }
-            (Self::Radar(r), DocumentChart::Radar(c)) => {
-                r.set_background(background);
-                Ok(DocumentFrame::Radar(
-                    r.prepare(c, size, scale).map_err(runtime)?,
-                ))
-            }
-            _ => Err(invalid("cannot change chart family")),
-        }
+        let inner = r.prepare(c, size, scale).map_err(runtime)?;
+        Ok(DocumentFrame::Radial(Arc::new(
+            crate::radial_compat::Frame::new(inner, c.clone()),
+        )))
     }
     pub fn prepare_annotations(
         &mut self,
@@ -402,21 +303,10 @@ impl DocumentRenderer {
         size: (u32, u32),
         scale: f32,
     ) -> PyResult<Arc<renderer::annotation::BoundedAnnotationFrame>> {
-        match (self, chart) {
-            (Self::Radial(r), DocumentChart::Radial(c)) => {
-                r.prepare_annotations(c, size, scale).map_err(runtime)
-            }
-            (Self::Categorical(r), DocumentChart::Categorical(c)) => {
-                r.prepare_annotations(c, size, scale).map_err(runtime)
-            }
-            (Self::BoxPlot(r), DocumentChart::BoxPlot(c)) => {
-                r.prepare_annotations(c, size, scale).map_err(runtime)
-            }
-            (Self::Radar(r), DocumentChart::Radar(c)) => {
-                r.prepare_annotations(c, size, scale).map_err(runtime)
-            }
-            _ => Err(invalid("cannot change chart family")),
-        }
+        let (Self::Radial(r), DocumentChart::Radial(c)) = (self, chart) else {
+            return Err(invalid("legacy chart requires migration"));
+        };
+        r.prepare_annotations(c, size, scale).map_err(runtime)
     }
     pub fn export(
         &mut self,
@@ -424,72 +314,37 @@ impl DocumentRenderer {
         size: (u32, u32),
         scale: f32,
     ) -> PyResult<renderer::RasterImage> {
-        match (self, chart) {
-            (Self::Radial(r), DocumentChart::Radial(c)) => {
-                r.export_rgba(c, size, scale).map_err(runtime)
-            }
-            (Self::Categorical(r), DocumentChart::Categorical(c)) => {
-                r.export_rgba(c, size, scale).map_err(runtime)
-            }
-            (Self::BoxPlot(r), DocumentChart::BoxPlot(c)) => {
-                r.export_rgba(c, size, scale).map_err(runtime)
-            }
-            (Self::Radar(r), DocumentChart::Radar(c)) => {
-                r.export_rgba(c, size, scale).map_err(runtime)
-            }
-            _ => Err(invalid("cannot change chart family")),
-        }
+        let (Self::Radial(r), DocumentChart::Radial(c)) = (self, chart) else {
+            return Err(invalid("legacy chart requires migration"));
+        };
+        r.export_rgba_blocking(c, size, renderer::ExportOptions::document(scale))
+            .map_err(runtime)
     }
     pub fn gpu_bytes(&self) -> u64 {
-        match self {
-            Self::Radial(r) => r.gpu_memory_usage().total_bytes(),
-            Self::Categorical(r) => r.gpu_memory_usage().total_bytes(),
-            Self::BoxPlot(r) => r.gpu_memory_usage().total_bytes(),
-            Self::Radar(r) => r.gpu_memory_usage().total_bytes(),
-        }
+        let Self::Radial(r) = self;
+        r.gpu_memory_usage().total_bytes()
     }
     pub fn end_frame(&self) {
-        match self {
-            Self::Radial(r) => r.end_frame(),
-            Self::Categorical(r) => r.end_frame(),
-            Self::BoxPlot(r) => r.end_frame(),
-            Self::Radar(r) => r.end_frame(),
-        }
+        let Self::Radial(r) = self;
+        r.end_frame();
     }
 }
 impl DocumentFrame {
     pub fn annotation_space(&self) -> renderer::annotation::PixelSpace {
-        match self {
-            Self::Radial(f) => f.annotation_space(),
-            Self::Categorical(f) => f.annotation_space(),
-            Self::BoxPlot(f) => f.annotation_space(),
-            Self::Radar(f) => f.annotation_space(),
-        }
+        let Self::Radial(f) = self;
+        f.annotation_space()
     }
-
-    pub fn decorations(&self) -> &renderer::decoration::DecorationMap {
-        match self {
-            Self::Radial(f) => f.decorations(),
-            Self::Categorical(f) => f.decorations(),
-            Self::BoxPlot(f) => f.decorations(),
-            Self::Radar(f) => f.decorations(),
-        }
+    pub fn decorations(&self) -> &crate::radial_compat::Decorations {
+        let Self::Radial(f) = self;
+        f.decorations()
     }
     pub fn draw(&self, pass: &mut wgpu::RenderPass<'_>) {
-        match self {
-            Self::Radial(f) => f.draw(pass),
-            Self::Categorical(f) => f.draw(pass),
-            Self::BoxPlot(f) => f.draw(pass),
-            Self::Radar(f) => f.draw(pass),
-        }
+        let Self::Radial(f) = self;
+        f.draw(pass);
     }
     pub fn has_data(&self, p: [f32; 2]) -> bool {
-        match self {
-            Self::Radial(f) => f.hit_test(p).is_some() || f.hit_test_at_rest(p).is_some(),
-            Self::Categorical(f) => f.hit_test(p).is_some(),
-            Self::BoxPlot(f) => f.hit_test(p).is_some(),
-            Self::Radar(f) => f.hit_test(p).is_some(),
-        }
+        let Self::Radial(f) = self;
+        f.hit_test(p).is_some() || f.hit_test_at_rest(p).is_some()
     }
 }
 impl FigureAccess<'_> {
@@ -504,7 +359,10 @@ impl FigureAccess<'_> {
             _ => return Err(invalid("unknown chart family")),
         })
     }
-    pub(super) fn set_document(&mut self, chart: DocumentChart) -> PyResult<()> {
+    pub(super) fn set_document(&mut self, mut chart: DocumentChart) -> PyResult<()> {
+        if let DocumentChart::Radial(c) = &mut chart {
+            c.normalize_labels();
+        }
         if self
             .data
             .document
@@ -527,7 +385,7 @@ impl FigureAccess<'_> {
             || !self.data.columns.is_empty()
             || !self.data.chart.config().subplots.is_empty()
             || !self.data.chart.config().overlays.is_empty()
-            || self.data.chart.config().polar.is_some()
+            || self.data.chart.config().polar().is_some()
         {
             return Err(invalid("create a separate Figure for bounded charts"));
         }
@@ -547,7 +405,7 @@ impl FigureAccess<'_> {
         self.data.history = Default::default();
         Ok(())
     }
-    fn document_renderer(&mut self) -> PyResult<&mut BoundedDocument> {
+    pub(super) fn document_renderer(&mut self) -> PyResult<&mut BoundedDocument> {
         let doc = self
             .data
             .document
@@ -558,7 +416,8 @@ impl FigureAccess<'_> {
                 RendererDevice::new(
                     self.renderer.device().clone(),
                     self.renderer.queue().clone(),
-                ),
+                )
+                .map_err(runtime)?,
                 &doc.chart,
             )?);
         }

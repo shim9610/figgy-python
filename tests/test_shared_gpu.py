@@ -143,6 +143,6 @@ def test_text_size_color_and_font_change_render_and_replay():
             figure.apply_settings(state)
         with figgy.Figure(backend='native') as other:
             other.axes[0].plot([0, 1], [1, 0])
-            exec(figure.to_code('other'), {'other': other})
+            exec(figure.to_code('other', mode='exact'), {'other': other})
             assert other.get_settings() == state
             assert np.array_equal(figure.render_rgba(), other.render_rgba())

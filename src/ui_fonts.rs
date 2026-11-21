@@ -47,3 +47,41 @@ pub(crate) fn install(ctx: &egui::Context) {
     });
     ctx.set_fonts(fonts.clone());
 }
+
+pub(crate) fn resolve(family: &str) -> Result<(Vec<u8>, u32), String> {
+    let mut db = fontdb::Database::new();
+    db.load_system_fonts();
+    let id = db
+        .query(&fontdb::Query {
+            families: &[fontdb::Family::Name(family)],
+            ..Default::default()
+        })
+        .ok_or_else(|| format!("Review font {family:?} is not installed"))?;
+    db.with_face_data(id, |data, index| (data.to_vec(), index))
+        .ok_or_else(|| "Review font data is unavailable".into())
+}
+
+pub(crate) fn install_review(ctx: &egui::Context, family: &str) -> Result<(), String> {
+    let (bytes, index) = resolve(family)?;
+    let mut fonts = egui::FontDefinitions::default();
+    let mut data = egui::FontData::from_owned(bytes);
+    data.index = index;
+    fonts
+        .font_data
+        .insert("figgy-review".into(), std::sync::Arc::new(data));
+    for names in fonts.families.values_mut() {
+        names.push("figgy-review".into());
+    }
+    let mut names = vec!["figgy-review".into()];
+    names.extend(
+        fonts.families[&egui::FontFamily::Proportional]
+            .iter()
+            .filter(|n| *n != "figgy-review")
+            .cloned(),
+    );
+    fonts
+        .families
+        .insert(egui::FontFamily::Name("figgy-review".into()), names);
+    ctx.set_fonts(fonts);
+    Ok(())
+}

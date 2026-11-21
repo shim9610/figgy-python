@@ -1,0 +1,310 @@
+{
+  "date": "2026-10-28",
+  "renderer": "0.18.1",
+  "model": "0.12.1",
+  "environment": "Installed CPython 3.12 wheel, NumPy 2.5.4, Vulkan llvmpipe LLVM 19.1.7. Actual X11 and Jupyter hosts.",
+  "scope": "Named public visual controls, not a complete Matplotlib replacement. Full internal identity/editor records remain in exact recovery.",
+  "coverage": [
+    "All 26 marker shapes via public symbols/fillstyle",
+    "Marker/error palettes and ordered sparse overrides; bin overrides",
+    "Resident color/size/matrix references",
+    "Vector appearance, scaling and color maps",
+    "Contour levels, colors and labels with explicit anchors",
+    "Polar projections and independent secondary axes",
+    "Angle/Unix timestamp formatters",
+    "Mapped/standalone colorbar placement and axis styles",
+    "Per-series and custom rich legends",
+    "Every native bounded global style leaf",
+    "Bounded series/cell/slice/detail styles and decoration layout",
+    "All annotation geometries, labels, frames and mixed coordinates"
+  ],
+  "validation": {
+    "public_appearance_cases": 131,
+    "matplotlib_api_cases": 86,
+    "installed_focused_passed": 948,
+    "installed_focused_ui_skips": 5,
+    "clean_preflight_passed": 135,
+    "native_jupyter_clipboard_and_typing_passed": 9,
+    "full_ci_collection": 1633,
+    "relaxed_threshold_or_recovery_oracles": 0,
+    "numpy_only_runtime_without_matplotlib": true,
+    "paired_wheel_source_files": 41,
+    "final_public_and_matplotlib_passed": 217,
+    "additional_fillstyle_cases": 2,
+    "ci_failure_ui_reproductions_passed": 3
+  },
+  "independent_checks": [
+    "Changed destination palettes/maps/vector/bin/error/overlay styles",
+    "Remove contour labels, polar and standalone scale absent from source",
+    "Line-fill ink independent from marker ink",
+    "Every panel must contain expected red/blue data ink before and after public/exact replay",
+    "Preserve an actual editor data selection on a fresh destination",
+    "Restore linear/log colorbar and plot scales across different initial scales",
+    "Restore wide log spacing and formatting without dependence on the old scale",
+    "Single-slot panel geometry and per-entry rich alignment"
+  ],
+  "backend_calibration": {
+    "native_binary_sha256": "28b342055240f95649487486bfa6f9738e55899606370f41f5a288884c7d402d",
+    "baseline_and_current_native_binary_identical": true,
+    "gl": {
+      "adapter": "llvmpipe LLVM 19.1.7",
+      "opaque_pixels": 282240,
+      "expected": 576000,
+      "top_sample_rgba": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "baseline_reproduces": true
+    },
+    "vulkan": {
+      "opaque_pixels": 576000,
+      "all_frozen_pngs_identical": true
+    },
+    "conclusion": "The software OpenGL path omits the first panel on both baseline and current wheels. Vulkan is the controlled CI/reference backend; no renderer workaround or threshold relaxation added.",
+    "reproduce": [
+      "import figgyplot as fg, numpy as np",
+      "with fg.Figure(grid=[['top'], ['bottom']], backend='native') as fig:",
+      "    fig.subplots['top'].axes.plot([0, 1], [1, 2])",
+      "    fig.subplots['bottom'].axes.plot([0, 1], [2, 1])",
+      "    image = fig.render_rgba()",
+      "    print(fig.info['adapter'], np.count_nonzero(image[..., 3]), image[100, 100])"
+    ],
+    "environment_control": "Run once with WGPU_BACKEND=gl and once with WGPU_BACKEND=vulkan, selecting the matching software ICD."
+  },
+  "frozen_scenes": [
+    {
+      "domain": "acoustics",
+      "scene": "figures/01_class_profiles.png",
+      "png_sha256": "fd0e04ec76af917ee8546203cc6ebeb2725e31b7d743f4d994de4bd52ea616fb",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 96
+    },
+    {
+      "domain": "acoustics",
+      "scene": "figures/02_record_heatmaps.png",
+      "png_sha256": "1436240cbe69eebc158a2f15f6dff5ed2d066ee4ceeebf64388d395f9e85a180",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 87
+    },
+    {
+      "domain": "acoustics",
+      "scene": "figures/03_pca_overlap.png",
+      "png_sha256": "d0968198529e0f58fdc51af15f0bce9db6f47e24316a13410749f838ae7365b0",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 58
+    },
+    {
+      "domain": "acoustics",
+      "scene": "figures/04_record_mean_distribution.png",
+      "png_sha256": "490bc986defb4cf3baa83bb1d372ec8229953aaad9a4bf3be02f978d1b883e0c",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 13
+    },
+    {
+      "domain": "education",
+      "scene": "plots/01_score_distribution.png",
+      "png_sha256": "b0b87a884ed941c95f7d08d493f870dd03244113f9aaa8974aa0ecf85448da41",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 33
+    },
+    {
+      "domain": "education",
+      "scene": "plots/02_lunch_and_score.png",
+      "png_sha256": "b798285774553f3695a430b5c83490c9a72e993b8f0c0d26e77ad4151d3ff4cf",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 39
+    },
+    {
+      "domain": "education",
+      "scene": "plots/03_subject_gap_by_grade.png",
+      "png_sha256": "96ae7994aabbeee933a62a261df186a4e776ff80c27b33b8c186958e38e7da15",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 13
+    },
+    {
+      "domain": "energy",
+      "scene": "plots/01_consumption_history.png",
+      "png_sha256": "4fd0c33726acaa228239621234994869f0fd2b2ee44f7a9b53aa13596df3b4bb",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 30
+    },
+    {
+      "domain": "energy",
+      "scene": "plots/02_relative_seasonality.png",
+      "png_sha256": "747937dcc534ec7e2ddfd5ff25fd50a45f4e95852ca376ce6d06cb9b1ddeffa1",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 16
+    },
+    {
+      "domain": "energy",
+      "scene": "plots/03_level_and_within_year_range.png",
+      "png_sha256": "b1a780285c3c0d532a20e32ed44f822321e402c484201c402ec5e33c922d8383",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 58
+    },
+    {
+      "domain": "materials",
+      "scene": "artifacts/01_strength_distribution.png",
+      "png_sha256": "e2cf988e0bb3f3194cfff385b6c503d56ec22be22a0c042a60eb4f94a1cd9c96",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 38
+    },
+    {
+      "domain": "materials",
+      "scene": "artifacts/02_strength_age_bands.png",
+      "png_sha256": "c5fabc8529c1fb021497c4ffcc3e433e17a038f8e2a1db08fbb4c3b38c8f1913",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 15
+    },
+    {
+      "domain": "materials",
+      "scene": "artifacts/03_cement_strength.png",
+      "png_sha256": "8f9e7da7b1410e7d47bc8c35a8ab3b9566d151d2aaea17e7689b78ed9e1fd3ce",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 51
+    },
+    {
+      "domain": "materials",
+      "scene": "artifacts/04_exact_age_summaries.png",
+      "png_sha256": "e81e03bc41eb8dbe7e17868e019dc0c960b5f461b9087e8075e52da697afed4f",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 39
+    },
+    {
+      "domain": "nutrition",
+      "scene": "plots/01_calorie_distributions.png",
+      "png_sha256": "f52dddb023f0433878fd9515f0aa8ff53555759db473389f297d21ffce9cd665",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 21
+    },
+    {
+      "domain": "nutrition",
+      "scene": "plots/02_calorie_bands.png",
+      "png_sha256": "c723ec2e8438e3bb11d4451611510f8a122e1eb1e4396ef8e34476f9cf357b99",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 23
+    },
+    {
+      "domain": "nutrition",
+      "scene": "plots/03_calories_sodium.png",
+      "png_sha256": "69c41ef86203c8aaa1db289d4bc3c1d6faac8646cbd258544ba1ba1b12310447",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 92
+    },
+    {
+      "domain": "sports",
+      "scene": "plots/01_salary_vs_hits.png",
+      "png_sha256": "4b9a8f8656209c1b66f10d00a133217e29750d0bcb3cb2239df0de9b1e2cf83f",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 43
+    },
+    {
+      "domain": "sports",
+      "scene": "plots/02_salary_by_experience.png",
+      "png_sha256": "d8f6d2f2c359a21382166fa027635079a6de4514e47dd083d930407f9c81ae8c",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 16
+    },
+    {
+      "domain": "sports",
+      "scene": "plots/03_salary_coverage.png",
+      "png_sha256": "bd743f0216200cca9d95e979edcdb9fcd51575672b27c88877f9935468c3cd84",
+      "frozen_png_identical": true,
+      "api_settings_series_pixels_equal": true,
+      "exact_full_ssot_pixels_equal": true,
+      "no_source_uploads": true,
+      "raw_settings_calls": 0,
+      "api_lines": 16
+    }
+  ],
+  "ci78_followup": {
+    "failures": [
+      "Native heatmap test asserted the renderer enum spelling in public Python code",
+      "Fresh linear destination received LogLocator before its missing log-scale setter"
+    ],
+    "changes": [
+      "Replace spelling assertion with full accepted config/series comparison, no-reupload check and RGBA equality, after retaining the zero-image-transport UI assertion",
+      "Always emit the colorbar scale and normalize plot scaling before restoring bounds/formatting",
+      "Preserve explicit picked_points/picked_data diagnostics that the source-based compiler previously considered unchanged"
+    ],
+    "local_reproduction": "Both failed UI scenarios and native/Jupyter clipboard replay passed on the updated installed wheel"
+  }
+}

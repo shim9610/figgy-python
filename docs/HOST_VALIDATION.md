@@ -2,10 +2,119 @@
 
 ## Current 0.3 validation setup
 
-The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.18.0`
-and `figgy-model 0.12.0`. The dated measurements and test totals below belong
+The current binding is `figgyplot 0.3.0`, targeting `figgy-renderer 0.18.1`
+and `figgy-model 0.12.1`. The dated measurements and test totals below belong
 to earlier checkpoints; they are not a test count or performance claim for the
 current release candidate.
+
+### Native annotation binding and review lifecycle (2026-10-22)
+
+The native drag path previously constructed a complete temporary `ChartView`
+for every pointer move merely to obtain its annotation map. The renderer API
+also creates grid, axis and annotation GPU resources. The host now reuses the
+presented map in its physical pixel space, falling back to a fresh logical map
+when layout, scale or annotation identity has changed. The renderer's own
+`ChartRenderStamp` selects axis versus annotation refresh; series styles rebuild
+only when their specs, display scale or pool generation change. No renderer
+internals or drawing/cache policies are modified.
+
+[Before/after measurements](measurements/native-annotation-drag-20261022.json)
+record normal and burst gestures for text and arrows at two sizes. For each
+32-move gesture, the fixed native path makes zero temporary annotation views,
+zero axis refreshes and zero style rebuilds. Complete SSOT checks preserve
+everything except the moved coordinates. A new counter assertion fails against
+the instrumented baseline wheel. Review-controller gestures additionally record
+durable manifest writes. Timings are CPU wall times on llvmpipe, with input-driver
+waits excluded; they are not physical-GPU frame-rate measurements.
+
+An installed release wheel passed 212 focused review, history, recovery and
+negative-oracle cases, and 134 workflow/asset checks. Two 12-case actual-host
+runs cover dragging/resize/text/Undo and review submission/storage failures,
+Korean targeted comments, native connect and both hosts' finish controls. The
+final wheel repeated the three new/expanded UI cases. Full collection is 827
+cases; these local checks do not establish that commit's full CI result.
+[Package checks](measurements/native-review-package-20261022.json) compare all
+installed package files with the release wheel, and packaged Python/browser/
+skill sources with the worktree.
+
+Review storage tests cover process readers/writers, nested locking, Windows
+sharing-error retries, unrelated errors and bounded failure propagation. A
+separate Windows job executes the same storage cases with real byte locks.
+Successor approval tests reject changes to arrays even when extents match, and
+source-backed finish validates exact approved settings/data without new windows.
+Colour swatches and reference-image attachments remain a future improvement.
+
+Run 65's four Linux pytest summaries report 827 passing cases, and the real
+Windows storage job passed all seven cases. Shard 0 nevertheless timed out:
+its 207 cases finished in 11m19s, then a clipboard-owner process retained the
+CI logging pipe until job cancellation roughly 33 minutes later. The execution
+audit correctly rejected a cancelled shard. Artifact upload itself took seconds.
+The [timestamped failure and local controls](measurements/ci65-clipboard-pipe-20261022.json)
+separate these phases. A clipboard writer now redirects the background owner's
+streams without terminating the owner. A real X11 negative control verifies
+Python can exit while its inherited output remains open; the fixed writer's
+output closes while its Unicode clipboard remains available. Tests also run
+through the actual tee pipeline and exercise JSON settings paste. Pytest return,
+interpreter exit and pipeline exit have distinct CI markers. Assertions, audit
+rules and budgets are unchanged; full collection now contains 828 cases.
+
+### Layout and review editing follow-up (2026-10-22)
+
+The installed release wheel passed **273 focused model, history, recovery and
+oracle cases**, **12 real UI cases** (9 paired native/Jupyter and 3 native-only), and **134 workflow
+and packaged-asset checks**, with no skips in those runs. Full collection contains
+809 cases; the focused runs do not establish a complete CI result.
+
+The input cases cover first-click plot geometry editing, inspector resizing,
+unchanged plot dimensions when opening the inspector, disabled polar/radar wheel
+zoom, annotation drawing, targeted Korean review comments, comment editing and
+deletion, title/series ownership, and annotation dragging. Geometry checks also
+resize radar, box, pie/donut and bar documents and restore their exact settings
+with Undo. Subscription is checked through both Python and the CLI across the
+complete Figure approval barrier.
+
+Annotation drag checks save complete before/after SSOT dumps. Only the selected
+arrow's four coordinate values change; the other annotation, series, axes and
+layout remain identical, and no columns are uploaded again. During the synthetic
+gesture, property descriptions rebuild 0 times in native and 1 time in the
+browser. [Recorded counters and SSOT changes](measurements/layout-review-host-work-20261022.json)
+include the tested wheel digest. Elapsed times include input-driver waits and
+are not a physical-GPU frame-rate measurement. Renderer drawing/cache behavior
+is unchanged.
+
+Environment: Linux x86_64, Python 3.12.14, llvmpipe Vulkan, Xvfb/Openbox,
+Chromium 154/SwiftShader and installed Noto Sans CJK KR. Rust formatting, JS
+syntax, installed-package checks and property-catalog inventory checks passed.
+Physical GPU and Windows/macOS runtime behavior remain unverified by these runs.
+
+PR run 61 did not execute tests: its build job exhausted the existing 20-minute
+budget after the Azure Ubuntu mirror downloaded 105 MB in 14 minutes 37 seconds
+(120 kB/s). Font unpacking/setup took seconds. The
+[timestamped log evidence](measurements/ci61-ubuntu-mirror-20261022.json) records
+the download separately from font configuration and build cancellation. Both CI
+install steps now use the official Ubuntu archive for the same signed packages;
+test assertions, execution auditing and job budgets are unchanged.
+
+Run 62 built the wheel successfully, but one shard's setup failed when the
+image's unrelated Microsoft APT feed returned HTTP 403. Its log also showed
+that replacing a host in `ubuntu.sources` did not override the image's separate
+mirrorlist. The final [shared installer](../scripts/install_ci_runtime.sh) uses
+an explicit temporary source list for the official Ubuntu archive and security
+feeds, with the Ubuntu archive signing key and image source parts disabled for
+both APT commands. No repository error is ignored. Three local installer checks
+exercise the real APT URI planner, detect vendor feeds when isolation is removed,
+and stop installation after an update failure. See the
+[failed setup evidence](measurements/ci62-image-apt-sources-20261022.json).
+
+Run 63 completed three shards with 202 passing cases each. The fourth exposed
+a native form regression: after Esc cleared a pie selection, the geometry form
+hid the ordinary title/material controls. The existing test was retained and
+reproduced locally before the fix. Geometry now takes priority for explicit plot
+selection or Layout mode; ordinary unselected editing keeps its global form.
+The expanded test edits title/material, checks Copy Python and no readbacks, and
+compares complete settings across mode switches with the same settled pointer
+hover state. All 12 focused UI cases and the 48 cases not executed after that CI
+failure passed locally. See the [before/after control evidence](measurements/native-unselected-form-20261022.json).
 
 Automatic pull-request checks are enabled in
 [PR tests](../.github/workflows/pr-tests.yml), including Linux native/Jupyter
@@ -626,3 +735,66 @@ RGBA readbacks/PNG display transport and unchanged source upload counts.
 Workflow/assets preflight has 112 passes; formatting, locked compilation,
 JavaScript syntax and installed browser asset comparisons also pass. Full Actions
 integration results are reported by the PR checks, independently of local results.
+
+## Native typing follow-up (2026-10-22)
+
+The annotation-drag measurements did not cover typing latency. Actual X11
+character input exposed a separate wrapper cost: every annotation-property
+keystroke serialized and reparsed the entire Settings document, and built its
+property description before and after accepting that edit. The native form now
+serializes only the edited annotation, then passes its typed Config through the
+same model validation, renderer acceptance and history boundary used by JSON
+settings. The public JSON boundary still rejects unknown fields. Text changes
+remain immediate; there is no delayed commit, skipped validation or dropped input.
+
+An unchanged document's object navigation is reused by revision during inline
+editing and comment composition. Ending an inactive history gesture avoids a
+document snapshot. Review polling reads the small comment draft once instead of
+serializing and decoding full window diagnostics twice. Durable draft writes
+and the approval barrier remain in place. Renderer source and repaint policy
+are unchanged.
+
+`scripts/profile_text_input.py` presents 24 separately delivered character
+inputs in each of four native editors, with the durable review controller active,
+12 series and 16 annotations. On Linux/llvmpipe, annotation-property UI work
+fell from **110.36 to 74.48 ms total** (4.60 to 3.10 ms per input; about 33%).
+Whole-frame totals were 460.00 and 417.52 ms, including software submit/present.
+The other editors had small UI costs before and after; whole-frame timings
+varied, so this does not establish a general frame-rate improvement or Windows
+IME performance. Raw stages, driver waits and the tested wheel hash are in
+`docs/measurements/native-typing-20261022.json`. Driver wait times are not FPS.
+
+Four new real-input cases cover inline text, annotation properties, general
+review comments and targeted comments with the inspector open. They verify
+per-character text, CJK paste, the renderer's structured superscript encoding,
+exact unrelated SSOT preservation, unchanged uploads, Undo/Redo and durable
+recovery. Typing creates no temporary chart views, axis rasters or series styles;
+unchanged drafts do not rebuild navigation or property descriptions. Six existing
+native/Jupyter checks for numeric editing, multiline/resize/format preservation,
+CJK targeted comments and annotation drag also passed. Settings/history/review
+checks passed 240 cases, and workflow/assets checks passed 72. One UI case and
+seven action-contract cases initially lacked their environment flags; all eight
+were subsequently executed and passed in those totals. Full PR CI is separate
+from these local results.
+
+## Review summary and exact detail views (2026-10-22)
+
+The [feedback view contract](REVIEW_FEEDBACK_VIEWS.md) adds summary-first agent
+consumption while preserving full protocol-1 checkpoints. Object summaries use
+the native editor's stable ownership addresses and retain every exact operation
+ID. Detail queries return the original operations in order and complete object
+snapshots, including deleted objects. Reverted edits disappear; comments remain
+separate; formatting-only and truncated text remain distinguishable. Binary
+reference changes are reported even when settings and axis bounds are identical.
+
+Seventeen new summary/schema/CLI tests and 169 existing review, recovery,
+history, navigation and property cases passed. Six actual native/Jupyter cases
+passed, covering typing, contextual editor behavior and targeted-comment IDs
+through the new summary/detail APIs. Workflow/assets checks passed 72 cases
+with the actual maturin-action metadata supplied. In total these are 264 local
+cases; full PR CI remains a separate check. The installed 35-file release
+package matches the tested wheel and worktree sources. The sample JSON and
+wheel hash are in `docs/measurements/review-summary-20261022.json`: 42,610 bytes
+of complete feedback become a 1,794-byte summary, while the six original
+operations remain unchanged. No renderer or LLM timing improvement is inferred
+from that payload measurement.

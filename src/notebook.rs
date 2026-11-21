@@ -74,6 +74,27 @@ impl NotebookFigure {
         self.center_cells.insert(id.into(), cells);
         Ok(())
     }
+    fn register_composite_metadata(
+        &mut self,
+        id: &str,
+        count: usize,
+        min: f64,
+        max: f64,
+    ) -> PyResult<()> {
+        if self.columns.contains_key(id) {
+            return Err(invalid("resource ID already exists"));
+        }
+        let extent = renderer::chart::FitExtent {
+            min,
+            max,
+            min_positive: (min > 0.).then_some(min),
+        };
+        self.columns.insert(id.into(), extent);
+        self.edge_samples.insert(id.into(), extent);
+        self.center_cells.insert(id.into(), extent);
+        let _ = count;
+        Ok(())
+    }
     fn remove_column(&mut self, id: &str) {
         self.columns.remove(id);
         self.edge_samples.remove(id);
@@ -89,7 +110,9 @@ impl NotebookFigure {
         if self.series.iter().any(|a| a.series_id == s.series_id) {
             return Err(invalid("series IDs must be unique"));
         }
-        if !self.columns.contains_key(&s.x_column) || !self.columns.contains_key(&s.y_column) {
+        if !s.is_dataless()
+            && (!self.columns.contains_key(&s.x_column) || !self.columns.contains_key(&s.y_column))
+        {
             return Err(invalid("unregistered source columns"));
         }
         self.series.push(s);
@@ -176,7 +199,13 @@ impl NotebookFigure {
         self.history = Default::default();
         Ok(())
     }
-    fn add_series_batch(&mut self, json: &str, config: &str) -> PyResult<()> {
+    #[pyo3(signature=(json, config, formatted=None))]
+    fn add_series_batch(
+        &mut self,
+        json: &str,
+        config: &str,
+        formatted: Option<&str>,
+    ) -> PyResult<()> {
         let previous_config = self.chart.config().clone();
         let previous_series = self.series.clone();
         let revision = self.revision;
@@ -187,6 +216,20 @@ impl NotebookFigure {
             self.chart = Chart::new(config);
             for spec in parse::<Vec<SeriesConfig>>(json)? {
                 self.add_series(&serde_json::to_string(&spec).map_err(invalid)?)?;
+            }
+            if let Some(formatted) = formatted {
+                let all: Vec<SeriesConfig> = parse(formatted)?;
+                if all.len() != self.series.len()
+                    || all.iter().zip(&self.series).any(|(a, b)| {
+                        a.series_id != b.series_id
+                            || a.x_column != b.x_column
+                            || a.y_column != b.y_column
+                    })
+                {
+                    return Err(invalid("formatted labels cannot replace source bindings"));
+                }
+                validate_draw_style(self.chart.config(), &all)?;
+                self.series = all;
             }
             self.fit(0.05)
         })();
@@ -205,6 +248,9 @@ impl NotebookFigure {
         let before: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
         let base_revision = self.revision;
         let mut s: Settings = parse(json)?;
+        if let Some(c) = s.radial.as_mut() {
+            c.normalize_labels();
+        }
         if !self.history.restoring_identities() {
             identity::track_identities(&before, &mut s)?;
         }
@@ -232,9 +278,10 @@ impl NotebookFigure {
             validate_model_numbers(series, "series")?;
         }
         if s.series.len() != self.series.len()
-            || s.series.iter().zip(&self.series).any(|(a, b)| {
-                a.series_id != b.series_id || a.x_column != b.x_column || a.y_column != b.y_column
-            })
+            || s.series
+                .iter()
+                .zip(&self.series)
+                .any(|(a, b)| !value_labels::same_sources(a, b, &s.config, self.chart.config()))
         {
             return Err(invalid(
                 "settings must address the same ordered series and source columns",
@@ -357,12 +404,10 @@ impl NotebookFigure {
             for series in &selected {
                 if !matches!(
                     series.render_type,
-                    renderer::DataRenderType::ScatterErrorbarX { .. }
-                        | renderer::DataRenderType::ScatterErrorbarY { .. }
-                        | renderer::DataRenderType::ScatterErrorbarXY { .. }
-                        | renderer::DataRenderType::LineScatterErrorbarX { .. }
-                        | renderer::DataRenderType::LineScatterErrorbarY { .. }
-                        | renderer::DataRenderType::LineScatterErrorbarXY { .. }
+                    renderer::DataRenderType::Xy(renderer::XySeries {
+                        errors: Some(_),
+                        ..
+                    })
                 ) {
                     continue;
                 }
@@ -394,10 +439,86 @@ impl NotebookFigure {
                 .fit_extents
                 .get(&s.series_id)
                 .copied()
-                .unwrap_or([self.columns[&s.x_column], self.columns[&s.y_column]]);
+                .unwrap_or_else(|| {
+                    [
+                        self.columns
+                            .get(&s.x_column)
+                            .copied()
+                            .unwrap_or(renderer::chart::FitExtent::EMPTY),
+                        self.columns
+                            .get(&s.y_column)
+                            .copied()
+                            .unwrap_or(renderer::chart::FitExtent::EMPTY),
+                    ]
+                });
+            // Category/box fits follow the public chart.rs statistics policy.
+            // Source columns are immutable; retain only their scalar extents.
+            if s.render_type.category_bars().is_some() {
+                use renderer::{CategoryBarDirection, CategoryBarMode};
+                let cfg = self.chart.config();
+                let layer = cfg.layer_of_series(&s.series_id);
+                let groups = cfg.bar_groups_of(layer);
+                let horizontal = groups.direction == CategoryBarDirection::Horizontal;
+                let zero = renderer::chart::FitExtent::point(0.);
+                let mut value = zero;
+                match groups.mode {
+                    CategoryBarMode::PercentStacked => {
+                        value.union(&renderer::chart::FitExtent::point(100.));
+                    }
+                    CategoryBarMode::Grouped => {
+                        let id = if horizontal { &s.x_column } else { &s.y_column };
+                        value.union(
+                            self.columns
+                                .get(id)
+                                .unwrap_or(&renderer::chart::FitExtent::EMPTY),
+                        );
+                    }
+                    CategoryBarMode::Stacked => {
+                        for member in self.series.iter().filter(|v| {
+                            v.render_type.category_bars().is_some()
+                                && cfg.layer_of_series(&v.series_id) == layer
+                        }) {
+                            let id = if horizontal {
+                                &member.x_column
+                            } else {
+                                &member.y_column
+                            };
+                            if let Some(e) = self.columns.get(id) {
+                                if e.min.is_finite() {
+                                    value.min += e.min.min(0.);
+                                }
+                                if e.max.is_finite() {
+                                    value.max += e.max.max(0.);
+                                }
+                                value.min_positive = match (value.min_positive, e.min_positive) {
+                                    (Some(a), Some(b)) => Some(a.min(b)),
+                                    (a, b) => a.or(b),
+                                };
+                            }
+                        }
+                    }
+                }
+                [a, b] = if horizontal {
+                    [value, renderer::chart::FitExtent::EMPTY]
+                } else {
+                    [renderer::chart::FitExtent::EMPTY, value]
+                };
+            } else if s.render_type.box_plot().is_some() {
+                let value = if a.min != 0. || a.max != 0. { a } else { b };
+                let cfg = self.chart.config();
+                let horizontal = cfg
+                    .bar_groups_of(cfg.layer_of_series(&s.series_id))
+                    .direction
+                    == renderer::CategoryBarDirection::Horizontal;
+                [a, b] = if horizontal {
+                    [value, renderer::chart::FitExtent::EMPTY]
+                } else {
+                    [renderer::chart::FitExtent::EMPTY, value]
+                };
+            }
             // Use the renderer's fit-domain classification for every matrix
             // family, including SSOT shading changes after transfer release.
-            use renderer::gpu_errorbar::{GpuFieldExtentMode, GpuSeriesFitMode};
+            use renderer::gpu_extent::{GpuFieldExtentMode, GpuSeriesFitMode};
             if let Some(GpuSeriesFitMode::Field(mode)) =
                 GpuSeriesFitMode::from_render_type(&s.render_type)
             {
@@ -408,10 +529,17 @@ impl NotebookFigure {
                         &self.columns
                     }
                 };
-                a = columns[&s.x_column];
-                b = columns[&s.y_column];
+                let cached_hex = matches!(&s.render_type,renderer::DataRenderType::Field(field) if field.matrix.grid_layout == renderer::data_config::GridLayout::Hexagonal)
+                    && self.fit_extents.contains_key(&s.series_id);
+                if !cached_hex {
+                    a = columns[&s.x_column];
+                    b = columns[&s.y_column];
+                }
             }
-            if let renderer::DataRenderType::Histogram { bar } = &s.render_type {
+            if let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries {
+                bar,
+            }) = &s.render_type
+            {
                 let base = renderer::chart::FitExtent {
                     min: bar.baseline,
                     max: bar.baseline,
@@ -426,15 +554,22 @@ impl NotebookFigure {
                     a.union(&base);
                 }
             }
+            if let renderer::DataRenderType::Feynman(diagram) = &s.render_type {
+                for [x, y] in diagram.positions().map_err(invalid)? {
+                    a.union(&renderer::chart::FitExtent::point(x));
+                    b.union(&renderer::chart::FitExtent::point(y));
+                }
+            }
             extents.push([a, b]);
         }
-        let fitted = document_fit::fit(
+        let mut fitted = document_fit::fit(
             self.chart.config(),
             &self.series,
             &extents,
             padding,
             active_only,
         );
+        self.fit_extra_axes(&mut fitted, padding, active_only);
         validate_config(&fitted)?;
         let mut state: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
         state["config"] = serde_json::to_value(fitted).map_err(runtime)?;
@@ -519,6 +654,105 @@ fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
 }
 
 impl NotebookFigure {
+    fn fit_extra_axes(&self, config: &mut Config, padding: f64, active_only: bool) {
+        use renderer::chart::FitExtent;
+        use renderer::data_config::{VectorComponents, VectorScale};
+        let original = config.clone();
+        let axis_fit = |axis: &renderer::config::AxisOptions, extent: &FitExtent| {
+            let mut cfg = default::default_config();
+            cfg.left_y = axis.clone();
+            cfg.right_y = axis.clone();
+            let mut chart = Chart::new(cfg);
+            chart.auto_fit_y_extent(extent, padding);
+            chart.config().left_y.clone()
+        };
+        let active_panel = match original.active_layer() {
+            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => i + 1,
+            _ => 0,
+        };
+        for panel in 0..=original.subplots.len() {
+            if active_only && panel != active_panel {
+                continue;
+            }
+            let cfg = if panel == 0 {
+                &mut *config
+            } else {
+                &mut config.subplots[panel - 1].config
+            };
+            let owned = self
+                .series
+                .iter()
+                .filter(|s| {
+                    original
+                        .subplots
+                        .iter()
+                        .position(|p| p.owns_series(&s.series_id))
+                        .map_or(0, |i| i + 1)
+                        == panel
+                })
+                .collect::<Vec<_>>();
+            if cfg.view_3d().is_some() {
+                let mut z = FitExtent::EMPTY;
+                for series in &owned {
+                    if let renderer::DataRenderType::Field(field) = &series.render_type {
+                        for name in &field.matrix.columns {
+                            if let Some(e) = self.columns.get(name) {
+                                z.union(e);
+                            }
+                        }
+                    } else if let Some(name) = &series.z_column {
+                        if let Some(anchors) = self.columns.get(name) {
+                            z.union(anchors);
+                            if let renderer::DataRenderType::Vector(
+                                renderer::data_config::VectorSeries {
+                                    components: VectorComponents::Points { w: Some(w), .. },
+                                    style,
+                                },
+                            ) = &series.render_type
+                            {
+                                if let (VectorScale::Data { factor }, Some(w)) =
+                                    (&style.scale, self.columns.get(w))
+                                {
+                                    let (low, high) = if *factor >= 0. {
+                                        (w.min, w.max)
+                                    } else {
+                                        (w.max, w.min)
+                                    };
+                                    for value in
+                                        [anchors.min + factor * low, anchors.max + factor * high]
+                                    {
+                                        if value.is_finite() {
+                                            z.union(&FitExtent::point(value));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                cfg.right_y = axis_fit(&cfg.right_y, &z);
+            }
+            if let Some(parallel) = cfg.parallel().cloned() {
+                for (index, axis) in parallel.axes.iter().enumerate() {
+                    let mut extent = FitExtent::EMPTY;
+                    for s in &owned {
+                        if let Some(name) =
+                            s.render_type.parallel().and_then(|p| p.columns.get(index))
+                        {
+                            if let Some(e) = self.columns.get(name) {
+                                extent.union(e);
+                            }
+                        }
+                    }
+                    let fitted = axis_fit(&axis.axis_options(&cfg.left_y), &extent);
+                    if let Some(parallel) = cfg.parallel_mut() {
+                        parallel.axes[index].min = fitted.min;
+                        parallel.axes[index].max = fitted.max;
+                    }
+                }
+            }
+        }
+    }
     fn replay_edit(&mut self, redo: bool) -> PyResult<()> {
         let current = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
         let target = self.history.target(redo, &current)?;
@@ -526,7 +760,10 @@ impl NotebookFigure {
         self.history.complete(redo, result.is_ok());
         result
     }
-    fn set_document_model(&mut self, document: bounded::DocumentChart) -> PyResult<()> {
+    fn set_document_model(&mut self, mut document: bounded::DocumentChart) -> PyResult<()> {
+        if let bounded::DocumentChart::Radial(c) = &mut document {
+            c.normalize_labels();
+        }
         if self
             .document
             .as_ref()
@@ -540,7 +777,7 @@ impl NotebookFigure {
             || !self.columns.is_empty()
             || !self.chart.config().subplots.is_empty()
             || !self.chart.config().overlays.is_empty()
-            || self.chart.config().polar.is_some()
+            || self.chart.config().polar().is_some()
         {
             return Err(invalid("create a separate Figure for bounded charts"));
         }

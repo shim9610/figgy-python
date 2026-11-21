@@ -30,7 +30,7 @@ def semantic_error(figure, feature):
     elif feature in ('baseline_fill','series_fill'):
         state['series'][-1]['render_type']['Line']['line']['fill']={'ToBaseline':0}
     elif feature=='polar':state['config']['polar']['clockwise']=False
-    elif feature=='radar':state['radar']['value_range']=[0,8]
+    elif feature=='radar':state['config']['left_y'].update(min=0,max=8);state['config']['right_y'].update(min=0,max=8)
     elif feature=='annotations':state['config']['annotations']['items'].pop()
     figure.apply_settings(state)
 

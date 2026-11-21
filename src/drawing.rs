@@ -117,6 +117,7 @@ impl Drawing {
         };
         let kind = match tool {
             Tool::Text => AnnotationKind::Text {
+                align: renderer::NoteAlign::Left,
                 anchor: anchor(to)?,
                 text: renderer::text::RichText::plain(
                     "Text",
@@ -396,7 +397,7 @@ impl editor::Editor {
             cfg.annotations.visible = true;
             cfg.set_active_layer(renderer::LayerRef::Annotations);
             cfg.picked_data = None;
-            cfg.picked_points = None;
+
             c.commit_config(cfg)
         };
         match result {
@@ -425,7 +426,11 @@ impl editor::Editor {
             }
         } else {
             let owner = interaction::panel_index(config.active_layer()) == 0 && self.panel_focused;
-            ([config.polar.is_none(); 2], config.polar.is_none(), owner)
+            (
+                [config.polar().is_none(); 2],
+                config.polar().is_none(),
+                owner,
+            )
         };
         if !owner || !self.drawing.tool.allowed(axes) {
             self.drawing.cancel();
