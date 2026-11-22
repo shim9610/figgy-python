@@ -48,7 +48,7 @@ def _range_link_rows(links, dpi):
         else:
             predecessor, successor = link
             row = {"from": predecessor, "to": successor}
-        if not {"from", "to"} <= row.keys() or row.keys() - {"from", "to", "exit_offset"}:
+        if not {"from", "to"} <= row.keys() or row.keys() - {"from", "to", "exit_fraction", "exit_offset"}:
             raise ValueError("links require from and to row indices")
         for key in ("from", "to"):
             value = row[key]
@@ -59,6 +59,13 @@ def _range_link_rows(links, dpi):
             ):
                 raise ValueError("link row indices must be unsigned 32-bit integers")
             row[key] = int(value)
+        if "exit_offset" in row and "exit_fraction" in row:
+            raise ValueError("specify exit_fraction or exit_offset, not both")
+        if row.get("exit_fraction") is not None:
+            fraction = number(row["exit_fraction"], "exit_fraction")
+            if not 0 <= fraction <= 1:
+                raise ValueError("exit_fraction must be between 0 and 1")
+            row["exit_fraction"] = fraction
         if row.get("exit_offset") is not None:
             row["exit_offset"] = number(row["exit_offset"], "exit_offset") * dpi / 72
         rows.append(row)
@@ -434,7 +441,9 @@ class AdvancedMethods:
         """Connect range-bar rows using zero-based (predecessor, successor) pairs.
 
         Pass the range-bar artist or its ID. Link mappings can specify ``from``,
-        ``to``, and ``exit_offset``. Width, head, inset and exit offset use points.
+        ``to``, and ``exit_fraction`` (0 at the predecessor start, 1 at its end).
+        Width, head and inset use points. The beta ``exit_offset`` in points
+        is converted using the current predecessor bar length.
         Use the returned artist's ``set(links=...)`` to replace the connections.
         """
         from .figure import _color
@@ -442,7 +451,8 @@ class AdvancedMethods:
 
         parent = getattr(bars, "id", bars)
         with self.figure._lock:
-            series = self._owned_series(self.figure.get_settings())
+            state = self.figure.get_settings()
+            series = self._owned_series(state)
             if getattr(bars, "figure", self.figure) is not self.figure or not any(
                 s["series_id"] == parent and "RangeBars" in s["render_type"]
                 for s in series
@@ -457,6 +467,8 @@ class AdvancedMethods:
             for key, value in (("width", width), ("head", head), ("inset", inset)):
                 if value is not None:
                     body[key] = number(value, key) * self.figure.dpi / 72
+            candidate = dict(config=state["config"], series=[*state["series"], spec])
+            spec = self.figure._migrate_range_links(candidate)["series"][-1]
             return self._install_series([spec])
 
     def set_line_offsets(self, series=None, *, x=0, y=0):

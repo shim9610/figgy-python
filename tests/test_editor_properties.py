@@ -481,9 +481,9 @@ def test_range_links_and_line_offsets_edit_without_column_uploads(backend):
         links = ax.range_links(bars, [], id='dependencies')
         uploads = fig.info.get('column_uploads')
         edit(fig, links.id, 'Appearance/links', [{'from': 0, 'to': 1}])
-        links.set(links=[{'from': 1, 'to': 0, 'exit_offset': 16}], linewidth=3)
+        links.set(links=[{'from': 1, 'to': 0, 'exit_fraction': .5}], linewidth=3)
         style = fig.get_settings()['series'][-1]['render_type']['RangeLinks']
-        assert style['links'] == [{'from': 1, 'to': 0, 'exit_offset': 16}]
+        assert style['links'] == [{'from': 1, 'to': 0, 'exit_fraction': .5}]
         assert style['width'] == links.get_linewidth() == 3
         assert fig.info.get('column_uploads') == uploads
         if backend == 'native':
@@ -550,7 +550,7 @@ def test_range_link_validation_and_appearance_replay_preserve_destination_topolo
         return fig.get_settings()['series'][-1]['render_type']['RangeLinks']['links']
 
     with fg.Figure(backend=backend, dpi=72) as source, fg.Figure(backend=backend, dpi=72) as destination:
-        setup(source, [{'from': 0, 'to': 1, 'exit_offset': 12}, (1, 0)])
+        setup(source, [{'from': 0, 'to': 1, 'exit_fraction': .25}, (1, 0)])
         ax, links = setup(destination, [(1, 2), (0, 1)])
         before = destination.get_settings()
         with pytest.raises(ValueError, match='outside series tasks'):
@@ -561,7 +561,15 @@ def test_range_link_validation_and_appearance_replay_preserve_destination_topolo
             edit(destination, 'deps', 'Appearance/links', [{'from': 0, 'to': 42}])
         assert destination.get_settings() == before
         exec(source.to_code(), {'fig': destination})
-        assert rows(destination) == [{'from': 1, 'to': 2}, {'from': 0, 'to': 1, 'exit_offset': 12}]
+        assert rows(destination) == [{'from': 1, 'to': 2}, {'from': 0, 'to': 1, 'exit_fraction': .25}]
+        old = source.get_settings()
+        old_rows = old['series'][-1]['render_type']['RangeLinks']['links']
+        old_rows[0].pop('exit_fraction')
+        old_rows[0]['exit_offset'] = 24
+        old_rows.append({'from': 99, 'to': 98, 'exit_offset': 24})
+        destination.apply_settings(old, preserve_data=True)
+        assert rows(destination)[0] == {'from': 1, 'to': 2}
+        assert 0 < rows(destination)[1]['exit_fraction'] < 1
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
@@ -623,3 +631,41 @@ def test_transition_color_and_wavelength_controls_start_disabled(backend):
         assert transition.get()['color']['a'] == 1
         edit(fig, 'spectra', 'Appearance/transitions/0/color/enabled', False)
         assert 'color' not in transition.get()
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('method', ['fit', 'tight_layout'])
+def test_range_exits_migrate_fit_and_round_trip_after_source_transfer(backend, method):
+    import json
+
+    with fg.Figure(backend=backend, dpi=72) as fig:
+        ax = fig.axes[0]
+        ax.range_bars([0, 1, 2], [0, 3, 6], [2, 5, 8], orientation='horizontal', id='tasks')
+        ax.range_links('tasks', [(0, 1), (1, 2)], id='deps')
+        ax.set_xlim(0, 10)
+        ax.set_ylim(-1, 3)
+        if backend == 'webgpu':
+            fig._native.payload()
+            fig._native.acknowledged()
+            assert fig.info['transfer_snapshot_bytes'] == 0
+            assert fig.info['range_endpoint_bytes'] == 48
+
+        def rows():
+            return fig.get_settings()['series'][-1]['render_type']['RangeLinks']['links']
+
+        old = fig.get_settings()
+        old['series'][-1]['render_type']['RangeLinks']['links'][0]['exit_offset'] = 24
+        plot_width = ax.get_position().bounds[2] * old['config']['chart_area']['width']
+        expected = 24 / (plot_width * .2)
+        fig.apply_settings(old)
+        assert 'exit_offset' not in rows()[0]
+        fraction = rows()[0]['exit_fraction']
+        assert fraction == pytest.approx(expected, rel=0.01)
+        assert 'exit_fraction' not in rows()[1]
+        getattr(fig, method)()
+        assert rows()[0]['exit_fraction'] == fraction
+        assert 0 <= rows()[1]['exit_fraction'] <= 1
+        saved = json.loads(json.dumps(fig.get_settings()))
+        ax.set_xlim(-1, 9)
+        fig.apply_settings(saved)
+        assert rows() == saved['series'][-1]['render_type']['RangeLinks']['links']

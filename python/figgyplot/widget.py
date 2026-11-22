@@ -211,15 +211,19 @@ class FigureWidget(anywidget.AnyWidget):
             self._ready_event.set()
         elif action == "unmounted":
             self._clients.pop(content.get("client"), None)
-        elif action == "fit":
-            if content.get("revision") == self.figure.revision:
-                self.figure.fit()
-            self.refresh()
-        elif action in ('undo', 'redo', 'reset_edits', 'property'):
+        elif action in ('undo', 'redo', 'reset_edits', 'property', 'fit', 'layout', 'settings'):
             error = ''
             try:
                 if action=='property':
                     self.figure.edit_property(content['object_id'],content['property_id'],content['value'],expected_revision=content.get('revision'))
+                elif action == 'settings':
+                    self.figure.apply_settings(_calendar_origins(content['settings'], encode=False),
+                                               expected_revision=content.get('revision'))
+                elif action in ('fit', 'layout'):
+                    with self.figure._lock:
+                        if content.get('revision') != self.figure.revision:
+                            raise ValueError('stale edit: the Figure changed; refresh and retry')
+                        (self.figure.fit if action == 'fit' else self.figure.tight_layout)()
                 else:
                     getattr(self.figure, action)(expected_revision=content.get('revision'))
             except (ValueError, RuntimeError) as exc:

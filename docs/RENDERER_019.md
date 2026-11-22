@@ -4,7 +4,7 @@ This development integration awaits the official upstream 0.19 release and final
 package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/c200678f874682b629564b0af7f732d3c84310fc)
+[integration revision](https://github.com/shim9610/figgy/commit/081347b57401f3655f23297cbf31abc7337f43b0)
 for renderer `0.19.0-beta.2` and model `0.13.0-beta.2`. Settings identify this
 integration as `0.19.0`. Rebuild the browser module with `scripts/build-wasm.sh`
 when changing the pin.
@@ -51,16 +51,22 @@ indices are zero-based and follow the order of the data passed to `range_bars`.
 ```python
 tasks = ax.range_bars([0, 1], [0, 3], [2, 6], orientation="horizontal")
 dependencies = ax.range_links(tasks, [(0, 1)], color="navy")
-dependencies.set(links=[{"from": 0, "to": 1, "exit_offset": 12}])
+dependencies.set(links=[{"from": 0, "to": 1, "exit_fraction": 0.4}])
 ```
 
 An index outside the source bars raises `ValueError`. Copy Python preserves
 the destination's bar binding and dependency pairs. Matching pairs can receive
 the copied exit offset.
 
-Drag a dependency in either editor to move its exit along the value axis. The
-Properties panel also accepts the link list as JSON. The Python API expresses
-`exit_offset` in points, while the editor uses logical pixels.
+`exit_fraction` places an exit between 0 (the predecessor starts) and 1
+(the predecessor ends). It survives zoom and changes in display or export
+scale. Fit and Auto layout choose an exit for links without one. Drag a
+dependency in either editor to move its exit. The Properties panel accepts
+the link list as JSON.
+
+Existing beta settings use `exit_offset` in logical pixels. Loading them
+converts the offset using the predecessor's length in the document's layout.
+The older Python argument uses points when a link is created or edited.
 
 Mesh calls require explicit integer `triangles` of shape `(N, 3)`. `tripcolor`
 uses one value per vertex with `shading="gouraud"`, or one value per triangle with
@@ -188,7 +194,9 @@ For a displayed notebook, use `await fig.savefig_async(path)` or
 WebGPU device. Source columns travel as binary buffers, including record,
 ragged and triangle resources; they are not serialized as JSON number lists.
 Notebook transfer snapshots are released after acknowledgement unless the Figure
-was created with `retain_notebook_data=True`.
+was created with `retain_notebook_data=True`. In figures with dependencies,
+range-bar start and end columns stay available for synchronous layout and beta settings
+conversion. Their size is reported by `fig.info["range_endpoint_bytes"]`.
 
 ## Input precision and memory
 

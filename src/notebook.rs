@@ -9,6 +9,7 @@ pub struct NotebookFigure {
     series: Vec<SeriesConfig>,
     columns: HashMap<String, renderer::chart::FitExtent>,
     column_lengths: HashMap<String, usize>,
+    range_endpoints: HashMap<String, (bool, Py<PyBytes>)>,
     edge_samples: HashMap<String, renderer::chart::FitExtent>,
     center_cells: HashMap<String, renderer::chart::FitExtent>,
     revision: u64,
@@ -40,6 +41,7 @@ impl NotebookFigure {
             series: vec![],
             columns: HashMap::new(),
             column_lengths: HashMap::new(),
+            range_endpoints: HashMap::new(),
             edge_samples: HashMap::new(),
             center_cells: HashMap::new(),
             revision: 0,
@@ -109,9 +111,32 @@ impl NotebookFigure {
         self.column_lengths.insert(id.into(), count);
         Ok(())
     }
+    fn cache_range_endpoint(&mut self, id: String, f32: bool, values: Py<PyBytes>) {
+        self.range_endpoints.insert(id, (f32, values));
+    }
+    fn range_endpoint_bytes(&self, py: Python<'_>) -> usize {
+        self.range_endpoints
+            .values()
+            .map(|(_, values)| values.bind(py).as_bytes().len())
+            .sum()
+    }
+    fn migrate_range_links_json(&self, py: Python<'_>, document: &str) -> PyResult<String> {
+        range_links::migrate(parse(document)?, |samples| {
+            self.read_range_endpoints(py, samples)
+        })
+        .map(|value| value.to_string())
+    }
+    fn layout_range_links_json(&self, py: Python<'_>, document: &str) -> PyResult<String> {
+        let mut state: Settings = parse(document)?;
+        range_links::update(&state.config, &mut state.series, None, false, |samples| {
+            self.read_range_endpoints(py, samples)
+        })?;
+        serde_json::to_string(&state).map_err(runtime)
+    }
     fn remove_column(&mut self, id: &str) {
         self.columns.remove(id);
         self.column_lengths.remove(id);
+        self.range_endpoints.remove(id);
         self.edge_samples.remove(id);
         self.center_cells.remove(id);
     }
@@ -198,7 +223,7 @@ impl NotebookFigure {
                 self.set_range("x", xmin, xmax)?;
                 self.set_range("y", ymin, ymax)?;
             } else {
-                self.fit(0.05)?;
+                self.fit_domain(0.05, false, false)?;
             }
             validate_config(self.chart.config())?;
             Ok(())
@@ -251,7 +276,7 @@ impl NotebookFigure {
                 validate_draw_style(self.chart.config(), &all)?;
                 self.series = all;
             }
-            self.fit(0.05)
+            self.fit_domain(0.05, false, false)
         })();
         if let Err(error) = result {
             self.chart = Chart::new(previous_config);
@@ -445,12 +470,12 @@ impl NotebookFigure {
         })
     }
     fn fit(&mut self, padding: f64) -> PyResult<()> {
-        self.fit_domain(padding, false)
+        self.fit_domain(padding, false, true)
     }
     fn fit_active(&mut self, padding: f64) -> PyResult<()> {
-        self.fit_domain(padding, true)
+        self.fit_domain(padding, true, true)
     }
-    fn fit_domain(&mut self, padding: f64, active_only: bool) -> PyResult<()> {
+    fn fit_domain(&mut self, padding: f64, active_only: bool, fit_exits: bool) -> PyResult<()> {
         if !padding.is_finite() || padding < 0. {
             return Err(invalid("padding must be finite and non-negative"));
         }
@@ -593,6 +618,15 @@ impl NotebookFigure {
         self.fit_extra_axes(&mut fitted, padding, active_only);
         validate_config(&fitted)?;
         let mut state: Value = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
+        if fit_exits {
+            let mut series = self.series.clone();
+            Python::attach(|py| {
+                range_links::update(&fitted, &mut series, None, active_only, |samples| {
+                    self.read_range_endpoints(py, samples)
+                })
+            })?;
+            state["series"] = serde_json::to_value(series).map_err(runtime)?;
+        }
         state["config"] = serde_json::to_value(fitted).map_err(runtime)?;
         self.apply_settings(&state.to_string())
     }
@@ -822,5 +856,34 @@ impl NotebookFigure {
         self.revision += 1;
         self.history = Default::default();
         Ok(())
+    }
+}
+
+impl NotebookFigure {
+    fn read_range_endpoints(
+        &self,
+        py: Python<'_>,
+        samples: &[(String, usize)],
+    ) -> PyResult<Vec<f64>> {
+        samples
+            .iter()
+            .map(|(id, index)| {
+                let (f32, data) = self.range_endpoints.get(id).ok_or_else(|| {
+                    invalid(format!("range-bar endpoint column {id} is unavailable"))
+                })?;
+                let stride = if *f32 { 4 } else { 8 };
+                let bytes = data
+                    .bind(py)
+                    .as_bytes()
+                    .chunks_exact(stride)
+                    .nth(*index)
+                    .ok_or_else(|| invalid("range link row is outside its bars"))?;
+                Ok(if *f32 {
+                    f32::from_le_bytes(bytes.try_into().unwrap()) as f64
+                } else {
+                    f64::from_le_bytes(bytes.try_into().unwrap())
+                })
+            })
+            .collect()
     }
 }

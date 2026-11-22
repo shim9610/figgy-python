@@ -2603,7 +2603,9 @@ export class FiggyChart {
      * (`Renderer::fit_layout`, #271). It can move the plot's edges, so it
      * takes the sources of the chart's monotonic groups as
      * `resize_monotonic` does. A chart without monotonic series takes no
-     * argument: `chart.fit_layout()`.
+     * argument: `chart.fit_layout()`; its range links without an exit
+     * then get the ones the layout chooses (#357), written by the frame
+     * that finds their GPU gather complete.
      * @param {Array<any> | null} [sources]
      */
     fit_layout(sources) {
@@ -2641,7 +2643,9 @@ export class FiggyChart {
      * active layer. A layer without series keeps its ranges. Then the
      * scale of every auto-scaled vector series is fitted to the spacing
      * of its arrows and its `auto_scale` flag consumed (#357), so the
-     * stored series say how long the arrows draw. A streamed source and a
+     * stored series say how long the arrows draw. Then each range link
+     * without an exit gets the one the layout chooses (#357), written by
+     * the frame that finds its GPU gather complete. A streamed source and a
      * monotonic chart are refused, and a refusal changes nothing.
      * `auto_fit_all(padding)` instead measures the active layer's drawn
      * extents (error bar ends included) on the GPU.
@@ -3495,11 +3499,12 @@ export class FiggyChart {
      * series `series_id`, as a `pick_data` hit names it (a histogram bin of
      * that series). The link becomes the data selection and the drag
      * starts: `on_move` moves its exit along the predecessor's edge
-     * (`drag_link_exit`, moving a shared trunk as one and snapping to the
-     * default within 3 px) and `on_release` ends it. `extent_px` is the
-     * hit's `extent_px`, the link's predecessor's drawn length in canvas
-     * pixels: the exit stops at the bar's end, so dragging back moves it
-     * at once; without it only the draw stops the exit. Returns `false`
+     * (`drag_link_exit`, moving a shared trunk as one and snapping back to
+     * unset within 3 px of `inset`) and `on_release` ends it. `extent_px`
+     * is the hit's `extent_px`, the link's predecessor's drawn length in
+     * canvas pixels: the exit is stored as a fraction of it (#357), between
+     * the bar's start and end, so the drag needs it; without it the drag
+     * moves nothing. Returns `false`
      * and changes nothing for an id or index that names no link.
      * JS: `const hit = JSON.parse(await chart.pick_data(x, y, 6));`
      * `if (hit?.kind === "histogram_bin") chart.press_range_link(hit.series_id, hit.bin_index, hit.extent_px);`
@@ -4447,11 +4452,11 @@ export class FiggyChart {
         }
     }
     /**
-     * Set the exit offset of link `index` of the range link series
-     * `series_id` (#357), in logical pixels from its predecessor's start;
-     * `undefined`, 0 or a non-finite value restores the default exit.
-     * Returns `false` and changes nothing for an unknown series, an index
-     * past its links or a negative offset.
+     * Set the exit of link `index` of the range link series `series_id`
+     * (#357), a fraction `0..=1` of its predecessor's drawn length from
+     * the start; `undefined` or a non-finite value clears it, so the next
+     * layout chooses. Returns `false` and changes nothing for an unknown
+     * series, an index past its links or a fraction outside `0..=1`.
      * @param {string} series_id
      * @param {number} index
      * @param {number | null} [offset]
@@ -5676,8 +5681,9 @@ export function default_config() {
  * (`default::config_for_series`, #357) as JSON: `default_config()` in the
  * frame the series' family draws by default. A chart that draws a Feynman
  * series has no axes, grid or tick labels (`AxisPreset::Hidden`), one that
- * draws an energy-level series takes the Grotrian frame, and every other
- * list gives `default_config()`. The frame is chosen here, once: an
+ * draws an energy-level series takes the Grotrian frame, one that draws a
+ * range link series takes the timeline frame (`default_timeline_config`),
+ * and every other list gives `default_config()`. The frame is chosen here, once: an
  * `apply_axis_preset` or `set_config` afterwards keeps the host's choice.
  * Throws for a series list that does not parse.
  *
@@ -7360,37 +7366,37 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1314, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1369, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1751, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1745, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1699, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1693, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 1704, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 1698, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1704, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1698, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__301);
             return ret;
         },
         __wbindgen_generic_0000000000000006: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1699, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1693, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__302);
             return ret;
         },
         __wbindgen_generic_0000000000000007: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1699, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1693, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__303);
             return ret;
         },

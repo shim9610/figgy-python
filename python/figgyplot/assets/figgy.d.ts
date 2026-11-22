@@ -1198,7 +1198,9 @@ export class FiggyChart {
      * (`Renderer::fit_layout`, #271). It can move the plot's edges, so it
      * takes the sources of the chart's monotonic groups as
      * `resize_monotonic` does. A chart without monotonic series takes no
-     * argument: `chart.fit_layout()`.
+     * argument: `chart.fit_layout()`; its range links without an exit
+     * then get the ones the layout chooses (#357), written by the frame
+     * that finds their GPU gather complete.
      */
     fit_layout(sources?: Array<any> | null): void;
     /**
@@ -1222,7 +1224,9 @@ export class FiggyChart {
      * active layer. A layer without series keeps its ranges. Then the
      * scale of every auto-scaled vector series is fitted to the spacing
      * of its arrows and its `auto_scale` flag consumed (#357), so the
-     * stored series say how long the arrows draw. A streamed source and a
+     * stored series say how long the arrows draw. Then each range link
+     * without an exit gets the one the layout chooses (#357), written by
+     * the frame that finds its GPU gather complete. A streamed source and a
      * monotonic chart are refused, and a refusal changes nothing.
      * `auto_fit_all(padding)` instead measures the active layer's drawn
      * extents (error bar ends included) on the GPU.
@@ -1621,11 +1625,12 @@ export class FiggyChart {
      * series `series_id`, as a `pick_data` hit names it (a histogram bin of
      * that series). The link becomes the data selection and the drag
      * starts: `on_move` moves its exit along the predecessor's edge
-     * (`drag_link_exit`, moving a shared trunk as one and snapping to the
-     * default within 3 px) and `on_release` ends it. `extent_px` is the
-     * hit's `extent_px`, the link's predecessor's drawn length in canvas
-     * pixels: the exit stops at the bar's end, so dragging back moves it
-     * at once; without it only the draw stops the exit. Returns `false`
+     * (`drag_link_exit`, moving a shared trunk as one and snapping back to
+     * unset within 3 px of `inset`) and `on_release` ends it. `extent_px`
+     * is the hit's `extent_px`, the link's predecessor's drawn length in
+     * canvas pixels: the exit is stored as a fraction of it (#357), between
+     * the bar's start and end, so the drag needs it; without it the drag
+     * moves nothing. Returns `false`
      * and changes nothing for an id or index that names no link.
      * JS: `const hit = JSON.parse(await chart.pick_data(x, y, 6));`
      * `if (hit?.kind === "histogram_bin") chart.press_range_link(hit.series_id, hit.bin_index, hit.extent_px);`
@@ -2071,11 +2076,11 @@ export class FiggyChart {
      */
     set_host_state(config: string, series: string): void;
     /**
-     * Set the exit offset of link `index` of the range link series
-     * `series_id` (#357), in logical pixels from its predecessor's start;
-     * `undefined`, 0 or a non-finite value restores the default exit.
-     * Returns `false` and changes nothing for an unknown series, an index
-     * past its links or a negative offset.
+     * Set the exit of link `index` of the range link series `series_id`
+     * (#357), a fraction `0..=1` of its predecessor's drawn length from
+     * the start; `undefined` or a non-finite value clears it, so the next
+     * layout chooses. Returns `false` and changes nothing for an unknown
+     * series, an index past its links or a fraction outside `0..=1`.
      */
     set_link_exit_offset(series_id: string, index: number, offset?: number | null): boolean;
     /**
@@ -2596,8 +2601,9 @@ export function default_config(): string;
  * (`default::config_for_series`, #357) as JSON: `default_config()` in the
  * frame the series' family draws by default. A chart that draws a Feynman
  * series has no axes, grid or tick labels (`AxisPreset::Hidden`), one that
- * draws an energy-level series takes the Grotrian frame, and every other
- * list gives `default_config()`. The frame is chosen here, once: an
+ * draws an energy-level series takes the Grotrian frame, one that draws a
+ * range link series takes the timeline frame (`default_timeline_config`),
+ * and every other list gives `default_config()`. The frame is chosen here, once: an
  * `apply_axis_preset` or `set_config` afterwards keeps the host's choice.
  * Throws for a series list that does not parse.
  *

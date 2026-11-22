@@ -110,24 +110,23 @@ def preserve_data(source, destination):
                 topology=("from", "to", "particle"),
             )
         elif kind == "RangeLinks":
-            # Offsets style matched links. The destination owns its bar binding
+            # Exit placement styles matched links. The destination owns its bar binding
             # and endpoints, including links without a counterpart in the source.
-            offsets = {}
+            exit_keys = ("exit_fraction", "exit_offset")
+            exits = {}
             if body["bars"] == old_body["bars"]:
                 for link in body.get("links", []):
-                    offsets.setdefault((link["from"], link["to"]), deque()).append(
-                        link.get("exit_offset")
+                    exits.setdefault((link["from"], link["to"]), deque()).append(
+                        {key: link[key] for key in exit_keys if key in link}
                     )
             body["bars"] = old_body["bars"]
             body["links"] = copy.deepcopy(old_body.get("links", []))
             for link in body["links"]:
-                matches = offsets.get((link["from"], link["to"]))
+                matches = exits.get((link["from"], link["to"]))
                 if matches:
-                    offset = matches.popleft()
-                    if offset is None:
-                        link.pop("exit_offset", None)
-                    else:
-                        link["exit_offset"] = offset
+                    for key in exit_keys:
+                        link.pop(key, None)
+                    link.update(matches.popleft())
         elif _bindings(spec) != _bindings(current):
             raise ValueError(
                 "appearance replay requires matching source column bindings"

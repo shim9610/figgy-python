@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild the public web host plus the recorded, bridge-only host patch.
 set -euo pipefail
-revision=c200678f874682b629564b0af7f732d3c84310fc
+revision=081347b57401f3655f23297cbf31abc7337f43b0
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 wasm_source=${FIGGY_WASM_SOURCE:-${TMPDIR:-/tmp}/figgy-web-kernel-$revision}
 if ! git -C "$wasm_source" rev-parse --git-dir >/dev/null 2>&1; then

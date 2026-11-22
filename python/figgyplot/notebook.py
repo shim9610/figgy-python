@@ -26,6 +26,22 @@ class NotebookData:
         dtype, data = entry
         return np.frombuffer(data, dtype=np.dtype(dtype).newbyteorder('<'))
 
+    def _cache_range_endpoints(self, series):
+        # Share the existing binary snapshots. Only figures with a link need
+        # to keep range-bar endpoints after the browser acknowledges upload.
+        if not self.columns or not any("RangeLinks" in spec["render_type"] for spec in series):
+            return
+        for spec in series:
+            style = spec["render_type"].get("RangeBars")
+            if style is not None:
+                for column in (spec["y_column"], style["start"]):
+                    dtype, data = self.columns[column]
+                    self.model.cache_range_endpoint(column, dtype == "float32", data)
+
+    def migrate_range_links_json(self, value):
+        self._cache_range_endpoints(json.loads(value)["series"])
+        return self.model.migrate_range_links_json(value)
+
     def apply_settings(self, value):
         if self.columns:
             from ._native import format_value_labels_json
@@ -255,7 +271,9 @@ class NotebookData:
         candidate = json.loads(previous)
         candidate.update(config=config, series=all_specs)
         formatted = json.loads(format_value_labels_json(json.dumps(candidate, allow_nan=False), self._label_column, previous))
-        return self.model.add_series_batch(spec_json, config_json, json.dumps(formatted['series'], allow_nan=False))
+        result = self.model.add_series_batch(spec_json, config_json, json.dumps(formatted['series'], allow_nan=False))
+        self._cache_range_endpoints(all_specs)
+        return result
 
     def remove_column(self, id):
         self.model.remove_column(id)

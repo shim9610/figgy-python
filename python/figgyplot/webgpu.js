@@ -1237,14 +1237,21 @@ export function render({model,el}) {
   // original target and cannot overwrite a newer pending inspector choice.
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{const format=exportFormat.value;exporting(1,format).then(data=>{const url=URL.createObjectURL(new Blob([data],{type:{png:'image/png',svg:'image/svg+xml',pdf:'application/pdf'}[format]}));const a=document.createElement('a');a.href=url;a.download='figure.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}).catch(fail);});
-  root.querySelector('[data-fit]').addEventListener('click',async()=>{
+  root.querySelector('[data-fit]').addEventListener('click',()=>{
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||Object.values(s.render_type)[0].line?.fill))){
-      try{await queue;await flush();model.send({action:'fit',revision});}catch(e){fail(e);}return;
+      replayEdit('fit');return;
     }
     enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
       dirty=true;commit();});
   });
-  root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(calendarOriginWire(root.querySelector('[data-settings]').value,true)));commit();}));
+  root.querySelector('[data-apply]').addEventListener('click',()=>{
+    try{
+      const settings=JSON.parse(calendarOriginWire(root.querySelector('[data-settings]').value,true));
+      if(settings.series?.some(spec=>spec.render_type?.RangeLinks?.links?.some(row=>owns(row,'exit_offset')))){
+        replayEdit('settings',{settings});
+      }else enqueue(()=>{install(settings);commit();});
+    }catch(error){fail(error);}
+  });
   root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
   root.querySelector('[data-close-properties]').addEventListener('click',()=>showProperties(false));
   root.querySelector('[data-select]').addEventListener('click',()=>{cancelDrawing();layoutMode(false);});
@@ -1293,7 +1300,10 @@ export function render({model,el}) {
   themeSelect.innerHTML='<option value="">Theme…</option>'+['gallery','cool-slate','midnight','warm-paper'].map(n=>`<option value="${n}">${n}</option>`).join('');toolbar.append(themeSelect);
   themeSelect.addEventListener('change',()=>{const name=themeSelect.value;if(name)enqueue(()=>{chart.apply_theme(name);local.background=kind?JSON.parse(chart.get_document()).background:(JSON.parse(chart.get_config()).background??null);if(!kind)clearColor(local.background);dirty=true;commit();});});
   const autoLayout=document.createElement('button');autoLayout.dataset.autoLayout='';autoLayout.textContent='Auto layout';toolbar.append(autoLayout);
-  autoLayout.addEventListener('click',()=>enqueue(()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else chart.fit_layout();dirty=true;commit();}));
+  autoLayout.addEventListener('click',()=>{
+    if(!kind&&local.series.some(s=>s.render_type.RangeLinks)){replayEdit('layout');return;}
+    enqueue(()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else chart.fit_layout();dirty=true;commit();});
+  });
   const exportFormat=document.createElement('select');exportFormat.dataset.exportFormat='';exportFormat.setAttribute('aria-label','Export format');exportFormat.innerHTML=['png','svg','pdf'].map(n=>`<option value="${n}">${n.toUpperCase()}</option>`).join('');toolbar.append(exportFormat);
   const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
   function bounds(){const value=JSON.parse(chart.decoration_bounds(elementName('data_area')));return value?.rect??[0,0,canvas.width,canvas.height];}
@@ -1450,17 +1460,7 @@ export function render({model,el}) {
     }
     for(const [id,entry]of composites){if(entry.kind==='record')chart.register_record(id,entry.fields);else if(entry.kind==='ragged')chart.register_ragged(id,entry.fields.values,entry.fields.offsets);else if(entry.kind==='triangles')chart.register_triangles(id,entry.fields.indices);}
     if(!kind){
-      const config=JSON.stringify(local.config);
-      if(local.series.some(series=>series.render_type.RangeLinks)){
-        // A compiled link must never reach an incomplete frame without its
-        // bars. Give the bar pipelines a chance to finish before adding links.
-        const base=clone(local.config);
-        delete base.picked_data;
-        const withoutLinks=local.series.filter(series=>!series.render_type.RangeLinks);
-        chart.set_host_state(JSON.stringify(base),JSON.stringify(withoutLinks));
-        await chart.prepare_data_pick();
-      }
-      chart.set_host_state(config,JSON.stringify(local.series));
+      chart.set_host_state(JSON.stringify(local.config),JSON.stringify(local.series));
       clearColor(local.background);
     }
     properties();

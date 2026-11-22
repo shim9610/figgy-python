@@ -3966,7 +3966,7 @@ def test_gantt_dependency_exit_drag_reaches_accepted_state(tmp_path, backend):
                 inputs = Inputs(handle)
                 drag_native(inputs, native_point(inputs.info(), logical), (24, 0))
                 changed = settings(fig.get_settings())[0]
-                assert changed['exit_offset'] > 0
+                assert 0 < changed['exit_fraction'] <= 1
                 assert (changed['from'], changed['to']) == (0, 1)
                 assert not inputs.info()['error']
                 inputs.click('undo')
@@ -3995,21 +3995,37 @@ display(fig.widget())
         page.evaluate(ROOT+'.flush()')
         state = json.loads(execute('import json;await fig.sync();print(json.dumps(fig.get_settings()))'))
         changed = settings(state)[0]
-        assert changed['exit_offset'] > 0
+        assert 0 < changed['exit_fraction'] <= 1
         assert (changed['from'], changed['to']) == (0, 1)
         click_button(page, '[data-undo]')
         page.evaluate(ROOT+'.flush()')
         assert settings(page.evaluate(ROOT+'.snapshot()')) == [{'from': 0, 'to': 1}]
+        click_button(page, '[data-auto-layout]')
+        state = json.loads(execute('await fig.sync();print(json.dumps(fig.get_settings()))'))
+        computed = settings(state)[0]['exit_fraction']
+        assert 0 < computed <= 1
+        assert settings(page.evaluate(ROOT+'.snapshot()'))[0]['exit_fraction'] == computed
         # The inspector edits the complete list while keeping the bar source resident.
         if page.locator('.figgy-properties').is_hidden():
             click_button(page, '[data-properties]')
         ObjectNavigator(page).choose('deps')
         links = page.locator('[data-catalog-field="Appearance/links"]')
-        links.fill('[{"from":1,"to":0,"exit_offset":18}]');links.press('Tab')
+        links.fill('[{"from":1,"to":0,"exit_fraction":0.5}]');links.press('Tab')
         execute('await fig.sync()')
-        assert settings(page.evaluate(ROOT+'.snapshot()')) == [{'from': 1, 'to': 0, 'exit_offset': 18}]
+        assert settings(page.evaluate(ROOT+'.snapshot()')) == [{'from': 1, 'to': 0, 'exit_fraction': 0.5}]
         click_button(page, '[data-fit]')
         execute("await fig.sync(); assert fig.get_settings()['config']['bottom_x']['max'] < 8")
+        old = page.evaluate(ROOT+'.snapshot()')
+        row = settings(old)[0]
+        assert row.pop('exit_fraction') == 0.5
+        row['exit_offset'] = 24
+        page.locator('[data-advanced] summary').click()
+        page.locator('[data-settings]').fill(json.dumps(old))
+        click_button(page, '[data-apply]')
+        accepted = json.loads(execute('await fig.sync();print(json.dumps(fig.get_settings()))'))
+        assert 0 < settings(accepted)[0]['exit_fraction'] < 1
+        assert 'exit_offset' not in settings(accepted)[0]
+        assert settings(accepted) == settings(page.evaluate(ROOT+'.snapshot()'))
         assert not page.locator('.figgy-error').inner_text()
 
 

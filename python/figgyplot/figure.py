@@ -406,6 +406,7 @@ class Figure(FigureMethods):
             info = json.loads(self._native.info_json())
             if self.backend == "webgpu":
                 info["transfer_snapshot_bytes"] = sum(len(v[1]) for v in self._native.columns.values())
+                info["range_endpoint_bytes"] = self._native.range_endpoint_bytes()
                 info["browser"] = [dict(w.browser_info, status=w.status) for w in self._widgets]
             return info
 
@@ -552,6 +553,17 @@ class Figure(FigureMethods):
         self._changed()
         return self
 
+    def _migrate_range_links(self, settings):
+        try:
+            has_offset = any("exit_offset" in row
+                             for spec in settings.get("series", [])
+                             for row in spec.get("render_type", {}).get("RangeLinks", {}).get("links", []))
+        except (AttributeError, TypeError) as exc:
+            raise ValueError("invalid settings series") from exc
+        if has_offset:
+            return json.loads(self._native.migrate_range_links_json(json.dumps(settings, allow_nan=False)))
+        return settings
+
     def apply_settings(self, settings, *, expected_revision=None, reset=False, preserve_data=False):
         """Replace accepted settings for existing series; source arrays are not copied.
 
@@ -581,6 +593,7 @@ class Figure(FigureMethods):
             if preserve_data:
                 from ._replay_data import preserve_data as protect_data
                 protect_data(settings, previous)
+            settings = self._migrate_range_links(settings)
             legacy = next((kind for kind in ('categorical','boxplot','radar') if settings.get(kind) is not None), None)
             if legacy is not None:
                 if previous['series'] or _family(previous):
@@ -904,6 +917,8 @@ class Figure(FigureMethods):
                         config[axis]['out_margin'] += extra
                     for panel in config.get('subplots',[]): padding(panel['config'])
                 padding(state['config'])
+            if any('RangeLinks' in spec['render_type'] for spec in state['series']):
+                state = json.loads(self._native.layout_range_links_json(json.dumps(state, allow_nan=False)))
             self.apply_settings(state)
         return self
 

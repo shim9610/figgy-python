@@ -67,7 +67,7 @@ impl FigureAccess<'_> {
                 result["index"] = json!(bin_index);
                 result["from"] = row["from"].clone();
                 result["to"] = row["to"].clone();
-                result["exit_offset"] = row["exit_offset"].clone();
+                result["exit_fraction"] = row["exit_fraction"].clone();
             }
             PickedDataRef::HistogramBin { bin_index, .. }
                 if series.render_type.energy_levels().is_some() =>

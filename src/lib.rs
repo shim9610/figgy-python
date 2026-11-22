@@ -23,6 +23,7 @@ use renderer::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+mod range_links;
 mod review_images;
 use std::{
     collections::HashMap,
@@ -1210,7 +1211,7 @@ impl FigureAccess<'_> {
                 self.set_range("x", xmin, xmax)?;
                 self.set_range("y", ymin, ymax)?;
             } else {
-                self.fit(py, 0.05)?;
+                self.fit_domain(py, 0.05, false, false)?;
             }
             validate_config(self.data.chart.config())?;
             Ok(())
@@ -1261,7 +1262,7 @@ impl FigureAccess<'_> {
             self.data.chart = chart;
             self.refresh_addresses();
             self.data.series = series;
-            self.fit(py, 0.05)
+            self.fit_domain(py, 0.05, false, false)
         })();
         if let Err(error) = result {
             self.renderer
@@ -1283,7 +1284,16 @@ impl FigureAccess<'_> {
     }
     fn apply_settings(&mut self, json: &str) -> PyResult<()> {
         let started = self.data.host_work.start();
-        let result = parse(json).and_then(|next| self.apply_settings_model(next));
+        let result = (|| {
+            let next = if json.contains("\"exit_offset\"") {
+                let migrated =
+                    range_links::migrate(parse(json)?, |samples| self.read_samples(samples))?;
+                parse(&migrated.to_string())?
+            } else {
+                parse(json)?
+            };
+            self.apply_settings_model(next)
+        })();
         self.data.host_work.finish("apply_settings", started);
         result
     }
@@ -1443,10 +1453,68 @@ impl FigureAccess<'_> {
             .map_err(runtime)
         })
     }
-    fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
-        self.fit_domain(py, padding, false)
+    fn fit_range_link_exits(&mut self, state: &mut Settings, active_only: bool) -> PyResult<()> {
+        let link_in_scope = |s: &SeriesConfig| {
+            s.render_type.range_links().is_some()
+                && (!active_only
+                    || state.config.layer_of_series(&s.series_id) == state.config.active_layer())
+        };
+        if !state.series.iter().any(|s| {
+            link_in_scope(s)
+                && s.render_type
+                    .range_links()
+                    .unwrap()
+                    .links
+                    .iter()
+                    .any(|l| l.exit_fraction.is_none())
+        }) {
+            return Ok(());
+        }
+        let config = gpu::config(self.data.figure_id, &state.config);
+        let source = state
+            .series
+            .iter()
+            .filter(|s| s.render_type.range_links().is_none() || link_in_scope(s))
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut specs = gpu::series(self.data.figure_id, &source);
+        self.renderer
+            .fit_link_exits(&config, &mut specs)
+            .map_err(runtime)?;
+        let exits = source
+            .iter()
+            .zip(specs)
+            .filter_map(|(original, fitted)| {
+                fitted
+                    .render_type
+                    .range_links()
+                    .map(|links| (original.series_id.as_str(), links.links.clone()))
+            })
+            .collect::<HashMap<_, _>>();
+        for spec in &mut state.series {
+            if let Some(links) = exits.get(spec.series_id.as_str())
+                && let Some(style) = spec.render_type.range_links_mut()
+            {
+                style.links.clone_from(links);
+            }
+        }
+        Ok(())
     }
-    fn fit_domain(&mut self, py: Python<'_>, padding: f64, active_only: bool) -> PyResult<()> {
+    fn layout_range_links_json(&mut self, json: &str) -> PyResult<String> {
+        let mut state: Settings = parse(json)?;
+        self.fit_range_link_exits(&mut state, false)?;
+        serde_json::to_string(&state).map_err(runtime)
+    }
+    fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
+        self.fit_domain(py, padding, false, true)
+    }
+    fn fit_domain(
+        &mut self,
+        py: Python<'_>,
+        padding: f64,
+        active_only: bool,
+        fit_exits: bool,
+    ) -> PyResult<()> {
         if !padding.is_finite() || padding < 0.0 {
             return Err(invalid("padding must be finite and non-negative"));
         }
@@ -1463,8 +1531,7 @@ impl FigureAccess<'_> {
                 )
             })
         {
-            let mut specs = gpu::series(self.data.figure_id, &self.data.series);
-            specs.retain(|s| s.render_type.range_links().is_none());
+            let specs = gpu::series(self.data.figure_id, &self.data.series);
             let mut chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
             let config = chart.config().clone();
             let mut layers = vec![renderer::LayerRef::Base];
@@ -1501,7 +1568,10 @@ impl FigureAccess<'_> {
                             let mut y = renderer::chart::FitExtent::EMPTY;
                             for s in &specs {
                                 let (fit_x, fit_y) = config.series_fit_roles(layer, &s.series_id);
-                                if !(fit_x || fit_y) || s.is_dataless() {
+                                if !(fit_x || fit_y)
+                                    || s.is_dataless()
+                                    || s.render_type.range_links().is_some()
+                                {
                                     continue;
                                 }
                                 let mut a = Chart::slot_extent(self.renderer.pool(), &s.x_column)
@@ -1540,7 +1610,12 @@ impl FigureAccess<'_> {
                     }
                 }
             }
-            return self.commit_config(gpu::local_config(self.data.figure_id, chart.config()));
+            let mut state = self.snapshot();
+            state.config = gpu::local_config(self.data.figure_id, chart.config());
+            if fit_exits {
+                self.fit_range_link_exits(&mut state, active_only)?;
+            }
+            return self.apply_settings_model(state);
         }
         let extents = py.detach(|| -> PyResult<Vec<[renderer::chart::FitExtent; 2]>> {
             pollster::block_on(self.renderer.ensure_errorbar_extent_engine()).map_err(runtime)?;
@@ -2042,6 +2117,15 @@ impl NativeFigure {
             Ok(())
         })
     }
+    fn migrate_range_links_json(&self, document: &str) -> PyResult<String> {
+        self.with(|core| {
+            range_links::migrate(parse(document)?, |samples| core.read_samples(samples))
+                .map(|value| value.to_string())
+        })
+    }
+    fn layout_range_links_json(&self, document: &str) -> PyResult<String> {
+        self.with(|core| core.layout_range_links_json(document))
+    }
     fn edit_history_json(&self) -> PyResult<String> {
         self.with(|core| Ok(core.data.history.status().to_string()))
     }
@@ -2094,7 +2178,7 @@ impl NativeFigure {
         self.with(|core| core.set_radial(json))
     }
     fn fit_active(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
-        self.with(|core| core.fit_domain(py, padding, true))
+        self.with(|core| core.fit_domain(py, padding, true, true))
     }
     fn fit(&self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.with(|core| core.fit(py, padding))
