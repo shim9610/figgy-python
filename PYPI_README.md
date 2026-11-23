@@ -76,9 +76,10 @@ separately. These measurements include RGBA readback and do not measure UI FPS.
 
 ## Install
 
-This distribution is **figgyplot 0.4.0**, using renderer 0.18.1. It includes
-reusable style tokens and execution-local style defaults, plus an opt-in review
-workflow with targeted comments and reference images. See the
+This distribution is **figgyplot 0.4.0**, using Figgy renderer 0.19. It includes
+SVG and PDF export, Gantt timelines, energy levels, Feynman diagrams, and
+reusable styles. See the
+[renderer 0.19 API](https://github.com/shim9610/figgy-python/blob/main/docs/RENDERER_019.md),
 [style guide](https://github.com/shim9610/figgy-python/blob/main/docs/STYLE_TOKENS.md)
 and [review guide](https://github.com/shim9610/figgy-python/blob/main/docs/REVIEW_FEEDBACK_VIEWS.md).
 

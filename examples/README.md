@@ -18,7 +18,7 @@ python examples/edit_and_reuse.py --output output/edit-and-reuse
 vectors, reference fills, steps, secondary Y, polar/radar and annotations on both
 hosts. See the [feature guide](../docs/RENDERER_018_FEATURES.md) for APIs and guards.
 
-Every gallery script defines `make_figure()` and uses synthetic data. Random
+Each chart in the preview table has a `make_figure()` entry point and uses synthetic data. Random
 examples use a fixed seed. The checked-in images are native renderer exports,
 not mockups or upstream Rust screenshots.
 
@@ -52,7 +52,7 @@ Open a native window, edit, then close it to save the current chart:
 python examples/scatter_clusters.py --show
 ```
 
-All gallery scripts accept `--output` and `--show`. Their default exports go to
+The preview-table scripts accept `--output` and `--show`. Their default exports go to
 `output/gallery/`. Shared argument handling and title/label setup live in
 [_gallery.py](_gallery.py); the chart/data construction is in each linked script.
 Gallery examples require NumPy and the installed native package only.
@@ -101,6 +101,38 @@ window creation/event processing belongs on Python's main thread. See the
 
 ## Renderer 0.19
 
-[renderer_019.py](renderer_019.py) renders stem, violin, waterfall and RGB images
-with every built-in theme. Run `python examples/renderer_019.py --formats png svg pdf`
-for PNG, SVG and PDF output. See the [API guide](../docs/RENDERER_019.md).
+[renderer_019.py](renderer_019.py) renders stem, violin, waterfall with
+connectors, and RGB images in all four built-in themes.
+[renderer_019_editing.py](renderer_019_editing.py) opens or exports one figure
+with a zoom inset, a Gantt timeline with progress and dependencies, an energy
+level diagram with wavelength labels, and a Feynman diagram.
+
+```bash
+python examples/renderer_019.py --output output/themes --formats png svg pdf
+python examples/renderer_019_editing.py --formats png svg pdf
+python examples/renderer_019_editing.py --show --theme cool-slate
+```
+
+The editing example writes `renderer-019-editing.png` under
+`output/renderer-019-editing/` by default. With `--show`, edits made in the
+native window are saved after it closes.
+
+![Figgy output showing a zoom inset, a Gantt timeline, labelled energy levels and a Feynman diagram](../docs/images/renderer-019-editing.png)
+
+In JupyterLab started from the repository root, use the same figure builder.
+
+```python
+from examples.renderer_019_editing import make_figure
+
+fig = make_figure(backend="webgpu")
+display(fig.widget())
+```
+
+Run the export in a later cell, with the widget still open.
+
+```python
+await fig.savefig_async("renderer-019-editing.pdf")
+```
+
+See the [API guide](../docs/RENDERER_019.md) for the controls, an offline NIST
+CSV recipe and Model Context Protocol (MCP) arguments.

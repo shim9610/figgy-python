@@ -1,22 +1,45 @@
-# Renderer 0.19 통합 점검 — 2026-11-18
+# Figgy 0.19 통합 점검
 
-이 문서의 11월 18일 측정은 이전 pin의 기록이다. 현재 native/WASM pin은
-[0.19 Python API 안내](RENDERER_019.md)에 있다.
+## 2026년 11월 23일
+
+Python PR #23은 네이티브와 Jupyter WebAssembly(WASM)에 같은 Figgy
+커밋 `5eafcee`를 사용한다. Figgy #412의 달력 눈금 중복, Grotrian
+화살표 교차, Feynman 외부 라벨 배치 수정이 포함된다.
+[Python PR #23](https://github.com/shim9610/figgy-python/pull/23) · [Figgy #412](https://github.com/shim9610/figgy/pull/412)
+
+Gantt 진행률과 행 표시 범위, 워터폴 연결선, 전이 파장 라벨, 편집기
+인셋 추가를 검증했다. 로컬에서 차트·출력 회귀 208개, 편집기·MCP 87개,
+실제 데스크톱·Jupyter 조작 4개가 통과했다. 커밋 `241a199`의
+GitHub Actions 작업 8개도 모두 통과했다. [CI 실행](https://github.com/shim9610/figgy-python/actions/runs/45091232854)
+
+현재 Figgy 모델에서 인셋의 부모가 서브플롯이면 확대 영역 표시선이
+첫 패널에 그려진다. Python 없이 `Config::inset_marker_parts`로
+좌표가 잘못 계산되는 것을 재현했다. 예제에서는 첫 패널에 인셋을 만든다.
+[Figgy #414](https://github.com/shim9610/figgy/issues/414)
+
+이전 기록의 혼합 서브플롯 검증 오류는 Figgy #330에서 수정됐다.
+레이더 첫 선택에서 무관한 선택 커널을 기다리던 동작은 Figgy #332에서
+수정됐다. 아래의 300초 측정은 두 수정 이전의 결과다.
+[Figgy #330](https://github.com/shim9610/figgy/pull/330) · [Figgy #332](https://github.com/shim9610/figgy/pull/332)
+
+사용법은 [Python API 안내](RENDERER_019.md)에서 확인할 수 있다.
+PyPI 배포는 Figgy 0.19 정식 릴리스와 해당 패키지 버전 고정 이후에 진행한다.
+[배포 절차](PUBLISHING.md)
+
+## 2026년 11월 18일 이전 기록
 
 Python PR [#23](https://github.com/shim9610/figgy-python/pull/23)에서 누락됐던
 차트 편집 API, 프리셋 적용, 값 라벨 포맷과 SVG/PDF 인쇄 크기를 수정했다.
-배포는 Figgy 0.19 정식 발행 후 정확한 공개 패키지 버전과 WASM을 고정하는
-기존 순서를 따른다. 이 통합 커밋을 PyPI에 배포하지 않았다.
 
-native renderer/model과 WebAssembly는 모두
-[`f5f611c4532b037f8c3b3087fab22a9f47852343`](https://github.com/shim9610/figgy/commit/f5f611c4532b037f8c3b3087fab22a9f47852343)를 사용한다.
+당시 네이티브 렌더러·모델과 WASM은
+[`f5f611c4532b037f8c3b3087fab22a9f47852343`](https://github.com/shim9610/figgy/commit/f5f611c4532b037f8c3b3087fab22a9f47852343)를 사용했다.
 이 커밋에는 상위 이슈 #308, #309, #318, #321, #322의 수정이 들어 있다. 에너지 라벨 선택도
 임시 메타데이터 우회 처리를 제거하고 공개 `selection_details()`를 사용한다.
 WASM과 native 릴리스 빌드 및 자산·배포 사전 검사 110개를 통과했다.
 브라우저는 source 공유 준위 선·전이·라벨의 선택도 공개 API로 재검증했다.
-상위 manifest의 개발 중 패키지 버전은 아직 renderer 0.18.1 / model 0.12.1이다.
+당시 Figgy manifest의 버전은 renderer 0.18.1과 model 0.12.1이었다.
 
-## 11월 18일 추가 점검
+### 11월 18일 추가 점검
 
 이전의 기본 회귀 통과 수는 실제 마우스 조작 전체를 검증했다는 뜻이 아니다.
 편의 API, 편집기 입력 경로, 출력·데이터 보존을 구분해서 확인한다.
@@ -62,7 +85,7 @@ WASM과 native 릴리스 빌드 및 자산·배포 사전 검사 110개를 통�
 `energy_level_records`로 source 공유 시리즈의 레코드를 찾는다. 수치 원본 배열을
 보관하지 않으며, 임시 브라우저 처리는 제거했다.
 
-## 수정 범위
+### 수정 범위
 
 - **이름 기반 편집:** 공통 시리즈로 바뀐 막대·박스·레이더에 `series`, `cell`,
   `set_value_labels`, `decoration`, `set_plot_bounds`, 방향 전환과 초기화 API를
@@ -85,7 +108,7 @@ WASM과 native 릴리스 빌드 및 자산·배포 사전 검사 110개를 통�
   테스트를 공통 Config·SeriesConfig, 리소스 연결, 데이터 보존과 실제 출력 검사로
   이관했다. 새 모델이 지원하는 축 범위·범례 위치와 큰 글꼴도 검사한다.
 
-## 상위 렌더러에서 막힌 조합
+### 당시 상위 렌더러에서 막힌 조합
 
 일반 Cartesian 루트 옆에 배치한 혼합 서브플롯 22종을 추가 검사했다.
 Native 등록·렌더링은 19종이 통과했고, `EnergyLevels`, `Ternary`, `Parallel`
@@ -98,7 +121,7 @@ Native 등록·렌더링은 19종이 통과했고, `EnergyLevels`, `Ternary`, `P
 상위 수정 뒤에는 XPASS로 실패하도록 해 두었다. 루트 축을 바꾸는 우회는 하지 않는다.
 정식 배포 조건에 이 조합의 재검증을 포함한다.
 
-## 브라우저 첫 GPU 선택 지연
+### 당시 브라우저 첫 GPU 선택 지연
 
 현재 pin에서도 작은 레이더의 공개 `pick_data()`가 **300초 안에 완료되지 않음**을
 재현했다. 아직 GPU 값 읽기에는 들어가지 않았고, 레이더와 무관한 violin·값 라벨
@@ -111,7 +134,7 @@ Chromium 154 / Vulkan SwiftShader 소프트웨어 GPU에서의 측정이며 물�
 [측정 자료](measurements/renderer-019-radar-first-pick-20261118.json)에 원본 결과의
 해시와 대기 파이프라인을 기록한다.
 
-## 11월 17일 실행 기준
+### 11월 17일 실행 기준
 
 | 검사 | 결과 | 범위 |
 | --- | --- | --- |
@@ -139,7 +162,7 @@ Linux X11/Xvfb·Mesa Vulkan과 실제 JupyterLab·Chromium WebGPU에서 검사�
 재질의 미세한 grain은 GPU에 등록된 시리즈 ID를 seed로 사용하므로 독립 Figure의
 픽셀 비교에서는 Flat 재질 또는 채널당 3/255 이하 오차를 사용하는 검사가 있다.
 
-## NIST 입력
+### NIST 입력
 
 `read_nist(levels, lines=None)`는 CSV 경로·본문·텍스트 스트림·테이블을 읽고
 configuration/term/J로 전이 끝점을 연결한다. 단위·수치 한정 기호·불확도·참고문헌을

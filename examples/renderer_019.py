@@ -31,6 +31,8 @@ def draw(theme, output, formats=("png",)):
         ax.waterfall(
             ["Start", "Growth", "Cost", "Recovery"],
             np.array([4, 3, -2, 1], dtype=np.float32),
+            connector_color="#8b7768",
+            connector_width=1.25,
         )
         ax.set_title("Waterfall")
         ax.set_ylabel("Balance")

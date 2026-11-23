@@ -45,43 +45,54 @@ with fg.Figure(backend="native") as fig:
 estimation, hexagonal bin aggregation and box statistics are also host operations;
 the resulting columns are drawn by the common renderer.
 
-Use `range_links` to connect rows in a range-bar series on the same axes. The
-indices are zero-based and follow the order of the data passed to `range_bars`.
+### Gantt timelines and waterfalls
+
+`timeline=True` puts the first task at the top and adds alternating row bands.
+Supply one progress fraction from 0 to 1 per bar. NaN draws an undivided bar.
+Link indices follow the zero-based order of the input rows.
 
 ```python
-tasks = ax.range_bars([0, 1], [0, 3], [2, 6], orientation="horizontal")
-dependencies = ax.range_links(tasks, [(0, 1)], color="navy")
-dependencies.set(links=[{"from": 0, "to": 1, "exit_fraction": 0.4}])
-```
+import figgyplot as fg
 
-An index outside the source bars raises `ValueError`. Copy Python preserves
-the destination's bar binding and dependency pairs. Matching pairs can receive
-the copied exit offset.
+with fg.Figure(backend="native") as fig:
+    ax = fig.axes[0]
+    tasks = ax.range_bars(
+        [0, 1, 2], [0, 2, 5], [2, 5, 7],
+        labels=["Design", "Build", "Test"], timeline=True,
+        progress=[1.0, 0.65, 0.0], remaining_opacity=0.35, id="tasks",
+    )
+    ax.range_links(tasks, [(0, 1), (1, 2)], id="dependencies")
+    ax.set_xlabel("Project day")
+    fig.tight_layout()
+    fig.savefig("timeline.svg", scale=2)
+```
 
 `exit_fraction` places an exit between 0 (the predecessor starts) and 1
 (the predecessor ends). It survives zoom and changes in display or export
 scale. Fit and Auto layout choose an exit for links without one. Drag a
-dependency in either editor to move its exit. The Properties panel accepts
-the link list as JSON.
+dependency in either editor or enter its fraction in the Properties panel's
+JSON link list. Copy Python applies exit fractions to matching link pairs
+with the destination's bar binding.
 
 Existing beta settings use `exit_offset` in logical pixels. Loading them
 converts the offset using the predecessor's length in the document's layout.
 The older Python argument uses points when a link is created or edited.
 
-Pass `timeline=True` to `range_bars` for horizontal Gantt bars with the first
-category at the top, alternating row bands and a per-row palette. Pass
-`progress=[0.25, 0.8, ...]` for the completed fractions and `remaining_opacity`
-for the unfinished portions. NaN draws an undivided bar. `bars.set_progress(fractions)` replaces progress
-data and `bars.set_progress(None)` hides it. After displaying a notebook figure,
-use a resident column reference such as `fig.data["tasks/progress"]` to change
-the binding. The editor's **Progress** properties accept a resident column ID
-and its unfinished opacity. For categorical axes, `ax.yaxis.set_category_window(-.5, 2.5)`
-keeps the first three rows visible. `set_category_bands(color)` adjusts the
-alternating fill. Both options are available in the axis properties.
+`tasks.set_progress([1, 0.8, 0.2])` replaces the fractions.
+`tasks.set_progress(None)` hides them. For a displayed Jupyter figure,
+`tasks.set_progress(fig.data["tasks/progress"])` binds a resident column.
+The editor's **Progress** group accepts that column's ID and unfinished opacity.
+`ax.yaxis.set_category_window(-0.5, 2.5)` displays the first three rows.
+Use `ax.yaxis.set_category_bands(color)` to style their alternating fill.
+The axis properties expose both controls. Band fill applies to the bottom
+or left axis of a rectangular plot.
 
 `waterfall` joins adjacent bars by default. Set `connector=False` to hide the
 lines, or change their appearance with `connector_color` and `connector_width`.
-`bars.set_connector()` and the **Connector** properties edit existing charts.
+`bars.set_connector(color="navy", linewidth=1.5)` styles an existing connection
+in points. The series properties expose the same controls under **Connector**.
+
+### Meshes and scientific diagrams
 
 Mesh calls require explicit integer `triangles` of shape `(N, 3)`. `tripcolor`
 uses one value per vertex with `shading="gouraud"`, or one value per triangle with
@@ -142,8 +153,9 @@ Use `levels.set_wavelength_labels()` or the editor's **Wavelength labels**
 properties to change the suffix, decimals or typography. The suffix uses the
 source unit as supplied, and values keep their original units.
 
-`read_nist` reads NIST Atomic Spectra Database CSV files, CSV text, text streams
-or tables. It preserves the exported energy/wavelength units, qualifiers,
+`read_nist` reads CSV exports of the National Institute of Standards and
+Technology (NIST) Atomic Spectra Database from paths, text, streams or tables.
+It preserves the exported energy/wavelength units, qualifiers,
 uncertainties and references, separates ionization limits and links transitions
 by configuration, term and J. Observed wavelengths take priority with Ritz
 fallback; `wavelength="ritz"` reverses that choice. Unknown level references
@@ -151,12 +163,21 @@ raise by default; explicit `unmatched="skip"` records their count in the result.
 It does not fetch a URL, convert units, infer missing transitions or collapse
 fine structure into centroids.
 
+Run this from the repository root with the included He I exports.
+The files supply the energy-axis unit and the original transition wavelengths.
+The label suffix uses the parsed wavelength unit.
+
 ```python
-data = fg.read_nist("levels.csv", "lines.csv")
-fig, ax = fg.subplots(backend="native")
-ax.energy_levels(data)  # also names the Y axis using the exported energy unit
-fig.set_theme("warm-paper").tight_layout()
-fig.savefig("levels.pdf")
+from pathlib import Path
+import figgyplot as fg
+
+data_dir = Path("tests/data/nist")
+data = fg.read_nist(data_dir / "he_i_levels.csv", data_dir / "he_i_lines.csv")
+with fg.Figure(backend="native") as fig:
+    ax = fig.axes[0]
+    ax.energy_levels(data, wavelength_labels={"unit": data.wavelength_unit, "decimals": 1})
+    fig.set_theme("warm-paper").tight_layout()
+    fig.savefig("helium.pdf")
 ```
 
 Use `inspect.signature` or MCP `capabilities` for supported chart arguments.
@@ -172,13 +193,18 @@ layout. `fig.tight_layout()` uses upstream text and decoration measurements;
 `fig.constrained_layout()` is an alias for that explicit layout pass.
 Native and notebook editor toolbars provide theme selection and **Auto layout**.
 
-The [runnable gallery](../examples/renderer_019.py) draws stem, violin, waterfall
-and RGB charts with all four themes. These images are renderer output:
+The [theme gallery](../examples/renderer_019.py) draws stem, violin, waterfall
+and RGB charts with all four themes. Native exports are available for
 [gallery](images/renderer-019-gallery.png),
 [cool-slate](images/renderer-019-cool-slate.png),
 [midnight](images/renderer-019-midnight.png) and
 [warm-paper](images/renderer-019-warm-paper.png).
-Run `python examples/renderer_019.py --formats png svg pdf` to export the examples.
+Run the two example scripts from the repository root.
+
+```bash
+python examples/renderer_019.py --formats png svg pdf
+python examples/renderer_019_editing.py --formats png svg pdf
+```
 
 `ax.twiny()` creates an overlay with its own X axis and a linked Y axis;
 `ax.twinx()` provides the converse. Axis units, discontinuities and probability
@@ -201,7 +227,9 @@ keeps that placement when the parent plot moves or resizes. In either editor,
 select the parent panel and use **Plot area → Add inset**. Use
 `zoom.subplot.set_text_scale("fixed")` to retain the stored text size and
 `zoom.subplot.set_inset_marker()` to indicate the magnified data range and draw
-connectors. Both options are available in the inset's properties.
+connectors. Both options are available in the inset's properties. The editing
+example attaches the inset to the first panel. In the current renderer,
+markers on other panels project onto the first plot. [Figgy #414](https://github.com/shim9610/figgy/issues/414)
 
 ## PNG, SVG and PDF
 
@@ -267,6 +295,19 @@ arguments and validation. Tools do not evaluate arbitrary Python code.
 Use `figure_inset` to add an inset, `figure_editor_properties` to discover an
 object's editable fields, and `figure_edit_property` to apply one of them.
 Use `figure_range_progress` to replace a range-bar series' progress values.
+
+After `figure_create`, pass the returned figure ID to `chart_add` with
+`kind="range_bars"` and set `options.id="tasks"`. To change the three progress
+values in the timeline above, call `figure_range_progress` with these arguments.
+
+```json
+{
+  "id": "<figure ID>",
+  "series": "tasks",
+  "progress": {"dtype": "float32", "values": [1.0, 0.8, 0.2]},
+  "remaining_opacity": 0.35
+}
+```
 
 ## Named category-chart editing
 

@@ -129,7 +129,7 @@ host coverage, materials and draw modes, including the line-only Milkyway restri
   view, drag the legend or titles, and adjust text, colors, line widths and ranges.
 - **Keep the result as code.** Copy Python produces familiar calls such as
   `ax.set_title(...)` and `ax.set_xlim(...)`, plus readable patches for advanced
-  layout and styling. Save PNG exports the current chart.
+  layout and styling. Save the chart as PNG, SVG or PDF.
 - **Reuse a layout across datasets.** Apply the exported code to figures with
   matching series IDs and DPI. Their data stays independent.
 - **Work in separate windows or Jupyter.** Native figures share a GPU context;
@@ -481,23 +481,22 @@ commands and expected outputs.
 | [multiple_windows.py](examples/multiple_windows.py) | Edit independent figures in separate windows |
 | [quickstart.py](examples/quickstart.py) | Plot and export a PNG |
 | [interactive.ipynb](examples/interactive.ipynb) | Browser WebGPU editing in Jupyter |
+| [renderer_019.py](examples/renderer_019.py) | Render four built-in themes with a waterfall example |
+| [renderer_019_editing.py](examples/renderer_019_editing.py) | Edit a Gantt chart, zoom inset, energy levels and Feynman diagram |
 
 ## Scope and performance
 
-The Python API provides **line/scatter/errorbar plots, histograms, heatmaps, contours, categorical bars, boxplots, pies and donuts**, with
-multiple series on one Axes, linear/log and inverted axes, picking, editable
-text/legend/styles, and PNG export. Cartesian plots support Precise, Sketch,
-Constellation and Milkyway draw modes. **Milkyway accepts line-only series;
-scatter and marker lines are intentionally disabled.** Constellation uses
-marker lines so stars remain at source samples.
+The Python API includes line and scatter plots, statistical and field plots,
+Gantt charts, 3D meshes, energy levels and Feynman diagrams. Named grids can
+combine Cartesian, categorical, box-plot and radar panels. Pie, donut and
+sunburst charts use a dedicated Figure. Native desktop and Jupyter WebGPU offer
+chart editing and PNG, SVG and PDF export. The [renderer 0.19 guide](docs/RENDERER_019.md)
+lists constructors, layout controls and export behavior.
 
-Pies/donuts on both native and browser WebGPU hosts expose 11 upstream materials, camera tilt, extrusion, rounded
-corners, textures and slice editing. Their bounded model contains up to 64
-categories and uses the upstream radial renderer on the shared GPU device.
-All chart families support native desktop and Jupyter WebGPU editing and PNG export.
-Categorical bars and boxplots use their upstream bounded models; histograms and
-contours use resident Cartesian columns. Cartesian/polar panels support one-level
-grids and shared axes; bounded families require their own single-panel Figures.
+Cartesian plots support Precise, Sketch, Constellation and Milkyway draw modes.
+Milkyway accepts line-only series. Constellation uses marker lines so stars
+remain at source samples. Pie and donut properties include material, camera
+tilt, extrusion, rounded corners, textures and slice appearance.
 
 `figsize` is in inches; `fontsize`, `linewidth` and `markersize` use points.
 Native Cartesian arrays are uploaded to a resident GPU column pool and reused during edits.
@@ -513,16 +512,14 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-The native extension uses the published **figgy-renderer 0.18.1** and
-**figgy-model 0.12.1** crates from crates.io, pinned in `Cargo.lock`.
-The packaged browser kernel is built from their upstream release commit
-`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d` with a recorded web-binding patch
-for non-borrowing GPU completion and current annotation hit geometry.
-Asset provenance checks pair the registry versions and checksums with that
-source revision and verify the binding patch hash. Rust owns chart layout,
-rendering, picking and drag policies; this repository adds the NumPy-facing API,
-native editing host, browser widgets and Python settings export.
+This source checkout pins **figgy-renderer 0.19.0-beta.2** and
+**figgy-model 0.13.0-beta.2**. The native extension and packaged browser kernel
+use the same Figgy revision. The [integration guide](docs/RENDERER_019.md)
+records the pin and rebuild command. Rust owns layout, rendering, picking and
+drag behavior. This repository provides the Python and NumPy API, desktop host,
+Jupyter widget, and Python settings export.
 
+- [Renderer 0.19 API](docs/RENDERER_019.md) — charts, editing, export and local MCP tools
 - [Desktop editor guide](docs/DESKTOP_EDITOR.md) — controls and screenshots
 - [Documentation index](docs/README.md) — user guides and validation reports
 - [Chart and style API](docs/CHART_TYPES.md) — chart constructors, materials and draw modes

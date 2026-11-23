@@ -196,7 +196,7 @@ ratio with surrounding space. PNG document dimensions stay unchanged.
 | Annotation | Visibility, text, anchors/endpoints, line and fill properties |
 | Axis | Limits, scale, tick spacing/direction/visibility, number format, significant digits, line width and color |
 | Copy Python | Export common setters and readable `fig.configure(...)` patches |
-| Save PNG | Enter a path, then Save image; export the chart at document resolution |
+| Export | Choose PNG, SVG or PDF, then set scale and path and select Save image |
 | Advanced settings… | Open full settings JSON in a separate OS window; Apply settings commits it |
 | Esc, empty-space click or repeated data click | Clear selection |
 | Arrow keys | Step samples or histogram bins, switch compatible series, step matrix cells or nudge decorations |
@@ -432,6 +432,11 @@ and data. X/Y/width/height use logical document pixels, independent of window
 DPI. Moving plot edges preserves axis ranges and resident data. Bounded charts
 show their current measured plot rectangle while automatic, materialize a manual
 rectangle on the first edit, and offer **Use automatic plot layout**.
+
+Select the parent panel in **Objects** and press **Plot area → Add inset**.
+Select the new inset in **Objects** to adjust its frame and text scaling.
+Configure its zoom range on the inset axes. The same controls are available
+in Jupyter WebGPU. [Runnable inset and timeline example](../examples/renderer_019_editing.py)
 
 ![Plot geometry controls in the actual Jupyter editor](images/layout-plot-controls.png)
 

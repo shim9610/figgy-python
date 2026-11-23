@@ -163,9 +163,8 @@ so replay does not reroll stars or handwriting.
 
 Cartesian styles are exposed in native and WebGPU document models and their
 Style menus. Unsupported chart/style combinations are rejected in both hosts.
-Pies, donuts, categorical bars and boxplots also support browser WebGPU editing
-and async PNG export. An explicit native `widget(backend="png")` remains available
-as a kernel-GPU fallback; it uses the separate PNG transport editor.
+The Jupyter WebGPU editor supports asynchronous PNG, SVG and PDF export.
+The explicit native `widget(backend="png")` uses the kernel GPU and sends PNGs.
 
 ## Python constructors and host coverage
 
@@ -181,8 +180,12 @@ host transports a PNG for ordinary redraws.
 | `imshow` | Heatmap |
 | `contour`, `contourf` | Contour, HeatmapContour |
 | `pie`, `donut` | RadialChart |
-| `bar`, `barh` | CategoricalChart |
-| `boxplot`, `bxp` | BoxPlotChart |
+| `bar`, `barh` | CategoryBars |
+| `boxplot`, `bxp` | BoxPlot |
+| `radar` | Radar |
+| `range_bars`, `waterfall` | RangeBars |
+| `range_links` | RangeLinks |
+| `energy_levels`, `feynman` | EnergyLevels, Feynman |
 
 ```python
 fig, ax = figgy.subplots()  # auto: Jupyter WebGPU in a kernel, native elsewhere
@@ -193,10 +196,9 @@ ax.set_ylabel("Count")
 # Choose fig.show() on desktop or display(fig.widget()) in Jupyter.
 ```
 
-The following calls are independent examples, not one combined document.
-Errorbars, histograms and contours are Cartesian and can share a Figure or grid.
-Bars, boxplots, radar and pies/donuts each need a separate single-panel Figure;
-they cannot mix with Cartesian series or occupy grid slots.
+Each call below is a separate recipe. Cartesian, category-bar, box and radar
+plots can occupy separate panels in a named grid. Pie, donut and sunburst charts
+use a dedicated Figure.
 
 ```python
 ax.errorbar([1, 2, 3], [2, 4, 3], yerr=[[.1, .2, .3], [.2, .1, .2]], xerr=.1)
@@ -217,12 +219,10 @@ accept a 2-D scalar array with optional 1-D x/y center coordinates.
 
 `bar` accepts one value per category or a series-by-category matrix. `None`
 is missing, zero is a real value. Modes are `grouped`, `stacked` and
-`percent_stacked`; horizontal direction is available through `barh`. Upstream
-bounds are 64 categories, 16 series and 512 bars. `boxplot` treats a 1-D array as
-one box and a sequence of arrays as one box per array; it computes NumPy linear
-quartiles, actual sample whiskers within `whis * IQR` (default 1.5), and all
-outliers. It does not silently drop outliers to fit the bounded limits (128 per
-box, 4096 total). `bxp` uses supplied statistics without recomputing them.
+`percent_stacked`. Use `barh` for horizontal bars. `boxplot` reads one box per
+array and uses NumPy linear quartiles. It computes sample whiskers within
+`whis * IQR` (default 1.5) and includes every outlier. `bxp` uses supplied
+statistics.
 Axis names may be set before or after `bar`/`barh`/`boxplot`/`bxp`. Horizontal
 charts map the X name to the value axis and the Y name to the category axis.
 Explicit `category_title`/`value_title` constructor properties override inherited
@@ -240,13 +240,11 @@ these setters do not perform automatic layout or adjust ticks. Constructors and
 layout. Copy Python replays style/configuration against matching category and
 series IDs, preserving the destination's data values.
 
-Copy Python omits unchanged renderer defaults and writes rich text in compact
-runs. It resets chart-level defaults before replaying its bounded patch, so a
-destination's previous material or label styling cannot survive an omitted
-default field. Existing category/series values are preserved. For manual edits,
-`configure_bounded` and `configure_radial` keep their selective-patch behavior
-unless `reset=True` is explicitly supplied. `fig.to_code(compact=False)` exposes
-expanded dictionaries for diagnostics; `get_settings()` always returns full SSOT.
+Copy Python writes rich text in compact runs and preserves the destination's
+category and series values. Radial replay restores chart-level defaults before
+applying appearance patches. Use `fig.to_code(compact=False)` to inspect
+expanded dictionaries and `get_settings()` to read the complete document.
+See [saved settings and replay](RENDERER_019.md#saved-settings).
 
 `ax.set_title("Comparison\nObserved sample", fontsize=18)` uses the independent
 rich title, with up to 512 characters and eight lines. It does not change the

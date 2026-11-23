@@ -92,6 +92,10 @@ when its order changes.
 | Point overrides | Add/remove sparse index overrides and edit their appearance | `Marker point overrides/*`, `Error-bar point overrides/*` |
 | Histogram / error bars | Bar dimensions, baseline, orientation, error stem/caps | `Bars/*`, `Error bars/*` |
 | Contour | Explicit levels, strokes, per-level colors, labels | `Contours/*`, `Contour labels/*`, `Label positions/*` |
+| Range bars / waterfall | Progress column, unfinished opacity and adjacent-bar connectors | `Progress/*`, `Connector/*` |
+| Category axis | Visible category range and alternating fill on rectangular bottom/left axes | `Category window/*`, `Category bands/*` |
+| Energy-level series | Wavelength label visibility, format and typography | `Wavelength labels/*` |
+| Parent panel / inset | Create an anchored inset, adjust its text scaling and show its marker | `Inset/add`, `Inset/Text scale`, `Inset marker/*` |
 | Vector | Pivot, head/shaft dimensions, pixel/data length units and factor | `Vectors/*`, `Color mapping/*` for point vectors |
 | Colorbar or mapped series | Colormap, scale/domain, layout, tick/label appearance | `Color scale/*`, `Colorbar layout/*`, `Colorbar ticks and labels/*` |
 | Colorbar title / tick labels | Direct title text with retained character styles; focused typography and numeric label formatting | `Title/*`, `Tick labels/*` |
