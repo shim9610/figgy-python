@@ -1277,7 +1277,7 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         } else if let Some(path) = path {
             if let Some(value) = state.pointer(&path) {
-                optional::category_axis(fields, value, &path);
+                optional::category_axis(fields, config, value, &path);
                 walk(
                     fields,
                     value,

@@ -517,6 +517,11 @@ class Axis:
         fig = self.axes.figure
         with fig._lock:
             state = fig.get_settings()
+            config = self.axes._config(state)
+            if (self.side in ("top", "right")
+                    or (self.axes.overlay_id and self.dimension == "y")
+                    or any(config.get(key) is not None for key in ("polar", "ternary", "view_3d", "parallel"))):
+                raise ValueError("category bands require a rectangular chart's bottom or left axis")
             axis = self._nodes(state)[0]
             if axis.get("categories") is None:
                 raise ValueError("category bands require a categorical axis")

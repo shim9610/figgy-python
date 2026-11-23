@@ -737,6 +737,17 @@ def test_waterfall_connector_and_panel_inset_action(backend):
         assert fig.get_settings() == accepted
 
 
+def test_radar_exposes_category_window_without_ineffective_bands():
+    with fg.Figure(backend="webgpu") as fig:
+        ax = fig.axes[0]
+        ax.radar(["A", "B", "C"], [2, 3, 4])
+        fields = {field["id"] for field in object_for(fig, "axis_bottom")["fields"]}
+        assert "Category window/enabled" in fields
+        assert "Category bands/enabled" not in fields
+        with pytest.raises(ValueError, match="rectangular chart"):
+            ax.xaxis.set_category_bands()
+
+
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
 @pytest.mark.parametrize('method', ['fit', 'tight_layout'])
 def test_range_exits_migrate_fit_and_round_trip_after_source_transfer(backend, method):

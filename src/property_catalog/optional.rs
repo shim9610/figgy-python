@@ -353,7 +353,7 @@ pub(super) fn range_bars(out: &mut Vec<Field>, style: &Value, path: &str) {
     }
 }
 
-pub(super) fn category_axis(out: &mut Vec<Field>, axis: &Value, path: &str) {
+pub(super) fn category_axis(out: &mut Vec<Field>, config: &Value, axis: &Value, path: &str) {
     if !axis["categories"].is_array() {
         return;
     }
@@ -375,6 +375,12 @@ pub(super) fn category_axis(out: &mut Vec<Field>, axis: &Value, path: &str) {
             "bounds",
             "Start and end (category coordinates)",
         );
+    }
+    let rectangular = ["polar", "ternary", "view_3d", "parallel"]
+        .iter()
+        .all(|key| config[*key].is_null());
+    if !rectangular || !(path.ends_with("/bottom_x") || path.ends_with("/left_y")) {
+        return;
     }
     let bands = &axis["category_bands"];
     field(
