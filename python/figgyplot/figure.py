@@ -169,7 +169,49 @@ class Artist(ArtistMethods):
         self.figure.update(self.id, label=value)
         return self
 
+    def set_progress(self, values, *, remaining_opacity=None):
+        """Set range-bar progress from fractions or a resident column; None hides it."""
+        return self.set(progress=values, remaining_opacity=remaining_opacity)
+
+    def set_connector(self, visible=True, *, color=None, linewidth=None):
+        """Connect adjacent range bars. Line width uses points."""
+        from ._advanced import _range_connector
+
+        fig = self.figure
+        with fig._lock:
+            state = fig.get_settings()
+            body = self._spec(state)["render_type"].get("RangeBars")
+            if body is None:
+                raise AttributeError("connectors require range bars")
+            if visible:
+                current = body.get("connector")
+                ink = (current or body)["color"]
+                width = current["width"] * 72 / fig.dpi if current else 1.0
+                body["connector"] = _range_connector(
+                    tuple(ink[key] for key in "rgba") if color is None else color,
+                    width if linewidth is None else linewidth,
+                    fig.dpi,
+                )
+            else:
+                body.pop("connector", None)
+            fig.apply_settings(state)
+        return self
+
     def set(self, **kwargs):
+        if "progress" in kwargs or "remaining_opacity" in kwargs:
+            from ._advanced import _edit_range_progress
+
+            values = kwargs.pop("progress", ...)
+            opacity = kwargs.pop("remaining_opacity", None)
+            with _edit_range_progress(self, values, opacity) as progress:
+                with self.figure.batch_update():
+                    state = self.figure.get_settings()
+                    body = self._spec(state)["render_type"]["RangeBars"]
+                    body["progress"] = progress
+                    self.figure.apply_settings(state)
+                    if kwargs:
+                        self.set(**kwargs)
+            return self
         aliases={'c':'color','lw':'linewidth','ls':'linestyle','ms':'markersize'}
         kwargs={aliases.get(k,k):v for k,v in kwargs.items()}
         with self.figure.batch_update():
@@ -723,6 +765,8 @@ class Figure(FigureMethods):
                                 matched = True
                         if 'color' in style:
                             style['color'] = _color(value)
+                            if 'RangeBars' in series['render_type']:
+                                style.pop('color_by', None)
                             matched = True
                         if 'Vector' in series['render_type']:
                             style['style']['color'] = _color(value)

@@ -1244,9 +1244,7 @@ impl FigureAccess<'_> {
         let result = (|| {
             let mut series = self.data.series.clone();
             series.extend(parse::<Vec<SeriesConfig>>(json)?);
-            identity::validate_range_link_rows(&series, |id| {
-                self.data.columns.get(id).map(|v| v.0)
-            })?;
+            identity::validate_range_rows(&series, |id| self.data.columns.get(id).map(|v| v.0))?;
             let config: Config = parse(config)?;
             self.format_value_labels(&config, &mut series)?;
             validate_config(&config)?;
@@ -1313,9 +1311,7 @@ impl FigureAccess<'_> {
         }
         validate_config(&next.config)?;
         validate_background(next.background)?;
-        identity::validate_range_link_rows(&next.series, |id| {
-            self.data.columns.get(id).map(|v| v.0)
-        })?;
+        identity::validate_range_rows(&next.series, |id| self.data.columns.get(id).map(|v| v.0))?;
         self.format_value_labels(&next.config, &mut next.series)?;
         validate_draw_style(&next.config, &next.series)?;
         let document = next.document()?;
@@ -2141,6 +2137,9 @@ impl NativeFigure {
             .to_string())
         })
     }
+    fn column_row_count(&self, id: &str) -> PyResult<Option<usize>> {
+        self.with(|core| Ok(core.data.columns.get(id).map(|v| v.0)))
+    }
     fn edit_operations_json(&self) -> PyResult<String> {
         self.with(|core| Ok(core.data.history.operations().to_string()))
     }
@@ -2291,7 +2290,15 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(
+        property_catalog::layout::add_inset_json,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
         property_catalog::diagrams::spectral_colors_json,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        property_catalog::diagrams::wavelength_labels_json,
         m
     )?)?;
     m.add_function(wrap_pyfunction!(property_catalog::editor_catalog_json, m)?)?;

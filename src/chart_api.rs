@@ -16,6 +16,7 @@ pub fn series_template_json(kind: &str) -> PyResult<String> {
         "category_bars" => SeriesConfig::category_bars("s", "x", "y"),
         "box_plot" => SeriesConfig::box_plot("s", "x", "y"),
         "range_bars" => SeriesConfig::range_bars("s", "x", "start", "y"),
+        "timeline_bars" => SeriesConfig::timeline_bars("s", "x", "start", "y"),
         "range_links" => SeriesConfig::range_links("s", "bars", []),
         "radar" => SeriesConfig::radar("s", "x", "y"),
         "ternary" => SeriesConfig::ternary("s", "x", "y", "c"),
@@ -60,6 +61,8 @@ pub fn coordinate_defaults_json(kind: &str) -> PyResult<String> {
         "ternary" => config.set_ternary(Some(Default::default())),
         "3d" => config.set_view_3d(Some(Default::default())),
         "parallel" => config.set_parallel(Some(Default::default())),
+        "cartesian" => {}
+        "timeline" => config = default::default_timeline_config(),
         _ => return Err(invalid("unknown projection")),
     };
     serde_json::to_string(&config).map_err(runtime)

@@ -146,11 +146,25 @@ pub(super) fn validate_columns(series: &[SeriesConfig], names: &HashSet<String>)
     Ok(())
 }
 
-pub(super) fn validate_range_link_rows(
+pub(super) fn validate_range_rows(
     series: &[SeriesConfig],
     count: impl Fn(&str) -> Option<usize>,
 ) -> PyResult<()> {
     for spec in series {
+        if let Some(progress) = spec
+            .render_type
+            .range_bars()
+            .and_then(|bars| bars.progress.as_ref())
+        {
+            if let Some(rows) = count(&spec.x_column)
+                && count(&progress.column) != Some(rows)
+            {
+                return Err(invalid(format!(
+                    "series {} needs one progress value per bar ({} rows)",
+                    spec.series_id, rows
+                )));
+            }
+        }
         let Some(links) = spec.render_type.range_links() else {
             continue;
         };

@@ -201,6 +201,8 @@ class ArtistData:
         body = next(iter(spec["render_type"].values()))
         if role in ("x", "y"):
             return ColumnReference(fig, spec[role + "_column"])
+        if role == "progress" and body.get("progress"):
+            return ColumnReference(fig, body["progress"]["column"])
         if role == "values" and "matrix" in body:
             return _grid(body["matrix"], fig)
         if role in ("u", "v") and "components" in body:

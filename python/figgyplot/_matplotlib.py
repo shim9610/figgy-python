@@ -495,6 +495,38 @@ class Axis:
         node.update(min=min(low, high), max=max(low, high), inverted=low > high)
         fig.apply_settings(state)
 
+    def set_category_window(self, start=None, end=None):
+        """Show a window in category coordinates (first category centered at 0)."""
+        fig = self.axes.figure
+        with fig._lock:
+            state = fig.get_settings()
+            axis = self._nodes(state)[0]
+            if axis.get("categories") is None:
+                raise ValueError("category windows require a categorical axis")
+            if start is None and end is None:
+                axis.pop("category_window", None)
+            else:
+                axis["category_window"] = [_number(start, "start"), _number(end, "end")]
+            fig.apply_settings(state)
+        return self
+
+    def set_category_bands(self, color=(0.31, 0.39, 0.51, 0.07)):
+        """Shade every other category. Pass None to remove the bands."""
+        from .figure import _color
+
+        fig = self.axes.figure
+        with fig._lock:
+            state = fig.get_settings()
+            axis = self._nodes(state)[0]
+            if axis.get("categories") is None:
+                raise ValueError("category bands require a categorical axis")
+            if color is None:
+                axis.pop("category_bands", None)
+            else:
+                axis["category_bands"] = dict(fill=_color(color), every="Alternate")
+            fig.apply_settings(state)
+        return self
+
     def set_tick_params(self, which="major", reset=False, **kwargs):
         return self.axes._tick_params(
             axis=self.dimension,
@@ -1409,10 +1441,9 @@ class AxesMethods:
     def inset_axes(self, bounds, *, id=None):
         """Add an inset using (left, bottom, width, height) in axes fractions."""
         from . import _document, _style_runtime
+        from ._native import add_inset_json
 
-        left, bottom, width, height = map(float, bounds)
-        if not (0 <= left < left + width <= 1 and 0 <= bottom < bottom + height <= 1):
-            raise ValueError("inset bounds must fit within the parent axes")
+        bounds = tuple(map(float, bounds))
         fig = self.figure
         with fig._lock:
             fig._require_cartesian()
@@ -1420,24 +1451,11 @@ class AxesMethods:
             if self.overlay_id:
                 raise ValueError("add insets to the primary axes of a panel")
             parent = _document.panel_index(state, self.subplot_id)
-            x, y, w, h = self._plot_rectangle(state)
-            top = 1 - bottom - height
-            panel_id = _document.identifier(id or f"{self.subplot_id}/inset{len(state['identity']['panels'])}")
-            if panel_id in _document.panel_configs(state):
-                raise ValueError(f"subplot ID already exists: {panel_id}")
-            config = copy.deepcopy(fig._default_config)
-            for key in ("subplots", "overlays", "annotations", "active_layer"):
-                config.pop(key, None)
-            x0, x1 = round(x + w * left), round(x + w * (left + width))
-            y0, y1 = round(y + h * top), round(y + h * (1 - bottom))
-            config["chart_area"] = dict(x=x0, y=y0, width=x1-x0, height=y1-y0)
-            state["config"].setdefault("subplots", []).append(dict(
-                config=config, series=[], anchor=dict(
-                    parent={"Subplot": parent - 1} if parent else "Parent",
-                    frame=[[left, left + width], [top, 1 - bottom]],
-                ),
-            ))
-            state["identity"]["panels"].append(dict(id=panel_id, overlays=[]))
+            raw, panel_id = add_inset_json(
+                json.dumps(state, allow_nan=False), parent, bounds,
+                json.dumps(fig._default_config), id,
+            )
+            state = json.loads(raw)
             _style_runtime.containers(fig, state, panel_ids=[panel_id])
             fig.apply_settings(state)
         return fig.subplots[panel_id].axes

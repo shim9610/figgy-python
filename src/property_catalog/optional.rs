@@ -313,6 +313,151 @@ pub(super) fn bounded_series(
         }
     }
 }
+pub(super) fn range_bars(out: &mut Vec<Field>, style: &Value, path: &str) {
+    let progress = &style["progress"];
+    field(
+        out,
+        progress.get("column").cloned().unwrap_or(json!("")),
+        &format!("{path}/progress"),
+        "Progress",
+        "source",
+        "Progress column (empty hides)",
+    );
+    if progress.is_object() {
+        field(
+            out,
+            progress["remaining_opacity"].clone(),
+            &format!("{path}/progress/remaining_opacity"),
+            "Progress",
+            "remaining_opacity",
+            "Unfinished opacity",
+        );
+    }
+    let connector = &style["connector"];
+    field(
+        out,
+        json!(connector.is_object()),
+        &format!("{path}/connector"),
+        "Connector",
+        "enabled",
+        "Connect adjacent bars",
+    );
+    if connector.is_object() {
+        walk(
+            out,
+            connector,
+            &format!("{path}/connector"),
+            "Connector",
+            "",
+        );
+    }
+}
+
+pub(super) fn category_axis(out: &mut Vec<Field>, axis: &Value, path: &str) {
+    if !axis["categories"].is_array() {
+        return;
+    }
+    let window = &axis["category_window"];
+    field(
+        out,
+        json!(window.is_array()),
+        &format!("{path}/category_window"),
+        "Category window",
+        "enabled",
+        "Limit visible categories",
+    );
+    if window.is_array() {
+        field(
+            out,
+            window.clone(),
+            &format!("{path}/category_window"),
+            "Category window",
+            "bounds",
+            "Start and end (category coordinates)",
+        );
+    }
+    let bands = &axis["category_bands"];
+    field(
+        out,
+        json!(bands.is_object()),
+        &format!("{path}/category_bands"),
+        "Category bands",
+        "enabled",
+        "Shade alternate categories",
+    );
+    if bands.is_object() {
+        field(
+            out,
+            bands["fill"].clone(),
+            &format!("{path}/category_bands/fill"),
+            "Category bands",
+            "fill",
+            "Fill",
+        );
+    }
+}
+
+pub(super) fn apply_range_and_categories(
+    result: &mut Value,
+    field: &Field,
+    value: &Value,
+    extents: &Value,
+) -> PyResult<bool> {
+    if !matches!(
+        field.id.as_str(),
+        "Progress/source"
+            | "Connector/enabled"
+            | "Category window/enabled"
+            | "Category bands/enabled"
+    ) {
+        return Ok(false);
+    }
+    let (parent, key) = field.path.rsplit_once('/').unwrap();
+    let owner = result
+        .pointer_mut(parent)
+        .ok_or_else(|| invalid("property owner changed"))?;
+    if field.id == "Progress/source" {
+        let source = value
+            .as_str()
+            .ok_or_else(|| invalid("progress column must be a string"))?;
+        if source.is_empty() {
+            owner[key] = Value::Null;
+        } else {
+            let range = extents
+                .get(source)
+                .ok_or_else(|| invalid(format!("unregistered progress column: {source}")))?;
+            if ![range[0].as_f64(), range[1].as_f64()]
+                .into_iter()
+                .all(|v| v.is_none_or(|v| (0. ..=1.).contains(&v)))
+            {
+                return Err(invalid("progress values must be fractions in [0, 1]"));
+            }
+            let opacity = owner[key]
+                .get("remaining_opacity")
+                .and_then(Value::as_f64)
+                .unwrap_or(default::TIMELINE_REMAINING_OPACITY as f64);
+            owner[key] = json!({"column":source,"remaining_opacity":opacity});
+        }
+        return Ok(true);
+    }
+    let enabled = value
+        .as_bool()
+        .ok_or_else(|| invalid("control must be boolean"))?;
+    owner[key] = if enabled {
+        match field.id.as_str() {
+            "Connector/enabled" => json!({"color":owner["color"],"width":1.}),
+            "Category window/enabled" => json!([
+                -0.5,
+                owner["categories"].as_array().unwrap().len() as f64 - 0.5
+            ]),
+            _ => json!(default::default_timeline_config().left_y.category_bands),
+        }
+    } else {
+        Value::Null
+    };
+    Ok(true)
+}
+
 pub(super) fn apply(result: &mut Value, field: &Field, value: &Value) -> PyResult<bool> {
     let timestamp = field.path.contains("/Timestamp/")
         && (field.id.ends_with("/mode") || field.path.ends_with("/period_labels"));

@@ -37,6 +37,18 @@ pub(super) fn fields(out: &mut Vec<Field>, state: &Value, node: &navigation::Nod
             "settings",
             "Line series and offsets",
         );
+        if state["identity"]["panels"].is_array() {
+            out.push(Field {
+                id: "Inset/add".into(),
+                path: "/config/subplots".into(),
+                group: "Plot area".into(),
+                label: "Add inset".into(),
+                kind: "action".into(),
+                value: json!(true),
+                choices: vec![],
+                integer: false,
+            });
+        }
     }
     if let Some(index) = object_subplot(node.layer) {
         let path = format!("/config/subplots/{index}");
@@ -139,6 +151,118 @@ fn object_subplot(layer: renderer::LayerRef) -> Option<usize> {
     }
 }
 
+fn add_inset(
+    state: &mut Value,
+    parent: usize,
+    bounds: [f64; 4],
+    mut config: Config,
+    requested_id: Option<&str>,
+) -> PyResult<String> {
+    let [left, bottom, width, height] = bounds;
+    let (right, upper) = (left + width, bottom + height);
+    if !(0. <= left && left < right && right <= 1. && 0. <= bottom && bottom < upper && upper <= 1.)
+    {
+        return Err(invalid("inset bounds must fit within the parent axes"));
+    }
+    let identity = &state["identity"];
+    let panels = identity["panels"]
+        .as_array()
+        .ok_or_else(|| invalid("insets require a named panel"))?;
+    let parent_id = panels
+        .get(parent)
+        .and_then(|v| v["id"].as_str())
+        .ok_or_else(|| invalid("unknown inset parent"))?;
+    let taken = |id: &str| {
+        identity["figure"] == id
+            || panels.iter().any(|p| {
+                p["id"] == id
+                    || p["overlays"]
+                        .as_array()
+                        .is_some_and(|a| a.iter().any(|v| v == id))
+            })
+            || identity["retired"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|v| v == id))
+    };
+    let panel_id = if let Some(id) = requested_id {
+        if id.is_empty() || taken(id) {
+            return Err(invalid(format!("inset ID is empty or already used: {id}")));
+        }
+        id.to_owned()
+    } else {
+        (panels.len()..)
+            .map(|i| format!("{parent_id}/inset{i}"))
+            .find(|id| !taken(id))
+            .unwrap()
+    };
+    let mut root: Config = serde_json::from_value(state["config"].clone()).map_err(invalid)?;
+    let (owner, cell) = match parent.checked_sub(1) {
+        None => (&root, renderer::CellRef::Parent),
+        Some(index) => (
+            &root
+                .subplots
+                .get(index)
+                .ok_or_else(|| invalid("unknown inset parent"))?
+                .config,
+            renderer::CellRef::Subplot(index),
+        ),
+    };
+    let area = owner
+        .data_area()
+        .map_err(|e| invalid(format!("cannot place an inset: {e:?}")))?;
+    let (top, lower) = (1. - bottom - height, 1. - bottom);
+    let x = |fraction: f64| (f64::from(area.x) + f64::from(area.width) * fraction).round() as u32;
+    let y = |fraction: f64| (f64::from(area.y) + f64::from(area.height) * fraction).round() as u32;
+    config.chart_area.0.x = x(left);
+    config.chart_area.0.y = y(top);
+    config.chart_area.0.width = x(right) - x(left);
+    config.chart_area.0.height = y(lower) - y(top);
+    config.subplots.clear();
+    config.overlays.clear();
+    config.annotations = Default::default();
+    config.active_layer = renderer::LayerRef::Base;
+    let mut subplot = renderer::Subplot {
+        config,
+        anchor: Some(renderer::InsetAnchor {
+            parent: cell,
+            frame: [[left, right], [top, lower]],
+        }),
+        ..Default::default()
+    };
+    if subplot.config.data_area().is_err() {
+        root.subplots.push(subplot);
+        let before = root.clone();
+        root.follow_parent_areas(&before, None);
+        subplot = root.subplots.pop().unwrap();
+    }
+    if state["config"]["subplots"].is_null() {
+        state["config"]["subplots"] = json!([]);
+    }
+    state["config"]["subplots"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(subplot));
+    state["identity"]["panels"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":panel_id,"overlays":[]}));
+    Ok(panel_id)
+}
+
+#[pyfunction]
+#[pyo3(signature=(settings,parent,bounds,config,id=None))]
+pub(crate) fn add_inset_json(
+    settings: &str,
+    parent: usize,
+    bounds: [f64; 4],
+    config: &str,
+    id: Option<&str>,
+) -> PyResult<(String, String)> {
+    let mut state: Value = crate::parse(settings)?;
+    let id = add_inset(&mut state, parent, bounds, crate::parse(config)?, id)?;
+    Ok((state.to_string(), id))
+}
+
 #[pyfunction]
 pub(crate) fn reposition_panel_json(config: &str, panel: usize, area: &str) -> PyResult<String> {
     let mut config: Config = crate::parse(config)?;
@@ -187,6 +311,20 @@ pub(super) fn apply(
     field: &Field,
     value: &Value,
 ) -> PyResult<bool> {
+    if field.id == "Inset/add" {
+        if value != true {
+            return Err(invalid("add inset requires an action"));
+        }
+        let parent = object_subplot(object.layer).map_or(0, |i| i + 1);
+        add_inset(
+            result,
+            parent,
+            [0.55, 0.45, 0.4, 0.45],
+            default::default_config(),
+            None,
+        )?;
+        return Ok(true);
+    }
     if field.id == "Inset marker/enabled" {
         let index = object_subplot(object.layer).ok_or_else(|| invalid("inset panel changed"))?;
         let marker = value

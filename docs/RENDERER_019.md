@@ -4,7 +4,7 @@ This development integration awaits the official upstream 0.19 release and final
 package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/081347b57401f3655f23297cbf31abc7337f43b0)
+[integration revision](https://github.com/shim9610/figgy/commit/5eafcee3f09c6b38b26d63a4b903f890e76cf952)
 for renderer `0.19.0-beta.2` and model `0.13.0-beta.2`. Settings identify this
 integration as `0.19.0`. Rebuild the browser module with `scripts/build-wasm.sh`
 when changing the pin.
@@ -68,6 +68,21 @@ Existing beta settings use `exit_offset` in logical pixels. Loading them
 converts the offset using the predecessor's length in the document's layout.
 The older Python argument uses points when a link is created or edited.
 
+Pass `timeline=True` to `range_bars` for horizontal Gantt bars with the first
+category at the top, alternating row bands and a per-row palette. Pass
+`progress=[0.25, 0.8, ...]` for the completed fractions and `remaining_opacity`
+for the unfinished portions. NaN draws an undivided bar. `bars.set_progress(fractions)` replaces progress
+data and `bars.set_progress(None)` hides it. After displaying a notebook figure,
+use a resident column reference such as `fig.data["tasks/progress"]` to change
+the binding. The editor's **Progress** properties accept a resident column ID
+and its unfinished opacity. For categorical axes, `ax.yaxis.set_category_window(-.5, 2.5)`
+keeps the first three rows visible. `set_category_bands(color)` adjusts the
+alternating fill. Both options are available in the axis properties.
+
+`waterfall` joins adjacent bars by default. Set `connector=False` to hide the
+lines, or change their appearance with `connector_color` and `connector_width`.
+`bars.set_connector()` and the **Connector** properties edit existing charts.
+
 Mesh calls require explicit integer `triangles` of shape `(N, 3)`. `tripcolor`
 uses one value per vertex with `shading="gouraud"`, or one value per triangle with
 `shading="flat"`. Surface calls accept rectilinear X/Y grids; use `plot_trisurf`
@@ -120,6 +135,12 @@ Individual propagators support stroke overrides. Use
 the diagram. Pass the unit used by the source wavelengths. The editor can
 enable either color mode and change its settings. Transition line widths use
 the diagram's series style.
+
+Pass `wavelength_labels={"unit": "nm", "decimals": 1}` to `energy_levels`
+to display the stored wavelengths of transitions that have no explicit label.
+Use `levels.set_wavelength_labels()` or the editor's **Wavelength labels**
+properties to change the suffix, decimals or typography. The suffix uses the
+source unit as supplied, and values keep their original units.
 
 `read_nist` reads NIST Atomic Spectra Database CSV files, CSV text, text streams
 or tables. It preserves the exported energy/wavelength units, qualifiers,
@@ -176,7 +197,8 @@ Edit the origin as a signed integer in the formatter's selected unit.
 
 `ax.inset_axes([.55, .3, .4, .45], id="zoom")` adds a panel in the parent
 plot. Bounds are left, bottom, width and height in axes fractions. The inset
-keeps that placement when the parent plot moves or resizes. Use
+keeps that placement when the parent plot moves or resizes. In either editor,
+select the parent panel and use **Plot area → Add inset**. Use
 `zoom.subplot.set_text_scale("fixed")` to retain the stored text size and
 `zoom.subplot.set_inset_marker()` to indicate the magnified data range and draw
 connectors. Both options are available in the inset's properties.
@@ -244,6 +266,7 @@ and resource release (`figure_close`). Chart construction uses the Python method
 arguments and validation. Tools do not evaluate arbitrary Python code.
 Use `figure_inset` to add an inset, `figure_editor_properties` to discover an
 object's editable fields, and `figure_edit_property` to apply one of them.
+Use `figure_range_progress` to replace a range-bar series' progress values.
 
 ## Named category-chart editing
 

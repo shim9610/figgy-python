@@ -158,9 +158,7 @@ impl NotebookFigure {
         }
         self.series.push(s);
         if let Err(error) = validate_draw_style(self.chart.config(), &self.series).and_then(|()| {
-            identity::validate_range_link_rows(&self.series, |id| {
-                self.column_lengths.get(id).copied()
-            })
+            identity::validate_range_rows(&self.series, |id| self.column_lengths.get(id).copied())
         }) {
             self.series.pop();
             return Err(error);
@@ -319,7 +317,7 @@ impl NotebookFigure {
         }
         validate_draw_style(&s.config, &s.series)?;
         validate_columns(&s.series, &self.columns.keys().cloned().collect())?;
-        identity::validate_range_link_rows(&s.series, |id| self.column_lengths.get(id).copied())?;
+        identity::validate_range_rows(&s.series, |id| self.column_lengths.get(id).copied())?;
         for series in &s.series {
             validate_model_numbers(series, "series")?;
         }
@@ -374,6 +372,9 @@ impl NotebookFigure {
                 .collect::<serde_json::Map<_, _>>()
         )
         .to_string()
+    }
+    fn column_row_count(&self, id: &str) -> Option<usize> {
+        self.column_lengths.get(id).copied()
     }
     fn edit_operations_json(&self) -> String {
         self.history.operations().to_string()

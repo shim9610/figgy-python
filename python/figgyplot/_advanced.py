@@ -1,6 +1,7 @@
 """Column-backed chart constructors using the renderer's public model defaults."""
 
 import copy
+from contextlib import contextmanager
 import json
 import math
 import numpy as np
@@ -70,6 +71,81 @@ def _range_link_rows(links, dpi):
             row["exit_offset"] = number(row["exit_offset"], "exit_offset") * dpi / 72
         rows.append(row)
     return rows
+
+
+def _progress_values(values, rows):
+    from .figure import _array
+
+    values = _array(values)
+    if values.size != rows or not np.all(np.isnan(values) | ((0 <= values) & (values <= 1))):
+        raise ValueError("progress requires one fraction in [0, 1] or NaN per bar")
+    return values
+
+
+def _range_progress(column, remaining_opacity):
+    from ._validation import number
+
+    opacity = number(remaining_opacity, "remaining opacity")
+    if not 0 <= opacity <= 1:
+        raise ValueError("remaining opacity must be in [0, 1]")
+    return dict(column=column, remaining_opacity=opacity)
+
+
+@contextmanager
+def _edit_range_progress(artist, values, opacity):
+    from ._artist_appearance import ColumnReference, _column
+
+    fig = artist.figure
+    with fig._lock:
+        spec = artist._spec(fig.get_settings())
+        body = spec["render_type"].get("RangeBars")
+        if body is None:
+            raise AttributeError("progress requires range bars")
+        current = body.get("progress")
+        if values is None:
+            yield None
+            return
+        if values is ...:
+            if current is None:
+                raise ValueError("set progress before changing its opacity")
+            values = current["column"]
+        if opacity is None:
+            opacity = current["remaining_opacity"] if current is not None else 0.4
+        native = fig._native
+        rows = native.column_row_count(spec["x_column"])
+        if isinstance(values, (str, ColumnReference)):
+            name = _column(values, fig)
+            if native.column_row_count(name) != rows:
+                raise ValueError("progress column must have one value per bar")
+            extent = json.loads(native.column_extents_json()).get(name, [])
+            if not extent or not all(v is None or 0 <= v <= 1 for v in extent):
+                raise ValueError("progress values must be fractions in [0, 1]")
+            yield _range_progress(name, opacity)
+            return
+        fig._require_data_edit()
+        array = _progress_values(values, rows)
+        columns = set(fig.data.keys())
+        name = artist.id + "/progress"
+        index = 1
+        while name in columns:
+            name = f"{artist.id}/progress/{index}"
+            index += 1
+        progress = _range_progress(name, opacity)
+        native.upload_column(name, array)
+        try:
+            yield progress
+        except BaseException:
+            active = artist._spec(fig.get_settings())["render_type"]["RangeBars"].get("progress")
+            if active is None or active["column"] != name:
+                native.remove_column(name)
+            raise
+
+
+def _range_connector(color, linewidth, dpi):
+    from .figure import _color
+    from ._validation import number
+
+    return dict(color=_color(color), width=number(linewidth, "connector width") * dpi / 72)
 
 
 class AdvancedMethods:
@@ -388,25 +464,53 @@ class AdvancedMethods:
         end,
         *,
         labels=None,
-        orientation="vertical",
-        color="black",
-        width=0.8,
+        orientation=None,
+        color=None,
+        width=None,
+        progress=None,
+        remaining_opacity=0.4,
+        timeline=False,
+        connector=False,
+        connector_color=None,
+        connector_width=1.0,
         id=None,
     ):
-        from .figure import _array, _color
+        """Plot intervals, optionally with a Gantt preset and one progress fraction per row."""
+        from .figure import _array, _color, _diff, _merge
 
         positions, start, end = _array(positions), _array(start), _array(end)
         if not positions.size or not positions.size == start.size == end.size:
             raise ValueError("positions/start/end must be nonempty and aligned")
+        if orientation is None:
+            orientation = "horizontal" if timeline else "vertical"
+        if timeline and orientation != "horizontal":
+            raise ValueError("timeline bars require horizontal orientation")
+        if width is None:
+            width = 0.6 if timeline else 0.8
         sid = self._sid(id)
-        s = template("range_bars")
+        s = template("timeline_bars" if timeline else "range_bars")
         s.update(series_id=sid, x_column=sid + "/x", y_column=sid + "/end")
         body = s["render_type"]["RangeBars"]
-        body.update(start=sid + "/start", color=_color(color), slot_width=float(width))
+        body.update(start=sid + "/start", slot_width=float(width))
+        if color is not None:
+            body["color"] = _color(color)
+            body.pop("color_by", None)
+        elif not timeline:
+            body["color"] = _color("black")
+        if connector:
+            body["connector"] = _range_connector(
+                tuple(body["color"][key] for key in "rgba") if connector_color is None else connector_color,
+                connector_width, self.figure.dpi,
+            )
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
-        cfg["bar_groups"] = dict(
-            direction=orientation.title(), mode="Grouped", group_width=0.8, bar_gap=2.0
-        )
+        if timeline:
+            defaults = json.loads(coordinate_defaults_json("cartesian"))
+            preset = json.loads(coordinate_defaults_json("timeline"))
+            _merge(cfg, _diff(defaults, preset))
+        else:
+            cfg["bar_groups"] = dict(
+                direction=orientation.title(), mode="Grouped", group_width=0.8, bar_gap=2.0
+            )
         if labels is not None:
             cfg["bar_groups"]["group_width"] = float(width)
             if len(labels) != len(positions):
@@ -415,11 +519,12 @@ class AdvancedMethods:
                 "categories"
             ] = [dict(id=f"category_{i}", label=str(v)) for i, v in enumerate(labels)]
             body["slot_width"] = None
-        return self._install_series(
-            [s],
-            [(sid + "/x", positions), (sid + "/start", start), (sid + "/end", end)],
-            config=cfg,
-        )
+        columns = [(sid + "/x", positions), (sid + "/start", start), (sid + "/end", end)]
+        if progress is not None:
+            name = sid + "/progress"
+            body["progress"] = _range_progress(name, remaining_opacity)
+            columns.append((name, _progress_values(progress, positions.size)))
+        return self._install_series([s], columns, config=cfg)
 
     def broken_barh(self, xranges, yrange, *, color="black", id=None):
         ranges = np.asarray(xranges, dtype=float)
@@ -489,12 +594,15 @@ class AdvancedMethods:
             self.figure.apply_settings(state)
         return self
 
-    def waterfall(self, labels, values, *, color="black", id=None):
+    def waterfall(self, labels, values, *, color="black", connector=True,
+                  connector_color=None, connector_width=1.0, id=None):
+        """Draw cumulative steps and join adjacent bars with a connector in points."""
         values = np.asarray(values)
         end = np.cumsum(values)
         start = end - values
         return self.range_bars(
-            np.arange(len(values)), start, end, labels=labels, color=color, id=id
+            np.arange(len(values)), start, end, labels=labels, color=color, id=id,
+            connector=connector, connector_color=connector_color, connector_width=connector_width,
         )
 
     def candlestick(
@@ -743,6 +851,7 @@ class AdvancedMethods:
         limits=(),
         bands=(),
         show="main",
+        wavelength_labels=False,
         id=None,
         **style,
     ):
@@ -785,6 +894,9 @@ class AdvancedMethods:
             body["bands"] = records(bands, "bands", rich, dpi=self.figure.dpi)
         body["show"] = {"main": "Main", "components": "Components"}.get(show, show)
         _diagram_style_update(body["style"], plain(style))
+        from ._diagram_artist import _set_wavelength_labels
+
+        _set_wavelength_labels(body["style"], wavelength_labels, self.figure)
         new_energies = np.asarray(
             [row["energy"] for row in [*levels, *limits]], dtype=float
         )

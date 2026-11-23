@@ -233,6 +233,14 @@ def figure_edit_property(id: str, object_id: str, property_id: str, value: Any):
     return fig.get_settings()
 
 
+def figure_range_progress(id: str, series: str, progress: Any = None,
+                          remaining_opacity: Optional[float] = None):
+    """Set range-bar progress using fractions or a resident column ID. Null hides progress."""
+    fig = _figure(id)
+    fig.artist(series).set_progress(_input(progress), remaining_opacity=remaining_opacity)
+    return fig.get_settings()
+
+
 def figure_export(id: str, path: str, format: Optional[str] = None, scale: float = 1.0):
     """Export the complete document to a local PNG, SVG or PDF file."""
     fig = _figure(id)
@@ -269,6 +277,7 @@ def create_server():
         figure_inset,
         figure_editor_properties,
         figure_edit_property,
+        figure_range_progress,
         figure_export,
         figure_close,
     ):

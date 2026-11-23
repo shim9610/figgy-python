@@ -295,6 +295,9 @@ pub(super) fn label_format_wire(name: &str) -> Value {
 }
 
 fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: &str) {
+    if path.ends_with("/category_window") || path.ends_with("/category_bands") {
+        return;
+    }
     if diagrams::fields(out, value, path, group, relative) {
         return;
     }
@@ -772,8 +775,14 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             if kind == "RangeLinks" && expanded["links"].is_null() {
                 expanded["links"] = json!([]);
             }
+            if kind == "RangeBars" {
+                optional::range_bars(fields, style, &root);
+            }
             for (key, value) in expanded.as_object().unwrap() {
                 if ["components", "err_x", "err_y", "yErr"].contains(&key.as_str()) {
+                    continue;
+                }
+                if kind == "RangeBars" && matches!(key.as_str(), "progress" | "connector") {
                     continue;
                 }
                 let group = match key.as_str() {
@@ -1268,6 +1277,7 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         } else if let Some(path) = path {
             if let Some(value) = state.pointer(&path) {
+                optional::category_axis(fields, value, &path);
                 walk(
                     fields,
                     value,
@@ -1741,6 +1751,9 @@ pub(crate) fn apply(
         return Ok(result);
     }
     if optional::apply(&mut result, field, &value)? {
+        return Ok(result);
+    }
+    if optional::apply_range_and_categories(&mut result, field, &value, extents)? {
         return Ok(result);
     }
     if field.id == "Annotation/order" {

@@ -1,19 +1,19 @@
 {
   "upstream_repository": "https://github.com/shim9610/figgy",
-  "upstream_revision": "081347b57401f3655f23297cbf31abc7337f43b0",
+  "upstream_revision": "5eafcee3f09c6b38b26d63a4b903f890e76cf952",
   "renderer_version": "0.19.0-beta.2",
   "web_package_version": "0.16.0-beta.2",
   "native_packages": {
     "figgy-renderer": {
       "version": "0.19.0-beta.2",
-      "source": "git+https://github.com/shim9610/figgy.git?rev=081347b57401f3655f23297cbf31abc7337f43b0#081347b57401f3655f23297cbf31abc7337f43b0",
-      "upstream_revision": "081347b57401f3655f23297cbf31abc7337f43b0",
+      "source": "git+https://github.com/shim9610/figgy.git?rev=5eafcee3f09c6b38b26d63a4b903f890e76cf952#5eafcee3f09c6b38b26d63a4b903f890e76cf952",
+      "upstream_revision": "5eafcee3f09c6b38b26d63a4b903f890e76cf952",
       "path_in_vcs": "crates/renderer"
     },
     "figgy-model": {
       "version": "0.13.0-beta.2",
-      "source": "git+https://github.com/shim9610/figgy.git?rev=081347b57401f3655f23297cbf31abc7337f43b0#081347b57401f3655f23297cbf31abc7337f43b0",
-      "upstream_revision": "081347b57401f3655f23297cbf31abc7337f43b0",
+      "source": "git+https://github.com/shim9610/figgy.git?rev=5eafcee3f09c6b38b26d63a4b903f890e76cf952#5eafcee3f09c6b38b26d63a4b903f890e76cf952",
+      "upstream_revision": "5eafcee3f09c6b38b26d63a4b903f890e76cf952",
       "path_in_vcs": "crates/model"
     }
   },
@@ -32,8 +32,8 @@
       "bytes": 339121
     },
     "figgy_bg.wasm": {
-      "sha256": "b1689bf1b6178758fce4ea9736ca1fad54aafab53433fe899d5139993b5a171c",
-      "bytes": 31602061
+      "sha256": "8d9af4362eba7bb9f190c91fceaa2a17588da1da59a12f629dc5c715149d7d91",
+      "bytes": 31604853
     }
   }
 }

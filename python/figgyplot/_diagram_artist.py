@@ -23,6 +23,43 @@ def _defaults(tag):
     return json.loads(series_template_json(kind))["render_type"][tag]["style"]
 
 
+def _set_wavelength_labels(style, settings, figure):
+    from collections.abc import Mapping
+    from .figure import _merge
+    from ._native import wavelength_labels_json
+    from ._diagram_input import plain
+
+    if settings is None or settings is False:
+        style.pop("wavelength_labels", None)
+        return
+    if settings is True:
+        settings = {}
+    if not isinstance(settings, Mapping):
+        raise TypeError("wavelength_labels must be a boolean or a mapping")
+    options = plain(settings)
+    labels = copy.deepcopy(style.get("wavelength_labels") or json.loads(wavelength_labels_json()))
+    fmt = labels.setdefault("format", {})
+    if "decimals" in options:
+        decimals = options.pop("decimals")
+        if decimals is None:
+            fmt.pop("decimals", None)
+        else:
+            fmt["decimals"] = decimals
+    if "trim_zeros" in options:
+        fmt["trim_zeros"] = options.pop("trim_zeros")
+    text = labels["text"]
+    if "fontsize" in options:
+        text["font_size"] = number(options.pop("fontsize"), "fontsize", positive=True) * figure.dpi / 72
+    if "color" in options:
+        text["color"] = _color(options.pop("color"))
+    if "font" in options:
+        text["font"] = figure._check_font(options.pop("font"))
+    unknown = options.keys() - {"unit", "text", "format"}
+    if unknown:
+        raise TypeError("unknown wavelength label options: " + ", ".join(sorted(unknown)))
+    style["wavelength_labels"] = _merge(labels, options)
+
+
 class DiagramArtist(Artist):
     """An energy-level or Feynman series; edit its rows through stable IDs."""
 
@@ -98,7 +135,10 @@ class DiagramArtist(Artist):
 
             style = copy.deepcopy(_defaults(tag))
             _merge(style, body.get("style", {}))
-            _diagram_style_update(style, plain(properties))
+            remaining = plain(properties)
+            if "wavelength_labels" in remaining and tag == "EnergyLevels":
+                _set_wavelength_labels(style, remaining.pop("wavelength_labels"), self.figure)
+            _diagram_style_update(style, remaining)
             part = style["level"] if tag == "EnergyLevels" else style
             if color is not None:
                 part["color"] = _color(color)
@@ -109,6 +149,12 @@ class DiagramArtist(Artist):
             body["style"] = style
 
         return self._edit_diagram(edit)
+
+    def set_wavelength_labels(self, visible=True, **options):
+        """Format each unlabelled transition's stored wavelength, with no unit conversion."""
+        if not isinstance(visible, bool):
+            raise TypeError("wavelength label visibility must be boolean")
+        return self.set_style(wavelength_labels=options if visible else False)
 
     def set_wavelength_colors(self, unit="nm", *, ultraviolet=None, infrared=None):
         """Color transition arrows by wavelength. Pass None to restore series colors."""

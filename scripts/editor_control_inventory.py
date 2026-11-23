@@ -55,9 +55,13 @@ def build(fig, case):
             id="spectrum",
         )
         diagram.set_wavelength_colors()
+        diagram.set_wavelength_labels(unit="nm", decimals=1)
         diagram.transition("t").set_color("red")
     elif case == "range_links":
-        bars = ax.range_bars([0, 1], [0, 2], [1, 3], orientation="horizontal", id="tasks")
+        bars = ax.range_bars([0, 1], [0, 2], [1, 3], labels=["A", "B"], timeline=True,
+                             progress=[.2, .75], id="tasks")
+        bars.set_connector()
+        ax.yaxis.set_category_window(-.5, 1.5)
         ax.range_links(bars, [(0, 1)], id="dependencies")
     else:
         ax.radar(["A", "B", "C"], [[2, 3, 4]])

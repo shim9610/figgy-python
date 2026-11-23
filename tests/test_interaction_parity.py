@@ -3957,7 +3957,8 @@ def test_gantt_dependency_exit_drag_reaches_accepted_state(tmp_path, backend):
     if backend == 'native':
         with figgy.Figure(backend=backend) as fig:
             ax = fig.axes[0]
-            bars = ax.range_bars([0, 1], [0, 5], [2, 7], orientation='horizontal', color='black', id='tasks')
+            bars = ax.range_bars([0, 1], [0, 5], [2, 7], orientation='horizontal',
+                                 progress=[.25, .75], color='black', id='tasks')
             ax.range_links(bars, [(0, 1)], color='#ff00ff', width=4, id='deps')
             ax.set_xlim(-1, 8);ax.set_ylim(-1, 2)
             logical = point(fig.render_rgba())
@@ -3978,7 +3979,8 @@ def test_gantt_dependency_exit_drag_reaches_accepted_state(tmp_path, backend):
     source = """
 import figgyplot as fg
 fig, ax = fg.subplots(backend='webgpu')
-bars = ax.range_bars([0, 1], [0, 5], [2, 7], orientation='horizontal', color='black', id='tasks')
+bars = ax.range_bars([0, 1], [0, 5], [2, 7], orientation='horizontal',
+                     progress=[.25, .75], color='black', id='tasks')
 ax.range_links(bars, [(0, 1)], color='#ff00ff', width=4, id='deps')
 ax.set_xlim(-1, 8)
 ax.set_ylim(-1, 2)
@@ -4026,6 +4028,16 @@ display(fig.widget())
         assert 0 < settings(accepted)[0]['exit_fraction'] < 1
         assert 'exit_offset' not in settings(accepted)[0]
         assert settings(accepted) == settings(page.evaluate(ROOT+'.snapshot()'))
+        ObjectNavigator(page).choose('tasks')
+        section = page.locator('details[data-property-section="Progress"]')
+        if not section.evaluate('(el) => el.open'):
+            section.locator('summary').click()
+        opacity = page.locator('[data-catalog-field="Progress/remaining_opacity"]')
+        opacity.fill('0.2')
+        opacity.press('Tab')
+        execute("await fig.sync(); assert abs(bars._body(fig.get_settings())['progress']['remaining_opacity'] - .2) < 1e-6")
+        progress = page.evaluate(ROOT+'.snapshot().series[0].render_type.RangeBars.progress')
+        assert progress['remaining_opacity'] == pytest.approx(.2)
         assert not page.locator('.figgy-error').inner_text()
 
 
@@ -4063,20 +4075,43 @@ display(fig.widget())
         assert not page.locator('.figgy-error').inner_text()
 
 
-@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
-def test_jupyter_inset_marker_and_parent_geometry_are_editable(tmp_path):
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_editor_can_add_an_inset_and_edit_its_parent(tmp_path, backend):
+    if backend == "native":
+        with figgy.Figure(backend=backend) as fig:
+            fig.axes[0].plot([0, 1], [0, 1])
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle)
+                inputs.click("properties")
+                choose_native_object(inputs, "main", "panel/main")
+                inputs.click("property:Inset/add")
+                inset = fig.get_settings()["config"]["subplots"][0]
+                assert inset["anchor"]["parent"] == "Parent"
+                inputs.click("undo")
+                assert not fig.get_settings()["config"].get("subplots")
+                inputs.click("redo")
+                assert fig.get_settings()["config"]["subplots"][0] == inset
+                assert not inputs.info()["error"]
+            finally:
+                handle.close()
+                Inputs.pump()
+        return
     source = """
 import figgyplot as fg
 fig, ax = fg.subplots(backend='webgpu')
 ax.plot([0, 1], [0, 1])
-zoom = ax.inset_axes([.35, .15, .55, .55], id='zoom')
-zoom.plot([0, 1], [1, 0])
 display(fig.widget())
 """
     with notebook(tmp_path, source) as (page, execute):
         click_button(page, '[data-properties]')
         navigator = ObjectNavigator(page)
-        navigator.panel('zoom')
+        navigator.panel('main')
+        page.locator('[data-catalog-field="Inset/add"]').click()
+        execute("await fig.sync()")
+        assert page.evaluate(ROOT + '.snapshot().config.subplots[0].anchor.parent') == "Parent"
+        navigator.panel('main/inset1')
         for section_name in ('Inset', 'Inset marker'):
             section = page.locator(f'details[data-property-section="{section_name}"]')
             if not section.evaluate('(el) => el.open'):

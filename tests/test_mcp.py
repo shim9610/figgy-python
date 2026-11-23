@@ -43,6 +43,7 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                     "figure_inset",
                     "figure_editor_properties",
                     "figure_edit_property",
+                    "figure_range_progress",
                     "figure_export",
                     "figure_close",
                 } <= {t.name for t in listing.tools}
@@ -63,6 +64,9 @@ def test_stdio_chart_edit_layout_and_export(tmp_path):
                 links = await call("chart_add", {"id": id, "kind": "range_links",
                                                  "args": ["tasks", [[0, 1]]], "options": {"id": "dependencies"}})
                 assert links["settings"]["series"][-1]["render_type"]["RangeLinks"]["links"] == [{"from": 0, "to": 1}]
+                progress = await call("figure_range_progress", {"id": id, "series": "tasks",
+                                      "progress": {"dtype": "float32", "values": [.25, .75]}})
+                assert progress["series"][0]["render_type"]["RangeBars"]["progress"]["column"] == "tasks/progress"
                 inset = await call("figure_inset", {"id": id, "bounds": [.4, .2, .5, .5], "inset_id": "zoom"})
                 assert inset["panel"] == "zoom"
                 fields = await call("figure_editor_properties", {"id": id, "object_id": "panel/zoom"})

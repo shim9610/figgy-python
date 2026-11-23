@@ -33,6 +33,9 @@ pub(super) fn expanded(kind: &str, body: &Value, rich: &Value) -> Value {
     {
         out["style"]["transition"]["color_by_wavelength"] = Value::Null;
     }
+    if kind == "EnergyLevels" && out["style"].get("wavelength_labels").is_none() {
+        out["style"]["wavelength_labels"] = Value::Null;
+    }
     let momentum: renderer::feynman::MomentumArrow =
         serde_json::from_value(json!({"label": rich})).unwrap();
     let momentum_defaults = json!({"side":momentum.side,"reversed":momentum.reversed,"label_offset":momentum.label_offset});
@@ -142,6 +145,69 @@ pub(super) fn fields(
     group: &str,
     relative: &str,
 ) -> bool {
+    if path.ends_with("/EnergyLevels/style/wavelength_labels") {
+        let group = "Wavelength labels";
+        field(
+            out,
+            json!(value.is_object()),
+            path,
+            group,
+            "enabled",
+            "Show wavelength labels",
+        );
+        if value.is_object() {
+            field(
+                out,
+                value.get("unit").cloned().unwrap_or(json!("")),
+                &format!("{path}/unit"),
+                group,
+                "unit",
+                "Unit suffix",
+            );
+            let format = &value["format"];
+            field(
+                out,
+                json!(format["decimals"].is_number()),
+                &format!("{path}/format/decimals"),
+                group,
+                "fixed",
+                "Use fixed decimal places",
+            );
+            if let Some(decimals) = format.get("decimals") {
+                field(
+                    out,
+                    decimals.clone(),
+                    &format!("{path}/format/decimals"),
+                    group,
+                    "decimals",
+                    "Decimal places",
+                );
+                field(
+                    out,
+                    format.get("trim_zeros").cloned().unwrap_or(json!(false)),
+                    &format!("{path}/format/trim_zeros"),
+                    group,
+                    "trim_zeros",
+                    "Trim trailing zeros",
+                );
+            }
+            for (key, label) in [
+                ("color", "Color"),
+                ("font_size", "Font size"),
+                ("font", "Font"),
+            ] {
+                field(
+                    out,
+                    value["text"][key].clone(),
+                    &format!("{path}/text/{key}"),
+                    group,
+                    key,
+                    label,
+                );
+            }
+        }
+        return true;
+    }
     if energy_optional(path) {
         let spectral = path.ends_with("/color_by_wavelength");
         field(
@@ -292,12 +358,40 @@ pub(crate) fn spectral_colors_json() -> PyResult<String> {
     serde_json::to_string(&renderer::energy_levels::SpectralColors::default()).map_err(runtime)
 }
 
+#[pyfunction]
+pub(crate) fn wavelength_labels_json() -> PyResult<String> {
+    serde_json::to_string(&renderer::energy_levels::WavelengthLabels::default()).map_err(runtime)
+}
+
 pub(super) fn apply(
     state: &mut Value,
     field: &Field,
     value: &Value,
     layer: renderer::LayerRef,
 ) -> PyResult<bool> {
+    if field.group == "Wavelength labels"
+        && matches!(
+            field.id.as_str(),
+            "Wavelength labels/enabled" | "Wavelength labels/fixed"
+        )
+    {
+        let enabled = value
+            .as_bool()
+            .ok_or_else(|| invalid("wavelength label control must be boolean"))?;
+        prepare_edit(state, &field.path, layer)?;
+        let (parent, key) = field.path.rsplit_once('/').unwrap();
+        let owner = state
+            .pointer_mut(parent)
+            .ok_or_else(|| invalid("wavelength label style changed"))?;
+        owner[key] = if !enabled {
+            Value::Null
+        } else if key == "wavelength_labels" {
+            json!(renderer::energy_levels::WavelengthLabels::default())
+        } else {
+            json!(2)
+        };
+        return Ok(true);
+    }
     if field.id.ends_with("/enabled") && energy_optional(&field.path) {
         prepare_edit(state, &field.path, layer)?;
         let (parent, key) = field.path.rsplit_once('/').unwrap();

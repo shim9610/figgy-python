@@ -633,6 +633,110 @@ def test_transition_color_and_wavelength_controls_start_disabled(backend):
         assert 'color' not in transition.get()
 
 
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_wavelength_label_format_is_editable_and_keeps_transition_data(backend):
+    levels = [{"id": "g", "column": "S", "energy": 0}, {"id": "e", "column": "P", "energy": 3}]
+    transitions = [{"id": "t", "lower": "g", "upper": "e", "wavelength": 530.25}]
+    with fg.Figure(backend=backend) as fig:
+        artist = fig.axes[0].energy_levels(levels, transitions=transitions, id="spectra",
+                                          wavelength_labels={"unit": "nm", "decimals": 1})
+
+        def style():
+            return fig.get_settings()["series"][0]["render_type"]["EnergyLevels"]["style"]
+
+        assert style()["wavelength_labels"]["format"]["decimals"] == 1
+        artist.set_wavelength_labels(fontsize=12, trim_zeros=True)
+        assert style()["wavelength_labels"]["unit"] == "nm"
+        assert style()["wavelength_labels"]["format"]["trim_zeros"]
+        artist.set_style(wavelength_labels=False)
+        base = fig.get_settings()
+        edit(fig, "spectra", "Wavelength labels/enabled", True)
+        edit(fig, "spectra", "Wavelength labels/unit", "nm")
+        edit(fig, "spectra", "Wavelength labels/fixed", True)
+        edit(fig, "spectra", "Wavelength labels/decimals", 3)
+        assert style()["wavelength_labels"]["format"]["decimals"] == 3
+        assert artist.transition("t").get()["wavelength"] == 530.25
+        if backend == "native":
+            with_labels = fig.to_png()
+        for _ in range(4):
+            fig.undo()
+        assert fig.get_settings() == base
+        if backend == "native":
+            assert with_labels != fig.to_png()
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_timeline_progress_and_category_controls_are_atomic(backend):
+    import numpy as np
+
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        bars = ax.range_bars([0, 1], [0, 2], [1, 4], labels=["A", "B"],
+                            timeline=True, progress=np.array([.25, .75], dtype=np.float32), id="tasks")
+        axis = fig.get_settings()["config"]["left_y"]
+        assert axis["inverted"] and axis["category_bands"]["every"] == "Alternate"
+        assert bars.data.progress.name == "tasks/progress"
+        start = fig.get_settings()
+        if backend == "native":
+            with_progress = fig.to_png()
+        else:
+            assert fig._native.columns[bars.data.progress.name][0] == "float32"
+        with pytest.raises(ValueError):
+            bars.set(progress=[.2, .3], nonexistent_style=5)
+        assert fig.get_settings() == start and "tasks/progress/1" not in fig.data.keys()
+        with pytest.raises(ValueError, match="per bar"):
+            bars.set_progress([.5])
+        bars.set_progress([.75, .25], remaining_opacity=.5)
+        assert bars.data.progress.name == "tasks/progress/1"
+        fig.undo()
+        assert fig.get_settings() == start
+        fig.data.add("short-progress", [.5])
+        if backend == "webgpu":
+            fig._native.payload()
+            fig._native.acknowledged()
+        with pytest.raises(ValueError, match="per bar"):
+            edit(fig, "tasks", "Progress/source", "short-progress")
+        assert fig.get_settings() == start
+        edit(fig, "tasks", "Progress/source", "")
+        if backend == "native":
+            assert with_progress != fig.to_png()
+        edit(fig, "tasks", "Progress/source", "tasks/progress")
+        edit(fig, "tasks", "Progress/remaining_opacity", .25)
+        assert bars.data.progress.name == "tasks/progress"
+        edit(fig, "axis_left", "Category window/enabled", True)
+        edit(fig, "axis_left", "Category window/bounds", [-.5, .5])
+        assert fig.get_settings()["config"]["left_y"]["category_window"] == [-.5, .5]
+        ax.yaxis.set_category_window()
+        assert "category_window" not in fig.get_settings()["config"]["left_y"]
+        ax.yaxis.set_category_bands(None)
+        edit(fig, "axis_left", "Category bands/enabled", True)
+        assert fig.get_settings()["config"]["left_y"]["category_bands"]["every"] == "Alternate"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_waterfall_connector_and_panel_inset_action(backend):
+    with fg.Figure(backend=backend, dpi=72) as fig:
+        bars = fig.axes[0].waterfall(["A", "B", "C"], [2, 1, -1], id="steps",
+                                      connector_color="red", connector_width=2)
+        before = fig.get_settings()
+        connector = before["series"][0]["render_type"]["RangeBars"]["connector"]
+        assert connector["width"] == 2 and connector["color"]["r"] == 1
+        bars.set_connector(False)
+        assert "connector" not in fig.get_settings()["series"][0]["render_type"]["RangeBars"]
+        edit(fig, "steps", "Connector/enabled", True)
+        assert fig.get_settings()["series"][0]["render_type"]["RangeBars"]["connector"]["width"] == 1
+        before = fig.get_settings()
+        fig.edit_property("panel/main", "Inset/add", True)
+        accepted = fig.get_settings()
+        assert len(fig.subplots) == 2
+        assert accepted["config"]["subplots"][0]["anchor"]["parent"] == "Parent"
+        assert accepted["series"] == before["series"]
+        fig.undo()
+        assert fig.get_settings() == before
+        fig.redo()
+        assert fig.get_settings() == accepted
+
+
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
 @pytest.mark.parametrize('method', ['fit', 'tight_layout'])
 def test_range_exits_migrate_fit_and_round_trip_after_source_transfer(backend, method):
