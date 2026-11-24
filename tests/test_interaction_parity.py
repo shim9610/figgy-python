@@ -4153,6 +4153,63 @@ assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= config['polar'
         assert not page.locator('.figgy-error').inner_text()
 
 
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
+def test_jupyter_python_fits_rose_labels_before_and_after_display(tmp_path):
+    source = """
+import figgyplot as fg
+fig = fg.Figure(backend='webgpu', grid=[['main', 'wind']])
+fig.subplots['main'].plot([0, 1], [0, 1])
+ax = fig.subplots['wind'].axes
+ax.rose(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+        [[.10, .02, .01, .02, .02, .01, .03, .09],
+         [.08, .01, .02, .03, .01, .02, .02, .07]], mode='stacked')
+ax.set_polar_options(zero=90, clockwise=True, labels_skipped=1)
+ax.configure(left_y={'label_style': {'format': 'Percent'}})
+
+def rose_config():
+    return fig.get_settings()['config']['subplots'][0]['config']
+
+assert fig.fit() is fig
+assert 'radial_label_angle_degrees' not in rose_config()['polar']
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        uploads = page.evaluate(ROOT + '.stats.column_uploads')
+        execute("""await fig.sync(timeout=120)
+assert fig.info['transfer_snapshot_bytes'] == 0
+config = rose_config()
+assert 0 <= config['polar']['radial_label_angle_degrees'] < 360
+assert config['polar']['radius_labels_skipped'] == 1
+assert config['left_y']['label_style']['format'] == 'Percent'
+
+ax.set_polar_options(zero=90, clockwise=True, label_angle=30)
+assert fig.tight_layout() is fig
+fig.subplots['main'].set_title('Wind direction')
+await fig.sync(timeout=120)
+config = rose_config()
+assert config['polar']['radial_label_angle_degrees'] == 30
+assert config['polar']['radius_labels_skipped'] >= 0
+assert config['left_y']['label_style']['format'] == 'Percent'
+assert 'Wind direction' in fig.to_code()
+
+ax.set_polar_options(zero=90, clockwise=True)
+ax.set_ylim(0, .8)
+before = fig.edit_history['undo_count']
+fig.fit(padding=.12)
+await fig.sync(timeout=120)
+fitted = rose_config()
+assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= fitted['polar'].keys()
+assert fitted['left_y']['max'] < .8
+assert fig.edit_history['undo_count'] == before + 1
+fig.undo()
+assert rose_config()['left_y']['max'] == .8
+assert 'radial_label_angle_degrees' not in rose_config()['polar']
+fig.redo()
+assert rose_config() == fitted
+""")
+        assert page.evaluate(ROOT + '.stats.column_uploads') == uploads
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
 def test_editor_drags_document_arrow_over_sibling_panel(tmp_path, backend):

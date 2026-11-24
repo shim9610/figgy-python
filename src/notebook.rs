@@ -389,6 +389,9 @@ impl NotebookFigure {
         self.history.finish(state, self.revision);
         Ok(())
     }
+    fn join_radius_fit_edit(&mut self, base: u64, middle: u64) {
+        self.history.join_adjacent(base, middle, self.revision);
+    }
     fn undo(&mut self) -> PyResult<()> {
         self.replay_edit(false)
     }

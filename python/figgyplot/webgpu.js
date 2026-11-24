@@ -96,6 +96,7 @@ export function render({model,el}) {
   const client=crypto.randomUUID();
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
   let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,pendingDraft=null,barriers=[],local=clone(model.get('state').settings);
+  let scheduledRadiusFit=null,radiusFitError=null;
   let editHistory=model.get('state').edit_history??{},historyBusy=false;
   let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
   // Session metadata is separate from chart SSOT and ordinary inspector fields.
@@ -616,7 +617,15 @@ export function render({model,el}) {
     if(valueLabelSignature(settings)!==valueLabelSignature(old))pendingValueLabels=true;
     local={...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};dirty=true;error.textContent='';
   }
-  function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending,draft:pendingDraft};pending=null;pendingDraft=null;historyControls();stats.kernel_edit_messages++;trace('edit.post',{sequence,revision});model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
+  function post(){
+    if(inflight||!pending)return;
+    inflight={sequence:++sequence,settings:pending,draft:pendingDraft};
+    pending=null;pendingDraft=null;
+    historyControls();stats.kernel_edit_messages++;trace('edit.post',{sequence,revision});
+    const message={action:'edit',client,sequence,revision,settings:inflight.settings};
+    if(inflight.draft?.radiusFit)message.radius_fit=inflight.draft.radiusFit;
+    model.send(message);
+  }
   function commit(draft=null){local=snapshot();pending=clone(local);pendingDraft=draft;post();properties();}
   function idle(){if(!inflight && !pending){for(const resolve of barriers.splice(0))resolve();}}
   function flush(){post();return !inflight&&!pending ? Promise.resolve() : new Promise(resolve=>barriers.push(resolve));}
@@ -1152,14 +1161,14 @@ export function render({model,el}) {
     for(const page of doc.getPages())page.scale(factor,factor);
     return await doc.save({useObjectStreams:false,addDefaultPage:false});
   }
-  async function exporting(scale=1,format='png'){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const raw=format==='svg'?new TextEncoder().encode(await chart.export_svg(scale)):format==='pdf'?await chart.export_pdf(scale):await chart.export_png(scale);const data=await physicalExport(bytes(raw),format);trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
+  async function exporting(scale=1,format='png'){trace('export.flush_started',{scale});await flushControls();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const raw=format==='svg'?new TextEncoder().encode(await chart.export_svg(scale)):format==='pdf'?await chart.export_pdf(scale):await chart.export_png(scale);const data=await physicalExport(bytes(raw),format);trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   function onState(){enqueue(()=>{const state=model.get('state');trace('state.received',{incoming_revision:state.revision});propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
     revision=state.revision;pending=null;pendingDraft=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
     catch(e){fail(e);model.send({action:'rejected',revision,settings:snapshot(),error:String(e)});}
-  }});}
+  }});scheduleRadiusFit();}
   function onMessage(message){
     if(message.client && message.client!==client)return;
     if(message.action==='ack')enqueue(()=>{
@@ -1176,7 +1185,13 @@ export function render({model,el}) {
           catch(e){retryError=e;}
         }
       }
-      if(message.error){pending=null;pendingDraft=null;install(accepted.settings);fail(retryError??message.error);}
+      if(message.error){
+        pending=null;pendingDraft=null;install(accepted.settings);
+        if(!draft?.radiusFit||!message.error.startsWith('stale edit:')){
+          if(draft?.radiusFit)radiusFitError={request:draft.radiusFit,error:message.error};
+          fail(retryError??message.error);
+        }
+      }
       else if(latest){pending=latest;install(latest);post();}else{install(accepted.settings);}
       propertyColumns=clone(accepted.property_columns??propertyColumns);propertyCatalog=clone(accepted.property_catalog??propertyCatalog);editHistory=accepted.edit_history??{};historyControls();properties();idle();
     });
@@ -1201,7 +1216,7 @@ export function render({model,el}) {
     else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
       const request={requestId:message.id,action:message.action};trace('request.received',request);
       // Do not block the serialized queue while waiting for an ack processed by it.
-      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await controlQueue;await queue;trace('request.queue_drained',request);await enqueue(formatPendingLabels,true);await flush();trace('request.edits_acknowledged',request);let result=null;
+      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await flushControls();trace('request.queue_drained',request);await enqueue(formatPendingLabels,true);await flush();trace('request.edits_acknowledged',request);let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
           const start=performance.now(),stages=[];let prewarmWarning=null;
           status.textContent='Preparing…';trace('prepare.started',request);
@@ -1232,6 +1247,7 @@ export function render({model,el}) {
     }
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
+  model.on('change:radius_fit_request',scheduleRadiusFit);scheduleRadiusFit();
   // Present the chosen inspector immediately without borrowing the renderer.
   // Apply interaction selection in event order so older keys/picks keep their
   // original target and cannot overwrite a newer pending inspector choice.
@@ -1247,15 +1263,41 @@ export function render({model,el}) {
       return polar&&(polar.radial_label_angle_degrees==null||polar.radius_labels_skipped==null);
     });
   }
-  function replayLayoutWithRadiusLabels(action){
-    const operation=replayEdit(action);
-    if(needsRadiusLabels())controlQueue=operation.then(result=>{
-      if(result.ok)return enqueue(async()=>{await chart.fit_host_radial_labels();dirty=true;commit();});
+  async function flushControls(){
+    // A kernel layout command can schedule a radius fit while its ack is pending.
+    let controls;
+    do{
+      controls=controlQueue;
+      await controls;await queue;await flush();
+    }while(controls!==controlQueue);
+    if(radiusFitError&&radiusFitError.request===model.get('radius_fit_request'))throw Error(radiusFitError.error);
+  }
+  function scheduleRadiusFit(){
+    const request=model.get('radius_fit_request'),base=model.get('state').revision;
+    const key=`${request}:${base}`;
+    if(!request||scheduledRadiusFit===key)return;
+    scheduledRadiusFit=key;
+    const stillCurrent=()=>request===model.get('radius_fit_request')&&base===model.get('state').revision;
+    const operation=controlQueue.then(async()=>{
+      await initialized;await queue;await flush();
+      await enqueue(async()=>{
+        if(!stillCurrent()||revision!==base)return;
+        if(needsRadiusLabels()){
+          const before=chart.get_config();
+          await chart.fit_host_radial_labels();
+          if(!stillCurrent()){chart.set_config(before);return;}
+          dirty=true;
+        }
+        // Acknowledge even if the data draws no wedges and the fit has no choice.
+        commit({radiusFit:request});
+      },true);
+      await flush();
     });
+    controlQueue=operation.catch(error=>{radiusFitError={request,error:String(error)};fail(error);});
   }
   root.querySelector('[data-fit]').addEventListener('click',()=>{
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||Object.values(s.render_type)[0].line?.fill))){
-      replayLayoutWithRadiusLabels('fit');return;
+      replayEdit('fit');return;
     }
     enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}
       else if(needsRadiusLabels()){chart.set_config(chart.fit_config(chart.get_config(),0.05));await chart.fit_host_radial_labels();}
@@ -1319,7 +1361,7 @@ export function render({model,el}) {
   themeSelect.addEventListener('change',()=>{const name=themeSelect.value;if(name)enqueue(()=>{chart.apply_theme(name);local.background=kind?JSON.parse(chart.get_document()).background:(JSON.parse(chart.get_config()).background??null);if(!kind)clearColor(local.background);dirty=true;commit();});});
   const autoLayout=document.createElement('button');autoLayout.dataset.autoLayout='';autoLayout.textContent='Auto layout';toolbar.append(autoLayout);
   autoLayout.addEventListener('click',()=>{
-    if(!kind&&local.series.some(s=>s.render_type.RangeLinks)){replayLayoutWithRadiusLabels('layout');return;}
+    if(!kind&&local.series.some(s=>s.render_type.RangeLinks)){replayEdit('layout');return;}
     enqueue(async()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else{chart.fit_layout();if(needsRadiusLabels())await chart.fit_host_radial_labels();}dirty=true;commit();});
   });
   const exportFormat=document.createElement('select');exportFormat.dataset.exportFormat='';exportFormat.setAttribute('aria-label','Export format');exportFormat.innerHTML=['png','svg','pdf'].map(n=>`<option value="${n}">${n.toUpperCase()}</option>`).join('');toolbar.append(exportFormat);
@@ -1492,6 +1534,6 @@ export function render({model,el}) {
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
   }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();disposeReviewImages();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('change:radius_fit_request',scheduleRadiusFit);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();disposeReviewImages();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

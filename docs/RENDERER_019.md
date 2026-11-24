@@ -193,6 +193,13 @@ layout. `fig.tight_layout()` uses upstream text and decoration measurements;
 `fig.constrained_layout()` is an alias for that explicit layout pass.
 Native and notebook editor toolbars provide theme selection and **Auto layout**.
 
+For rose and wind rose charts, `fig.fit()` and `fig.tight_layout()` choose
+any unset radius-label angle and inner-label skip count. With the notebook
+backend, display the widget and use `await fig.sync()` before reading the
+computed settings. A call made before display is applied once the browser is
+ready. Pass either parameter of `ax.set_polar_options(label_angle=30,
+labels_skipped=1)` to fix that value while the renderer chooses the other.
+
 The [theme gallery](../examples/renderer_019.py) draws stem, violin, waterfall
 and RGB charts with all four themes. Native exports are available for
 [gallery](images/renderer-019-gallery.png),

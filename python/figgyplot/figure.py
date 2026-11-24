@@ -302,6 +302,8 @@ class Figure(FigureMethods):
         self._default_config = copy.deepcopy(self.get_settings()["config"])
         self._widgets = weakref.WeakSet()
         self._windows = []
+        self._radius_fit_serial = 0
+        self._radius_fit_request = None
         self._edit_baseline_marked = False
         self._selection = None
         self._next_series = 0
@@ -588,6 +590,8 @@ class Figure(FigureMethods):
             if expected_revision is not None and expected_revision != self.revision:
                 raise ValueError('stale edit: the Figure changed; refresh and retry')
             getattr(self._native, action)()
+            if self._radius_fit_request is not None:
+                self._set_radius_fit_request(None)
             self._selection = None
             accepted = self.get_settings()
             self.axes = [self._axes_for(p['id'], overlay) for p in accepted['identity']['panels']
@@ -946,11 +950,15 @@ class Figure(FigureMethods):
         return ('gallery','cool-slate','midnight','warm-paper')
 
     def tight_layout(self, *, pad=None):
-        """Fit bands to actual rendered text, including subplots and overlays."""
+        """Fit rendered text bands, including subplots and overlays.
+
+        For WebGPU, await `sync()` after display to read the fitted rose labels.
+        """
         from ._native import transform_settings_json
         if pad is not None and (not math.isfinite(float(pad)) or float(pad)<0):
             raise ValueError('pad must be nonnegative and finite')
         with self._lock:
+            base_revision = self.revision
             state=json.loads(transform_settings_json(json.dumps(self.get_settings()),'layout',''))
             if pad is not None and not state.get('radial'):
                 extra=float(pad)*12*self.dpi/72
@@ -968,9 +976,32 @@ class Figure(FigureMethods):
             ):
                 state = json.loads(self._native.finish_layout_json(json.dumps(state, allow_nan=False)))
             self.apply_settings(state)
+            if self.backend == 'webgpu':
+                self._queue_radius_label_fit(state, base_revision)
         return self
 
     constrained_layout = tight_layout
+
+    def _set_radius_fit_request(self, request):
+        self._radius_fit_request = request
+        for widget in list(self._widgets):
+            widget.radius_fit_request = request[0] if request is not None else 0
+
+    def _queue_radius_label_fit(self, state, base_revision):
+        root = state['config']
+        owners = {series: panel['config'] for panel in root.get('subplots', [])
+                  for series in panel['series']}
+        for spec in state['series']:
+            if 'CategoryBars' not in spec['render_type']:
+                continue
+            polar = owners.get(spec['series_id'], root).get('polar')
+            if polar is not None and (
+                polar.get('radial_label_angle_degrees') is None
+                or polar.get('radius_labels_skipped') is None
+            ):
+                self._radius_fit_serial += 1
+                self._set_radius_fit_request((self._radius_fit_serial, base_revision, self.revision))
+                return
 
     def configure(self, *, config=None, series=None, identity=None, reset=False):
         """Apply advanced layout/style patches to existing plotted data.
@@ -1231,6 +1262,7 @@ class Figure(FigureMethods):
         Figures containing only heatmaps, contours, or filled contours default
         to zero padding. Other Cartesian figures use 5%. Pass an explicit
         padding fraction to override either default.
+        For WebGPU, await `sync()` after display to read the fitted rose labels.
         """
         self._require_data_edit()
         with self._lock:
@@ -1247,8 +1279,11 @@ class Figure(FigureMethods):
                     any(kind in s['render_type'] for kind in ('Heatmap', 'Contour', 'HeatmapContour'))
                     for s in series
                 ) else 0.05
+            base_revision = self.revision
             self._native.fit(float(padding))
-        self._changed()
+            self._changed()
+            if self.backend == 'webgpu':
+                self._queue_radius_label_fit(self.get_settings(), base_revision)
         return self
 
     def widget(self, *, backend=None, auto_prepare=True):

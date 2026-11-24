@@ -117,6 +117,7 @@ class FigureWidget(anywidget.AnyWidget):
     browser_info = traitlets.Dict().tag(sync=True)
     draw_styles = traitlets.Dict().tag(sync=True)
     auto_prepare = traitlets.Bool(True).tag(sync=True)
+    radius_fit_request = traitlets.Int().tag(sync=True)
     review = traitlets.Dict().tag(sync=True)
     review_font_data = traitlets.Bytes().tag(sync=True)
 
@@ -132,7 +133,9 @@ class FigureWidget(anywidget.AnyWidget):
         manifest, buffers = figure._native.payload()
         assets = Path(__file__).with_name("assets")
         from ._native import draw_style_specs_json
+        pending_fit = figure._radius_fit_request
         super().__init__(auto_prepare=auto_prepare, manifest=manifest, columns=buffers,
+                         radius_fit_request=pending_fit[0] if pending_fit is not None else 0,
                          draw_styles=json.loads(draw_style_specs_json()),
                          wasm=(assets / "figgy_bg.wasm").read_bytes(),
                          wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"),
@@ -234,7 +237,16 @@ class FigureWidget(anywidget.AnyWidget):
             self._handling = True
             error = ""
             try:
-                self.figure.apply_settings(_calendar_origins(content["settings"], encode=False), expected_revision=content["revision"])
+                with self.figure._lock:
+                    request = content.get("radius_fit")
+                    pending_fit = self.figure._radius_fit_request
+                    if request is not None and (pending_fit is None or request != pending_fit[0]):
+                        raise ValueError("stale edit: the radius label fit was replaced or canceled")
+                    self.figure.apply_settings(_calendar_origins(content["settings"], encode=False),
+                                               expected_revision=content["revision"])
+                    if request is not None:
+                        self.figure._native.join_radius_fit_edit(*pending_fit[1:])
+                        self.figure._set_radius_fit_request(None)
             except Exception as exc:
                 error = str(exc)
             finally:
