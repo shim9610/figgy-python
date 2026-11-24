@@ -1334,12 +1334,14 @@ class AxesMethods:
         inner_radius=0,
         interpolation="chord",
         pieces=8,
-        label_angle=90,
+        label_angle=None,
+        labels_skipped=None,
     ):
         """Figgy polar projection; angles zero/label_angle use degrees.
 
         Sector endpoints use unit. Arc interpolation uses 1..64 chords per
-        sample segment. Original numerical coordinates are retained.
+        sample segment. Leave the radius label angle or skip count unset
+        for the renderer to choose at fit time on a rose plot.
         """
         if unit not in ("degrees", "radians") or interpolation not in ("chord", "arc"):
             raise ValueError("unit is degrees/radians; interpolation is chord/arc")
@@ -1354,6 +1356,11 @@ class AxesMethods:
         bounds = None if sector is None else [_number(v, "sector") for v in sector]
         if bounds is not None and len(bounds) != 2:
             raise ValueError("sector requires two endpoints")
+        if labels_skipped is not None and (
+            isinstance(labels_skipped, bool) or not isinstance(labels_skipped, int)
+            or not 0 <= labels_skipped < 2**32
+        ):
+            raise ValueError("labels_skipped must be an unsigned 32-bit integer or None")
         return self.set_polar(
             angle_unit=unit.title(),
             zero_angle_degrees=_number(zero, "zero"),
@@ -1363,7 +1370,8 @@ class AxesMethods:
             interpolation="Chord"
             if interpolation == "chord"
             else {"Arc": {"pieces": pieces}},
-            radial_label_angle_degrees=_number(label_angle, "label angle"),
+            radial_label_angle_degrees=None if label_angle is None else _number(label_angle, "label angle"),
+            radius_labels_skipped=labels_skipped,
         )
 
     def clear_polar(self):

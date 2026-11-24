@@ -209,13 +209,13 @@ class FeatureMethods:
     def _add_annotation(self, kind, *, id=None, **properties):
         """Add a document annotation using upstream geometry and logical pixels.
 
-        Ratio anchors use the parent plot rectangle. Subplot-local annotation
-        spaces are not supported by renderer 0.18 and are rejected explicitly.
+        Ratio anchors use the root plot rectangle. Text and arrows can extend
+        over other panels within the document.
         """
         from ._charts import family
         state = self.figure.get_settings()
         if self.overlay_id or _document.panel_index(state, self.subplot_id) != 0:
-            raise ValueError('renderer 0.18 annotations belong to the parent panel only')
+            raise ValueError('document annotations belong to the parent panel only')
         owner = state[family(state)] if family(state) else state['config']
         if kind not in ('ReferenceLine', 'Span', 'Text', 'Arrow'):
             raise ValueError('unsupported annotation kind')

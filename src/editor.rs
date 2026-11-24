@@ -93,7 +93,7 @@ impl Editor {
                     let result = c
                         .settings_json()
                         .and_then(|s| crate::chart_api::transform_settings_json(&s, "theme", name))
-                        .and_then(|s| c.layout_range_links_json(&s))
+                        .and_then(|s| c.finish_layout_json(&s))
                         .and_then(|s| c.apply_settings(&s));
                     if let Err(e) = result {
                         self.error = e.to_string();
@@ -110,6 +110,7 @@ impl Editor {
             let result = c
                 .settings_json()
                 .and_then(|s| crate::chart_api::transform_settings_json(&s, "layout", ""))
+                .and_then(|s| c.finish_layout_json(&s))
                 .and_then(|s| c.apply_settings(&s));
             if let Err(e) = result {
                 self.error = e.to_string();

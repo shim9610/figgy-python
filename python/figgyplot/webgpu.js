@@ -227,7 +227,7 @@ export function render({model,el}) {
     const index=kind?0:panelAt(point)??0;
     const owner=kind?snapshot()[kind]:snapshot().config;
     let annotation=null;
-    if(index===0&&owner.annotations?.visible!==false&&owner.annotations?.items?.length){await annotationGeometry();annotation=chart.hit_annotation(...point);}
+    if(owner.annotations?.visible!==false&&owner.annotations?.items?.length){await annotationGeometry();annotation=chart.hit_annotation(...point);}
     if(Number.isInteger(annotation))hits=[{layer:'Annotations',target:kind?`annotation_${annotation}`:`annotation:${owner.annotations.items[annotation].id}`}];
     else if(kind){const target=chart.hit_decoration(...point,true);if(target)hits=[{layer:'Base',target}];if(!hits.length||hits.every(v=>v.target==='data_area')){const hit=JSON.parse(chart.pick(...point,false));if(hit)hits=[{layer:'Base',target:kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id}];}}
     else{hits=decorationsAt(point,index);if(hits.every(v=>v.target.endsWith('data_area'))){const data=await pickPanelCandidates(point,index);if(data.length)hits=data.map(v=>({layer:v.layer,target:v.ref.series_id}));}}
@@ -1237,11 +1237,29 @@ export function render({model,el}) {
   // original target and cannot overwrite a newer pending inspector choice.
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
   root.querySelector('[data-save]').addEventListener('click',()=>{const format=exportFormat.value;exporting(1,format).then(data=>{const url=URL.createObjectURL(new Blob([data],{type:{png:'image/png',svg:'image/svg+xml',pdf:'application/pdf'}[format]}));const a=document.createElement('a');a.href=url;a.download='figure.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}).catch(fail);});
+  function needsRadiusLabels(){
+    if(kind)return false;
+    const subplots=local.config.subplots??[];
+    return local.series.some(spec=>{
+      if(!spec.render_type.CategoryBars)return false;
+      const panel=subplots.find(v=>v.series?.includes(spec.series_id))?.config??local.config;
+      const polar=panel.polar;
+      return polar&&(polar.radial_label_angle_degrees==null||polar.radius_labels_skipped==null);
+    });
+  }
+  function replayLayoutWithRadiusLabels(action){
+    const operation=replayEdit(action);
+    if(needsRadiusLabels())controlQueue=operation.then(result=>{
+      if(result.ok)return enqueue(async()=>{await chart.fit_host_radial_labels();dirty=true;commit();});
+    });
+  }
   root.querySelector('[data-fit]').addEventListener('click',()=>{
     if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||Object.values(s.render_type)[0].line?.fill))){
-      replayEdit('fit');return;
+      replayLayoutWithRadiusLabels('fit');return;
     }
-    enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
+    enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}
+      else if(needsRadiusLabels()){chart.set_config(chart.fit_config(chart.get_config(),0.05));await chart.fit_host_radial_labels();}
+      else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
       dirty=true;commit();});
   });
   root.querySelector('[data-apply]').addEventListener('click',()=>{
@@ -1301,8 +1319,8 @@ export function render({model,el}) {
   themeSelect.addEventListener('change',()=>{const name=themeSelect.value;if(name)enqueue(()=>{chart.apply_theme(name);local.background=kind?JSON.parse(chart.get_document()).background:(JSON.parse(chart.get_config()).background??null);if(!kind)clearColor(local.background);dirty=true;commit();});});
   const autoLayout=document.createElement('button');autoLayout.dataset.autoLayout='';autoLayout.textContent='Auto layout';toolbar.append(autoLayout);
   autoLayout.addEventListener('click',()=>{
-    if(!kind&&local.series.some(s=>s.render_type.RangeLinks)){replayEdit('layout');return;}
-    enqueue(()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else chart.fit_layout();dirty=true;commit();});
+    if(!kind&&local.series.some(s=>s.render_type.RangeLinks)){replayLayoutWithRadiusLabels('layout');return;}
+    enqueue(async()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else{chart.fit_layout();if(needsRadiusLabels())await chart.fit_host_radial_labels();}dirty=true;commit();});
   });
   const exportFormat=document.createElement('select');exportFormat.dataset.exportFormat='';exportFormat.setAttribute('aria-label','Export format');exportFormat.innerHTML=['png','svg','pdf'].map(n=>`<option value="${n}">${n.toUpperCase()}</option>`).join('');toolbar.append(exportFormat);
   const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
@@ -1344,7 +1362,7 @@ export function render({model,el}) {
       const index=panelIndex(local.config.active_layer);
       const annotations=local.config.annotations;
       let annotation=null;
-      if(index===0&&annotations?.visible!==false&&annotations?.items?.length){await annotationGeometry();const at=chart.hit_annotation(x,y);if(at!==undefined&&at!==null)annotation=at;}
+      if(annotations?.visible!==false&&annotations?.items?.length){await annotationGeometry();const at=chart.hit_annotation(x,y);if(at!==undefined&&at!==null)annotation=at;}
       const hits=annotation===null?decorationsAt(point,index):[{layer:'Annotations',target:`annotation_${annotation}`}];
       const probeState=snapshot();probeState.config.active_layer=baseLayer(index);
       const original=JSON.parse(chart.active_layer());chart.set_active_layer(JSON.stringify(baseLayer(index)));

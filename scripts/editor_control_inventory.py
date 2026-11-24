@@ -93,7 +93,9 @@ def rows():
             # layer, so their nested fields are part of the inventory too.
             enable = {"Area fill/enabled", "Contours/show_labels", "Contours/level_colors",
                       "Contour labels/background", "Series style/custom", "Slice labels/custom_labels",
-                      "Slice labels/custom_label_format", "Slice labels/custom_label_color", "Polar coordinates/limit_sector"}
+                      "Slice labels/custom_label_format", "Slice labels/custom_label_color", "Polar coordinates/limit_sector",
+                      "Polar coordinates/fixed/radial_label_angle_degrees",
+                      "Polar coordinates/fixed/radius_labels_skipped"}
             for _ in range(3):
                 for owner in fig.editor_properties():
                     for field in owner["fields"]:

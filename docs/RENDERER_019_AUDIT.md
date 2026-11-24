@@ -1,9 +1,18 @@
 # Figgy 0.19 통합 점검
 
+## 2026년 11월 24일
+
+네이티브와 Jupyter WASM을 Figgy `81bf14f`로 맞췄다. 서브플롯 인셋의
+확대 표시선이 올바른 부모에 그려지는 수정과 패널을 가로지르는 주석,
+작은 인셋이 있는 문서의 그리기 수정이 포함된다. 극좌표 막대에서는
+맞춤 시 반지름 라벨의 각도와 생략할 안쪽 라벨 수를 선택하며, 저장된
+각도·개수와 명시적 숫자 포맷을 유지한다.
+[Figgy #424](https://github.com/shim9610/figgy/pull/424)
+
 ## 2026년 11월 23일
 
-Python PR #23은 네이티브와 Jupyter WebAssembly(WASM)에 같은 Figgy
-커밋 `5eafcee`를 사용한다. Figgy #412의 달력 눈금 중복, Grotrian
+이 시점의 Python PR #23은 네이티브와 Jupyter WebAssembly(WASM)에
+Figgy 커밋 `5eafcee`를 사용했다. Figgy #412의 달력 눈금 중복, Grotrian
 화살표 교차, Feynman 외부 라벨 배치 수정이 포함된다.
 [Python PR #23](https://github.com/shim9610/figgy-python/pull/23) · [Figgy #412](https://github.com/shim9610/figgy/pull/412)
 
@@ -12,10 +21,9 @@ Gantt 진행률과 행 표시 범위, 워터폴 연결선, 전이 파장 라벨,
 실제 데스크톱·Jupyter 조작 4개가 통과했다. 커밋 `241a199`의
 GitHub Actions 작업 8개도 모두 통과했다. [CI 실행](https://github.com/shim9610/figgy-python/actions/runs/45091232854)
 
-현재 Figgy 모델에서 인셋의 부모가 서브플롯이면 확대 영역 표시선이
-첫 패널에 그려진다. Python 없이 `Config::inset_marker_parts`로
-좌표가 잘못 계산되는 것을 재현했다. 예제에서는 첫 패널에 인셋을 만든다.
-[Figgy #414](https://github.com/shim9610/figgy/issues/414)
+이전 Figgy 모델에서는 인셋의 부모가 서브플롯이면 확대 영역 표시선이
+첫 패널에 그려졌다. Python 없이 `Config::inset_marker_parts`로 재현했고,
+이후 Figgy #416에서 수정됐다. [Figgy #414](https://github.com/shim9610/figgy/issues/414) · [Figgy #416](https://github.com/shim9610/figgy/pull/416)
 
 이전 기록의 혼합 서브플롯 검증 오류는 Figgy #330에서 수정됐다.
 레이더 첫 선택에서 무관한 선택 커널을 기다리던 동작은 Figgy #332에서

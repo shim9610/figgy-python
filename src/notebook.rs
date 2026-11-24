@@ -126,7 +126,7 @@ impl NotebookFigure {
         })
         .map(|value| value.to_string())
     }
-    fn layout_range_links_json(&self, py: Python<'_>, document: &str) -> PyResult<String> {
+    fn finish_layout_json(&self, py: Python<'_>, document: &str) -> PyResult<String> {
         let mut state: Settings = parse(document)?;
         range_links::update(&state.config, &mut state.series, None, false, |samples| {
             self.read_range_endpoints(py, samples)

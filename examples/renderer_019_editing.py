@@ -85,7 +85,7 @@ def plot_reaction(ax):
 def make_figure(backend="native", theme="warm-paper"):
     fig = fg.Figure(
         figsize=(12, 9), dpi=110, backend=backend,
-        grid=[["signal", "timeline"], ["energy", "reaction"]],
+        grid=[["timeline", "signal"], ["energy", "reaction"]],
     )
     try:
         plot_timeline(fig.subplots["timeline"].axes)

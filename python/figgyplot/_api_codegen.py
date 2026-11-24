@@ -796,7 +796,7 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
         if polar:
             interpolation = polar["interpolation"]
             emit(
-                f"{ax}.set_polar_options(unit={polar['angle_unit'].lower()!r}, zero={polar['zero_angle_degrees']!r}, clockwise={polar['clockwise']!r}, sector={polar['sector']!r}, inner_radius={polar['inner_radius_fraction']!r}, interpolation={'chord' if interpolation == 'Chord' else 'arc'!r}, pieces={1 if interpolation == 'Chord' else interpolation['Arc']['pieces']!r}, label_angle={polar['radial_label_angle_degrees']!r})",
+                f"{ax}.set_polar_options(unit={polar['angle_unit'].lower()!r}, zero={polar['zero_angle_degrees']!r}, clockwise={polar['clockwise']!r}, sector={polar['sector']!r}, inner_radius={polar['inner_radius_fraction']!r}, interpolation={'chord' if interpolation == 'Chord' else 'arc'!r}, pieces={1 if interpolation == 'Chord' else interpolation['Arc']['pieces']!r}, label_angle={polar.get('radial_label_angle_degrees')!r}, labels_skipped={polar.get('radius_labels_skipped')!r})",
                 force=True,
             )
         else:

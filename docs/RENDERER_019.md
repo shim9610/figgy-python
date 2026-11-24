@@ -4,7 +4,7 @@ This development integration awaits the official upstream 0.19 release and final
 package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/5eafcee3f09c6b38b26d63a4b903f890e76cf952)
+[integration revision](https://github.com/shim9610/figgy/commit/81bf14f938d937a0d00607002a3fec6fb1e4b0b9)
 for renderer `0.19.0-beta.2` and model `0.13.0-beta.2`. Settings identify this
 integration as `0.19.0`. Rebuild the browser module with `scripts/build-wasm.sh`
 when changing the pin.
@@ -221,15 +221,27 @@ The tick-label inspector exposes calendar steps, the start weekday, period
 labels, and relative or custom labels when the number format is **Timestamp**.
 Edit the origin as a signed integer in the formatter's selected unit.
 
+For a rose chart, **Fit** chooses the radius-label angle and the number of
+inner labels to skip when those values are unset. **Auto layout** also fills
+these settings in either editor. Use
+`ax.set_polar_options(label_angle=45, labels_skipped=1)` to keep an explicit
+angle in degrees and skip one inner label. Pass `None` to restore the renderer's
+choice for the next fit. An explicit formatter such as **Percent** survives
+range fitting.
+
 `ax.inset_axes([.55, .3, .4, .45], id="zoom")` adds a panel in the parent
 plot. Bounds are left, bottom, width and height in axes fractions. The inset
 keeps that placement when the parent plot moves or resizes. In either editor,
 select the parent panel and use **Plot area → Add inset**. Use
 `zoom.subplot.set_text_scale("fixed")` to retain the stored text size and
-`zoom.subplot.set_inset_marker()` to indicate the magnified data range and draw
-connectors. Both options are available in the inset's properties. The editing
-example attaches the inset to the first panel. In the current renderer,
-markers on other panels project onto the first plot. [Figgy #414](https://github.com/shim9610/figgy/issues/414)
+`zoom.subplot.set_inset_marker()` to mark the magnified range in the parent
+plot and draw connectors to the inset. Both options are available in the
+inset's properties. The editing example places its inset in the second
+panel. [Figgy #416](https://github.com/shim9610/figgy/pull/416)
+
+Text and arrow annotations use the first panel's coordinates and can extend
+over sibling panels. Select or drag the visible annotation in either editor.
+[Figgy #422](https://github.com/shim9610/figgy/pull/422)
 
 ## PNG, SVG and PDF
 

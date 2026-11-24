@@ -1,7 +1,7 @@
 diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
 --- a/crates/web/src/web/chart/frame.rs
 +++ b/crates/web/src/web/chart/frame.rs
-@@ -185,6 +185,200 @@
+@@ -185,6 +185,219 @@
      pub async fn prewarm_all(&mut self) -> Result<(), JsValue> {
          self.renderer.prewarm_all().await.map_err(js_err)?;
          self.request_host_redraw();
@@ -188,6 +188,25 @@ diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.
 +        format_host_labels(&config,&mut series,|id,field,count|Ok(columns.get(&(id.to_string(),field.map(str::to_string),count)).cloned().unwrap_or_default()))?;
 +        if series!=original {self.set_series(&serde_json::to_string(&series).map_err(js_err)?)?;}
 +        self.get_series()
++    }
++
++    /// Resolve the renderer's radial-label fit before the host commits the edit.
++    pub async fn fit_host_radial_labels(&mut self) -> Result<(), JsValue> {
++        let mut config = self.chart_config()?.clone();
++        let mut cell = 0;
++        let mut changed = false;
++        while let Some(ticket) = self
++            .renderer
++            .begin_radial_label_fit(&config, self.chart_series()?, cell)
++            .map_err(js_err)?
++        {
++            cell = ticket.cell() + 1;
++            changed |= ticket.resolve().await.map_err(js_err)?.write(&mut config).map_err(js_err)?;
++        }
++        if changed {
++            self.set_config(&serde_json::to_string(&config).map_err(js_err)?)?;
++        }
++        Ok(())
 +    }
 +
 +    /// Host fence: does not borrow the chart while GPU work completes.

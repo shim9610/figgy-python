@@ -961,8 +961,12 @@ class Figure(FigureMethods):
                         config[axis]['out_margin'] += extra
                     for panel in config.get('subplots',[]): padding(panel['config'])
                 padding(state['config'])
-            if any('RangeLinks' in spec['render_type'] for spec in state['series']):
-                state = json.loads(self._native.layout_range_links_json(json.dumps(state, allow_nan=False)))
+            if any(
+                'RangeLinks' in spec['render_type']
+                or (self.backend == 'native' and 'CategoryBars' in spec['render_type'])
+                for spec in state['series']
+            ):
+                state = json.loads(self._native.finish_layout_json(json.dumps(state, allow_nan=False)))
             self.apply_settings(state)
         return self
 
@@ -1558,7 +1562,8 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
         if self.overlay_id:
             raise ValueError('secondary Y axes do not support polar coordinates')
         defaults = dict(zero_angle_degrees=0., clockwise=False, angle_unit='Degrees', sector=None,
-                        inner_radius_fraction=0., interpolation='Chord', radial_label_angle_degrees=90.)
+                        inner_radius_fraction=0., interpolation='Chord',
+                        radial_label_angle_degrees=None, radius_labels_skipped=None)
         _merge(defaults, options)
         return self.configure(polar=defaults)
 

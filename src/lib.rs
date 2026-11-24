@@ -1496,10 +1496,50 @@ impl FigureAccess<'_> {
         }
         Ok(())
     }
-    fn layout_range_links_json(&mut self, json: &str) -> PyResult<String> {
+    fn finish_layout_json(&mut self, json: &str) -> PyResult<String> {
         let mut state: Settings = parse(json)?;
         self.fit_range_link_exits(&mut state, false)?;
+        self.fit_polar_label_layout(&mut state, false)?;
         serde_json::to_string(&state).map_err(runtime)
+    }
+    fn fit_polar_label_layout(&self, state: &mut Settings, active_only: bool) -> PyResult<()> {
+        let needs_fit = |config: &Config| {
+            config.polar().is_some_and(|polar| {
+                polar.radial_label_angle_degrees.is_none() || polar.radius_labels_skipped.is_none()
+            })
+        };
+        if !needs_fit(&state.config)
+            && !state
+                .config
+                .subplots
+                .iter()
+                .any(|panel| needs_fit(&panel.config))
+        {
+            return Ok(());
+        }
+        let active = state.config.active_layer();
+        let bars = state
+            .series
+            .iter()
+            .filter(|spec| {
+                spec.render_type.category_bars().is_some()
+                    && (!active_only || state.config.layer_of_series(&spec.series_id) == active)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if bars.is_empty() {
+            return Ok(());
+        }
+        let mut config = gpu::config(self.data.figure_id, &state.config);
+        let bars = gpu::series(self.data.figure_id, &bars);
+        if self
+            .renderer
+            .fit_radial_labels(&mut config, &bars)
+            .map_err(runtime)?
+        {
+            state.config = gpu::local_config(self.data.figure_id, &config);
+        }
+        Ok(())
     }
     fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.fit_domain(py, padding, false, true)
@@ -1610,6 +1650,7 @@ impl FigureAccess<'_> {
             state.config = gpu::local_config(self.data.figure_id, chart.config());
             if fit_exits {
                 self.fit_range_link_exits(&mut state, active_only)?;
+                self.fit_polar_label_layout(&mut state, active_only)?;
             }
             return self.apply_settings_model(state);
         }
@@ -2119,8 +2160,8 @@ impl NativeFigure {
                 .map(|value| value.to_string())
         })
     }
-    fn layout_range_links_json(&self, document: &str) -> PyResult<String> {
-        self.with(|core| core.layout_range_links_json(document))
+    fn finish_layout_json(&self, document: &str) -> PyResult<String> {
+        self.with(|core| core.finish_layout_json(document))
     }
     fn edit_history_json(&self) -> PyResult<String> {
         self.with(|core| Ok(core.data.history.status().to_string()))

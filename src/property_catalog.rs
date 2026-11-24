@@ -1302,6 +1302,22 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     "",
                 );
                 fields.retain(|v| v.id != "Polar coordinates/interpolation");
+                for (key, label) in [
+                    (
+                        "radial_label_angle_degrees",
+                        "Use a stored radius-label angle",
+                    ),
+                    ("radius_labels_skipped", "Use a stored inner label count"),
+                ] {
+                    field(
+                        fields,
+                        json!(polar[key].is_number()),
+                        &format!("{panel}/polar/{key}"),
+                        "Polar coordinates",
+                        &format!("fixed/{key}"),
+                        label,
+                    );
+                }
                 optional::choice(
                     fields,
                     "Polar coordinates/interpolation_mode",

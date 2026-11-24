@@ -941,7 +941,7 @@ impl SurfaceWindow {
                             let map = view.annotation_map();
                             map.element(map.hit_test([x, y])?).map(|e| e.index)
                         })
-                        .filter(|_| index == 0 && display.annotations.visible);
+                        .filter(|_| display.annotations.visible);
                     let hits = interaction::decorations_at(&display, index, (x, y));
                     let area = interaction::panel(&display, index)
                         .data_area()

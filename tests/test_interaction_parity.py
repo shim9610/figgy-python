@@ -4129,3 +4129,86 @@ display(fig.widget())
         assert after['anchor'] == before['anchor']
         assert after['config']['chart_area'] != before['config']['chart_area']
         assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
+def test_jupyter_rose_fit_commits_radius_label_layout(tmp_path):
+    source = """
+import figgyplot as fg
+fig, ax = fg.subplots(backend='webgpu')
+ax.rose(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+        [[.10, .02, .01, .02, .02, .01, .03, .09],
+         [.08, .01, .02, .03, .01, .02, .02, .07]], mode='stacked')
+ax.set_polar_options(zero=90, clockwise=True)
+ax.configure(left_y={'label_style': {'format': 'Percent'}})
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        click_button(page, '[data-fit]')
+        execute("""await fig.sync()
+config = fig.get_settings()['config']
+assert config['left_y']['label_style']['format'] == 'Percent'
+assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= config['polar'].keys()
+""")
+        assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_editor_drags_document_arrow_over_sibling_panel(tmp_path, backend):
+    from io import BytesIO
+    from PIL import Image
+
+    setup = """
+left, right = fig.subplots['left'].axes, fig.subplots['right'].axes
+left.plot([0, 1], [0, 1])
+right.plot([0, 1], [0, 1])
+left.arrow(1.35, .4, .25, 0, coords='ratio', color='#ff00ff', linewidth=3, id='cross-panel')
+"""
+
+    def ink_position(image):
+        pixels = np.asarray(image)
+        ys, xs = np.nonzero((pixels[..., 0] > 225) & (pixels[..., 1] < 35) & (pixels[..., 2] > 225))
+        assert len(xs) > 30 and min(xs) > pixels.shape[1] // 2
+        return float(np.median(xs)), float(np.median(ys))
+
+    def arrow(state):
+        return state['config']['annotations']['items'][0]['kind']['Arrow']
+
+    if backend == 'native':
+        with figgy.Figure(backend=backend, grid=[['left', 'right']]) as fig:
+            exec(setup, {'fig': fig})
+            position = ink_position(fig.render_rgba())
+            before = arrow(fig.get_settings())
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle)
+                x, y = native_point(inputs.info(), position)
+                inputs.click_rect([x, y, 0, 0])
+                drag_native(inputs, (x, y), (16, 12))
+                assert arrow(fig.get_settings())['from'] != before['from']
+                assert not inputs.info()['error']
+            finally:
+                handle.close()
+                Inputs.pump()
+        return
+
+    source = ("import figgyplot as fg\n"
+              "fig = fg.Figure(backend='webgpu', grid=[['left', 'right']])\n"
+              + setup + "\ndisplay(fig.widget())")
+    with notebook(tmp_path, source) as (page, execute):
+        check_display_frame_ready(page)
+        canvas = page.locator('.figgy-editor canvas')
+        x, y = ink_position(Image.open(BytesIO(canvas.screenshot())).convert('RGB'))
+        box = canvas.bounding_box()
+        x, y = x + box['x'], y + box['y']
+        before = arrow(page.evaluate(ROOT + '.snapshot()'))
+        page.mouse.click(x, y)
+        page.evaluate(ROOT + '.flush()')
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x + 16, y + 12, steps=3)
+        page.mouse.up()
+        execute('await fig.sync()')
+        assert arrow(page.evaluate(ROOT + '.snapshot()'))['from'] != before['from']
+        assert not page.locator('.figgy-error').inner_text()

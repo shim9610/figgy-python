@@ -1194,6 +1194,10 @@ export class FiggyChart {
      */
     fit_config_scoped(config_json: string, scope_json: string, padding: number): string;
     /**
+     * Resolve the renderer's radial-label fit before the host commits the edit.
+     */
+    fit_host_radial_labels(): Promise<void>;
+    /**
      * Fits the chart's layout to its labels and titles and applies it
      * (`Renderer::fit_layout`, #271). It can move the plot's edges, so it
      * takes the sources of the chart's monotonic groups as
@@ -1221,7 +1225,9 @@ export class FiggyChart {
      * and the z axis of a 3D chart, from the columns' cached statistics
      * with 5% padding. A chart starts at a `0..1` placeholder range; this
      * is the call for a first plot. Synchronous, and independent of the
-     * active layer. A layer without series keeps its ranges. Then the
+     * active layer. A layer without series keeps its ranges. A fitted
+     * linear axis keeps an explicit label format such as `Percent` with
+     * its digits; `Decimal` and `Power` become `Auto` (#417). Then the
      * scale of every auto-scaled vector series is fitted to the spacing
      * of its arrows and its `auto_scale` flag consumed (#357), so the
      * stored series say how long the arrows draw. Then each range link
@@ -1778,9 +1784,10 @@ export class FiggyChart {
      * `indices[3t]`, `indices[3t + 1]` and `indices[3t + 2]`.
      *
      * `indices` is a `Uint32Array` whose length is a non-zero multiple of 3;
-     * anything else is an error and nothing is registered. The array is
-     * borrowed for the upload, not copied, and every index up to
-     * `u32::MAX` reaches the GPU exactly. Resident only, as
+     * anything else is an error and nothing is registered. wasm-bindgen
+     * copies the JS array into wasm memory for the call; that call-scoped
+     * copy is uploaded and dropped when the call returns, and every index up
+     * to `u32::MAX` reaches the GPU exactly. Resident only, as
      * `register_record`.
      */
     register_triangles(id: string, indices: Uint32Array): void;
@@ -2855,6 +2862,7 @@ export interface InitOutput {
     readonly figgychart_first_frame_ready: (a: number) => any;
     readonly figgychart_fit_config: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly figgychart_fit_config_scoped: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly figgychart_fit_host_radial_labels: (a: number) => any;
     readonly figgychart_fit_layout: (a: number, b: number) => [number, number];
     readonly figgychart_fit_point_size_domain: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_fit_ranges: (a: number) => [number, number];
@@ -3002,11 +3010,11 @@ export interface InitOutput {
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__302: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__303: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__304: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__301: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__302: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

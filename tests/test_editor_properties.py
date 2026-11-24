@@ -319,6 +319,17 @@ def test_polar_optional_controls_and_grid_vector_colors(backend):
         assert fig.get_settings()['config']['polar']['sector']==[0,180]
         edit(fig,'data_area','Polar coordinates/limit_sector',False)
         assert fig.get_settings()['config']['polar'].get('sector') is None
+        edit(fig, 'data_area', 'Polar coordinates/fixed/radial_label_angle_degrees', True)
+        edit(fig, 'data_area', 'Polar coordinates/radial_label_angle_degrees', 45)
+        edit(fig, 'data_area', 'Polar coordinates/fixed/radius_labels_skipped', True)
+        edit(fig, 'data_area', 'Polar coordinates/radius_labels_skipped', 2)
+        polar = fig.get_settings()['config']['polar']
+        assert polar['radial_label_angle_degrees'] == 45 and polar['radius_labels_skipped'] == 2
+        edit(fig, 'data_area', 'Polar coordinates/fixed/radial_label_angle_degrees', False)
+        code = fig.to_code()
+        current = fig.get_settings()
+        exec(code, {'fig': fig})
+        assert fig.get_settings() == current
     with fg.Figure(backend=backend) as fig:
         fig.axes[0].quiver([0,1],[1,2],[[1,2],[3,4]],[[2,1],[4,3]],id='grid')
         edit(fig,'grid','Color mapping/grid_source','Horizontal component')
@@ -606,6 +617,43 @@ def test_anchored_inset_can_share_a_grid_and_follow_parent_edits(backend):
         assert model()["anchor"]["frame"] != current["anchor"]["frame"]
         if backend == 'native':
             assert fig.to_png().startswith(b'\x89PNG')
+
+
+def test_native_nested_inset_marker_is_drawn_on_its_parent():
+    import numpy as np
+
+    with fg.Figure(backend='native', figsize=(12, 7), grid=[['left', 'right']]) as fig:
+        for panel in ('left', 'right'):
+            fig.subplots[panel].axes.plot([0, 1], [0, 1])
+        right = fig.subplots['right'].axes
+        inset = right.inset_axes([.4, .28, .52, .6], id='zoom')
+        inset.plot([0, 1], [0, 1])
+        inset.set_xlim(.05, .3)
+        inset.set_ylim(.08, .4)
+        inset.subplot.set_inset_marker(color='#ff00ff', linewidth=3)
+        image = np.asarray(fig.render_rgba())
+        ink = (image[:, :, 0] > 225) & (image[:, :, 1] < 35) & (image[:, :, 2] > 225)
+        assert ink[:, image.shape[1] // 2:].sum() > 40
+        assert not ink[:, :image.shape[1] // 2].any()
+
+
+def test_native_rose_fits_optional_radius_labels_and_preserves_explicit_format():
+    with fg.Figure(backend='native') as fig:
+        ax = fig.axes[0]
+        ax.rose(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+                [[.10, .02, .01, .02, .02, .01, .03, .09],
+                 [.08, .01, .02, .03, .01, .02, .02, .07]], mode='stacked')
+        ax.set_polar_options(zero=90, clockwise=True)
+        ax.configure(left_y={'label_style': {'format': 'Percent'}})
+        fig.fit()
+        config = fig.get_settings()['config']
+        assert config['left_y']['label_style']['format'] == 'Percent'
+        assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= config['polar'].keys()
+        ax.set_polar_options(zero=90, clockwise=True, label_angle=30, labels_skipped=1)
+        fig.tight_layout()
+        polar = fig.get_settings()['config']['polar']
+        assert polar['radial_label_angle_degrees'] == 30
+        assert polar['radius_labels_skipped'] == 1
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])

@@ -473,6 +473,7 @@ pub(super) fn apply(result: &mut Value, field: &Field, value: &Value) -> PyResul
         || entry_override
         || field.kind == "action"
         || field.id == "Series style/custom"
+        || field.id.starts_with("Polar coordinates/fixed/")
         || field.id.starts_with("Slice labels/custom_")
         || field.id == "Selected item/custom"
         || matches!(
@@ -490,7 +491,18 @@ pub(super) fn apply(result: &mut Value, field: &Field, value: &Value) -> PyResul
         return Ok(false);
     }
     let (parent, key) = field.path.rsplit_once('/').unwrap();
-    let accepted = if entry_override {
+    let accepted = if field.id.starts_with("Polar coordinates/fixed/") {
+        if !value
+            .as_bool()
+            .ok_or_else(|| invalid("polar label control must be boolean"))?
+        {
+            Value::Null
+        } else if key == "radial_label_angle_degrees" {
+            json!(renderer::polar::DEFAULT_RADIAL_LABEL_ANGLE_DEGREES)
+        } else {
+            json!(0)
+        }
+    } else if entry_override {
         if value
             .as_bool()
             .ok_or_else(|| invalid("entry override control must be boolean"))?
