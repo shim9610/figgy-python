@@ -1,5 +1,6 @@
 //! winit + egui surface host. It shares the existing resident FigureCore.
 use super::*;
+use renderer::layout::{DragSnap, SnapGuides};
 use std::{
     cell::RefCell,
     sync::{
@@ -116,6 +117,7 @@ struct SurfaceWindow {
     input: egui_winit::State,
     ui_renderer: egui_wgpu::Renderer,
     view: Option<renderer::ChartView>,
+    presented_chart: Option<Chart>,
     styles: Vec<renderer::ChartStyle>,
     style_specs: Vec<SeriesConfig>,
     last_stamp: Option<renderer::ChartRenderStamp>,
@@ -129,6 +131,11 @@ struct SurfaceWindow {
     rendered_selection: Option<String>,
     handle: Option<String>,
     dragging: bool,
+    drag_snap: DragSnap,
+    // The live annotation map measures in surface pixels instead of document pixels.
+    annotation_snap: DragSnap,
+    annotation_drag_guides: SnapGuides,
+    rendered_snap_guides: SnapGuides,
     panning: bool,
     diagram_drag: Option<(renderer::config::PickedDataRef, Option<f32>)>,
     pan_moved: bool,
@@ -243,6 +250,7 @@ impl SurfaceWindow {
             input,
             ui_renderer,
             view: None,
+            presented_chart: None,
             styles: vec![],
             style_specs: vec![],
             last_stamp: None,
@@ -256,6 +264,10 @@ impl SurfaceWindow {
             rendered_selection: None,
             handle: None,
             dragging: false,
+            drag_snap: DragSnap::off(),
+            annotation_snap: DragSnap::off(),
+            annotation_drag_guides: SnapGuides::NONE,
+            rendered_snap_guides: SnapGuides::NONE,
             panning: false,
             diagram_drag: None,
             pan_moved: false,
@@ -499,6 +511,7 @@ impl SurfaceWindow {
             self.handle = None;
             self.diagram_drag = None;
             self.dragging = false;
+            self.finish_snap_drag();
             self.panning = false;
             c.clear_data_selection()?;
         } else {
@@ -790,6 +803,13 @@ impl SurfaceWindow {
                 } else if self.dragging
                     && let Some(target) = &self.selected
                 {
+                    let config = c.data.chart.config();
+                    let document = config.document_area();
+                    let from = [document.x as f32, document.y as f32];
+                    let to = [panel.x as f32, panel.y as f32];
+                    let snap = config.snaps_while_dragging() && !self.modifiers.alt_key();
+                    self.drag_snap.set_enabled(snap);
+                    self.annotation_snap.set_enabled(snap);
                     let stamp = c
                         .renderer
                         .chart_render_stamp(c.data.chart_id)
@@ -818,14 +838,30 @@ impl SurfaceWindow {
                             self.cursor.0 - old.0,
                             self.cursor.1 - old.1,
                             self.handle.as_deref(),
+                            Some(&mut self.annotation_snap),
                         )?;
+                        self.annotation_drag_guides = self.annotation_snap.guides();
+                        self.drag_snap.release();
                     } else {
-                        c.drag(
+                        self.annotation_snap.release();
+                        let at = [
+                            from[0] + (old.0 - to[0]) / scale,
+                            from[1] + (old.1 - to[1]) / scale,
+                        ];
+                        let started = c.data.host_work.start();
+                        let result = c.drag_inner(
                             target,
                             (self.cursor.0 - old.0) / scale,
                             (self.cursor.1 - old.1) / scale,
                             self.handle.as_deref(),
-                        )?;
+                            snap.then_some((at, &mut self.drag_snap)),
+                        );
+                        c.data.host_work.finish("drag", started);
+                        result?;
+                        if target.starts_with("annotation:") {
+                            self.annotation_drag_guides =
+                                self.drag_snap.guides().mapped(from, scale, to);
+                        }
                     }
                     self.last_input = Some(input_received);
                     self.window.request_redraw();
@@ -837,6 +873,9 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                self.drag_snap = DragSnap::new(scale);
+                self.annotation_snap = DragSnap::new(1.);
+                self.annotation_drag_guides = SnapGuides::NONE;
                 let text = c
                     .data
                     .chart
@@ -1061,6 +1100,7 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                self.finish_snap_drag();
                 if let Some((revision, choices)) = self.pending_choices.take() {
                     self.dragging = false;
                     self.panning = false;
@@ -1152,6 +1192,11 @@ impl SurfaceWindow {
             _ => {}
         }
         Ok(())
+    }
+    fn finish_snap_drag(&mut self) {
+        self.drag_snap.release();
+        self.annotation_snap.release();
+        self.annotation_drag_guides = SnapGuides::NONE;
     }
     fn frame(&mut self) -> PyResult<()> {
         let Some(core) = self.core.upgrade() else {
@@ -1486,13 +1531,6 @@ impl SurfaceWindow {
                 );
             }
         }
-        if !self.settings_only && self.view.is_none() {
-            self.view = Some(
-                c.renderer
-                    .create_chart_view(&Chart::new(display.clone()), display.chart_area.0)
-                    .map_err(runtime)?,
-            );
-        }
         let current_stamp = c
             .renderer
             .chart_render_stamp(c.data.chart_id)
@@ -1500,18 +1538,61 @@ impl SurfaceWindow {
         let specs = c.gpu_series(&c.data.series);
         let view_changed = scale != self.last_scale || self.last_panel != Some(panel);
         let pool_changed = self.last_pool_generation != c.renderer.pool().generation();
+        let document = c.data.chart.config().document_area();
+        let placed = display.document_area();
+        let snap_guides = if self.dragging
+            && self
+                .selected
+                .as_deref()
+                .is_some_and(|id| !id.starts_with("annotation:"))
+        {
+            self.drag_snap.guides().mapped(
+                [document.x as f32, document.y as f32],
+                scale,
+                [placed.x as f32, placed.y as f32],
+            )
+        } else {
+            SnapGuides::NONE
+        };
+        if !self.settings_only {
+            let preview = self
+                .chooser
+                .as_ref()
+                .and_then(|v| v.preview())
+                .and_then(|v| v.target.as_deref());
+            if self.presented_chart.is_none()
+                || c.data.revision != self.last_revision
+                || view_changed
+            {
+                self.presented_chart =
+                    Some(Chart::as_given(gpu::config(c.data.figure_id, &display)));
+            }
+            let chart = self.presented_chart.as_mut().unwrap();
+            chart.select(preview.or(self.selected.as_deref()));
+            chart.set_snap_guides(snap_guides);
+            if self.view.is_none() {
+                self.view = Some(
+                    c.renderer
+                        .create_chart_view(chart, display.chart_area.0)
+                        .map_err(runtime)?,
+                );
+            }
+        }
+        let snap_changed = self.rendered_snap_guides != snap_guides;
+        let annotation_guides_changed = self
+            .view
+            .as_ref()
+            .is_some_and(|view| view.annotation_snap_guides() != self.annotation_drag_guides);
         if !self.settings_only
             && (c.data.revision != self.last_revision
                 || self.selected != self.rendered_selection
                 || current_stamp.needs_draw_since(self.last_stamp.as_ref())
                 || view_changed
+                || snap_changed
+                || annotation_guides_changed
                 || pool_changed)
         {
-            let preview_target = self
-                .chooser
-                .as_ref()
-                .and_then(|v| v.preview())
-                .and_then(|v| v.target.clone());
+            let chart = self.presented_chart.as_ref().unwrap();
             let annotation_selected = self
                 .selected
                 .as_deref()
@@ -1520,6 +1601,7 @@ impl SurfaceWindow {
             // A document revision alone does not mean axes or styles changed.
             let refresh_axis = current_stamp.needs_raster_since(self.last_stamp.as_ref())
                 || view_changed
+                || snap_changed
                 || self.last_revision == u64::MAX
                 || (self.selected != self.rendered_selection
                     && self
@@ -1530,14 +1612,12 @@ impl SurfaceWindow {
             if refresh_axis {
                 let raster_started = c.data.host_work.start();
                 c.renderer
-                    .refresh_axis_with_selection(
+                    .refresh_axis_with_selection_at(
                         self.view.as_mut().unwrap(),
-                        &Chart::new(display.clone()),
+                        chart,
                         display.chart_area.0,
-                        preview_target
-                            .as_ref()
-                            .or(self.selected.as_ref())
-                            .map(String::as_str),
+                        chart.selected(),
+                        scale,
                     )
                     .map_err(runtime)?;
                 c.data
@@ -1548,15 +1628,18 @@ impl SurfaceWindow {
             // raster. A box taken from the previous view is stale after an edit.
             if (!refresh_axis
                 && current_stamp.needs_annotation_raster_since(self.last_stamp.as_ref()))
+                || annotation_guides_changed
+                || (refresh_axis && !self.annotation_drag_guides.is_empty())
                 || self.view.as_ref().unwrap().annotation_selected() != annotation_selected
             {
                 let annotation_started = c.data.host_work.start();
                 c.renderer
-                    .refresh_annotations(
+                    .refresh_annotations_with_guides(
                         self.view.as_mut().unwrap(),
-                        &Chart::new(display.clone()),
+                        chart,
                         display.chart_area.0,
                         annotation_selected,
+                        self.annotation_drag_guides,
                     )
                     .map_err(runtime)?;
                 c.data
@@ -1582,6 +1665,7 @@ impl SurfaceWindow {
             self.last_stamp = Some(current_stamp);
             self.last_revision = c.data.revision;
             self.rendered_selection = self.selected.clone();
+            self.rendered_snap_guides = snap_guides;
             self.last_scale = scale;
             self.last_pool_generation = c.renderer.pool().generation();
             self.last_panel = Some(panel);
@@ -1599,7 +1683,7 @@ impl SurfaceWindow {
                 c.renderer
                     .prepare(&mut [renderer::ChartDrawItem {
                         view: self.view.as_mut().unwrap(),
-                        chart: &Chart::new(gpu::config(c.data.figure_id, &display)),
+                        chart: self.presented_chart.as_ref().unwrap(),
                         series: &series,
                     }])
                     .map_err(runtime)?,
@@ -1918,6 +2002,7 @@ impl ApplicationHandler for App {
                 w.pending_choices = None;
                 w.last_revision = u64::MAX;
                 w.modifiers = ModifiersState::empty();
+                w.finish_snap_drag();
                 w.dragging = false;
                 w.panning = false;
                 w.diagram_drag = None;
@@ -1930,6 +2015,10 @@ impl ApplicationHandler for App {
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 w.modifiers = modifiers.state();
+                if w.dragging && w.modifiers.alt_key() {
+                    w.finish_snap_drag();
+                    w.window.request_redraw();
+                }
                 Ok(())
             }
             WindowEvent::KeyboardInput { ref event, .. }

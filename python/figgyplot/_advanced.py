@@ -1835,6 +1835,8 @@ class AdvancedMethods:
         return low, high
 
     def set_zlabel(self, text, **kwargs):
+        if text:
+            kwargs.setdefault("visible", True)
         return self.figure.update("axis_title_right", _axes=self, text=text, **kwargs)
 
     def _axis_node(self, state, axis):

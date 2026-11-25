@@ -102,6 +102,7 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str) -> PyResult<T> {
                     "plot_background",
                     "background",
                     "layout_state",
+                    "snap_to_guides",
                 ];
                 for key in obj.keys() {
                     if !KEYS.contains(&key.as_str()) {
@@ -1860,7 +1861,7 @@ impl FigureAccess<'_> {
     }
     fn drag(&mut self, target: &str, dx: f32, dy: f32, handle: Option<&str>) -> PyResult<bool> {
         let started = self.data.host_work.start();
-        let result = self.drag_inner(target, dx, dy, handle);
+        let result = self.drag_inner(target, dx, dy, handle, None);
         self.data.host_work.finish("drag", started);
         result
     }
@@ -1870,6 +1871,7 @@ impl FigureAccess<'_> {
         dx: f32,
         dy: f32,
         handle: Option<&str>,
+        snap: Option<([f32; 2], &mut renderer::layout::DragSnap)>,
     ) -> PyResult<bool> {
         if !dx.is_finite() || !dy.is_finite() {
             return Err(invalid("drag must be finite"));
@@ -1879,7 +1881,14 @@ impl FigureAccess<'_> {
         }
         if target.starts_with("annotation:") {
             let view = self.annotation_view()?;
-            return self.drag_annotation_with_map(view.annotation_map(), target, dx, dy, handle);
+            return self.drag_annotation_with_map(
+                view.annotation_map(),
+                target,
+                dx,
+                dy,
+                handle,
+                snap.map(|(_, snap)| snap),
+            );
         }
 
         let id = self.element(target)?;
@@ -1893,6 +1902,13 @@ impl FigureAccess<'_> {
             el.as_resizable()
                 .ok_or_else(|| invalid("element cannot be resized"))?
                 .resize_by(&mut cfg, &CpuTextMeasure::default(), h, dx, dy)
+        } else if let Some((at, snap)) = snap {
+            let areas = cfg.snap_areas();
+            let measure = CpuTextMeasure::for_style(&cfg.draw_style);
+            self.data
+                .hitmap
+                .drag_snapped(id, &mut cfg, &measure, Some(at), dx, dy, areas, snap)
+                .ok_or_else(|| invalid("element cannot be dragged"))?
         } else {
             el.as_draggable()
                 .ok_or_else(|| invalid("element cannot be dragged"))?
@@ -1914,6 +1930,7 @@ impl FigureAccess<'_> {
         dx: f32,
         dy: f32,
         handle: Option<&str>,
+        snap: Option<&mut renderer::layout::DragSnap>,
     ) -> PyResult<bool> {
         let started = self.data.host_work.start();
         if !dx.is_finite() || !dy.is_finite() {
@@ -1944,6 +1961,8 @@ impl FigureAccess<'_> {
                 .find(|h| format!("{h:?}") == handle)
                 .ok_or_else(|| invalid("unknown resize handle"))?;
             map.resize_by(&mut config.annotations, id, handle, dx, dy)
+        } else if let Some(snap) = snap {
+            map.drag_snapped(&mut config.annotations, id, dx, dy, snap)
         } else {
             map.drag_by(&mut config.annotations, id, dx, dy)
         };

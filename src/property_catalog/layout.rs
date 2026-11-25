@@ -22,6 +22,16 @@ pub(super) fn fields(out: &mut Vec<Field>, state: &Value, node: &navigation::Nod
                 },
             );
         }
+        if bounded.is_none() {
+            field(
+                out,
+                json!(config.snaps_while_dragging()),
+                "/config/snap_to_guides",
+                "Interaction",
+                "Snap to guides",
+                "Snap decorations to guides",
+            );
+        }
     }
     if node.kind != "panel" {
         return;

@@ -872,7 +872,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -940,7 +940,7 @@ checksum = "b97b65636e5b9ef369943878ac74335ba1c55c1cb6adbf1e2c293c624248d693"
 [[package]]
 name = "figgy-model"
 version = "0.13.0-beta.2"
-source = "git+https://github.com/shim9610/figgy.git?rev=81bf14f938d937a0d00607002a3fec6fb1e4b0b9#81bf14f938d937a0d00607002a3fec6fb1e4b0b9"
+source = "git+https://github.com/shim9610/figgy.git?rev=c06d91c2ae9a6012d143d7840aa41a028856d7bc#c06d91c2ae9a6012d143d7840aa41a028856d7bc"
 dependencies = [
  "serde",
 ]
@@ -948,7 +948,7 @@ dependencies = [
 [[package]]
 name = "figgy-renderer"
 version = "0.19.0-beta.2"
-source = "git+https://github.com/shim9610/figgy.git?rev=81bf14f938d937a0d00607002a3fec6fb1e4b0b9#81bf14f938d937a0d00607002a3fec6fb1e4b0b9"
+source = "git+https://github.com/shim9610/figgy.git?rev=c06d91c2ae9a6012d143d7840aa41a028856d7bc#c06d91c2ae9a6012d143d7840aa41a028856d7bc"
 dependencies = [
  "arc-swap",
  "bytemuck",
@@ -959,7 +959,7 @@ dependencies = [
  "futures-channel",
  "js-sys",
  "png",
- "read-fonts 0.46.0",
+ "read-fonts 0.47.0",
  "swash",
  "tiny-skia 0.12.0",
  "wasm-bindgen",
@@ -2618,9 +2618,9 @@ dependencies = [
 
 [[package]]
 name = "read-fonts"
-version = "0.46.0"
+version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdaa4fffe9ff3ca2c353fa9729792805b9b3e324695ff5a081f860612e81b330"
+checksum = "a39d2f8f681030a7bcbbcf3e8568775ac2393afd51401a2e2133ee89e3953897"
 dependencies = [
  "bytemuck",
  "foldhash",
@@ -2737,7 +2737,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3095,7 +3095,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3865,7 +3865,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

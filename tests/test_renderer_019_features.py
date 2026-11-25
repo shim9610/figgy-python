@@ -333,6 +333,7 @@ def test_three_dimensional_scatter_maps_and_z_axis_are_independent(backend):
         ax.set_ylim_without_tick_auto(0, 3)
         cfg = fig.get_settings()["config"]
         assert [cfg["right_y"][key] for key in ("min", "max")] == [5, 25]
+        assert cfg["right_y"]["title_option"]["visible"]
         assert (
             "".join(
                 v["text"] for v in cfg["right_y"]["title_option"]["text"]["segments"]
@@ -351,6 +352,8 @@ def test_three_dimensional_scatter_maps_and_z_axis_are_independent(backend):
                 8,
                 4,
             ]
+        ax.set_zlabel("Height", visible=False)
+        assert not fig.get_settings()["config"]["right_y"]["title_option"]["visible"]
 
 
 @pytest.mark.parametrize("kind", ["box", "raincloud", "mesh"])

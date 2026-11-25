@@ -4210,6 +4210,98 @@ assert rose_config() == fitted
         assert page.evaluate(ROOT + '.stats.column_uploads') == uploads
 
 
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter drags')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_title_drag_snaps_to_center_unless_alt_is_held(tmp_path, backend):
+    scene = '''
+ax.plot([0, 1], [0, 1])
+ax.set_title('Align this title')
+ax.configure(chart_title={'offset_x': 55})
+'''
+    if backend == 'native':
+        from PIL import ImageGrab
+
+        def guide_pixels(image):
+            r, g, b = np.asarray(image)[:, :, :3].transpose(2, 0, 1)
+            return np.count_nonzero((r > 170) & (g < 110) & (b > 90) & (b < r))
+
+        with figgy.Figure(backend=backend) as fig:
+            ax = fig.axes[0]
+            exec(scene, {'ax': ax})
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle)
+                for alt in (False, True):
+                    ax.configure(chart_title={'offset_x': 55})
+                    inputs.pump()
+                    info = inputs.info()
+                    x, y, w, h = info['decorations']['chart_title']
+                    panel_x, _, panel_width, _ = info['chart_panel']
+                    center = panel_x + panel_width / 2
+                    start = (x + w / 2, y + h / 2)
+                    if alt:
+                        inputs.xdo('keydown', 'Alt_L')
+                        inputs.pump()
+                    try:
+                        inputs.input_frame('mousemove', '--window', inputs.wid, *map(round, start))
+                        inputs.input_frame('mousedown', 1)
+                        try:
+                            inputs.input_frame('mousemove', '--window', inputs.wid, round(center - 3), round(start[1]))
+                            live = guide_pixels(ImageGrab.grab(xdisplay=os.environ['DISPLAY']))
+                            if alt:
+                                assert live == 0
+                            else:
+                                assert live > 20
+                                assert guide_pixels(fig.render_rgba()) == 0
+                        finally:
+                            inputs.input_frame('mouseup', 1)
+                        assert guide_pixels(ImageGrab.grab(xdisplay=os.environ['DISPLAY'])) == 0
+                    finally:
+                        if alt:
+                            inputs.xdo('keyup', 'Alt_L')
+                            inputs.pump()
+                    x, _, w, _ = inputs.info()['decorations']['chart_title']
+                    assert x + w / 2 == pytest.approx(center - (3 if alt else 0), abs=1.3)
+                owner = next(node for node in fig.editor_properties() if node['target'] == 'figure')
+                fig.edit_property(owner['id'], 'Interaction/Snap to guides', False)
+                assert fig.get_settings()['config']['snap_to_guides'] is False
+            finally:
+                handle.close()
+                Inputs.pump()
+        return
+
+    source = "import figgyplot as fg\nfig, ax = fg.subplots(backend='webgpu')\n" + scene + "\ndisplay(fig.widget())"
+    with notebook(tmp_path, source) as (page, execute):
+        canvas = page.locator('.figgy-editor canvas')
+        bounds = canvas.bounding_box()
+        center = bounds['x'] + bounds['width'] / 2
+
+        def title_center():
+            x, y, w, h = page.evaluate(ROOT + ".decorations().then(d=>d.chart_title.rect)")
+            return browser_surface_point(page, (x + w / 2, y + h / 2))
+
+        for alt in (False, True):
+            execute("ax.configure(chart_title={'offset_x': 55}); await fig.sync()")
+            x, y = title_center()
+            page.mouse.move(x, y)
+            if alt:
+                page.keyboard.down('Alt')
+            try:
+                page.mouse.down()
+                page.mouse.move(center - 3, y)
+                page.mouse.up()
+            finally:
+                if alt:
+                    page.keyboard.up('Alt')
+            execute('await fig.sync()')
+            assert title_center()[0] == pytest.approx(center - (3 if alt else 0), abs=1.3)
+        execute("""fig.configure(config={'snap_to_guides': False})
+await fig.sync()
+assert fig.get_settings()['config']['snap_to_guides'] is False
+""")
+        assert page.evaluate(ROOT + '.snapshot().config.snap_to_guides') is False
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter inputs')
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
 def test_editor_drags_document_arrow_over_sibling_panel(tmp_path, backend):

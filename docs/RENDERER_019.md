@@ -193,6 +193,11 @@ layout. `fig.tight_layout()` uses upstream text and decoration measurements;
 `fig.constrained_layout()` is an alias for that explicit layout pass.
 Native and notebook editor toolbars provide theme selection and **Auto layout**.
 
+Drag a title, legend, or annotation near an alignment guide to snap it into
+place. Hold Alt (Option on macOS) to bypass snapping during the drag, or turn
+off **Snap decorations to guides** in the Figure properties. Python can set
+the same option with `fig.configure(config={"snap_to_guides": False})`.
+
 For rose and wind rose charts, `fig.fit()` and `fig.tight_layout()` choose
 any unset radius-label angle and inner-label skip count. With the notebook
 backend, display the widget and use `await fig.sync()` before reading the
