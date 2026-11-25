@@ -187,7 +187,7 @@ class NotebookData:
         self.cache_series_extents(spec_json)
         return self.model.add_series_fitted(spec_json, config, bounds)
 
-    def add_series_batch(self, spec_json, config_json):
+    def add_series_batch(self, spec_json, config_json, *, identity=None):
         specs = json.loads(spec_json)
         config = json.loads(config_json)
 
@@ -271,7 +271,7 @@ class NotebookData:
         candidate = json.loads(previous)
         candidate.update(config=config, series=all_specs)
         formatted = json.loads(format_value_labels_json(json.dumps(candidate, allow_nan=False), self._label_column, previous))
-        result = self.model.add_series_batch(spec_json, config_json, json.dumps(formatted['series'], allow_nan=False))
+        result = self.model.add_series_batch(spec_json, config_json, json.dumps(formatted['series'], allow_nan=False), identity)
         self._cache_range_endpoints(all_specs)
         return result
 
@@ -282,7 +282,7 @@ class NotebookData:
             for token in self.composites.pop(id)[1].values():
                 self.columns.pop(token, None)
 
-    def payload(self):
+    def payload(self, *, seal=True):
         if (
             self.sealed
             and not self.columns
@@ -294,7 +294,8 @@ class NotebookData:
             raise RuntimeError(
                 "Notebook transfer snapshots were released; create a new Figure, or set retain_notebook_data=True before upload"
             )
-        self.sealed = True
+        if seal:
+            self.sealed = True
         manifest, buffers = [], []
         fields = {
             token: dict(resource=id, kind=kind, field=key)
@@ -309,5 +310,6 @@ class NotebookData:
         return manifest, buffers
 
     def acknowledged(self):
+        self.sealed = True
         if not self.retain:
             self.columns.clear()

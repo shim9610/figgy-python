@@ -204,6 +204,8 @@ struct Identity {
     retired: Vec<String>,
     #[serde(default)]
     tick_modes: HashMap<String, HashMap<String, TickMode>>,
+    #[serde(default)]
+    energy_units: HashMap<String, String>,
 }
 #[derive(Deserialize)]
 enum TickMode {
@@ -278,6 +280,13 @@ pub(super) fn validate_identity(
         }
     }
     let panel_ids: HashSet<_> = meta.panels.iter().map(|p| p.id.as_str()).collect();
+    if meta
+        .energy_units
+        .iter()
+        .any(|(owner, unit)| !panel_ids.contains(owner.as_str()) || unit.trim().is_empty())
+    {
+        return Err(invalid("energy units must reference existing panels"));
+    }
     for (owner, modes) in &meta.tick_modes {
         let sides: &[&str] = if panel_ids.contains(owner.as_str()) {
             &["bottom_x", "top_x", "left_y", "right_y"]

@@ -68,7 +68,7 @@ def validate(state):
     meta = state.get('identity')
     if meta is None:
         return
-    if set(meta)-{'tick_modes'} != {'figure', 'panels', 'layout', 'groups', 'retired'}:
+    if set(meta)-{'tick_modes', 'energy_units'} != {'figure', 'panels', 'layout', 'groups', 'retired'}:
         raise ValueError('unknown or missing identity metadata fields')
     panels = meta['panels']
     if len(panels) != len(state['config'].get('subplots', [])) + 1:
@@ -88,6 +88,14 @@ def validate(state):
             seen.add(value)
     owners={p['id']:{'bottom_x','top_x','left_y','right_y'} for p in panels}
     owners.update({o:{'x_axis','y_axis'} for p in panels for o in p['overlays']})
+    units = meta.get('energy_units', {})
+    if not isinstance(units, dict) or set(units) - {p['id'] for p in panels} or any(
+        not isinstance(unit, str) or not unit.strip() for unit in units.values()
+    ):
+        raise ValueError('energy units must reference existing panels')
+    for group in meta['groups'].values():
+        if group.get('axis') == 'y' and len({units[p].casefold() for p in group.get('members', []) if p in units}) > 1:
+            raise ValueError('cannot share an energy axis across different energy units')
     modes=meta.get('tick_modes',{})
     if not isinstance(modes,dict) or any(owner not in owners or not isinstance(axes,dict)
         or set(axes)-owners[owner] or any(mode not in ('Auto','Fixed') for mode in axes.values())
@@ -243,6 +251,7 @@ def prune_tick_modes(before, after):
     def owners(meta):return {v for p in meta['panels'] for v in [p['id'],*p['overlays']]}
     for removed in owners(old)-owners(new):
         if isinstance(new.get('tick_modes'),dict):new['tick_modes'].pop(removed,None)
+        if isinstance(new.get('energy_units'),dict):new['energy_units'].pop(removed,None)
 
 
 def validate_features(state):

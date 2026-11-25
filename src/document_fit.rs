@@ -2,6 +2,95 @@
 use super::*;
 use renderer::chart::FitExtent;
 
+pub(super) fn energy_extent(spec: &SeriesConfig, series: &[SeriesConfig]) -> FitExtent {
+    let Some(diagram) = spec.render_type.energy_levels() else {
+        return FitExtent::EMPTY;
+    };
+    let source = diagram
+        .source
+        .as_ref()
+        .and_then(|id| {
+            series
+                .iter()
+                .find(|s| &s.series_id == id)?
+                .render_type
+                .energy_levels()
+        })
+        .unwrap_or(diagram);
+    let Some((min, max)) = source.energy_extent(diagram.show) else {
+        return FitExtent::EMPTY;
+    };
+    let min_positive = if min > 0. {
+        Some(min)
+    } else {
+        source
+            .levels
+            .iter()
+            .filter(|level| level.role.drawn_in(diagram.show))
+            .map(|level| level.energy)
+            .chain(source.limits.iter().map(|limit| limit.energy))
+            .filter(|energy| energy.is_finite() && *energy > 0.)
+            .reduce(f64::min)
+    };
+    FitExtent {
+        min,
+        max,
+        min_positive,
+    }
+}
+
+pub(super) fn include_energy_levels(
+    chart: &mut Chart,
+    layer: renderer::LayerRef,
+    series: &[SeriesConfig],
+    padding: f64,
+) {
+    let config = chart.config();
+    let mut extent = FitExtent::EMPTY;
+    let mut has_other_data = false;
+    for spec in series {
+        if config.series_fit_roles(layer, &spec.series_id).1 {
+            extent.union(&energy_extent(spec, series));
+            has_other_data |= (!spec.is_dataless() && spec.render_type.range_links().is_none())
+                || spec.render_type.feynman().is_some();
+        }
+    }
+    if !extent.min.is_finite() {
+        return;
+    }
+    if !has_other_data {
+        chart.auto_fit_layer_extent(layer, &FitExtent::EMPTY, &extent, padding);
+        return;
+    }
+    // The native renderer already fit the ordinary sources. Union the two
+    // independently padded ranges so neither side receives padding twice.
+    let bounds = |config: &Config| {
+        let panel = match layer {
+            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                &config.subplots[i].config
+            }
+            _ => config,
+        };
+        let overlay = match layer {
+            renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) => Some(i),
+            _ => None,
+        };
+        let axis = panel.scaling_axes(overlay).1;
+        (axis.min, axis.max)
+    };
+    let mut candidate = Chart::as_given(config.clone());
+    candidate.auto_fit_layer_extent(layer, &FitExtent::EMPTY, &extent, padding);
+    let (a, b) = bounds(config);
+    let (c, d) = bounds(candidate.config());
+    if c < a || d > b {
+        let mut merged = FitExtent::point(a);
+        for value in [b, c, d] {
+            merged.union(&FitExtent::point(value));
+        }
+        chart.auto_fit_layer_extent(layer, &FitExtent::EMPTY, &merged, 0.);
+    }
+}
+
 pub(super) fn fit(
     config: &Config,
     series: &[SeriesConfig],

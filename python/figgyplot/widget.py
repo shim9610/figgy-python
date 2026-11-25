@@ -118,6 +118,7 @@ class FigureWidget(anywidget.AnyWidget):
     draw_styles = traitlets.Dict().tag(sync=True)
     auto_prepare = traitlets.Bool(True).tag(sync=True)
     radius_fit_request = traitlets.Int().tag(sync=True)
+    radius_fit_panels = traitlets.List(traitlets.Unicode()).tag(sync=True)
     review = traitlets.Dict().tag(sync=True)
     review_font_data = traitlets.Bytes().tag(sync=True)
 
@@ -130,12 +131,13 @@ class FigureWidget(anywidget.AnyWidget):
         self._ready_event = _AsyncSignal()
         self._mounted_event = _AsyncSignal()
         self._closed = False
-        manifest, buffers = figure._native.payload()
+        manifest, buffers = figure._native.payload(seal=False)
         assets = Path(__file__).with_name("assets")
         from ._native import draw_style_specs_json
         pending_fit = figure._radius_fit_request
         super().__init__(auto_prepare=auto_prepare, manifest=manifest, columns=buffers,
                          radius_fit_request=pending_fit[0] if pending_fit is not None else 0,
+                         radius_fit_panels=pending_fit[3] if pending_fit is not None else [],
                          draw_styles=json.loads(draw_style_specs_json()),
                          wasm=(assets / "figgy_bg.wasm").read_bytes(),
                          wasm_js=(assets / "figgy.js").read_text(encoding="utf-8"),
@@ -143,8 +145,24 @@ class FigureWidget(anywidget.AnyWidget):
         self.refresh()
         self.on_msg(self._command)
 
+    def _set_radius_fit_request(self, request):
+        with self.hold_sync():
+            self.radius_fit_panels = request[3] if request is not None else []
+            self.radius_fit_request = request[0] if request is not None else 0
+
+    def _refresh_payload(self, *, seal=False):
+        with self.figure._lock:
+            if not self.figure._native.sealed:
+                with self.hold_sync():
+                    self.manifest, self.columns = self.figure._native.payload(seal=seal)
+
+    def _repr_mimebundle_(self, **kwargs):
+        self._refresh_payload(seal=True)
+        return super()._repr_mimebundle_(**kwargs)
+
     def refresh(self):
         if not self._handling:
+            self._refresh_payload()
             settings = self.figure.get_settings()
             from ._codegen import editor_code_payload
             from ._native import object_outline_json, bounded_view_json
@@ -196,7 +214,8 @@ class FigureWidget(anywidget.AnyWidget):
             except Exception as exc:
                 self.send(dict(action='review_result',error=str(exc)))
         elif action == "mounted":
-            self._clients[content["client"]] = True
+            self._refresh_payload(seal=True)
+            self._clients.setdefault(content["client"], False)
             self._mounted_event.set()
         elif action == "ready":
             self.status = "ready"
@@ -210,8 +229,10 @@ class FigureWidget(anywidget.AnyWidget):
                     self.wasm = b""
                     self.wasm_js = ""
         elif action == "failed":
-            self.status = "WebGPU error: " + str(content.get("error"))
-            self._ready_event.set()
+            self._clients.pop(content.get("client"), None)
+            if not self._clients:
+                self.status = "WebGPU error: " + str(content.get("error"))
+                self._ready_event.set()
         elif action == "unmounted":
             self._clients.pop(content.get("client"), None)
         elif action in ('undo', 'redo', 'reset_edits', 'property', 'fit', 'layout', 'settings'):
@@ -245,7 +266,7 @@ class FigureWidget(anywidget.AnyWidget):
                     self.figure.apply_settings(_calendar_origins(content["settings"], encode=False),
                                                expected_revision=content["revision"])
                     if request is not None:
-                        self.figure._native.join_radius_fit_edit(*pending_fit[1:])
+                        self.figure._native.join_radius_fit_edit(*pending_fit[1:3])
                         self.figure._set_radius_fit_request(None)
             except Exception as exc:
                 error = str(exc)
@@ -290,11 +311,13 @@ class FigureWidget(anywidget.AnyWidget):
             raise RuntimeError("Figure widget closed")
         if self.status.startswith("WebGPU error"):
             raise RuntimeError(self.status)
+        ready = [client for client, initialized in self._clients.items() if initialized]
+        client = ready[-1] if ready else next(reversed(self._clients), None)
         loop = asyncio.get_running_loop()
         id = uuid.uuid4().hex
         future = loop.create_future()
         self._pending[id] = (future, action)
-        self.send({"action": action, "id": id, "client": next(reversed(self._clients), None), **kwargs})
+        self.send({"action": action, "id": id, "client": client, **kwargs})
         try:
             return await asyncio.wait_for(future, timeout)
         except asyncio.TimeoutError:

@@ -54,6 +54,31 @@ def test_nist_csv_preserves_units_flags_and_transition_identity(backend, tmp_pat
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_nist_unit_survives_edited_title_and_fit_reads_edited_levels(backend):
+    data = fg.read_nist(StringIO(LEVELS))
+    incompatible = copy.deepcopy(data)
+    incompatible.energy_unit = "cm-1"
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        levels = ax.energy_levels(data)
+        ax.set_ylabel("Measured energy")
+        before = fig.get_settings()
+        revision = fig.revision
+        with pytest.raises(ValueError, match="energy axis uses 'eV'.*'cm-1'"):
+            ax.energy_levels(incompatible)
+        assert fig.get_settings() == before
+        assert fig.revision == revision
+
+        levels.level(data.levels[1]["id"]).set_energy(100)
+        ax.fit()
+        assert ax.get_ylim()[1] > 100
+        ax.set_ylim(0, 30)
+        fig.fit()
+        assert ax.get_ylim()[1] > 100
+        assert ax.get_ylabel() == "Measured energy"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
 def test_numpy_records_and_plain_labels_are_accepted_without_mutating_inputs(backend):
     vertices = [
         dict(

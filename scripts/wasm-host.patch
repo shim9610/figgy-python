@@ -1,13 +1,32 @@
-diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
---- a/crates/web/src/web/chart/frame.rs
-+++ b/crates/web/src/web/chart/frame.rs
-@@ -185,6 +185,219 @@
-     pub async fn prewarm_all(&mut self) -> Result<(), JsValue> {
-         self.renderer.prewarm_all().await.map_err(js_err)?;
-         self.request_host_redraw();
-+        Ok(())
+diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
+index 0406a3a..c80cacb 100644
+--- a/crates/web/src/radial.rs
++++ b/crates/web/src/radial.rs
+@@ -329,6 +329,16 @@ impl FiggyRadialChart {
+             .map_err(js_err)
+     }
+ 
++    /// Host fence: keep edits serialized independently of GPU completion.
++    pub fn gpu_ready(&self) -> js_sys::Promise {
++        let (sender, receiver) = futures_channel::oneshot::channel();
++        self.gpu.queue().on_submitted_work_done(move || { let _ = sender.send(()); });
++        wasm_bindgen_futures::future_to_promise(async move {
++            receiver.await.map_err(|_| js_err("GPU completion callback was dropped"))?;
++            Ok(JsValue::UNDEFINED)
++        })
 +    }
 +
+     pub async fn export_png(&mut self, scale: f32) -> Result<js_sys::Uint8Array, JsValue> {
+         self.export_png_with_background(scale, "document").await
+     }
+diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
+index 918964b..4001af2 100644
+--- a/crates/web/src/web/chart/frame.rs
++++ b/crates/web/src/web/chart/frame.rs
+@@ -188,6 +188,229 @@ impl FiggyChart {
+         Ok(())
+     }
+ 
 +    /// Install coupled chart metadata in one renderer transaction.
 +    pub fn set_host_state(&mut self, config: &str, series: &str) -> Result<(), JsValue> {
 +        let mut config: renderer::Config = serde_json::from_str(config).map_err(js_err)?;
@@ -191,13 +210,23 @@ diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.
 +    }
 +
 +    /// Resolve the renderer's radial-label fit before the host commits the edit.
-+    pub async fn fit_host_radial_labels(&mut self) -> Result<(), JsValue> {
++    pub async fn fit_host_radial_labels(&mut self, cells_json: Option<String>) -> Result<(), JsValue> {
 +        let mut config = self.chart_config()?.clone();
++        let scoped_series = cells_json.map(|encoded| {
++            let cells: Vec<usize> = serde_json::from_str(&encoded).map_err(js_err)?;
++            Ok::<_, JsValue>(self.chart_series()?.iter().filter(|spec| {
++                let cell = match config.layer_of_series(&spec.series_id) {
++                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => i + 1,
++                    _ => 0,
++                };
++                cells.contains(&cell)
++            }).cloned().collect::<Vec<_>>())
++        }).transpose()?;
 +        let mut cell = 0;
 +        let mut changed = false;
 +        while let Some(ticket) = self
 +            .renderer
-+            .begin_radial_label_fit(&config, self.chart_series()?, cell)
++            .begin_radial_label_fit(&config, scoped_series.as_deref().unwrap_or(self.chart_series()?), cell)
 +            .map_err(js_err)?
 +        {
 +            cell = ticket.cell() + 1;
@@ -218,26 +247,37 @@ diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.
 +        let chart = Chart::new(config.into_owned());
 +        self.renderer.refresh_annotations(&mut self.view, &chart, panel_rect, self.selected_annotation).map_err(js_err)?;
 +        self.redraw_pending = true;
-         Ok(())
-     }
- 
-diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
---- a/crates/web/src/radial.rs
-+++ b/crates/web/src/radial.rs
-@@ -329,6 +329,16 @@
-             .map_err(js_err)
-     }
- 
-+    /// Host fence: keep edits serialized independently of GPU completion.
-+    pub fn gpu_ready(&self) -> js_sys::Promise {
-+        let (sender, receiver) = futures_channel::oneshot::channel();
-+        self.gpu.queue().on_submitted_work_done(move || { let _ = sender.send(()); });
-+        wasm_bindgen_futures::future_to_promise(async move {
-+            receiver.await.map_err(|_| js_err("GPU completion callback was dropped"))?;
-+            Ok(JsValue::UNDEFINED)
-+        })
++        Ok(())
 +    }
 +
-     pub async fn export_png(&mut self, scale: f32) -> Result<js_sys::Uint8Array, JsValue> {
-         self.export_png_with_background(scale, "document").await
-     }
+     /// Process pending pool maintenance and draw only when visual state is
+     /// dirty. A clean rAF tick returns before touching the pool or surface.
+     pub fn frame(&mut self) -> Result<(), JsValue> {
+diff --git a/crates/web/src/web/chart/state.rs b/crates/web/src/web/chart/state.rs
+index 3933073..693bfc8 100644
+--- a/crates/web/src/web/chart/state.rs
++++ b/crates/web/src/web/chart/state.rs
+@@ -95,6 +95,12 @@ impl FiggyChart {
+         &mut self,
+         mut series: Vec<SeriesConfig>,
+     ) -> Result<(), JsValue> {
++        // Keep authored automatic coordinates in the renderer document.
++        // Geometry and hit tests resolve them when needed.
++        if self.monotonic.is_none() {
++            self.renderer.set_chart_series(self.chart_id, series).map_err(js_err)?;
++            return self.sync_hitmap();
++        }
+         place_feynman_vertices(&mut series)?;
+         match self.monotonic {
+             Some(id) => self
+@@ -113,6 +119,10 @@ impl FiggyChart {
+         config: renderer::Config,
+         mut series: Vec<SeriesConfig>,
+     ) -> Result<(), JsValue> {
++        if self.monotonic.is_none() {
++            self.renderer.set_chart_state(self.chart_id, config, series).map_err(js_err)?;
++            return self.sync_hitmap();
++        }
+         place_feynman_vertices(&mut series)?;
+         match self.monotonic {
+             // The series first; a document the editor refuses puts them back.

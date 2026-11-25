@@ -4157,7 +4157,7 @@ assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= config['polar'
 def test_jupyter_python_fits_rose_labels_before_and_after_display(tmp_path):
     source = """
 import figgyplot as fg
-fig = fg.Figure(backend='webgpu', grid=[['main', 'wind']])
+fig = fg.Figure(backend='webgpu', grid=[['main', 'wind', 'other']])
 fig.subplots['main'].plot([0, 1], [0, 1])
 ax = fig.subplots['wind'].axes
 ax.rose(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
@@ -4165,6 +4165,8 @@ ax.rose(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
          [.08, .01, .02, .03, .01, .02, .02, .07]], mode='stacked')
 ax.set_polar_options(zero=90, clockwise=True, labels_skipped=1)
 ax.configure(left_y={'label_style': {'format': 'Percent'}})
+other = fig.subplots['other'].axes
+other.rose(['N', 'E', 'S', 'W'], [.06, .01, .03, .04])
 
 def rose_config():
     return fig.get_settings()['config']['subplots'][0]['config']
@@ -4206,8 +4208,75 @@ assert rose_config()['left_y']['max'] == .8
 assert 'radial_label_angle_degrees' not in rose_config()['polar']
 fig.redo()
 assert rose_config() == fitted
+
+ax.set_polar_options(zero=90, clockwise=True)
+other.set_polar_options(zero=90, clockwise=True)
+ax.fit()
+await fig.sync(timeout=120)
+assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= rose_config()['polar'].keys()
+other_polar = fig.get_settings()['config']['subplots'][1]['config']['polar']
+assert 'radial_label_angle_degrees' not in other_polar
+assert 'radius_labels_skipped' not in other_polar
 """)
         assert page.evaluate(ROOT + '.stats.column_uploads') == uploads
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
+def test_jupyter_title_edit_keeps_feynman_automatic_positions(tmp_path):
+    source = """
+import figgyplot as fg
+fig, ax = fg.subplots(backend="webgpu")
+diagram = ax.feynman([dict(id="a", role="incoming"), dict(id="b", role="outgoing")],
+                     [dict(id="line", source="a", target="b", particle="fermion")])
+ax.set_title("Before")
+display(fig)
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        execute("""await fig.sync()
+assert diagram.vertex('a').get_position() is None
+assert diagram.vertex('b').get_position() is None
+""")
+        click_button(page, '[data-properties]')
+        ObjectNavigator(page).choose('chart_title')
+        field = page.locator('[data-fields] input[data-property=text]')
+        field.fill('After')
+        field.press('Tab')
+        execute("""await fig.sync()
+assert ax.get_title() == 'After'
+assert diagram.vertex('a').get_position() is None
+diagram.set_layout(direction='bottom-to-top')
+await fig.sync()
+assert diagram.vertex('b').get_position() is None
+""")
+        body = page.evaluate(ROOT + '.snapshot().series[0].render_type.Feynman')
+        assert body['layout']['direction'] == 'BottomToTop'
+        assert all(vertex.get('at') is None for vertex in body['vertices'])
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter and WebGPU input')
+def test_jupyter_failed_second_view_leaves_first_view_usable(tmp_path):
+    source = """
+import figgyplot as fg
+fig, ax = fg.subplots(backend="webgpu")
+ax.plot([0, 1], [1, 0])
+display(fig)
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        execute("assert fig.info['transfer_snapshot_bytes'] == 0")
+        page.evaluate("""async()=>{
+            const app=window.jupyterapp,panel=app.shell.currentWidget;
+            panel.content.model.sharedModel.insertCell(1,{cell_type:'code',source:'display(fig)',metadata:{}});
+            panel.content.activeCellIndex=1;
+            await app.commands.execute('notebook:run-cell');
+        }""")
+        page.wait_for_function("""()=>Array.from(document.querySelectorAll('.figgy-editor [data-status]'))
+            .map(e=>e.textContent).join(',')==='Ready,WebGPU failed'""", timeout=90000)
+        assert 'Transfer snapshots were released' in page.locator('.figgy-error').last.inner_text()
+        execute("""await fig.sync()
+assert (await fig.to_png_async(timeout=120)).startswith(b'\\x89PNG')
+""")
+        page.evaluate("window.jupyterapp.shell.currentWidget.content.widgets[1].model.outputs.clear()")
+        page.locator('.figgy-editor').nth(1).wait_for(state='detached')
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter drags')

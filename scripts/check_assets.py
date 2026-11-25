@@ -25,11 +25,15 @@ def check_assets(assets):
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 NATIVE_PACKAGES = {"figgy-renderer": "crates/renderer", "figgy-model": "crates/model"}
 HOST_PATCH = "scripts/wasm-host.patch"
-HOST_PATCH_FILES = {"crates/web/src/web/chart/frame.rs", "crates/web/src/radial.rs"}
+HOST_PATCH_FILES = {
+    "crates/web/src/web/chart/frame.rs",
+    "crates/web/src/web/chart/state.rs",
+    "crates/web/src/radial.rs",
+}
 
 
 def host_patch_record(root):
-    """Allow only additive changes to the two unpublished WASM bridge files."""
+    """Allow only additive changes to the unpublished WASM bridge."""
     import subprocess
     import tempfile
     path = Path(root) / HOST_PATCH
@@ -51,7 +55,7 @@ def host_patch_record(root):
     if (len(entries) != len(HOST_PATCH_FILES) or any(len(entry) != 3 or not entry[0].isdigit()
             or int(entry[0]) == 0 or entry[1] != "0" for entry in entries)
             or {entry[2] for entry in entries} != HOST_PATCH_FILES):
-        raise ValueError("WASM host patch may only add code to the two unpublished bridge files")
+        raise ValueError("WASM host patch may only add code to the allowed unpublished bridge files")
     return {"path": HOST_PATCH, "sha256": hashlib.sha256(data).hexdigest(),
             "files": sorted(HOST_PATCH_FILES)}
 

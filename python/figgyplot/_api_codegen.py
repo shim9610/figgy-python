@@ -266,6 +266,9 @@ def settings_to_api_code(settings, defaults, dpi=120, variable="fig"):
 
     emit(f"{variable}.reset_style()", force=True)
     layout = settings["identity"].get("layout")
+    snap = settings["config"].get("snap_to_guides")
+    if snap is not None:
+        emit(f"{variable}.configure(config={{'snap_to_guides': {snap!r}}})", force=True)
     if layout:
         args = ", ".join(
             f"{key}={layout[key]!r}"

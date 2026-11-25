@@ -242,20 +242,27 @@ impl NotebookFigure {
         self.history = Default::default();
         Ok(())
     }
-    #[pyo3(signature=(json, config, formatted=None))]
+    #[pyo3(signature=(json, config, formatted=None, identity=None))]
     fn add_series_batch(
         &mut self,
         json: &str,
         config: &str,
         formatted: Option<&str>,
+        identity: Option<&str>,
     ) -> PyResult<()> {
         let previous_config = self.chart.config().clone();
         let previous_series = self.series.clone();
+        let previous_identity = self.identity.clone();
         let revision = self.revision;
         let history = self.history.clone();
         let result = (|| {
             let config = parse(config)?;
             validate_config(&config)?;
+            if let Some(identity) = identity {
+                let metadata = parse(identity)?;
+                identity::validate_identity(Some(&metadata), &config, 2)?;
+                self.identity = Some(metadata);
+            }
             self.chart = Chart::new(config);
             for spec in parse::<Vec<SeriesConfig>>(json)? {
                 self.add_series(&serde_json::to_string(&spec).map_err(invalid)?)?;
@@ -279,6 +286,7 @@ impl NotebookFigure {
         if let Err(error) = result {
             self.chart = Chart::new(previous_config);
             self.series = previous_series;
+            self.identity = previous_identity;
             self.revision = revision;
             self.history = history;
             return Err(error);
@@ -609,6 +617,9 @@ impl NotebookFigure {
                     a.union(&renderer::chart::FitExtent::point(x));
                     b.union(&renderer::chart::FitExtent::point(y));
                 }
+            }
+            if fit_exits {
+                b.union(&document_fit::energy_extent(s, &self.series));
             }
             extents.push([a, b]);
         }

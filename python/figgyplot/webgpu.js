@@ -1282,9 +1282,11 @@ export function render({model,el}) {
       await initialized;await queue;await flush();
       await enqueue(async()=>{
         if(!stillCurrent()||revision!==base)return;
-        if(needsRadiusLabels()){
+        const owners=model.get('radius_fit_panels');
+        const cells=local.identity.panels.flatMap((panel,index)=>owners.includes(panel.id)?[index]:[]);
+        if(cells.length&&needsRadiusLabels()){
           const before=chart.get_config();
-          await chart.fit_host_radial_labels();
+          await chart.fit_host_radial_labels(JSON.stringify(cells));
           if(!stillCurrent()){chart.set_config(before);return;}
           dirty=true;
         }
@@ -1296,7 +1298,7 @@ export function render({model,el}) {
     controlQueue=operation.catch(error=>{radiusFitError={request,error:String(error)};fail(error);});
   }
   root.querySelector('[data-fit]').addEventListener('click',()=>{
-    if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||Object.values(s.render_type)[0].line?.fill))){
+    if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||s.render_type.EnergyLevels||Object.values(s.render_type)[0].line?.fill))){
       replayEdit('fit');return;
     }
     enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}
@@ -1538,7 +1540,7 @@ export function render({model,el}) {
     root.figgy={stats,diagnostics,details:()=>enqueue(async()=>kind?null:await selectionDetails(),true),annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
-  }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
+  }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',client,error:String(e)});}}})();
   return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('change:radius_fit_request',scheduleRadiusFit);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();disposeReviewImages();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

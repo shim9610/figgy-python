@@ -152,7 +152,7 @@ class AdvancedMethods:
     def _sid(self, id=None):
         return _document.identifier(id or f"series_{self.figure._next_series}")
 
-    def _install_series(self, specs, columns=(), composites=(), config=None):
+    def _install_series(self, specs, columns=(), composites=(), config=None, *, energy_unit=None):
         """Publish sources and series together; roll back uncommitted resources."""
         from .figure import _array, Artist
 
@@ -170,6 +170,27 @@ class AdvancedMethods:
             ids = [s["series_id"] for s in specs]
             if len(set(ids)) != len(ids) or existing.intersection(ids):
                 raise ValueError("series IDs must be unique within the Figure")
+            identity = None
+            if energy_unit:
+                identity = state["identity"]
+                units = identity.setdefault("energy_units", {})
+                owners = {self.subplot_id}
+                for group in identity["groups"].values():
+                    if group["axis"] == "y" and self.subplot_id in group["members"]:
+                        owners.update(group["members"])
+                for owner in owners:
+                    known = units.get(owner)
+                    if known is None:
+                        # Older figures recorded the NIST unit in the generated axis title.
+                        panel = _document.panel_config(state, owner)
+                        title = "".join(s["text"] for s in panel["left_y"]["title_option"]["text"]["segments"])
+                        if title.startswith("Energy (") and title.endswith(")"):
+                            known = title[len("Energy ("):-1]
+                    if known and known.casefold() != energy_unit.casefold():
+                        raise ValueError(
+                            f"energy axis uses {known!r}, but the NIST data uses {energy_unit!r}"
+                        )
+                units[self.subplot_id] = energy_unit
             if config is not None:
                 local = self._config(state)
                 area = copy.deepcopy(local["chart_area"])
@@ -224,6 +245,7 @@ class AdvancedMethods:
                 fig._native.add_series_batch(
                     json.dumps(specs, allow_nan=False),
                     json.dumps(state["config"], allow_nan=False),
+                    identity=json.dumps(identity, allow_nan=False) if identity is not None else None,
                 )
             except Exception:
                 for name in reversed(uploaded):
@@ -239,9 +261,10 @@ class AdvancedMethods:
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
         defaults = json.loads(coordinate_defaults_json(projection))
         for key in ("polar", "ternary", "view_3d", "parallel"):
-            cfg.pop(key, None)
             if key in defaults:
-                cfg[key] = defaults[key]
+                cfg.setdefault(key, defaults[key])
+            else:
+                cfg.pop(key, None)
         return cfg
 
     def set_projection(self, projection="cartesian", **properties):
@@ -864,7 +887,7 @@ class AdvancedMethods:
                 raise ValueError("NIST data already supplies transitions and limits")
             data = levels
             levels, transitions, limits = data.levels, data.transitions, data.limits
-            energy_unit = data.energy_unit
+            energy_unit = data.energy_unit.strip()
         else:
             energy_unit = None
         state = self.figure.get_settings()
@@ -932,14 +955,14 @@ class AdvancedMethods:
                 max=high + padding,
                 major_spacing=(high - low + 2 * padding) / 5,
             )
-            if energy_unit is not None:
+            if energy_unit and not state["identity"].get("energy_units", {}).get(self.subplot_id):
                 from .figure import _segments
 
                 cfg[axis]["title_option"]["text"]["segments"] = _segments(
                     "Energy (" + energy_unit + ")"
                 )
                 cfg[axis]["title_option"]["visible"] = True
-        return self._install_series([s], config=cfg)
+        return self._install_series([s], config=cfg, energy_unit=energy_unit)
 
     def feynman(
         self, vertices, propagators, *, layout=None, direction=None, id=None, **style
@@ -1077,11 +1100,24 @@ class AdvancedMethods:
         orientation="vertical",
         **properties,
     ):
+        return self._category_bars(
+            x, height, width, bottom, align=align, label=label, colors=colors,
+            color=color, mode=mode, orientation=orientation, properties=properties,
+        )
+
+    def _category_bars(
+        self, x, height, width=0.8, bottom=None, *, align="center", label=None,
+        colors=None, color=None, mode="grouped", orientation="vertical",
+        projection=None, properties=None,
+    ):
         from .figure import _color, _COLORS
 
+        properties = {} if properties is None else properties
         style_patch = properties.pop("style", {})
         if not isinstance(style_patch, dict):raise TypeError("style must be a mapping")
         if properties:
+            if projection is not None:
+                raise TypeError(f"unsupported rose options: {', '.join(sorted(properties))}")
             from ._charts import ChartMethods
 
             return ChartMethods.bar(
@@ -1121,7 +1157,7 @@ class AdvancedMethods:
             "percent_stacked",
         ):
             raise ValueError("invalid bar orientation or mode")
-        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
+        cfg = projection if projection is not None else copy.deepcopy(self._config(self.figure.get_settings()))
         axis = "bottom_x" if orientation == "vertical" else "left_y"
         cfg[axis]["categories"] = [
             dict(id=f"category_{i}", label=str(v)) for i, v in enumerate(labels)
@@ -1180,12 +1216,20 @@ class AdvancedMethods:
 
         style_patch = properties.pop("style", {})
         if not isinstance(style_patch, dict):raise TypeError("style must be a mapping")
-        if properties:
+        if set(properties) - {"value_range"}:
             from ._features import FeatureMethods
 
             return FeatureMethods.radar(
                 self, categories, values, labels=labels, colors=colors, style=style_patch, **properties
             )
+        bounds = properties.get("value_range")
+        if bounds is not None:
+            from ._validation import number
+
+            low, high = (number(v, "radar value range") for v in bounds)
+            if low >= high:
+                raise ValueError("radar value range must be increasing")
+            bounds = (low, high)
         categories = list(categories)
         a = np.asarray(values)
         if a.ndim == 1:
@@ -1209,7 +1253,6 @@ class AdvancedMethods:
             zero_angle_degrees=90.0,
             angle_unit="Degrees",
             grid_shape="Polygon",
-            **properties,
         )
         cfg["bottom_x"]["categories"] = [
             dict(id=f"category_{i}", label=str(v)) for i, v in enumerate(categories)
@@ -1232,12 +1275,16 @@ class AdvancedMethods:
                     (sid + "/y", row),
                 ]
             )
-        return self._install_series(specs, columns, config=cfg)
+        artists = self._install_series(specs, columns, config=cfg)
+        if bounds is not None:
+            self.set_ylim(*bounds)
+        return artists
 
     def rose(self, categories, values, **kwargs):
+        kwargs = dict(kwargs)
+        style = kwargs.pop("style", {})
         cfg = self._projection_config("polar")
-        self.configure(**cfg)
-        return self.bar(categories, values, **kwargs)
+        return self._category_bars(categories, values, projection=cfg, properties={"style": style}, **kwargs)
 
     def violinplot(
         self,

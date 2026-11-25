@@ -156,7 +156,7 @@ def test_host_patch_cannot_change_native_sources_or_build_configuration(registry
     elif change == "deletion":
         # A syntactically valid patch that removes existing bridge code is
         # outside this deliberately additive host extension's scope.
-        hunk = re.search(r"^@@ -\d+,\d+ \+\d+,(\d+) @@\n ", data, re.MULTILINE)
+        hunk = re.search(r"^@@ -\d+,\d+ \+\d+,(\d+) @@[^\n]*\n ", data, re.MULTILINE)
         start, end = hunk.span(1)
         data = data[:start] + str(int(hunk[1]) - 1) + " @@\n-" + data[hunk.end():]
     else:

@@ -1196,7 +1196,7 @@ export class FiggyChart {
     /**
      * Resolve the renderer's radial-label fit before the host commits the edit.
      */
-    fit_host_radial_labels(): Promise<void>;
+    fit_host_radial_labels(cells_json?: string | null): Promise<void>;
     /**
      * Fits the chart's layout to its labels and titles and applies it
      * (`Renderer::fit_layout`, #271). It can move the plot's edges, so it
@@ -2871,7 +2871,7 @@ export interface InitOutput {
     readonly figgychart_first_frame_ready: (a: number) => any;
     readonly figgychart_fit_config: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly figgychart_fit_config_scoped: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly figgychart_fit_host_radial_labels: (a: number) => any;
+    readonly figgychart_fit_host_radial_labels: (a: number, b: number, c: number) => any;
     readonly figgychart_fit_layout: (a: number, b: number) => [number, number];
     readonly figgychart_fit_point_size_domain: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_fit_ranges: (a: number) => [number, number];

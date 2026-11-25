@@ -1235,7 +1235,13 @@ impl FigureAccess<'_> {
         self.data.history = Default::default();
         Ok(())
     }
-    fn add_series_batch(&mut self, py: Python<'_>, json: &str, config: &str) -> PyResult<()> {
+    fn add_series_batch(
+        &mut self,
+        py: Python<'_>,
+        json: &str,
+        config: &str,
+        identity: Option<&str>,
+    ) -> PyResult<()> {
         if self.data.document.is_some() {
             return Err(invalid("bounded charts cannot contain coordinate series"));
         }
@@ -1247,6 +1253,10 @@ impl FigureAccess<'_> {
             series.extend(parse::<Vec<SeriesConfig>>(json)?);
             identity::validate_range_rows(&series, |id| self.data.columns.get(id).map(|v| v.0))?;
             let config: Config = parse(config)?;
+            let metadata = identity.map(parse::<Value>).transpose()?;
+            if let Some(metadata) = &metadata {
+                identity::validate_identity(Some(metadata), &config, 2)?;
+            }
             self.format_value_labels(&config, &mut series)?;
             validate_config(&config)?;
             validate_draw_style(&config, &series)?;
@@ -1261,6 +1271,9 @@ impl FigureAccess<'_> {
             self.data.chart = chart;
             self.refresh_addresses();
             self.data.series = series;
+            if let Some(metadata) = metadata {
+                self.data.identity = Some(metadata);
+            }
             self.fit_domain(py, 0.05, false, false)
         })();
         if let Err(error) = result {
@@ -1273,6 +1286,7 @@ impl FigureAccess<'_> {
                 .map_err(runtime)?;
             self.data.chart = Chart::as_given(previous.config);
             self.data.series = previous.series;
+            self.data.identity = previous.identity;
             self.data.revision = revision;
             self.data.history = history;
             return Err(error);
@@ -1585,6 +1599,9 @@ impl FigureAccess<'_> {
                     chart
                         .auto_fit_layer_union(self.renderer.pool(), layer, &specs, padding)
                         .map_err(runtime)?;
+                    if fit_exits {
+                        document_fit::include_energy_levels(&mut chart, layer, &specs, padding);
+                    }
                     let local = match layer {
                         renderer::LayerRef::Subplot(i)
                         | renderer::LayerRef::SubplotOverlay(i, _) => &config.subplots[i].config,
@@ -2157,8 +2174,15 @@ impl NativeFigure {
     ) -> PyResult<()> {
         self.with(|core| core.add_series_fitted(py, json, config, bounds))
     }
-    fn add_series_batch(&self, py: Python<'_>, json: &str, config: &str) -> PyResult<()> {
-        self.with(|core| core.add_series_batch(py, json, config))
+    #[pyo3(signature=(json, config, identity=None))]
+    fn add_series_batch(
+        &self,
+        py: Python<'_>,
+        json: &str,
+        config: &str,
+        identity: Option<&str>,
+    ) -> PyResult<()> {
+        self.with(|core| core.add_series_batch(py, json, config, identity))
     }
     #[pyo3(signature=(json, dpi=None))]
     fn apply_settings(&self, json: &str, dpi: Option<f64>) -> PyResult<()> {

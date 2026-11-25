@@ -163,6 +163,9 @@ raise by default; explicit `unmatched="skip"` records their count in the result.
 It does not fetch a URL, convert units, infer missing transitions or collapse
 fine structure into centroids.
 
+For NIST diagrams sharing one energy axis, normalize energies and their
+uncertainties to a common unit before adding the datasets.
+
 Run this from the repository root with the included He I exports.
 The files supply the energy-axis unit and the original transition wavelengths.
 The label suffix uses the parsed wavelength unit.

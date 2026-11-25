@@ -985,23 +985,29 @@ class Figure(FigureMethods):
     def _set_radius_fit_request(self, request):
         self._radius_fit_request = request
         for widget in list(self._widgets):
-            widget.radius_fit_request = request[0] if request is not None else 0
+            widget._set_radius_fit_request(request)
 
-    def _queue_radius_label_fit(self, state, base_revision):
-        root = state['config']
-        owners = {series: panel['config'] for panel in root.get('subplots', [])
-                  for series in panel['series']}
+    def _queue_radius_label_fit(self, state, base_revision, panel_id=None):
+        panels = _document.panel_configs(state)
+        requested = set()
         for spec in state['series']:
             if 'CategoryBars' not in spec['render_type']:
                 continue
-            polar = owners.get(spec['series_id'], root).get('polar')
+            owner = _document.series_panel_id(state, spec['series_id'])
+            if panel_id is not None and owner != panel_id:
+                continue
+            polar = panels[owner].get('polar')
             if polar is not None and (
                 polar.get('radial_label_angle_degrees') is None
                 or polar.get('radius_labels_skipped') is None
             ):
-                self._radius_fit_serial += 1
-                self._set_radius_fit_request((self._radius_fit_serial, base_revision, self.revision))
-                return
+                requested.add(owner)
+        if requested:
+            if self._radius_fit_request is not None:
+                requested.update(self._radius_fit_request[3])
+            self._radius_fit_serial += 1
+            self._set_radius_fit_request((self._radius_fit_serial, base_revision, self.revision,
+                                          [owner for owner in panels if owner in requested]))
 
     def configure(self, *, config=None, series=None, identity=None, reset=False):
         """Apply advanced layout/style patches to existing plotted data.
@@ -1375,7 +1381,7 @@ class Figure(FigureMethods):
         else:Path(filename).write_bytes(data)
 
     def _repr_mimebundle_(self, **kwargs):
-        if self.backend=='native' and _family(self.get_settings()) is not None:
+        if self.backend=='native':
             return {"image/png": self.to_png()}
         # Keep a live widget referenced; Jupyter displays the model once per output.
         return self.widget()._repr_mimebundle_(**kwargs)
@@ -1609,8 +1615,13 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             if _family(self.figure.get_settings()):
                 self.figure.fit(padding)
             else:
+                base_revision = self.figure.revision
                 self.figure._native.fit_active(float(padding))
-        self.figure._changed()
+                self.figure._changed()
+                if self.figure.backend == 'webgpu' and self.overlay_id is None:
+                    self.figure._queue_radius_label_fit(
+                        self.figure.get_settings(), base_revision, self.subplot_id
+                    )
         return self
 
     def _owned_series(self, state):

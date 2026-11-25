@@ -356,6 +356,31 @@ def test_three_dimensional_scatter_maps_and_z_axis_are_independent(backend):
         assert not fig.get_settings()["config"]["right_y"]["title_option"]["visible"]
 
 
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_adding_projected_series_preserves_authored_projection(backend):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.view_init(12, 30, projection="persp")
+        ax.configure(view_3d={"distance": 2.7})
+        camera = fig.get_settings()["config"]["view_3d"]
+        ax.plot3D([0, 1], [0, 1], [0, 1])
+        ax.scatter3D([0, 1], [0, 1], [1, 2])
+        assert fig.get_settings()["config"]["view_3d"] == camera
+
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        before = fig.get_settings()
+        with pytest.raises(ValueError, match="one value per category"):
+            ax.rose(["N", "S"], [1])
+        assert fig.get_settings() == before
+        ax.set_polar_options(zero=90, clockwise=True, label_angle=45)
+        ax.rose(["N", "S"], [1, 2])
+        polar = fig.get_settings()["config"]["polar"]
+        assert polar["zero_angle_degrees"] == 90
+        assert polar["clockwise"] is True
+        assert polar["radial_label_angle_degrees"] == 45
+
+
 @pytest.mark.parametrize("kind", ["box", "raincloud", "mesh"])
 def test_composite_sources_are_isolated_and_released_on_close(kind):
     with fg.Figure(backend="native") as probe:
