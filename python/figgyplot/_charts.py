@@ -305,7 +305,8 @@ class ChartMethods:
             config = self._config(self.figure.get_settings())
             _set_colorbar(config,cmap,low,high)
             return self._add(x, y, {'HeatmapContour' if filled else 'Contour': style}, id=id,
-                             extra_columns=columns, config=config, bounds=(float(x[0]), float(x[-1]), float(y[0]), float(y[-1])))
+                             extra_columns=columns, config=config, allow_missing_values=True,
+                             bounds=(float(x[0]), float(x[-1]), float(y[0]), float(y[-1])))
 
     @_style_runtime.styled
     def contourf(self, *args, **kwargs):

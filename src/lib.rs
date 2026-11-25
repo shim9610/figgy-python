@@ -579,7 +579,7 @@ impl FigureAccess<'_> {
             rgba,
         })
     }
-    fn upload<T: Number>(&mut self, id: &str, values: &[T]) -> PyResult<()> {
+    fn upload<T: Number>(&mut self, id: &str, values: &[T], allow_missing: bool) -> PyResult<()> {
         if self.data.columns.contains_key(id) {
             return Err(invalid(format!("column already exists: {id}")));
         }
@@ -599,7 +599,7 @@ impl FigureAccess<'_> {
                 max = max.max(v);
             }
         }
-        if !min.is_finite() {
+        if !(min.is_finite() || allow_missing && values.iter().all(|v| v.f64().is_nan())) {
             return Err(invalid("data has no finite values"));
         }
         let source = BorrowedColumn { values };
@@ -1136,18 +1136,25 @@ impl FigureAccess<'_> {
         self.data.preparation = Some(report.clone());
         Ok(report.to_string())
     }
-    fn upload_column(&mut self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn upload_column(
+        &mut self,
+        id: &str,
+        array: &Bound<'_, PyAny>,
+        allow_missing: bool,
+    ) -> PyResult<()> {
         if let Ok(data) = array.extract::<PyReadonlyArray1<'_, f64>>() {
             self.upload(
                 id,
                 data.as_slice()
                     .map_err(|_| invalid("array must be contiguous"))?,
+                allow_missing,
             )
         } else if let Ok(data) = array.extract::<PyReadonlyArray1<'_, f32>>() {
             self.upload(
                 id,
                 data.as_slice()
                     .map_err(|_| invalid("array must be contiguous"))?,
+                allow_missing,
             )
         } else {
             Err(invalid(
@@ -2136,8 +2143,14 @@ impl NativeFigure {
             core: Arc::new(Mutex::new(core)),
         })
     }
-    fn upload_column(&self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.with(|core| core.upload_column(id, array))
+    #[pyo3(signature=(id, array, *, allow_missing=false))]
+    fn upload_column(
+        &self,
+        id: &str,
+        array: &Bound<'_, PyAny>,
+        allow_missing: bool,
+    ) -> PyResult<()> {
+        self.with(|core| core.upload_column(id, array, allow_missing))
     }
     fn upload_composite(
         &self,

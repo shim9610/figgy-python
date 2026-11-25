@@ -60,7 +60,13 @@ impl NotebookFigure {
             _ => return Err(invalid("unknown chart family")),
         })
     }
-    fn upload_column(&mut self, id: &str, array: &Bound<'_, PyAny>) -> PyResult<()> {
+    #[pyo3(signature=(id, array, *, allow_missing=false))]
+    fn upload_column(
+        &mut self,
+        id: &str,
+        array: &Bound<'_, PyAny>,
+        allow_missing: bool,
+    ) -> PyResult<()> {
         if self.columns.contains_key(id) {
             return Err(invalid("column ID already exists"));
         }
@@ -68,7 +74,7 @@ impl NotebookFigure {
             if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f64>>() {
                 let a = a.as_slice().map_err(invalid)?;
                 (
-                    extent(a)?,
+                    extent(a, allow_missing)?,
                     edge_sample_extent(a),
                     center_cell_extent(a),
                     a.len(),
@@ -76,7 +82,7 @@ impl NotebookFigure {
             } else if let Ok(a) = array.extract::<PyReadonlyArray1<'_, f32>>() {
                 let a = a.as_slice().map_err(invalid)?;
                 (
-                    extent(a)?,
+                    extent(a, allow_missing)?,
                     edge_sample_extent(a),
                     center_cell_extent(a),
                     a.len(),
@@ -700,7 +706,7 @@ fn center_cell_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
     result
 }
 
-fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
+fn extent<T: Number>(a: &[T], allow_missing: bool) -> PyResult<renderer::chart::FitExtent> {
     let mut ext = renderer::chart::FitExtent::EMPTY;
     for (index, n) in a.iter().enumerate() {
         let v = n.f64();
@@ -717,7 +723,9 @@ fn extent<T: Number>(a: &[T]) -> PyResult<renderer::chart::FitExtent> {
             }
         }
     }
-    if !ext.min.is_finite() {
+    if !(ext.min.is_finite()
+        || allow_missing && !a.is_empty() && a.iter().all(|v| v.f64().is_nan()))
+    {
         return Err(invalid("data has no finite values"));
     }
     Ok(ext)

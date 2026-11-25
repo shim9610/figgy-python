@@ -152,7 +152,10 @@ class AdvancedMethods:
     def _sid(self, id=None):
         return _document.identifier(id or f"series_{self.figure._next_series}")
 
-    def _install_series(self, specs, columns=(), composites=(), config=None, *, energy_unit=None):
+    def _install_series(
+        self, specs, columns=(), composites=(), config=None, *, energy_unit=None,
+        missing_columns=(),
+    ):
         """Publish sources and series together; roll back uncommitted resources."""
         from .figure import _array, Artist
 
@@ -222,7 +225,7 @@ class AdvancedMethods:
             uploaded = []
             try:
                 for name, array in columns:
-                    fig._native.upload_column(name, _array(array))
+                    fig._native.upload_column(name, _array(array), allow_missing=name in missing_columns)
                     uploaded.append(name)
                 for kind, name, fields in composites:
                     normalized = {
@@ -736,6 +739,14 @@ class AdvancedMethods:
         vmax=None,
         id=None,
     ):
+        return self._tri_mesh(
+            x, y, c, triangles, shading=shading, cmap=cmap, vmin=vmin, vmax=vmax, id=id
+        )
+
+    def _tri_mesh(
+        self, x, y, c, triangles, *, cmap, id, shading="gouraud", vmin=None,
+        vmax=None, contour=None, filled=False,
+    ):
         from .figure import _array
         from ._features import colorbar
 
@@ -764,6 +775,11 @@ class AdvancedMethods:
         body["triangles"] = sid + "/triangles"
         body["values"] = dict(column=sid + "/values", at=at)
         body["fill"]["shading"] = "Interpolated" if at == "Vertices" else "Flat"
+        if contour is not None:
+            body["contour"] = contour
+            body["fill"] = (
+                dict(mode="Bands", shading="Interpolated", opacity=1.0) if filled else None
+            )
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
         colorbar(cfg, c, cmap, vmin, vmax)
         return self._install_series(
@@ -814,17 +830,10 @@ class AdvancedMethods:
         )
         if not math.isfinite(line["line_width"]) or line["line_width"] < 0:
             raise ValueError("linewidths must be finite and nonnegative")
-        artist = self.tripcolor(x, y, z, triangles=triangles, cmap=cmap, id=id)
-        state = self.figure.get_settings()
-        body = next(s for s in state["series"] if s["series_id"] == artist.id)[
-            "render_type"
-        ]["TriMesh"]
-        body["contour"] = dict(levels=levels.tolist(), line=line)
-        body["fill"] = (
-            dict(mode="Bands", shading="Interpolated", opacity=1.0) if filled else None
+        return self._tri_mesh(
+            x, y, z, triangles, cmap=cmap, id=id,
+            contour=dict(levels=levels.tolist(), line=line), filled=filled,
         )
-        self.figure.apply_settings(state)
-        return artist
 
     def tricontourf(self, x, y, z, levels=8, **kwargs):
         kwargs.setdefault("linewidths", 0.0)
@@ -1491,6 +1500,7 @@ class AdvancedMethods:
         vmax=None,
         id=None,
     ):
+        """Bin finite samples, ignoring points outside an explicit extent."""
         from ._features import colorbar
 
         x, y = np.asarray(x), np.asarray(y)
@@ -1502,9 +1512,23 @@ class AdvancedMethods:
             if C.shape != x.shape:
                 raise ValueError("C must match x/y")
             valid &= np.isfinite(C)
+        if extent is not None:
+            extent = tuple(map(float, extent))
+            if (
+                len(extent) != 4
+                or not all(map(math.isfinite, extent))
+                or extent[0] >= extent[1]
+                or extent[2] >= extent[3]
+            ):
+                raise ValueError("extent requires increasing finite x/y bounds")
+            xmin, xmax, ymin, ymax = extent
+            valid &= (xmin <= x) & (x <= xmax) & (ymin <= y) & (y <= ymax)
+        if C is not None:
             C = C[valid]
         x, y = x[valid], y[valid]
         if not x.size:
+            if extent is not None:
+                raise ValueError("hexbin requires finite samples within extent")
             raise ValueError("hexbin requires finite samples")
         nx, ny = (
             (int(gridsize), max(2, round(int(gridsize) / math.sqrt(3))))
@@ -1514,7 +1538,7 @@ class AdvancedMethods:
         if min(nx, ny) < 2:
             raise ValueError("gridsize must be at least two per axis")
         xmin, xmax, ymin, ymax = (
-            map(float, extent)
+            extent
             if extent is not None
             else (float(x.min()), float(x.max()), float(y.min()), float(y.max()))
         )
@@ -1565,7 +1589,8 @@ class AdvancedMethods:
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
         colorbar(cfg, z, cmap, vmin, vmax)
         return self._install_series(
-            [s], [(sid + "/x", xs), (sid + "/y", ys), *zip(names, z)], config=cfg
+            [s], [(sid + "/x", xs), (sid + "/y", ys), *zip(names, z)],
+            config=cfg, missing_columns=set(names),
         )
 
     def plot_surface(
@@ -1609,7 +1634,8 @@ class AdvancedMethods:
         cfg = self._projection_config("3d")
         colorbar(cfg, z, cmap, vmin, vmax)
         return self._install_series(
-            [s], [(sid + "/x", x), (sid + "/y", y), *zip(names, z)], config=cfg
+            [s], [(sid + "/x", x), (sid + "/y", y), *zip(names, z)],
+            config=cfg, missing_columns=set(names),
         )
 
     def plot3D(self, x, y, z, *, color="blue", linewidth=1.5, label=None, id=None):

@@ -48,12 +48,12 @@ class NotebookData:
             value = format_value_labels_json(value, self._label_column, self.model.settings_json())
         return self.model.apply_settings(value)
 
-    def upload_column(self, id, array):
+    def upload_column(self, id, array, *, allow_missing=False):
         if self.sealed:
             raise RuntimeError(
                 "Notebook columns are sealed after display; create a new Figure to change source data"
             )
-        self.model.upload_column(id, array)
+        self.model.upload_column(id, array, allow_missing=allow_missing)
         # Independent snapshot: later user mutations must not alter transferred data.
         little = np.asarray(array, dtype=array.dtype.newbyteorder("<"))
         self.columns[id] = (str(array.dtype), little.tobytes(order="C"))

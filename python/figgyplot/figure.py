@@ -1726,7 +1726,7 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
         """Create a donut; accepts the same labels/material/style options as pie."""
         return self.pie(values, inner_radius=inner_radius, **kwargs)
 
-    def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None, z_column=None):
+    def _add(self, x, y, render_type, label=None, id=None, extra_columns=(), config=None, bounds=None, z_column=None, *, allow_missing_values=False):
         fig = self.figure
         fig._require_data_edit()
         with fig._lock:
@@ -1768,7 +1768,7 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             spec,document=_style_runtime.series(fig,document,spec,self.subplot_id)
             try:
                 for name, array in [(names[0], x), (names[1], y), *extra_columns]:
-                    fig._native.upload_column(name, array)
+                    fig._native.upload_column(name, array, allow_missing=allow_missing_values and name not in names)
                     uploaded.append(name)
                 fig._native.add_series_fitted(
                     json.dumps(spec, allow_nan=False),
@@ -2023,7 +2023,8 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             _set_colorbar(config,cmap,low,high)
             for key in ("left_y", "right_y"):
                 config[key]["inverted"] = origin == "upper"
-            return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext)
+            return self._add(x, y, style, id=id, extra_columns=columns, config=config, bounds=ext,
+                             allow_missing_values=True)
 
     def set_title(self, text, **kwargs):
         """Set the chart title, including newlines; keep other title styles.

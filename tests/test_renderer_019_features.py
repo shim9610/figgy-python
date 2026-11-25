@@ -39,7 +39,7 @@ def populate(ax, kind):
             )
         )
     if kind == "hexbin":
-        return ax.hexbin([0, 1, 2, 1], [0, 1, 0, 2], gridsize=5)
+        return ax.hexbin([0, 0, 1, 100], [0, 0, 1, 100], gridsize=(3, 3), extent=(0, 1, 0, 1))
     if kind == "mesh":
         return ax.tripcolor([0, 1, 0], [0, 0, 1], [1, 2, 3], triangles=[[0, 1, 2]])
     if kind == "tricontour":
@@ -152,6 +152,51 @@ def test_notebook_source_manifest_and_edit_replay(kind):
         assert all(
             item["dtype"] in ("float32", "float64", "uint32") for item in manifest
         )
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("values, expected", [(None, (2, 1)), ([2, 4, 5, 200], (3, 5))])
+def test_sparse_hexbin_counts_and_reduces_only_inside_extent(backend, values, expected):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.hexbin(
+            [0, 0, 1, 100], [0, 0, 1, 100], values, gridsize=(3, 3), extent=(0, 1, 0, 1), id="bins",
+        )
+        extents = json.loads(fig._native.column_extents_json())
+        low, high = expected
+        assert [extents[f"bins/z/{i}"] for i in range(3)] == [[low, low], [None, None], [high, high]]
+        before = fig.get_settings()
+        with pytest.raises(ValueError, match="finite samples within extent"):
+            ax.hexbin([100], [100], extent=(0, 1, 0, 1))
+        assert fig.get_settings() == before
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("kind", ["imshow", "contour", "contourf", "plot_surface"])
+def test_numeric_field_can_have_a_nan_row(backend, kind):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        z = np.array([[1, 2], [np.nan, np.nan], [2, 3], [3, 4]], dtype=np.float32)
+        args = ([0, 1], [0, 1, 2, 3], z) if kind == "plot_surface" else (z,)
+        getattr(ax, kind)(*args, id="field")
+        extents = json.loads(fig._native.column_extents_json())
+        assert extents["field/z/1"] == [None, None]
+        assert extents["field/z/2"] == [2, 3]
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("filled", [False, True])
+def test_triangle_contour_publishes_only_the_complete_mesh(backend, filled):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        revision = fig.revision
+        method = ax.tricontourf if filled else ax.tricontour
+        method([0, 1, 0], [0, 0, 1], [0, 1, 2], levels=[0.5, 1.5], triangles=[[0, 1, 2]])
+        assert fig.revision == revision + 1
+        assert fig.edit_history["undo_count"] == 0
+        mesh = fig.get_settings()["series"][0]["render_type"]["TriMesh"]
+        assert mesh["contour"]["levels"] == [0.5, 1.5]
+        assert (mesh.get("fill") is not None) == filled
 
 
 def test_float32_input_is_preserved_without_changing_original():
@@ -288,6 +333,7 @@ def test_native_and_notebook_initial_domains_match(kind):
             dict(red=255, green=0, blue=0),
         ),
         ("line3d", dict(kind="point", point_index=1), dict(x=1, y=1, z=2)),
+        ("hexbin", dict(kind="matrix_cell", x_index=2, y_index=2), dict(value=1)),
         (
             "quiver3d",
             dict(kind="point", point_index=1),
