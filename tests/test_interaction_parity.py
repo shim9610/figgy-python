@@ -404,9 +404,13 @@ def check_display_frame_ready(page, after_layout_change=False):
 @pytest.mark.parametrize('kind', CASES)
 def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
     owner=lambda s:s['radial'] if kind=='radial' else s['config']
+    # The movement assertions below measure raw pointer deltas.
+    disable_snap = "\nfig.configure(config={'snap_to_guides': False})" if kind != 'radial' else ''
     with figgy.figure(backend='native') as fig:
         ax=fig.axes[0]
         exec(CASES[kind], {'ax':ax})
+        if kind != 'radial':
+            fig.configure(config={'snap_to_guides': False})
         ax.set_title('Shared interaction')
         handle=fig.show(block=False)
         try:
@@ -463,7 +467,7 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
             native_data=fig.get_settings()['radial']['slices'] if kind=='radial' else fig.get_settings()['series']
         finally:
             handle.close();Inputs.pump()
-    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+CASES[kind]+"\nax.set_title('Shared interaction')\ndisplay(fig.widget())"
+    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+CASES[kind]+disable_snap+"\nax.set_title('Shared interaction')\ndisplay(fig.widget())"
     with notebook(tmp_path/kind, source) as (page,execute):
         check_display_frame_ready(page)
         browser_uploads=page.evaluate(ROOT+'.stats.column_uploads')
@@ -534,7 +538,15 @@ def test_bounded_hosts_share_drag_resize_pick_hover_and_export(tmp_path, kind):
 def test_browser_coalesces_input_while_ordinary_frame_is_pending(tmp_path,family):
     """Slow GPU completion must not build a frame backlog ahead of PNG export."""
     setup={'categorical':"ax.bar(['A','B'],[3,5])",'boxplot':"ax.boxplot([[1,2,3],[2,4,6]])",'radar':"ax.radar(['A','B','C'],[2,4,3])"}[family]
-    source="import json\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+setup+"\nax.text(.1,.1,'Probe',coords='ratio',id='probe')\nax.set_title('Frame backpressure')\ndisplay(fig.widget())"
+    source = f"""import json
+import figgyplot as figgy
+fig, ax = figgy.subplots(backend='webgpu')
+{setup}
+fig.configure(config={{'snap_to_guides': False}})
+ax.text(.1, .1, 'Probe', coords='ratio', id='probe')
+ax.set_title('Frame backpressure')
+display(fig.widget())
+"""
     with notebook(tmp_path/'frame-backpressure', source) as (page,execute):
         click_button(page, '[data-properties]')
         page.locator('.figgy-properties').wait_for(state='visible')
@@ -4308,13 +4320,13 @@ ax.configure(chart_title={'offset_x': 55})
                     panel_x, _, panel_width, _ = info['chart_panel']
                     center = panel_x + panel_width / 2
                     start = (x + w / 2, y + h / 2)
-                    if alt:
-                        inputs.xdo('keydown', 'Alt_L')
-                        inputs.pump()
                     try:
                         inputs.input_frame('mousemove', '--window', inputs.wid, *map(round, start))
                         inputs.input_frame('mousedown', 1)
                         try:
+                            # Openbox grabs Alt+left press for window movement.
+                            if alt:
+                                inputs.input_frame('keydown', 'Alt_L')
                             inputs.input_frame('mousemove', '--window', inputs.wid, round(center - 3), round(start[1]))
                             live = guide_pixels(ImageGrab.grab(xdisplay=os.environ['DISPLAY']))
                             if alt:
