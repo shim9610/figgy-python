@@ -22,6 +22,7 @@ def create(session, id='plot', family='line', uploads=None):
     if family=='line':ax.plot([0,1],[2,3],id='signal')
     elif family=='mapped':ax.scatter([0,1],[2,3],c=[1,2],s=[2,4],id='mapped')
     elif family=='matrix':ax.imshow([[1,2],[3,4]],id='field')
+    elif family=='sparse_matrix':ax.imshow([[1,2],[np.nan,np.nan],[3,4]],id='field')
     elif family=='vector':ax.quiver([0,1],[1,2],[2,1],[1,3],id='arrows')
     elif family=='vector_grid':ax.quiver([0,1],[1,2],[[2,1],[1,3]],[[1,2],[3,1]],values=[[1,2],[3,4]],id='arrows')
     elif family=='fill_pair':ax.fill_between([0,1],[2,3],[1,2],id='band')
@@ -35,7 +36,7 @@ def create(session, id='plot', family='line', uploads=None):
     return fig
 
 
-@pytest.mark.parametrize('family',['line','mapped','matrix','vector','vector_grid','fill_pair','pie','bar','box','radar','panels'])
+@pytest.mark.parametrize('family',['line','mapped','matrix','sparse_matrix','vector','vector_grid','fill_pair','pie','bar','box','radar','panels'])
 @pytest.mark.parametrize('backend',['native','webgpu'])
 def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backend,monkeypatch):
     original={}
@@ -54,6 +55,7 @@ def test_complete_binary_checkpoint_restores_all_families(tmp_path,family,backen
         if family == 'pie':assert checkpoint['bounded_data']
         else:assert checkpoint['columns']
         if family == 'box': assert checkpoint['composites']
+        if family == 'sparse_matrix': assert checkpoint['columns']['field/z/1']['allow_missing'] is True
         assert 'Keep this title' not in json.dumps(approved)
         assert_cached_columns(tmp_path/'cache',checkpoint,original)
         assert_cached_bounded(tmp_path/'cache',checkpoint,family)

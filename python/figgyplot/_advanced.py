@@ -225,7 +225,11 @@ class AdvancedMethods:
             uploaded = []
             try:
                 for name, array in columns:
-                    fig._native.upload_column(name, _array(array), allow_missing=name in missing_columns)
+                    values = _array(array)
+                    if name in missing_columns:
+                        fig._native.upload_column(name, values, allow_missing=True)
+                    else:
+                        fig._native.upload_column(name, values)
                     uploaded.append(name)
                 for kind, name, fields in composites:
                     normalized = {
@@ -1502,13 +1506,14 @@ class AdvancedMethods:
     ):
         """Bin finite samples, ignoring points outside an explicit extent."""
         from ._features import colorbar
+        from .figure import _numeric_array
 
-        x, y = np.asarray(x), np.asarray(y)
+        x, y = _numeric_array(x), _numeric_array(y)
         if x.ndim != 1 or y.shape != x.shape or not x.size:
             raise ValueError("x/y must be aligned one-dimensional samples")
         valid = np.isfinite(x) & np.isfinite(y)
         if C is not None:
-            C = np.asarray(C)
+            C = _numeric_array(C)
             if C.shape != x.shape:
                 raise ValueError("C must match x/y")
             valid &= np.isfinite(C)
@@ -1597,8 +1602,9 @@ class AdvancedMethods:
         self, X, Y, Z, *, cmap="viridis", vmin=None, vmax=None, id=None, **style
     ):
         from ._features import colorbar
+        from .figure import _numeric_array
 
-        x, y, z = np.asarray(X), np.asarray(Y), np.asarray(Z)
+        x, y, z = np.asarray(X), np.asarray(Y), _numeric_array(Z)
         if x.ndim == 2 and y.ndim == 2:
             if (
                 x.shape != z.shape

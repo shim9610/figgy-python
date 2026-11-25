@@ -262,15 +262,15 @@ class ChartMethods:
         Explicit levels are SSOT values. An integer requests evenly spaced
         interior levels. ``filled=True`` adds upstream banded field rendering.
         """
-        from .figure import _array, _color
+        from .figure import _array, _color, _numeric_array
         from ._color_scale import _set_colorbar
         if len(args) == 1:
-            z = np.asarray(args[0])
+            z = _numeric_array(args[0])
             if z.ndim != 2:
                 raise ValueError('Z must be a matrix')
             x, y = np.arange(z.shape[1], dtype=float), np.arange(z.shape[0], dtype=float)
         elif len(args) == 3:
-            x, y, z = _array(args[0]), _array(args[1]), np.asarray(args[2])
+            x, y, z = _array(args[0]), _array(args[1]), _numeric_array(args[2])
         else:
             raise TypeError('use contour(Z) or contour(X,Y,Z)')
         if z.ndim != 2 or min(z.shape) < 2 or z.shape != (y.size, x.size) or z.dtype.kind not in 'fiu':

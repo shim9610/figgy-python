@@ -96,14 +96,19 @@ class _CapturedData:
             return value(*args, **kwargs)
         return mutate
 
-    def upload_column(self, name, array):
+    def upload_column(self, name, array, *, allow_missing=False):
         with self.session._store.locked():
             state = self.session._store.read()
             if state['rounds'][-1]['id']!=self.round_id:raise ValueError('Stale Figure from a previous review round')
             doc = self.session._mutable(state, self.figure_id)
             if doc['instance_id']!=self.instance_id:raise ValueError('Stale Figure instance; restore the current checkpoint')
             reference = self.session._store.put(array)
-            self.native.upload_column(name, array)
+            if allow_missing:
+                self.native.upload_column(name, array, allow_missing=True)
+                if np.isnan(array).all():
+                    reference['allow_missing'] = True
+            else:
+                self.native.upload_column(name, array)
             try:
                 doc['columns'][name] = reference
                 self.session._store.write(state)
@@ -628,7 +633,13 @@ class Session:
             try:
                 composite_fields = {token for item in doc.get('composites', {}).values() for token in item['fields'].values()}
                 for name,ref in doc['columns'].items():
-                    if name not in composite_fields: fig._native.upload_column(name,self._store.get(ref))
+                    if name in composite_fields:
+                        continue
+                    values = self._store.get(ref)
+                    if ref.get('allow_missing') is True:
+                        fig._native.upload_column(name, values, allow_missing=True)
+                    else:
+                        fig._native.upload_column(name, values)
                 for name,item in doc.get('composites', {}).items():
                     fig._native.upload_composite(item['kind'], name, {key:self._store.get(doc['columns'][token]) for key,token in item['fields'].items()})
                 family=next((k for k in ('radial','categorical','boxplot','radar') if k in settings),None)

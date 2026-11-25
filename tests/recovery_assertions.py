@@ -13,10 +13,10 @@ class RecordedUploads:
     def __getattr__(self, name):
         return getattr(self.native, name)
 
-    def upload_column(self, name, array):
+    def upload_column(self, name, array, **options):
         assert name not in self.arrays, ('duplicate upload', name)
         original = np.array(array, copy=True)
-        self.native.upload_column(name, array)
+        self.native.upload_column(name, array, **options)
         self.arrays[name] = original
 
     def upload_composite(self, kind, name, fields):

@@ -66,12 +66,24 @@ def _color(value):
     return dict(zip("rgba", map(float, values)))
 
 
+def _float_dtype(dtype):
+    if (dtype.kind in 'fb' and dtype.itemsize <= 4) or (dtype.kind in 'iu' and dtype.itemsize <= 2):
+        return np.float32
+    return np.float64
+
+
+def _numeric_array(value):
+    data = np.asarray(value)
+    if data.dtype.kind in "fiub" and np.ma.is_masked(value):
+        return value.astype(_float_dtype(data.dtype), copy=False).filled(np.nan)
+    return data
+
+
 def _array(value):
-    value = np.asarray(value)
+    value = _numeric_array(value)
     if value.ndim != 1 or not value.size or value.dtype.kind not in "fiub":
         raise ValueError("data must be a non-empty one-dimensional numeric array")
-    dtype = np.float32 if value.dtype.kind in 'fb' and value.dtype.itemsize <= 4 or value.dtype.kind in 'iu' and value.dtype.itemsize <= 2 else np.float64
-    return np.ascontiguousarray(value, dtype=dtype)
+    return np.ascontiguousarray(value, dtype=_float_dtype(value.dtype))
 
 
 class RenderWarning(UserWarning):
@@ -1768,7 +1780,10 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             spec,document=_style_runtime.series(fig,document,spec,self.subplot_id)
             try:
                 for name, array in [(names[0], x), (names[1], y), *extra_columns]:
-                    fig._native.upload_column(name, array, allow_missing=allow_missing_values and name not in names)
+                    if allow_missing_values and name not in names:
+                        fig._native.upload_column(name, array, allow_missing=True)
+                    else:
+                        fig._native.upload_column(name, array)
                     uploaded.append(name)
                 fig._native.add_series_fitted(
                     json.dumps(spec, allow_nan=False),
@@ -1991,9 +2006,10 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
         Existing color-scale styling is preserved; explicit cmap replaces its
         map. Returns the matrix Artist, editable by id with Figure.update.
         """
-        z = np.asarray(z)
+        z = np.asanyarray(z)
         if z.ndim == 3:
             return self.imshow_rgb(z,extent=extent,origin=origin,interpolation=interpolation,id=id)
+        z = _numeric_array(z)
         if z.ndim != 2 or min(z.shape) < 2 or z.dtype.kind not in "fiu":
             raise ValueError("imshow expects a numeric matrix with at least 2 rows and columns")
         if origin not in ("upper", "lower") or interpolation not in ("nearest", "bilinear"):

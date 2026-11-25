@@ -173,15 +173,36 @@ def test_sparse_hexbin_counts_and_reduces_only_inside_extent(backend, values, ex
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])
 @pytest.mark.parametrize("kind", ["imshow", "contour", "contourf", "plot_surface"])
-def test_numeric_field_can_have_a_nan_row(backend, kind):
+@pytest.mark.parametrize("masked", [False, True])
+def test_numeric_field_can_have_a_nan_row(backend, kind, masked):
     with fg.Figure(backend=backend) as fig:
         ax = fig.axes[0]
         z = np.array([[1, 2], [np.nan, np.nan], [2, 3], [3, 4]], dtype=np.float32)
+        if masked:
+            mask = np.isnan(z)
+            z = np.ma.array(np.where(mask, 999, z).astype(np.int16), mask=mask)
         args = ([0, 1], [0, 1, 2, 3], z) if kind == "plot_surface" else (z,)
         getattr(ax, kind)(*args, id="field")
         extents = json.loads(fig._native.column_extents_json())
         assert extents["field/z/1"] == [None, None]
         assert extents["field/z/2"] == [2, 3]
+        if masked:
+            assert z.mask[1].all() and (z.data[1] == 999).all()
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_masked_line_preserves_float32_and_ignores_hidden_values(backend):
+    with fg.Figure(backend=backend) as fig:
+        y = np.ma.array([1, 999, 2], mask=[0, 1, 0], dtype=np.float32)
+        fig.axes[0].plot(y, id="line")
+        extents = json.loads(fig._native.column_extents_json())
+        assert extents["line/y"] == [1, 2]
+        assert fig.axes[0].get_ylim()[1] < 3
+        assert y.mask[1] and y.data[1] == 999
+        if backend == "webgpu":
+            row = fig._native.columns["line/y"]
+            assert row[0] == "float32"
+            np.testing.assert_equal(np.frombuffer(row[1], dtype="<f4"), [1, np.nan, 2])
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])

@@ -3076,7 +3076,7 @@ def test_renderer_019_theme_layout_exports_share_host_state(backend, kind):
 @pytest.mark.parametrize('source,reference,expected',[
     ("ax.boxplot([[1,2,3],[2,4,6]])",dict(kind='histogram_bin',bin_index=1),dict(median=4)),
     ("ax.tripcolor([0,1,0],[0,0,1],[1,2,3],triangles=[[0,1,2]])",dict(kind='mesh_triangle',triangle_index=0),dict(vertices=[0,1,2],values=[1,2,3])),
-    ("ax.hexbin([0,0,1,100],[0,0,1,100],gridsize=(3,3),extent=(0,1,0,1))",dict(kind='matrix_cell',x_index=2,y_index=2),dict(value=1)),
+    ("ax.hexbin(np.ma.array([0,0,1,1,100],mask=[0,0,0,1,0]),[0,0,1,1,100],gridsize=(3,3),extent=(0,1,0,1))",dict(kind='matrix_cell',x_index=2,y_index=2),dict(value=1)),
     ("ax.scatter([0,1],[0,1],[10,20],c=[3,8],s=[2,4],id='points')",dict(kind='point',point_index=1),dict(x=1,y=1,z=20,color_value=8,size_value=4)),
     ("ax.imshow(np.array([[[255,0,0],[0,255,0]],[[0,0,255],[255,255,0]]],dtype=np.uint8))",dict(kind='matrix_cell',x_index=0,y_index=0),dict(red=255,green=0,blue=0)),
     ("ax.energy_levels([dict(id='a',column='S',energy=np.float32(0),label='ground'),dict(id='b',column='P',energy=np.float32(3),label='excited')])",dict(kind='value_label',category_index=1,part='level'),dict(index=1)),
