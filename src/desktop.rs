@@ -768,17 +768,6 @@ impl SurfaceWindow {
                             self.pending_choices = None;
                         }
                         let mut cfg = c.data.chart.config().clone();
-                        let panel = active_panel_mut(&mut cfg);
-                        if panel.view_3d().is_some() {
-                            let dx = (self.cursor.0 - old.0) / scale;
-                            let dy = (self.cursor.1 - old.1) / scale;
-                            if panel.orbit_view(dx, dy) {
-                                c.commit_config(cfg)?;
-                            }
-                            self.last_input = Some(input_received);
-                            self.window.request_redraw();
-                            return Ok(());
-                        }
                         let bounds = c
                             .data
                             .hitmap
@@ -789,25 +778,19 @@ impl SurfaceWindow {
                             )
                             .unwrap()
                             .rect();
-                        let dx = -(self.cursor.0 - old.0) as f64 / bounds.width.max(1.) as f64;
-                        let dy = (self.cursor.1 - old.1) as f64 / bounds.height.max(1.) as f64;
-                        navigate_document_axis(
+                        let dx = self.cursor.0 - old.0;
+                        let dy = self.cursor.1 - old.1;
+                        if crate::view_gesture::apply(
                             &mut cfg,
                             c.data.identity.as_ref(),
-                            "x",
-                            1.,
-                            0.5,
-                            dx,
-                        );
-                        navigate_document_axis(
-                            &mut cfg,
-                            c.data.identity.as_ref(),
-                            "y",
-                            1.,
-                            0.5,
-                            dy,
-                        );
-                        c.commit_config(cfg)?;
+                            crate::view_gesture::Gesture::Pan {
+                                pixels: [dx, dy],
+                                logical: [dx / scale, dy / scale],
+                                area: [bounds.width, bounds.height],
+                            },
+                        ) {
+                            c.commit_config(cfg)?;
+                        }
                         self.last_input = Some(input_received);
                         self.window.request_redraw();
                     }
@@ -1175,15 +1158,6 @@ impl SurfaceWindow {
                 let mut cfg = c.data.chart.config().clone();
                 let delta = if dy != 0. { dy } else { dx };
                 let factor = (-delta.clamp(-12., 12.) * 0.1).exp();
-                let panel = active_panel_mut(&mut cfg);
-                if panel.view_3d().is_some() {
-                    if panel.zoom_view(factor.recip()) {
-                        c.commit_config(cfg)?;
-                        self.last_input = Some(input_received);
-                        self.window.request_redraw();
-                    }
-                    return Ok(());
-                }
                 let bounds = c
                     .data
                     .hitmap
@@ -1199,14 +1173,17 @@ impl SurfaceWindow {
                     1. - ((self.cursor.1 - bounds.y) / bounds.height.max(1.)).clamp(0., 1.) as f64;
                 let ctrl = self.modifiers.control_key();
                 let shift = self.modifiers.shift_key();
-                // Ctrl isolates X, Shift isolates Y; plain wheel zooms both.
-                if !shift || ctrl {
-                    navigate_document_axis(&mut cfg, c.data.identity.as_ref(), "x", factor, x, 0.);
+                if crate::view_gesture::apply(
+                    &mut cfg,
+                    c.data.identity.as_ref(),
+                    crate::view_gesture::Gesture::Zoom {
+                        factor,
+                        anchor: [x, y],
+                        axes: [!shift || ctrl, !ctrl || shift],
+                    },
+                ) {
+                    c.commit_config(cfg)?;
                 }
-                if !ctrl || shift {
-                    navigate_document_axis(&mut cfg, c.data.identity.as_ref(), "y", factor, y, 0.);
-                }
-                c.commit_config(cfg)?;
                 self.last_input = Some(input_received);
                 self.window.request_redraw();
             }
@@ -1834,39 +1811,6 @@ impl SurfaceWindow {
         Ok(())
     }
 }
-/// Transform bounds in axis space so logarithmic and inverted axes behave like
-/// linear axes. Shift is measured as a fraction of the visible span.
-fn navigate_axis(axis: &mut renderer::config::AxisOptions, factor: f64, anchor: f64, shift: f64) {
-    let log = axis.scale == renderer::config::AxisScale::Logarithmic;
-    let (min, max) = if log {
-        (axis.min.log10(), axis.max.log10())
-    } else {
-        (axis.min, axis.max)
-    };
-    let span = max - min;
-    let anchor = if axis.inverted { 1. - anchor } else { anchor };
-    let shift = if axis.inverted { -shift } else { shift };
-    let pivot = min + span * anchor;
-    let low = pivot + (min - pivot) * factor + shift * span;
-    let high = pivot + (max - pivot) * factor + shift * span;
-    let (low, high) = if log {
-        (10_f64.powf(low), 10_f64.powf(high))
-    } else {
-        (low, high)
-    };
-    if low.is_finite()
-        && high.is_finite()
-        && low < high
-        && (!log || low > 0.)
-        && (high - low) <= f32::MAX as f64
-        && low.abs() <= f32::MAX as f64
-        && high.abs() <= f32::MAX as f64
-    {
-        axis.min = low;
-        axis.max = high;
-    }
-}
-
 struct App {
     pending: Vec<(Arc<Mutex<FigureCore>>, Arc<Control>)>,
     windows: HashMap<WindowId, SurfaceWindow>,
@@ -2191,56 +2135,5 @@ fn active_coordinate_config(config: &Config) -> Config {
             config.subplot_config(i).unwrap_or_else(|| config.clone())
         }
         _ => config.clone(),
-    }
-}
-fn active_panel_mut(config: &mut Config) -> &mut Config {
-    match config.active_layer() {
-        renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
-            &mut config.subplots[i].config
-        }
-        _ => config,
-    }
-}
-fn navigate_document_axis(
-    config: &mut Config,
-    identity: Option<&Value>,
-    dimension: &str,
-    factor: f64,
-    anchor: f64,
-    shift: f64,
-) {
-    let layer = config.active_layer();
-    let (panel, overlay) = match layer {
-        renderer::LayerRef::Subplot(i) => (Some(i), None),
-        renderer::LayerRef::SubplotOverlay(i, o) => (Some(i), Some(o)),
-        renderer::LayerRef::Overlay(o) => (None, Some(o)),
-        _ => (None, None),
-    };
-    let cfg = if let Some(i) = panel {
-        &mut config.subplots[i].config
-    } else {
-        config
-    };
-    if dimension == "y"
-        && let Some(o) = overlay
-    {
-        navigate_axis(&mut cfg.overlays[o].y_axis, factor, anchor, shift);
-        if factor != 1. && crate::tick_policy::automatic(identity, layer, "right_y") {
-            crate::tick_policy::retick(&mut cfg.overlays[o].y_axis);
-        }
-    } else if dimension == "x" {
-        for (key, axis) in [("bottom_x", &mut cfg.bottom_x), ("top_x", &mut cfg.top_x)] {
-            navigate_axis(axis, factor, anchor, shift);
-            if factor != 1. && crate::tick_policy::automatic(identity, layer, key) {
-                crate::tick_policy::retick(axis);
-            }
-        }
-    } else {
-        for (key, axis) in [("left_y", &mut cfg.left_y), ("right_y", &mut cfg.right_y)] {
-            navigate_axis(axis, factor, anchor, shift);
-            if factor != 1. && crate::tick_policy::automatic(identity, layer, key) {
-                crate::tick_policy::retick(axis);
-            }
-        }
     }
 }

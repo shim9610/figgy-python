@@ -177,37 +177,16 @@ def tick_owners(meta, owner, key):
 
 
 def set_tick_mode(state, panel_id, overlay_id, side, automatic, *, paired=True, spacing=None):
-    meta = state.get('identity')
-    if meta is None:
+    if state.get('identity') is None:
         return
-    axis = 'x' if side in ('bottom_x', 'top_x', 'x_axis') else 'y'
-    overlay = overlay_config(state, panel_id, overlay_id) if overlay_id else None
-    own = overlay is not None and not overlay.get('link_' + axis, axis == 'x')
-    owner = overlay_id if own else panel_id
-    key = axis + '_axis' if own else side
+    from ._native import tick_mode_json
 
-    def assign(member, axis):
-        if automatic is not None:
-            meta.setdefault('tick_modes', {}).setdefault(member, {})[axis] = 'Auto' if automatic else 'Fixed'
-        else:
-            modes = meta.get('tick_modes', {})
-            if member in modes:
-                modes[member].pop(axis, None)
-                if not modes[member]:
-                    modes.pop(member)
-            if not modes:
-                meta.pop('tick_modes', None)
-
-    configs = panel_configs(state) if spacing is not None and key in ('bottom_x', 'left_y') else {}
-    for member in tick_owners(meta, owner, key):
-        assign(member, key)
-        if configs:
-            configs[member][key]['major_spacing'] = spacing
-    peer = {'bottom_x': 'top_x', 'top_x': 'bottom_x', 'left_y': 'right_y', 'right_y': 'left_y'}.get(key)
-    cfg = panel_config(state, panel_id)
-    if paired and peer and all(cfg[key].get(k) == cfg[peer].get(k) for k in ('min', 'max', 'scale', 'inverted')):
-        for member in tick_owners(meta, owner, peer):
-            assign(member, peer)
+    layer = target_layer(state, panel_id, overlay_id)
+    update = json.loads(tick_mode_json(
+        json.dumps({'config': state['config'], 'identity': state['identity']}, allow_nan=False),
+        json.dumps(layer), side, automatic, paired, spacing,
+    ))
+    state.update(update)
 
 
 def manual_tick_patch(state, patch, panel_id=None, overlay_id=None, _claimed=None):

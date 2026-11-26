@@ -167,13 +167,6 @@ class FigureWidget(anywidget.AnyWidget):
             from ._codegen import editor_code_payload
             from ._native import object_outline_json, bounded_view_json
             catalog=self.figure._editor_catalog_transport()
-            config = settings["config"]
-            layer = config.get("active_layer")
-            if isinstance(layer, dict):
-                panel = layer.get("Subplot", layer.get("SubplotOverlay", [None])[0])
-                if panel is not None:
-                    config = config["subplots"][panel]["config"]
-            dimensions = ("x", "y", "z", "height") if config.get("view_3d") else ("x", "y", "z")
             self.state = {"settings": _calendar_origins(settings, encode=True), "revision": self.figure.revision, "dpi": self.figure.dpi,
                           **editor_code_payload(settings,self.figure._default_config,self.figure.dpi),
                           "edit_history": self.figure.edit_history,
@@ -181,8 +174,7 @@ class FigureWidget(anywidget.AnyWidget):
                           "property_columns": catalog['columns'],
                           "outline": json.loads(object_outline_json(json.dumps(settings))),
                           "bounded_view": json.loads(bounded_view_json(json.dumps(settings))),
-                          "texts": _display_texts(settings),
-                          "log_bounds": {axis: self.figure._native.log_bounds(axis) for axis in dimensions}}
+                          "texts": _display_texts(settings)}
 
     def _command(self, widget, content, buffers):
         action = content.get("action")
@@ -242,11 +234,20 @@ class FigureWidget(anywidget.AnyWidget):
                 self._ready_event.set()
         elif action == "unmounted":
             self._clients.pop(content.get("client"), None)
-        elif action in ('undo', 'redo', 'reset_edits', 'property', 'fit', 'layout', 'settings'):
+        elif action in ('undo', 'redo', 'reset_edits', 'property', 'axis_edit', 'fit', 'layout', 'settings'):
             error = ''
             try:
                 if action=='property':
                     self.figure.edit_property(content['object_id'],content['property_id'],content['value'],expected_revision=content.get('revision'))
+                elif action == 'axis_edit':
+                    with self.figure._lock:
+                        if content.get('revision') != self.figure.revision:
+                            raise ValueError('stale edit: the Figure changed; refresh and retry')
+                        state = self.figure._complete_axis_form(
+                            self.figure.get_settings(), content['target'], content['layer'],
+                            _calendar_origins(content['axis'], encode=False), content.get('automatic'),
+                        )
+                        self.figure.apply_settings(state, expected_revision=content['revision'])
                 elif action == 'settings':
                     self.figure.apply_settings(_calendar_origins(content['settings'], encode=False),
                                                expected_revision=content.get('revision'))

@@ -492,7 +492,7 @@ fn panel_path(layer: renderer::LayerRef) -> String {
 }
 /// SSOT roots use the same layer/decoration addresses as the editor. Review
 /// summaries consume these bindings instead of inventing another object model.
-fn decoration_path(node: &navigation::Node) -> Option<String> {
+fn decoration_path(state: &Value, node: &navigation::Node) -> Option<String> {
     let short = node.target.as_deref()?.rsplit(':').next()?;
     let panel = panel_path(node.layer);
     Some(match short {
@@ -501,28 +501,20 @@ fn decoration_path(node: &navigation::Node) -> Option<String> {
         "data_area" => format!("{panel}/chart_area"),
         _ if short.starts_with("colorbar") => format!("{panel}/colorbar"),
         _ if short.starts_with("axis_") || short.starts_with("tick_labels_") => {
-            let side = short.rsplit('_').next()?;
-            let axis = match side {
-                "bottom" => "bottom_x",
-                "top" => "top_x",
-                "left" => "left_y",
-                _ => "right_y",
-            };
-            let base = match node.layer {
-                renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i)
-                    if side == "right" =>
-                {
-                    format!("{panel}/overlays/{i}/y_axis")
-                }
-                _ => format!("{panel}/{axis}"),
-            };
-            if short.starts_with("axis_title_") {
-                format!("{base}/title_option")
-            } else if short.starts_with("tick_labels_") {
-                format!("{base}/label_style")
+            let (target, suffix) = if let Some(side) = short.strip_prefix("axis_title_") {
+                (format!("axis_{side}"), "/title_option")
             } else {
-                base
-            }
+                (
+                    short.to_owned(),
+                    if short.starts_with("tick_labels_") {
+                        "/label_style"
+                    } else {
+                        ""
+                    },
+                )
+            };
+            let axis = crate::axis_edit::address(state, &target, node.layer)?;
+            format!("{}{suffix}", axis.path)
         }
         _ => return None,
     })
@@ -609,7 +601,7 @@ pub(crate) fn review_object_bindings_json(settings: &str) -> PyResult<String> {
         if target.ends_with("colorbar_axis") {
             return vec![format!("{panel}/colorbar/axis")];
         }
-        decoration_path(node).into_iter().collect()
+        decoration_path(state, node).into_iter().collect()
     }
     fn visit(state: &Value, nodes: &[navigation::Node], out: &mut Vec<Value>) {
         for node in nodes {
@@ -1259,7 +1251,7 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
         }
     } else {
         let config = state.pointer(&panel).unwrap();
-        let path = decoration_path(node);
+        let path = decoration_path(state, node);
         if short.starts_with("colorbar") {
             colorbar_fields(fields, state, &panel);
             let path = if short == "colorbar_title" {
@@ -1290,6 +1282,22 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     "",
                 );
             }
+        }
+        if node.kind == "axis"
+            && let Some(axis) = crate::axis_edit::address(state, target, node.layer)
+        {
+            field(
+                fields,
+                json!(tick_policy::automatic(
+                    state.get("identity"),
+                    axis.layer,
+                    axis.side
+                )),
+                &format!("{}/auto_ticks", axis.path),
+                "Layout and appearance",
+                "auto_ticks",
+                "Automatic tick spacing",
+            );
         }
         if short == "data_area" || target == "figure" {
             links::fields(fields, state, node.layer);
@@ -1659,8 +1667,20 @@ impl editor::Editor {
                             .or_insert(response.rect);
                         if changed {
                             let mut extents=json!(c.data.columns.iter().map(|(name,(_,min,max))|(name.clone(),json!([min,max]))).collect::<serde_json::Map<_,_>>());
-                            if field.id=="Color scale/axis/scale"&&value=="Logarithmic" {
-                                if let Ok(bounds)=c.log_bounds_for("z",object.layer){extents["_positive"]=json!(bounds);}
+                            if field.id.ends_with("/scale") && value == "Logarithmic" {
+                                let settings = serde_json::to_value(c.snapshot()).unwrap();
+                                let axis = object.target.as_deref()
+                                    .and_then(|target| crate::axis_edit::address(&settings, target, object.layer));
+                                let domain = if field.id == "Color scale/axis/scale" {
+                                    Some(("z", object.layer))
+                                } else {
+                                    axis.as_ref().map(|a| (a.dimension, a.layer))
+                                };
+                                if let Some((dimension, layer)) = domain
+                                    && let Ok(bounds) = c.log_bounds_for(dimension, layer)
+                                {
+                                    extents["_positive"] = json!(bounds);
+                                }
                             }
                             match apply(&c.snapshot(), &object.id, &field.id, value, &extents)
                                 .and_then(|v| c.apply_settings(&v.to_string()))
@@ -1978,6 +1998,38 @@ pub(crate) fn apply(
             placement.insert(other, field.value.clone());
         }
     }
+    let positive = || {
+        serde_json::from_value(extents["_positive"].clone())
+            .map_err(|_| invalid("positive data limits are required for a logarithmic axis"))
+    };
+    if let Some(target) = object.target.as_deref()
+        && let Some(axis) = crate::axis_edit::address(&result, target, object.layer)
+        && let Some(path) = field.path.strip_prefix(&format!("{}/", axis.path))
+        && let Some(mut candidate) = result.pointer(&axis.path).cloned()
+    {
+        let mode = match path {
+            "auto_ticks" => Some(
+                value
+                    .as_bool()
+                    .ok_or_else(|| invalid("automatic ticks must be boolean"))?,
+            ),
+            "major_spacing" => Some(false),
+            _ => None,
+        };
+        if path != "auto_ticks" {
+            let (parent, key) = path.rsplit_once('/').unwrap_or(("", path));
+            let node = if parent.is_empty() {
+                &mut candidate
+            } else {
+                candidate
+                    .pointer_mut(&format!("/{parent}"))
+                    .ok_or_else(|| invalid("axis property owner changed"))?
+            };
+            node[key.replace("~1", "/").replace("~0", "~")] = value;
+        }
+        crate::axis_edit::apply(&mut result, &axis, candidate, mode, positive)?;
+        return Ok(result);
+    }
     if let Some(node) = result.pointer_mut(&field.path) {
         *node = value;
     } else {
@@ -1988,51 +2040,7 @@ pub(crate) fn apply(
             .insert(key.replace("~1", "/").replace("~0", "~"), value);
     }
     if field.id == "Color scale/axis/scale" {
-        let axis = result.pointer_mut(parent).unwrap();
-        if axis["scale"] == "Logarithmic" && axis["min"].as_f64().is_some_and(|v| v <= 0.) {
-            let bounds = extents["_positive"]
-                .as_array()
-                .filter(|v| v.len() == 2)
-                .ok_or_else(|| {
-                    invalid("set a positive color domain before choosing logarithmic scale")
-                })?;
-            axis["min"] = bounds[0].clone();
-            axis["max"] = bounds[1].clone();
-        }
-        axis["major_spacing"] = if axis["scale"] == "Logarithmic" {
-            json!(1.)
-        } else {
-            json!((axis["max"].as_f64().unwrap() - axis["min"].as_f64().unwrap()) / 5.)
-        };
-    }
-    // Numeric axis commands carry the same tick intent as the specialised
-    // forms. Resolve the command's owner, not whichever panel happens to have
-    // keyboard focus in another view.
-    if !field.path.contains("/colorbar/")
-        && result
-            .pointer(parent)
-            .is_some_and(|axis| axis.get("major_spacing").is_some() && axis.get("scale").is_some())
-    {
-        let side = parent.rsplit('/').next().unwrap();
-        let side = if side == "y_axis" { "right_y" } else { side };
-        if key == "major_spacing" {
-            let active = result["config"].get("active_layer").cloned();
-            result["config"]["active_layer"] = serde_json::to_value(object.layer).unwrap();
-            crate::tick_policy::set_mode(&mut result, side, false);
-            crate::tick_policy::synchronize_spacing(&mut result, side);
-            if let Some(active) = active {
-                result["config"]["active_layer"] = active;
-            } else {
-                result["config"]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove("active_layer");
-            }
-        } else if matches!(key, "min" | "max")
-            && crate::tick_policy::automatic(state.identity.as_ref(), object.layer, side)
-        {
-            crate::tick_policy::retick_value(result.pointer_mut(parent).unwrap());
-        }
+        crate::axis_edit::apply_scale(result.pointer_mut(parent).unwrap(), positive, false)?;
     }
     if field.path.starts_with("/identity/layout/placement/")
         || field.path == "/identity/layout/gap"

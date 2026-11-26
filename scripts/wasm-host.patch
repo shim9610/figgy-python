@@ -23,7 +23,17 @@ diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.
 index 918964b..4001af2 100644
 --- a/crates/web/src/web/chart/frame.rs
 +++ b/crates/web/src/web/chart/frame.rs
-@@ -188,6 +188,247 @@ impl FiggyChart {
+@@ -2,6 +2,9 @@
+ 
+ use super::*;
+ 
++#[path = "view_gesture.rs"]
++mod view_gesture;
++
+ #[wasm_bindgen]
+ impl FiggyChart {
+     // ---- frame / resize / export ----
+@@ -188,6 +191,254 @@ impl FiggyChart {
          Ok(())
      }
  
@@ -46,22 +56,29 @@ index 918964b..4001af2 100644
 +        Ok(())
 +    }
 +
-+    /// Orbit or zoom the active panel's camera with the renderer model's rules.
-+    pub fn navigate_camera(&mut self, dx: f32, dy: f32, factor: f64) -> Result<bool, JsValue> {
-+        let (dx, dy) = self.display_delta_to_document(dx, dy)?;
++    /// Apply a canvas drag to the active panel.
++    pub fn pan_host_view(&mut self, identity: &str, dx: f32, dy: f32, width: f32, height: f32) -> Result<bool, JsValue> {
++        let (x, y) = self.display_delta_to_document(dx, dy)?;
++        self.apply_view_gesture(identity, view_gesture::Gesture::Pan {
++            pixels: [dx, dy], logical: [x, y], area: [width, height],
++        })
++    }
++
++    /// Apply a wheel zoom to the active panel.
++    pub fn zoom_host_view(&mut self, identity: &str, factor: f64, x: f64, y: f64, zoom_x: bool, zoom_y: bool) -> Result<bool, JsValue> {
++        self.apply_view_gesture(identity, view_gesture::Gesture::Zoom {
++            factor, anchor: [x, y], axes: [zoom_x, zoom_y],
++        })
++    }
++
++    fn apply_view_gesture(&mut self, identity: &str, gesture: view_gesture::Gesture) -> Result<bool, JsValue> {
++        let identity = serde_json::from_str(identity).map_err(js_err)?;
 +        let mut config = self.chart_config()?.clone();
-+        let panel = match config.active_layer() {
-+            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
-+                &mut config.subplots[i].config
-+            }
-+            _ => &mut config,
-+        };
-+        let orbited = panel.orbit_view(dx, dy);
-+        let zoomed = panel.zoom_view(factor);
-+        if orbited || zoomed {
-+            self.replace_chart_config(config)?;
++        if !view_gesture::apply(&mut config, Some(&identity), gesture) {
++            return Ok(false);
 +        }
-+        Ok(orbited || zoomed)
++        self.replace_chart_config(config)?;
++        Ok(true)
 +    }
 +
 +    /// Refresh the registered chart's data and pick masks without presenting it.

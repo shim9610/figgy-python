@@ -1444,10 +1444,6 @@ export class FiggyChart {
      */
     monotonic_groups(): FiggyJson;
     /**
-     * Orbit or zoom the active panel's camera with the renderer model's rules.
-     */
-    navigate_camera(dx: number, dy: number, factor: number): boolean;
-    /**
      * The monotonic series that need their group's source before they
      * can be drawn, as JSON `[{ series_id, group, change }]` (#271):
      * series whose group was never supplied, which draw nothing until
@@ -1490,6 +1486,10 @@ export class FiggyChart {
      * again (#205).
      */
     on_release(): void;
+    /**
+     * Apply a canvas drag to the active panel.
+     */
+    pan_host_view(identity: string, dx: number, dy: number, width: number, height: number): boolean;
     /**
      * The panel on top at physical canvas point `(x, y)` (#312), as JSON
      * `{ layer, panel, subplot, active, in_data_area, document }`, or
@@ -2439,6 +2439,10 @@ export class FiggyChart {
      */
     wait_submitted_work(): Promise<void>;
     /**
+     * Apply a wheel zoom to the active panel.
+     */
+    zoom_host_view(identity: string, factor: number, x: number, y: number, zoom_x: boolean, zoom_y: boolean): boolean;
+    /**
      * Zoom a 3D chart's camera (`Config.view_3d`): the eye distance is
      * divided by `factor` and clamped (`Config::zoom_view`). Returns whether
      * the view changed; a flat chart never does.
@@ -2899,12 +2903,12 @@ export interface InitOutput {
     readonly figgychart_legend_entry: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_load_demo: (a: number) => [number, number];
     readonly figgychart_monotonic_groups: (a: number) => [number, number, number, number];
-    readonly figgychart_navigate_camera: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly figgychart_needs_source: (a: number) => [number, number, number, number];
     readonly figgychart_next_view_point_index: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
     readonly figgychart_on_move: (a: number, b: number, c: number) => [number, number];
     readonly figgychart_on_press: (a: number, b: number, c: number) => [number, number, number];
     readonly figgychart_on_release: (a: number) => [number, number];
+    readonly figgychart_pan_host_view: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
     readonly figgychart_panel_at: (a: number, b: number, c: number) => [number, number, number, number];
     readonly figgychart_pick_data: (a: number, b: number, c: number, d: number) => any;
     readonly figgychart_pick_point: (a: number, b: number, c: number, d: number) => any;
@@ -3006,6 +3010,7 @@ export interface InitOutput {
     readonly figgychart_update_register_column_f32: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgychart_update_register_column_f64: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly figgychart_wait_submitted_work: (a: number) => any;
+    readonly figgychart_zoom_host_view: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
     readonly figgychart_zoom_view: (a: number, b: number) => [number, number, number];
     readonly figgyreadiness_pipelines_ready: (a: number) => any;
     readonly figgyreadiness_series_ready: (a: number) => any;
@@ -3025,11 +3030,11 @@ export interface InitOutput {
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined___js_sys_bd561c7fc2e002d3___Function_fn_wasm_bindgen_54fefb75fc756602___JsValue_____wasm_bindgen_54fefb75fc756602___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__305: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__306: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__307: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_: (a: number, b: number, c: any) => void;
-    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__304: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__305: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

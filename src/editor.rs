@@ -1351,6 +1351,9 @@ impl Editor {
             None
         };
         let target = target.rsplit(':').next().unwrap_or(target);
+        let axis_target =
+            crate::axis_edit::address(&state, target, c.data.chart.config().active_layer());
+        let mut tick_mode = None;
         let mut changed = false;
         let legend_owners: std::collections::HashSet<String> = state["series"]
             .as_array()
@@ -1378,8 +1381,18 @@ impl Editor {
         let config = state.pointer(&scoped_path).unwrap().clone();
         let mut config = config;
         let original_right = config["right_y"].clone();
+        let original_top = config["top_x"].clone();
         if let Some(i) = overlay_index {
-            config["right_y"] = config["overlays"][i]["y_axis"].clone();
+            if config["overlays"][i]["link_y"] != true {
+                config["right_y"] = config["overlays"][i]["y_axis"].clone();
+            }
+            if config["overlays"][i]["link_x"] == false {
+                config["top_x"] = config["overlays"][i]["x_axis"].clone();
+            }
+        }
+        if let Some(address) = &axis_target {
+            let key = axis_key(target.rsplit('_').next().unwrap());
+            config[key] = state.pointer(&address.path).unwrap().clone();
         }
         let visibility = match target {
             "chart_title" => Some((&mut config["chart_title"], "visible")),
@@ -1523,18 +1536,16 @@ impl Editor {
             changed |= label_format_controls(ui, node, &mut self.controls);
         } else if target.starts_with("axis_") {
             let key = axis_key(target.trim_start_matches("axis_"));
+            let address = axis_target.as_ref().unwrap();
             let mut automatic = crate::tick_policy::automatic(
                 c.data.identity.as_ref(),
-                c.data.chart.config().active_layer(),
-                key,
+                address.layer,
+                address.side,
             );
             let response = ui.checkbox(&mut automatic, "Automatic tick spacing");
             self.controls.insert("auto_ticks".into(), response.rect);
             if response.changed() {
-                crate::tick_policy::set_mode(&mut state, key, automatic);
-                if automatic {
-                    crate::tick_policy::retick_value(&mut config[key]);
-                }
+                tick_mode = Some(automatic);
                 changed = true;
             }
             let node = &mut config[key];
@@ -1591,9 +1602,6 @@ impl Editor {
                 | number(ui, node, "max", "Maximum", "", &mut self.controls);
             changed |= range_changed;
             let node = &mut config[key];
-            if range_changed && automatic {
-                crate::tick_policy::retick_value(node);
-            }
             let spacing_changed = number(
                 ui,
                 node,
@@ -1603,7 +1611,7 @@ impl Editor {
                 &mut self.controls,
             );
             if spacing_changed {
-                crate::tick_policy::set_mode(&mut state, key, false);
+                tick_mode = Some(false);
                 changed = true;
             }
             changed |= number(
@@ -1627,75 +1635,29 @@ impl Editor {
             }
         }
         if changed {
-            // A scale switch is a view helper: use the positive data domain if
-            // the old linear limits cross zero, without editing source arrays.
-            let right_dimension = if config["view_3d"].is_object() {
-                "height"
-            } else {
-                "y"
-            };
-            for (key, dimension) in [
-                ("bottom_x", "x"),
-                ("top_x", "x"),
-                ("left_y", "y"),
-                ("right_y", right_dimension),
-                ("colorbar", "z"),
-            ] {
-                if !config[key].is_object() {
-                    continue;
+            if let Some(address) = &axis_target {
+                let key = axis_key(target.rsplit('_').next().unwrap());
+                let axis = std::mem::take(&mut config[key]);
+                let result = crate::axis_edit::apply(&mut state, address, axis, tick_mode, || {
+                    c.log_bounds_for(address.dimension, address.layer)
+                });
+                if let Err(error) = result {
+                    self.error = error.to_string();
+                    return;
                 }
-                let old = if key == "colorbar" {
-                    &state.pointer(&scoped_path).unwrap()[key]["axis"]
-                } else {
-                    &state.pointer(&scoped_path).unwrap()[key]
-                };
-                let axis = if key == "colorbar" {
-                    &mut config[key]["axis"]
-                } else {
-                    &mut config[key]
-                };
-                if axis["scale"] == "Logarithmic"
-                    && old["scale"] != "Logarithmic"
-                    && axis["min"].as_f64().is_some_and(|v| v <= 0.)
-                {
-                    match c.log_bounds(dimension) {
-                        Ok((min, max)) => {
-                            axis["min"] = json!(min);
-                            axis["max"] = json!(max);
-                        }
-                        Err(e) => {
-                            self.error = e.to_string();
-                            return;
-                        }
+            } else {
+                if let Some(i) = overlay_index {
+                    if config["overlays"][i]["link_y"] != true {
+                        config["overlays"][i]["y_axis"] = config["right_y"].clone();
+                        config["right_y"] = original_right;
+                    }
+                    if config["overlays"][i]["link_x"] == false {
+                        config["overlays"][i]["x_axis"] = config["top_x"].clone();
+                        config["top_x"] = original_top;
                     }
                 }
+                *state.pointer_mut(&scoped_path).unwrap() = config;
             }
-        }
-        // Secondary Y axes have independent ownership even when their numeric
-        // domains happen to match the panel's primary axes.
-        if changed && overlay_index.is_none() {
-            crate::axis_edit::sync_linked_axis_edit(
-                state.pointer(&scoped_path).unwrap(),
-                &mut config,
-                target,
-            );
-        }
-        if let Some(i) = overlay_index {
-            config["overlays"][i]["y_axis"] = config["right_y"].clone();
-            config["right_y"] = original_right;
-        }
-        *state.pointer_mut(&scoped_path).unwrap() = config;
-        if changed
-            && matches!(
-                target,
-                "axis_bottom" | "axis_top" | "axis_left" | "axis_right"
-            )
-        {
-            for side in ["bottom_x", "left_y"] {
-                crate::tick_policy::synchronize_spacing(&mut state, side);
-            }
-        }
-        if changed {
             match c.apply_settings(&state.to_string()) {
                 Ok(_) => {
                     self.error.clear();
@@ -1857,11 +1819,6 @@ fn scale_control(
         return false;
     }
     axis["scale"] = json!(value);
-    axis["major_spacing"] = json!(if value == "Logarithmic" {
-        1.0
-    } else {
-        (axis["max"].as_f64().unwrap() - axis["min"].as_f64().unwrap()) / 5.0
-    });
     true
 }
 

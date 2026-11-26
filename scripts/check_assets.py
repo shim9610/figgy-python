@@ -30,6 +30,7 @@ HOST_PATCH_FILES = {
     "crates/web/src/web/chart/state.rs",
     "crates/web/src/radial.rs",
 }
+SHARED_HOST_SOURCES = ("src/view_gesture.rs", "src/tick_policy.rs")
 
 
 def host_patch_record(root):
@@ -57,7 +58,9 @@ def host_patch_record(root):
             or {entry[2] for entry in entries} != HOST_PATCH_FILES):
         raise ValueError("WASM host patch may only add code to the allowed unpublished bridge files")
     return {"path": HOST_PATCH, "sha256": hashlib.sha256(data).hexdigest(),
-            "files": sorted(HOST_PATCH_FILES)}
+            "files": sorted(HOST_PATCH_FILES),
+            "shared_sources": {source: hashlib.sha256((Path(root) / source).read_bytes()).hexdigest()
+                               for source in SHARED_HOST_SOURCES}}
 
 
 def native_registry_packages(root):

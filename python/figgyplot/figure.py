@@ -18,7 +18,7 @@ from . import _style_runtime
 from . import _chart_text
 from ._colors import CSS4_COLORS
 from ._matplotlib import ArtistMethods, AxesMethods, FigureMethods, Legend, Text
-from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, sync_linked_axis_edit_json, text_segments_json
+from ._native import NativeFigure, __version__, fitted_chart_title_margin, font_family_available, segments_plain_text, text_segments_json
 
 _COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 _NAMED = dict(CSS4_COLORS, b="#0000ff", r="#ff0000", g="#008000", k="#000000", w="#ffffff")
@@ -566,10 +566,16 @@ class Figure(FigureMethods):
             if expected_revision is not None and expected_revision != self.revision:
                 raise ValueError('stale edit: the Figure changed; refresh and retry')
             extents=json.loads(self._native.column_extents_json())
-            if property_id=='Color scale/axis/scale' and value=='Logarithmic':
+            settings = self.get_settings()
+            if property_id in ('Color scale/axis/scale', 'Layout and appearance/scale') and value == 'Logarithmic':
                 owner=self.editor_properties(object_id)
-                extents['_positive']=self._native.log_bounds_at('z',json.dumps(owner['layer']))
-            state=json.loads(editor_property_json(json.dumps(self.get_settings(),allow_nan=False),
+                if property_id == 'Color scale/axis/scale':
+                    extents['_positive'] = self._native.log_bounds_at('z', json.dumps(owner['layer']))
+                elif owner and owner['target'] and owner['target'].rsplit(':', 1)[-1] in ('axis_bottom', 'axis_top', 'axis_left', 'axis_right'):
+                    address, axis = self._axis_form(settings, owner['target'], owner['layer'])
+                    if axis['min'] <= 0:
+                        extents['_positive'] = self._native.log_bounds_at(address['dimension'], json.dumps(address['layer']))
+            state=json.loads(editor_property_json(json.dumps(settings,allow_nan=False),
                 object_id,property_id,json.dumps(value,allow_nan=False),json.dumps(extents,allow_nan=False)))
             return self.apply_settings(state,expected_revision=expected_revision)
 
@@ -724,6 +730,29 @@ class Figure(FigureMethods):
         for message in self._native.take_render_warnings():
             _warn_external(message, RenderWarning)
 
+    def _axis_form(self, state, target, layer):
+        from ._native import axis_address_json
+
+        address = json.loads(axis_address_json(json.dumps({"config": state["config"]}, allow_nan=False), json.dumps(layer), target))
+        axis = state
+        for part in address["path"].split("/")[1:]:
+            axis = axis[int(part)] if isinstance(axis, list) else axis[part]
+        return address, axis
+
+    def _complete_axis_form(self, state, target, layer, axis, automatic=None):
+        from ._native import complete_axis_edit_json
+
+        address, previous = self._axis_form(state, target, layer)
+        positive = None
+        if axis["scale"] == "Logarithmic" and axis["scale"] != previous["scale"] and axis["min"] <= 0:
+            positive = self._native.log_bounds_at(address["dimension"], json.dumps(address["layer"]))
+        subset = {"config": state["config"], "identity": state.get("identity")}
+        state.update(json.loads(complete_axis_edit_json(
+            json.dumps(subset, allow_nan=False), json.dumps(layer), target,
+            json.dumps(axis, allow_nan=False), automatic, positive,
+        )))
+        return state
+
     def update(self, target, *, _axes=None, **properties):
         """Edit a stable series/decorative target using familiar property names.
 
@@ -820,7 +849,12 @@ class Figure(FigureMethods):
                     from ._color_scale import update_color_scale
                     update_color_scale(cfg, **scale_changes)
             else:
-                before_config = copy.deepcopy(cfg)
+                axis_target = target.startswith(("axis_", "tick_labels_")) and not target.startswith("axis_title_")
+                if axis_target:
+                    layer = (_document.target_layer(state, _axes.subplot_id, _axes.overlay_id)
+                             if _axes is not None else "Base")
+                    _, node = self._axis_form(state, target, layer)
+                    candidate = copy.deepcopy(node)
                 if target == "chart_title":
                     node, rich = cfg["chart_title"], cfg["chart_title"]["text"]
                 elif target == "legend":
@@ -829,16 +863,11 @@ class Figure(FigureMethods):
                     axis = _axis_key(target[len("axis_title_"): ])
                     axis_node = _axes._axis_node(state, "x" if axis in ("bottom_x","top_x") else "y") if _axes is not None and _axes.overlay_id else cfg[axis]
                     node, rich = axis_node["title_option"], axis_node["title_option"]["text"]
-                elif target.startswith("tick_labels_"):
-                    node = cfg[_axis_key(target[len("tick_labels_"): ])]["label_style"]
-                    rich = None
-                elif target.startswith("axis_"):
-                    node = cfg[_axis_key(target[len("axis_"): ])]
+                elif axis_target:
+                    node = candidate["label_style"] if target.startswith("tick_labels_") else candidate
                     rich = None
                 else:
                     raise ValueError(f"unknown editable target: {target}")
-                if 'major_spacing' in properties and target.startswith('axis_') and not target.startswith('axis_title_'):
-                    _document.set_tick_mode(state,_axes.subplot_id if _axes else state['identity']['panels'][0]['id'],_axes.overlay_id if _axes else None,_axis_key(target[len('axis_'):]),False,spacing=properties['major_spacing'])
                 for key, value in properties.items():
                     if key == "text" and rich is not None:
                         rich["segments"] = _segments(value, dpi=self.dpi)
@@ -890,18 +919,9 @@ class Figure(FigureMethods):
                 # enlarged) grows it instead of being clipped at the top.
                 if target == "chart_title" and {"text", "fontsize", "font", "visible"} & properties.keys():
                     cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
-                if target.startswith("axis_") and not target.startswith("axis_title_") and "scale" in properties:
-                    axis = _axis_key(target[len("axis_"):])
-                    node = cfg[axis]
-                    if node["scale"] == "Logarithmic" and before_config[axis]["scale"] != "Logarithmic" and node["min"] <= 0:
-                        dimension = "height" if axis == "right_y" and cfg.get("view_3d") else axis[-1]
-                        node["min"], node["max"] = self._native.log_bounds(dimension)
-                    if "major_spacing" not in properties:
-                        node["major_spacing"] = 1.0 if node["scale"] == "Logarithmic" else (node["max"] - node["min"]) / 5
-                reconciled = json.loads(sync_linked_axis_edit_json(
-                    json.dumps(before_config, allow_nan=False), json.dumps(cfg, allow_nan=False), target))
-                cfg.clear()
-                cfg.update(reconciled)
+                if axis_target:
+                    automatic = False if target.startswith("axis_") and "major_spacing" in properties else None
+                    state = self._complete_axis_form(state, target, layer, candidate, automatic)
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in ([series] if series is not None else []):
                 for style in spec["render_type"].values():
@@ -2113,11 +2133,11 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             if scale == "log" and any(node["min"] <= 0 for node in nodes):
                 layer = _document.target_layer(state, self.subplot_id, self.overlay_id)
                 bounds = self.figure._native.log_bounds_at("height" if axis == "z" else axis, json.dumps(layer))
-            for node in nodes:
-                if bounds is not None and node["min"] <= 0:
-                    node["min"], node["max"] = bounds
-                node["scale"] = scales[scale]
-                node["major_spacing"] = 1.0 if scale == "log" else (node["max"] - node["min"]) / 5
+            from ._native import scale_axes_json
+
+            updated = json.loads(scale_axes_json(json.dumps(nodes), scales[scale], bounds))
+            for node, replacement in zip(nodes, updated):
+                node.update(replacement)
             self.figure.apply_settings(state)
 
     def set_xscale(self, scale):

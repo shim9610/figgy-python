@@ -90,7 +90,7 @@ def registry_pairing(tmp_path):
     (tmp_path / "Cargo.lock").write_text(lock)
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/build-wasm.sh").write_text("revision=" + revision + "\n")
-    shutil.copyfile(ROOT / "scripts/wasm-host.patch", tmp_path / "scripts/wasm-host.patch")
+    copy_host_sources(tmp_path)
     patch = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"](tmp_path)
     assets = tmp_path / "python/figgyplot/assets"
     assets.mkdir(parents=True)
@@ -103,6 +103,13 @@ def registry_pairing(tmp_path):
 def check_pairing(root):
     runpy.run_path(str(ROOT / "scripts/check_assets.py"))["check_renderer_revision"](root)
 
+def copy_host_sources(root):
+    sources = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["SHARED_HOST_SOURCES"]
+    for relative in ("scripts/wasm-host.patch", *sources):
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, path)
+
 
 def test_host_patch_check_does_not_depend_on_callers_git_subdirectory(registry_pairing, monkeypatch):
     monkeypatch.chdir(ROOT / "scripts")
@@ -114,12 +121,12 @@ def test_host_patch_inside_another_checkout(tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     nested = tmp_path / "ci-results" / "fixture"
     (nested / "scripts").mkdir(parents=True)
-    shutil.copyfile(ROOT / "scripts/wasm-host.patch", nested / "scripts/wasm-host.patch")
+    copy_host_sources(nested)
     checker = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"]
     assert checker(nested) == checker(ROOT)
 
 
-@pytest.mark.parametrize("change", ["bytes", "missing", "hash", "path", "files"])
+@pytest.mark.parametrize("change", ["bytes", "shared", "missing", "hash", "path", "files"])
 def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
     import json
     check_pairing(registry_pairing)
@@ -128,6 +135,9 @@ def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
     if change == "bytes":
         patch = registry_pairing / "scripts/wasm-host.patch"
         patch.write_text(patch.read_text().replace("Host fence", "Host wait"))
+    elif change == "shared":
+        source = registry_pairing / "src/view_gesture.rs"
+        source.write_text(source.read_text() + "\n")
     elif change == "missing":
         del provenance["wasm_host_patch"]
     elif change == "hash":

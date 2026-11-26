@@ -64,22 +64,6 @@ function segments(value) {return Array.from(value,c=>({text:c,superscript:false,
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
 // Properties controls edit both sides of an implicitly shared axis. Raw SSOT
 // installation deliberately bypasses this helper, preserving independent axes.
-function reconcilePairedAxisEdit(before,state,target){
-  const match=/^(?:axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
-  if(!match)return;
-  const key=side[match[1]],other={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[key];
-  if(before.config?.view_3d&&key.endsWith('_y'))return;
-  const previous=before.config?.[key],peerBefore=before.config?.[other],axis=state.config?.[key],peer=state.config?.[other];
-  if(!previous||!peerBefore||!axis||!peer)return;
-  if(!['min','max','scale','inverted'].every(name=>previous[name]===peerBefore[name]))return;
-  const changed=(old,value)=>JSON.stringify(old)!==JSON.stringify(value);
-  for(const name of ['min','max','scale','inverted','major_spacing','minor_count','tick','major_tick_length','minor_tick_length','line_color','line_width','line_style']){
-    if(changed(previous[name],axis[name]))peer[name]=clone(axis[name]);
-  }
-  for(const [name,value] of Object.entries(axis.label_style??{})){
-    if(!['label_offset_x','label_offset_y'].includes(name)&&changed(previous.label_style?.[name],value))peer.label_style[name]=clone(value);
-  }
-}
 const ids = ['chart_title','legend','data_area','colorbar','colorbar_axis','colorbar_tick_labels','colorbar_title',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
 const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',label_format:'Number format',significant_digits:'Significant digits',auto_ticks:'Automatic tick spacing',font_size:'Font size',font:'Font family',line_width:'Line width'};
 const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
@@ -244,6 +228,10 @@ export function render({model,el}) {
   });
   model.on('change:review',reviewState);model.on('change:status',reviewState);model.on('msg:custom',reviewMessage);reviewState();
   function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
+  function requestReplay(action,args){
+    historyBusy=true;historyControls();
+    return new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args});});
+  }
   function replayEdit(action,args={}){
     const operation=controlQueue.then(async()=>{
       await queue;await flush();if(disposed)throw Error('Widget disposed');
@@ -252,8 +240,7 @@ export function render({model,el}) {
         const field=propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id);
         if(!field||JSON.stringify(field.value)!==JSON.stringify(base_value))throw Error('stale edit: the property changed; refresh and retry');
       }
-      historyBusy=true;historyControls();
-      const response=await new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args,...(action==='property'?{base_value}:{})});});
+      const response=await requestReplay(action,{...args,...(action==='property'?{base_value}:{})});
       return {ok:!!response&&!response.error,value:propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id)?.value};
     });
     controlQueue=operation.catch(e=>{historyBusy=false;historyControls();fail(e);return {ok:false};});return controlQueue;
@@ -682,47 +669,19 @@ export function render({model,el}) {
     const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
     if(overlay===undefined)return cfg;
     const view=Object.create(cfg),node=cfg.overlays[overlay];
-    Object.defineProperty(view,'right_y',{get:()=>node.y_axis,set:value=>node.y_axis=value});
+    if(node.link_y!==true)Object.defineProperty(view,'right_y',{get:()=>node.y_axis,set:value=>node.y_axis=value});
+    if(node.link_x===false)Object.defineProperty(view,'top_x',{get:()=>node.x_axis,set:value=>node.x_axis=value});
     if(node.legend)Object.defineProperty(view,'legend',{get:()=>node.legend,set:value=>node.legend=value});
     return view;
-  }
-  function navigateDocumentAxis(state,dimension,factor,anchor,shift=0){
-    const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
-    if(dimension==='y'&&overlay!==undefined){navigate(cfg.overlays[overlay].y_axis,factor,anchor,shift);if(factor!==1&&tickAutomatic(state,'right_y'))retick(cfg.overlays[overlay].y_axis);}
-    else for(const key of dimension==='x'?['bottom_x','top_x']:['left_y','right_y']){navigate(cfg[key],factor,anchor,shift);if(factor!==1&&tickAutomatic(state,key))retick(cfg[key]);}
-  }
-  function tickAddress(state,key){
-    const layer=state.config.active_layer,index=(layer?.Subplot??layer?.SubplotOverlay?.[0]??-1)+1,panel=state.identity?.panels?.[index];
-    const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
-    return key==='right_y'&&overlay!==undefined?[panel?.overlays?.[overlay],'y_axis']:[panel?.id,key];
-  }
-  function tickOwners(state,owner,key){
-    const owners=new Set([owner]),dimension={bottom_x:'x',left_y:'y'}[key];
-    if(dimension)for(let old=-1;old!==owners.size;){old=owners.size;for(const group of Object.values(state.identity.groups))if(group.axis===dimension&&group.members.some(id=>owners.has(id)))for(const id of group.members)owners.add(id);}
-    return owners;
-  }
-  function tickAutomatic(state,key){const [owner,side]=tickAddress(state,key);return [...tickOwners(state,owner,side)].every(id=>state.identity?.tick_modes?.[id]?.[side]!=='Fixed');}
-  function tickMode(state,key,automatic){const [owner,side]=tickAddress(state,key);if(owner===undefined)return;state.identity.tick_modes??={};
-    const peer={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[side],cfg=activePanel(state),keys=[side];
-    if(peer&&!(cfg.view_3d&&side.endsWith('_y'))&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))keys.push(peer);
-    for(const key of keys)for(const id of tickOwners(state,owner,key)){state.identity.tick_modes[id]??={};state.identity.tick_modes[id][key]=automatic?'Auto':'Fixed';}
-  }
-  function syncTickSpacing(state,key){
-    const [owner,side]=tickAddress(state,key);if(!['bottom_x','left_y'].includes(side))return;
-    const spacing=activePanel(state)[key].major_spacing;
-    for(const id of tickOwners(state,owner,side)){const index=state.identity.panels.findIndex(p=>p.id===id);panelConfig(index,state)[key].major_spacing=spacing;}
-  }
-  function retick(axis){
-    if(axis.scale==='Logarithmic'){const decades=Math.max(1,Math.ceil(Math.log10(axis.max))-Math.floor(Math.log10(axis.min)));axis.major_spacing=decades<=6?1:decades<=12?2:Math.ceil(decades/6);return;}
-    const span=axis.max-axis.min;if(!(span>0&&Number.isFinite(span)))return;
-    const base=10**Math.floor(Math.log10(span)),fraction=span/base;
-    axis.major_spacing=base>0&&Number.isFinite(base)?(fraction>=5?base:fraction>=2?base*.5:base*.2):span;
   }
   function elementName(name,state=local){
     const layer=state.config.active_layer,index=layer?.Subplot??layer?.SubplotOverlay?.[0];
     const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
     let prefix=index===undefined?'':`subplot_${index}:`;
-    if(overlay!==undefined&&['axis_right','tick_labels_right','axis_title_right'].includes(name))prefix+=`overlay_${overlay}:`;
+    if(overlay!==undefined){
+      const owner=activePanel(state).overlays[overlay];
+      if((owner.link_y!==true&&name.endsWith('_right'))||(owner.link_x===false&&name.endsWith('_top')))prefix+=`overlay_${overlay}:`;
+    }
     return prefix+name;
   }
   const tree=root.querySelector('[data-object-tree]'),search=root.querySelector('[data-object-search]');
@@ -821,28 +780,34 @@ export function render({model,el}) {
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
     if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
     const propertyLayer=clone(layerOf(local)),propertyOwners=JSON.stringify(local.identity?.panels);
-    function applyProperty(apply,value){
-      const base=snapshot(),before=clone(base),state=clone(base);
-      if(JSON.stringify(before.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
-      const owner=s=>kind?s[kind]:s.config,visibleLayer=clone(owner(state).active_layer??'Base');
-      owner(before).active_layer=clone(propertyLayer);owner(state).active_layer=clone(propertyLayer);
-      apply(state,value);
-      const secondary=before.config.active_layer?.Overlay??before.config.active_layer?.SubplotOverlay?.[1];
-      if(!kind&&!(secondary!==undefined&&/^(axis|tick_labels)_right$/.test(target)))reconcilePairedAxisEdit({config:configOf(before)},{config:configOf(state)},target);
-      if(/^axis_(bottom|top|left|right)$/.test(target))for(const key of ['bottom_x','left_y'])syncTickSpacing(state,key);
-      owner(state).active_layer=visibleLayer;
+    const axisTarget=/^(axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
+    function applyProperty(apply,value,field){
+      const base=snapshot(),state=clone(base);
+      if(JSON.stringify(state.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
+      const owner=kind?state[kind]:state.config,visibleLayer=owner.active_layer??'Base';
+      owner.active_layer=clone(propertyLayer);
+      apply?.(state,value);
+      if(!kind&&axisTarget){
+        const automatic=field==='auto_ticks'?value:field==='major_spacing'?false:null;
+        return {target,layer:propertyLayer,axis:configOf(state)[side[axisTarget[2]]],automatic,revision};
+      }
+      owner.active_layer=visibleLayer;
       install(state);commit(propertyDraft(base,snapshot()));
     }
-    function submitProperty(apply,value,onError=()=>{}){
-      // A draft is not an optimistic full-document edit. Wait outside the
-      // renderer queue for earlier acknowledgements, then apply only its field
-      // to the newest accepted state. ACK processing needs that queue itself.
-      const operation=controlQueue.then(async()=>{await queue;await flush();return enqueue(()=>applyProperty(apply,value),true);});
+    function submitProperty(apply,value,field,onError=()=>{}){
+      const operation=controlQueue.then(async()=>{
+        await queue;await flush();
+        const axisChange=await enqueue(()=>applyProperty(apply,value,field),true);
+        if(axisChange){
+          const result=await requestReplay('axis_edit',axisChange);
+          if(result?.error)onError();
+        }
+      });
       controlQueue=operation.catch(e=>{onError();fail(e);});
     }
     function field(label,value,type,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;trace('property.changed',{field:label,type});submitProperty(apply,value);});row.append(input);fields.append(row);return input;
+      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;trace('property.changed',{field:label,type});submitProperty(apply,value,label);});row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
@@ -851,14 +816,10 @@ export function render({model,el}) {
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
       for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Auto:'Automatic',Decimal:'Decimal (123.45)',Plain:'Plain number',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Percent:'Percent (25%)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>submitProperty(apply,input.value,()=>{input.value=value;}));row.append(input);fields.append(row);
+      input.addEventListener('change',()=>submitProperty(apply,input.value,label,()=>{input.value=value;}));row.append(input);fields.append(row);
     }
-    function scaleControl(label,axis,find,dimension){
-      choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
-        const a=find(s);
-        if(v==='Logarithmic'&&a.min<=0){const r=model.get('state').log_bounds[dimension];[a.min,a.max]=r;}
-        a.scale=v;a.major_spacing=v==='Logarithmic'?1:(a.max-a.min)/5;
-      });
+    function scaleControl(label,axis,find){
+      choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{find(s).scale=v;});
       const note=document.createElement('p');note.textContent='Log view omits zero and negative values; source data is preserved.';fields.append(note);
     }
     function numberFormat(style,find){
@@ -872,7 +833,7 @@ export function render({model,el}) {
         find(s).significant_digits=v;
       });digits.min='1';digits.max='15';digits.step='1';
     }
-    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>submitProperty(apply,input.checked));row.append(input);fields.append(row);}
+    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>submitProperty(apply,input.checked,label));row.append(input);fields.append(row);}
     function legendSeries(state){
       const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
       const index=layer?.Subplot??layer?.SubplotOverlay?.[0],children=state.config.subplots??[];
@@ -1004,13 +965,14 @@ export function render({model,el}) {
       richControls(find,inspectedTarget,textInput);}
       choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
-      toggle('auto_ticks',tickAutomatic(local,key),(s,v)=>{tickMode(s,key,v);if(v)retick(configOf(s)[key]);});
-      scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key==='right_y'&&cfg.view_3d?'height':key.at(-1));
+      const automatic=inspectedObject(inspectedTarget)?.fields.find(field=>field.id==='Layout and appearance/auto_ticks')?.value;
+      toggle('auto_ticks',automatic??true);
+      scaleControl('axis_scale',cfg[key],s=>configOf(s)[key]);
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>configOf(s)[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>configOf(s)[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>configOf(s)[key].tick=v);
       numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);
-      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;if(name==='major_spacing')tickMode(s,key,false);else if(['min','max'].includes(name)&&tickAutomatic(s,key))retick(configOf(s)[key]);});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
+      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
     }finally{
@@ -1371,12 +1333,6 @@ export function render({model,el}) {
   const exportFormat=document.createElement('select');exportFormat.dataset.exportFormat='';exportFormat.setAttribute('aria-label','Export format');exportFormat.innerHTML=['png','svg','pdf'].map(n=>`<option value="${n}">${n.toUpperCase()}</option>`).join('');toolbar.append(exportFormat);
   const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
   function bounds(){const value=JSON.parse(chart.decoration_bounds(elementName('data_area')));return value?.rect??[0,0,canvas.width,canvas.height];}
-  function navigate(a,factor,anchor,shift=0){
-    const log=a.scale==='Logarithmic';let lo=log?Math.log10(a.min):a.min,hi=log?Math.log10(a.max):a.max;
-    const span=hi-lo;if(a.inverted){anchor=1-anchor;shift=-shift;}const pivot=lo+span*anchor;
-    const low=pivot+(lo-pivot)*factor+shift*span,high=pivot+(hi-pivot)*factor+shift*span;
-    a.min=log?10**low:low;a.max=log?10**high:high;
-  }
   function selectPanelAt(point){
     const panels=panelsAt(point);if(focusIndex()===null&&panels.length>1){openChooser(panels.map(panelChoice),point);return;}
     const at=panelAt(point);selected=null;chart.on_press(-100,-100);chart.on_release();chart.set_picked_data('null');
@@ -1452,14 +1408,14 @@ export function render({model,el}) {
     else if(gesture.diagram){if(gesture.moved)chart.on_move(next[0]-old[0],next[1]-old[1]);}
     else if(gesture.pan){
       if(gesture.moved){
-        const s=snapshot(),dx=next[0]-old[0],dy=next[1]-old[1];selected=null;
-        if(activePanel(s).view_3d){
-          if(s.config.picked_data)chart.set_picked_data('null');
-          chart.navigate_camera(dx,dy,1);
-        }else{
-          stats.pan_updates=(stats.pan_updates??0)+1;
-          const r=bounds();delete s.config.picked_data;navigateDocumentAxis(s,'x',1,.5,-dx/r[2]);navigateDocumentAxis(s,'y',1,.5,dy/r[3]);install(s);
+        const dx=next[0]-old[0],dy=next[1]-old[1],r=bounds();
+        selected=null;
+        if(!activePanel(local).view_3d)stats.pan_updates=(stats.pan_updates??0)+1;
+        if(!gesture.panningStarted){
+          chart.set_picked_data('null');
+          gesture.panningStarted=true;
         }
+        chart.pan_host_view(JSON.stringify(local.identity??null),dx,dy,r[2],r[3]);
       }
     }
     else if(!gesture.choices){chart.set_snap_modifier(e.altKey);chart.on_move(next[0]-old[0],next[1]-old[1]);}dirty=true;
@@ -1490,15 +1446,11 @@ export function render({model,el}) {
     }
     if(!chart||kind||!wheelArea||(hasPanels()&&focusIndex()===null))return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX,pointSize=[canvas.width,canvas.height];enqueue(()=>{
     point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];
-    const s=snapshot(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1);
-    if(activePanel(s).view_3d){
-      if(chart.navigate_camera(0,0,1/factor)){dirty=true;commit();}
-      return;
-    }
+    const factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1);
     const r=bounds(),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
-    if(!shift||ctrl)navigateDocumentAxis(s,'x',factor,x);
-    if(!ctrl||shift)navigateDocumentAxis(s,'y',factor,y);
-    install(s);commit();
+    if(chart.zoom_host_view(JSON.stringify(local.identity??null),factor,x,y,!shift||ctrl,!ctrl||shift)){
+      dirty=true;commit();
+    }
   });},{passive:false});
   canvas.addEventListener('keydown',e=>{if(!chart)return;if(e.key==='F11'){e.preventDefault();fullscreen().catch(fail);return;}if(drawingTool!=='select')return;if((e.key==='Delete'||e.key==='Backspace')&&selected&&(selected.startsWith('annotation:')||/^annotation_\d+$/.test(selected))){e.preventDefault();enqueue(()=>{const s=snapshot(),owner=kind?s[kind]:s.config,index=kind?Number(selected.slice(11)):owner.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)owner.annotations.items.splice(index,1);if(kind)owner.decorations.selected=null;selected=null;install(s);commit();});return;}if(e.key!=='Escape'&&!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?10:1;enqueue(()=>{
     if(e.key==='Escape'){selected=null;focusedPanel=null;observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}

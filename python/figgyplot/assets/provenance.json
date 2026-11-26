@@ -19,22 +19,26 @@
   },
   "wasm_host_patch": {
     "path": "scripts/wasm-host.patch",
-    "sha256": "7e62d01dec4a911ce81775d9354323f1ddf673c51e3aa74dcc643bdfb369c18e",
+    "sha256": "dea49060311c20f2153b4731cedc15cef2a8590d7d6089868bfbf2ad053fd490",
     "files": [
       "crates/web/src/radial.rs",
       "crates/web/src/web/chart/frame.rs",
       "crates/web/src/web/chart/state.rs"
-    ]
+    ],
+    "shared_sources": {
+      "src/view_gesture.rs": "6c651d2e3f1bf4eb7f5412cc12e26eaebd0e0f89bd504de80291ce57892ea704",
+      "src/tick_policy.rs": "9b0fd5a9e2948292f22eeb03292dd3ce6bb776d86d9a00f31f9930b6a82a779b"
+    }
   },
   "wasm_bindgen_version": "0.2.129",
   "assets": {
     "figgy.js": {
-      "sha256": "b2a9041c0ed6adbb688f6ccbcd194fc7b4f592033211bed35211887890e0b953",
-      "bytes": 340871
+      "sha256": "02e8ec1aa85b68c2de7efe7779f6a5eb4e56b1d132c1cb639a81cf643efedf4a",
+      "bytes": 341758
     },
     "figgy_bg.wasm": {
-      "sha256": "83af0bca0b4959deab7bab48316b96c2b98da514dae32c0d3834c8bdd5ceadb7",
-      "bytes": 32608353
+      "sha256": "84f60bad2069e6db74a749f5142fe6641741255cd590998467d87d116ba3a789",
+      "bytes": 32529155
     }
   }
 }

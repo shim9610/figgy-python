@@ -381,7 +381,7 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
         };
         series_group.children = series_nodes(layer);
         panel.children.push(series_group);
-        for (o, _) in config["overlays"]
+        for (o, model) in config["overlays"]
             .as_array()
             .into_iter()
             .flatten()
@@ -392,21 +392,34 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
             } else {
                 LayerRef::SubplotOverlay(index - 1, o)
             };
+            let mut sides = Vec::new();
+            if model["link_x"] == false {
+                sides.push(("top", "X axis"));
+            }
+            if model["link_y"] != true {
+                sides.push(("right", "Y axis"));
+            }
+            let (side, name) = match sides.as_slice() {
+                [("top", _)] => ("top", "Secondary X"),
+                [("right", _)] => ("right", "Secondary Y"),
+                [..] if sides.is_empty() => ("right", "Overlay"),
+                _ => ("right", "Secondary axes"),
+            };
             let id = state["identity"]["panels"][index]["overlays"][o]
                 .as_str()
-                .unwrap_or("Secondary Y");
+                .unwrap_or(name);
             let overlay_key = format!("{key}/overlay/{id}");
             let mut overlay = leaf(
                 &overlay_key,
-                &format!("Secondary Y · {id}"),
+                &format!("{name} · {id}"),
                 "layer",
                 overlay_layer,
-                format!("{prefix}overlay_{o}:axis_right"),
+                format!("{prefix}overlay_{o}:axis_{side}"),
             );
             overlay.children.push(axes(
                 &overlay_key,
                 &format!("{prefix}overlay_{o}:"),
-                &[("right", "Y axis")],
+                &sides,
                 overlay_layer,
             ));
             overlay.children.extend(series_nodes(overlay_layer));

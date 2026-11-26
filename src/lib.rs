@@ -2132,7 +2132,8 @@ mod notebook;
 mod property_catalog;
 mod radial_compat;
 mod target_chooser;
-mod tick_policy;
+mod view_gesture;
+use view_gesture::tick_policy;
 mod ui_fonts;
 use identity::{validate_columns, validate_identity};
 mod selection;
@@ -2448,7 +2449,10 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(review_images::review_image_json, m)?)?;
     m.add_function(wrap_pyfunction!(property_catalog::editor_property_json, m)?)?;
     m.add_function(wrap_pyfunction!(navigation::bounded_view_json, m)?)?;
-    m.add_function(wrap_pyfunction!(axis_edit::sync_linked_axis_edit_json, m)?)?;
+    m.add_function(wrap_pyfunction!(axis_edit::axis_address_json, m)?)?;
+    m.add_function(wrap_pyfunction!(axis_edit::complete_axis_edit_json, m)?)?;
+    m.add_function(wrap_pyfunction!(axis_edit::scale_axes_json, m)?)?;
+    m.add_function(wrap_pyfunction!(axis_edit::tick_mode_json, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

@@ -2395,6 +2395,7 @@ ax.activate()
     with notebook(tmp_path/'overlay-objects',source) as (page,execute):
         def bounds(target):return page.evaluate(ROOT+'.decorations()')[target]['rect']
         def screen(rect):
+            page.locator('canvas').scroll_into_view_if_needed()
             return page.evaluate("""r=>{const c=document.querySelector('.figgy-editor canvas'),b=c.getBoundingClientRect();return [b.x+(r[0]+r[2]/2)*b.width/c.width,b.y+(r[1]+r[3]/2)*b.height/c.height];}""",rect)
         before=page.evaluate(ROOT+'.snapshot()');uploads=page.evaluate(ROOT+'.stats.column_uploads')
         # Decorations exposes the active owner; the shared plot edge plus the
@@ -3624,6 +3625,77 @@ assert fig.get_settings() == before
             assert page.evaluate(ROOT+'.stats.column_uploads') == uploads
             assert page.evaluate(ROOT+'.stats.binary_upload_bytes') == upload_bytes
             assert not page.locator('.figgy-error').inner_text()
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires actual native and notebook axis input')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_secondary_x_owns_its_scale_and_wheel_navigation(tmp_path, backend):
+    setup = """
+ax = fig.axes[0]
+ax.plot([3,6,8],[0,1,2],id='reference')
+twin = ax.twiny(id='frequency')
+twin.plot([20,40,80],[0,1,2],id='signal')
+twin.set_xlim(-1,100)
+ax.activate()
+"""
+    node = 'panel/main/overlay/frequency/axis_top'
+
+    def check(before, logarithmic, zoomed):
+        for key in ('bottom_x', 'top_x', 'left_y', 'right_y'):
+            assert before[key] == logarithmic[key] == zoomed[key]
+        axis = logarithmic['overlays'][0]['x_axis']
+        assert (axis['scale'], axis['min'], axis['max']) == ('Logarithmic', 20, 80)
+        zoom = zoomed['overlays'][0]['x_axis']
+        assert axis['min'] < zoom['min'] < zoom['max'] < axis['max']
+        assert zoomed['overlays'][0]['y_axis'] == before['overlays'][0]['y_axis']
+
+    if backend == 'native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup, {'fig': fig})
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle)
+                before = fig.get_settings()['config']
+                inputs.click('properties')
+                choose_native_object(inputs, 'overlay/frequency/axis_top', node)
+                inputs.click('axis_scale')
+                inputs.click('axis_scale_Logarithmic')
+                logarithmic = fig.get_settings()['config']
+                x, y, w, h = inputs.info()['decorations']['data_area']
+                inputs.input_frame('mousemove', '--window', inputs.wid, round(x+w/2), round(y+h/2))
+                inputs.xdo('keydown', 'ctrl')
+                try:
+                    inputs.xdo('click', 4)
+                finally:
+                    inputs.xdo('keyup', 'ctrl')
+                inputs.pump()
+                check(before, logarithmic, fig.get_settings()['config'])
+                assert not inputs.info()['error']
+            finally:
+                handle.close()
+                Inputs.pump()
+        return
+
+    source = "import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"
+    with notebook(tmp_path, source+setup+"\ndisplay(fig.widget())") as (page, execute):
+        get_config = "print(json.dumps(fig.get_settings()['config']))"
+        before = json.loads(execute(get_config))
+        click_button(page, '[data-properties]')
+        ObjectNavigator(page).choose('overlay_0:axis_top', node=node)
+        page.locator('[data-property=axis_scale]').select_option('Logarithmic')
+        execute('await fig.sync()')
+        logarithmic = json.loads(execute(get_config))
+        x, y, w, h = page.evaluate(ROOT+'.decorations()')['data_area']['rect']
+        page.mouse.move(*browser_surface_point(page, (x+w/2, y+h/2)))
+        page.keyboard.down('Control')
+        try:
+            page.mouse.wheel(0, -120)
+        finally:
+            page.keyboard.up('Control')
+        page.wait_for_function(f"() => {ROOT}.snapshot().config.overlays[0].x_axis.min > 20")
+        execute('await fig.sync()')
+        check(before, logarithmic, json.loads(execute(get_config)))
+        assert not page.locator('.figgy-error').inner_text()
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires actual native and notebook 3D input')

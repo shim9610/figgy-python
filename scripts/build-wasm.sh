@@ -24,6 +24,7 @@ git -C "$wasm_source" archive "$revision" | tar -x -C "$build_source"
 git -C "$build_source" init -q
 git -C "$build_source" apply --check "$repo_root/scripts/wasm-host.patch"
 git -C "$build_source" apply "$repo_root/scripts/wasm-host.patch"
+cp "$repo_root"/src/{view_gesture,tick_policy}.rs "$build_source/crates/web/src/web/chart/"
 rustup target add wasm32-unknown-unknown
 # Must match the pinned upstream Cargo.lock, independent of native Cargo.lock.
 if [ "$(wasm-bindgen --version 2>/dev/null || true)" != "wasm-bindgen 0.2.129" ]; then

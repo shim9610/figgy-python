@@ -624,8 +624,11 @@ def test_height_scale_uses_z_data_without_editing_y_or_the_color_scale(backend):
         ax.scatter3D([0, 1, 2], [3, 6, 8], [20, 40, 80], c=[200, 400, 800])
         reference.activate()
         ax.set_ylim(-1, 100)
-        for edit in (lambda: ax.set_zscale("log"),
-                     lambda: fig.update("axis_right", _axes=ax, scale="log")):
+        for edit in (
+            lambda: ax.set_zscale("log"),
+            lambda: fig.update("axis_right", _axes=ax, scale="log"),
+            lambda: fig.edit_property("panel/height/axis_right", "Layout and appearance/scale", "Logarithmic"),
+        ):
             ax.set_zlim(-1, 100)
             before = fig.get_settings()["config"]["subplots"][0]["config"]
             edit()
