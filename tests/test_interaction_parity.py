@@ -941,7 +941,8 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         page.locator('[data-advanced]').evaluate('element=>element.open=false')
         target=ObjectNavigator(page)
         def choose(control, value):
-            page.locator(f'[data-property={control}]').select_option(value);page.evaluate(ROOT+'.flush()')
+            page.locator(f'[data-property={control}]').select_option(value)
+            execute('await fig.sync()')
         target.choose('axis_bottom');before=page.evaluate(ROOT+'.snapshot()')
         choose('axis_scale','Logarithmic')
         assert_scale(page.evaluate(ROOT+'.snapshot()'),'bottom_x','Logarithmic')
@@ -968,7 +969,7 @@ def test_axis_and_color_log_scale_editing_matches_both_hosts(tmp_path):
         width,height=page.locator('.figgy-editor canvas').evaluate('(c)=>[c.width,c.height]')
         rect=[box[0]*960/width,box[1]*600/height,box[2]*960/width,box[3]*600/height]
         linear=sample(Image.open(path).convert('RGB'),rect)
-        choose('color_scale','Logarithmic');execute('await fig.sync()')
+        choose('color_scale','Logarithmic')
         assert_scale(page.evaluate(ROOT+'.snapshot()'),'colorbar','Logarithmic')
         path=tmp_path/'logarithmic.png';execute(f'await fig.savefig_async({str(path)!r})')
         assert sample(Image.open(path).convert('RGB'),rect)>linear+30
