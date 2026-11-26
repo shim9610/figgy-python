@@ -1845,7 +1845,7 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
         return fig._artist_for(sid)
 
     @_style_runtime.styled
-    def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle="-", marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None, **kwargs):
+    def plot(self, x, y=None, fmt=None, *, color=None, linewidth=1.5, linestyle=None, marker=None, markersize=4, label=None, id=None, interpolation="Linear", fill=None, fill_color=None, **kwargs):
         """Plot a line, or a line with markers, from equal-length numeric arrays.
 
         With y omitted, use sample indices for X. linewidth/markersize are in
@@ -1876,21 +1876,25 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             fmt, y = y, None
         if fmt is not None:
             remaining = str(fmt)
-            has_line = False
+            fmt_line = fmt_color = fmt_marker = None
             for candidate in ("--", "-.", ":", "-"):
                 if candidate in remaining:
-                    linestyle = candidate
-                    has_line = True
+                    fmt_line = candidate
                     remaining = remaining.replace(candidate, "", 1)
                     break
             for c in remaining:
-                if c in "bgrkwcmy" and color is None:
-                    color = c
-                elif c in _MARKERS and marker is None:
-                    marker = c
+                if c in "bgrkwcmy" and fmt_color is None:
+                    fmt_color = c
+                elif (c in _MARKERS or c == ".") and fmt_marker is None:
+                    fmt_marker = c
                 else:
                     raise ValueError(f"unsupported plot format: {fmt}")
-            marker_only_format = marker is not None and not has_line and linestyle == "-"
+            color = fmt_color if color is None else color
+            marker = fmt_marker if marker is None else marker
+            marker_only_format = marker is not None and fmt_line is None and linestyle is None
+            linestyle = fmt_line if linestyle is None else linestyle
+        if linestyle is None:
+            linestyle = "-"
         if y is None:
             y = _array(x)
             x = np.arange(y.size, dtype=np.float32 if y.dtype == np.float32 and y.size <= 2**24 else np.float64)
@@ -1912,7 +1916,9 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             line['fill_color'] = _color(fill_color) if fill_color is not None else copy.deepcopy(color)
         style = {"Line": {"line": line}}
         if marker is not None:
-            scatter = {"point_color": color, "point_size": float(markersize) * self.figure.dpi / 144, "point_shape": _MARKERS.get(marker, marker)}
+            dot = marker == "."
+            scatter = {"point_color": color, "point_size": float(markersize) * self.figure.dpi / (288 if dot else 144),
+                       "point_shape": "CircleFilled" if dot else _MARKERS.get(marker, marker)}
             style = {"Scatter": {"scatter": scatter}} if marker_only_format else {"ScatterLine": {"line": line, "scatter": scatter}}
         return [self._add(x, y, style, label, id)]
 

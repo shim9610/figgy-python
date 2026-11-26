@@ -85,7 +85,34 @@ class NotebookData:
     def cache_series_extents(self, spec_json):
         # Only bounded extent metadata survives transfer release, never sample arrays.
         spec = json.loads(spec_json)
-        style = next(iter(spec["render_type"].values()))
+        kind, style = next(iter(spec["render_type"].items()))
+        if kind in ("Line", "Scatter", "ScatterLine", "Stem"):
+            x_column, y_column = spec["x_column"], spec["y_column"]
+            x, y = self._label_column(x_column, None), self._label_column(y_column, None)
+            if x is not None and y is not None:
+                rows = min(x.size, y.size)
+                valid = np.isfinite(x[:rows]) & np.isfinite(y[:rows])
+                if rows < 2 or rows != x.size or rows != y.size or not valid.all():
+                    connected = valid[:-1] & valid[1:]
+                    drawn = np.zeros_like(valid)
+                    drawn[:-1] |= connected
+                    drawn[1:] |= connected
+
+                    def extent(values, mask):
+                        finite = values[:rows][mask]
+                        if not finite.size:
+                            return None
+                        positive = finite[finite > 0]
+                        return (
+                            float(finite.min()), float(finite.max()),
+                            float(positive.min()) if positive.size else None,
+                        )
+
+                    self.model.cache_paired_extents(
+                        x_column, y_column,
+                        [extent(x, valid), extent(y, valid)],
+                        [extent(x, drawn), extent(y, drawn)],
+                    )
         if style.get("matrix", {}).get("grid_layout") == "Hexagonal":
 
             def grid_array(name):
@@ -187,7 +214,13 @@ class NotebookData:
         self.cache_series_extents(spec_json)
         return self.model.add_series_fitted(spec_json, config, bounds)
 
-    def add_series_batch(self, spec_json, config_json, *, identity=None):
+    def category_column_values(self, id):
+        values = self._label_column(id, None)
+        if values is None:
+            raise RuntimeError("Notebook columns are sealed after display; declare category data before display")
+        return values
+
+    def add_series_batch(self, spec_json, config_json, *, identity=None, category_columns=None):
         specs = json.loads(spec_json)
         config = json.loads(config_json)
 
@@ -208,6 +241,15 @@ class NotebookData:
             )
 
         all_specs = json.loads(self.model.settings_json())["series"] + specs
+        if category_columns is not None:
+            bindings = json.loads(category_columns)
+            for spec in all_specs:
+                if spec["series_id"] in bindings:
+                    spec["x_column"], spec["y_column"] = bindings[spec["series_id"]]
+                    labels = spec["render_type"]["CategoryBars"]["labels"]
+                    if labels.get("offsets"):
+                        rows = self.model.column_row_count(spec["x_column"])
+                        labels["offsets"].extend([[0, 0]] * (rows - len(labels["offsets"])))
         for spec in specs:
             self.cache_series_extents(json.dumps(spec))
             kind, style = next(iter(spec["render_type"].items()))
@@ -271,7 +313,10 @@ class NotebookData:
         candidate = json.loads(previous)
         candidate.update(config=config, series=all_specs)
         formatted = json.loads(format_value_labels_json(json.dumps(candidate, allow_nan=False), self._label_column, previous))
-        result = self.model.add_series_batch(spec_json, config_json, json.dumps(formatted['series'], allow_nan=False), identity)
+        result = self.model.add_series_batch(
+            spec_json, config_json, json.dumps(formatted['series'], allow_nan=False),
+            identity, category_columns,
+        )
         self._cache_range_endpoints(all_specs)
         return result
 

@@ -154,7 +154,7 @@ class AdvancedMethods:
 
     def _install_series(
         self, specs, columns=(), composites=(), config=None, *, energy_unit=None,
-        missing_columns=(),
+        missing_columns=(), category_columns=None,
     ):
         """Publish sources and series together; roll back uncommitted resources."""
         from .figure import _array, Artist
@@ -253,6 +253,7 @@ class AdvancedMethods:
                     json.dumps(specs, allow_nan=False),
                     json.dumps(state["config"], allow_nan=False),
                     identity=json.dumps(identity, allow_nan=False) if identity is not None else None,
+                    category_columns=json.dumps(category_columns) if category_columns else None,
                 )
             except Exception:
                 for name in reversed(uploaded):
@@ -1059,6 +1060,13 @@ class AdvancedMethods:
 
         specs = [rename(s) for s in bundle["series"]]
         cfg = rename(bundle["config"])
+        state = self.figure.get_settings()
+        current = self._config(state)
+        if self.figure.subplots[self.subplot_id].axes._owned_series(state):
+            for axis in ("bottom_x", "left_y"):
+                categories = current[axis].get("categories")
+                if categories is not None and categories != cfg[axis].get("categories"):
+                    raise ValueError("use the existing category order when adding a legacy chart")
         area = chart.get("decorations", {}).get("data_area")
         if area is not None:
             cfg["layout_state"] = "fixed"
@@ -1113,17 +1121,23 @@ class AdvancedMethods:
         orientation="vertical",
         **properties,
     ):
-        return self._category_bars(
-            x, height, width, bottom, align=align, label=label, colors=colors,
-            color=color, mode=mode, orientation=orientation, properties=properties,
-        )
+        """Draw category bars, aligning added series to the category axis.
+
+        Additional calls may reorder, omit or append categories. A masked
+        height or a height of None leaves its category cell empty.
+        """
+        with self.figure._lock:
+            return self._category_bars(
+                x, height, width, bottom, align=align, label=label, colors=colors,
+                color=color, mode=mode, orientation=orientation, properties=properties,
+            )
 
     def _category_bars(
         self, x, height, width=0.8, bottom=None, *, align="center", label=None,
         colors=None, color=None, mode="grouped", orientation="vertical",
         projection=None, properties=None,
     ):
-        from .figure import _color, _COLORS
+        from .figure import _color, _COLORS, _float_dtype, _numeric_array
 
         properties = {} if properties is None else properties
         style_patch = properties.pop("style", {})
@@ -1145,7 +1159,7 @@ class AdvancedMethods:
                 style=style_patch,
                 **properties,
             )
-        values = np.asarray(height)
+        values = _numeric_array(height)
         if values.dtype == object:
             values = np.asarray(
                 [
@@ -1170,11 +1184,75 @@ class AdvancedMethods:
             "percent_stacked",
         ):
             raise ValueError("invalid bar orientation or mode")
-        cfg = projection if projection is not None else copy.deepcopy(self._config(self.figure.get_settings()))
+        if values.dtype.kind not in "fiub":
+            raise ValueError("bar heights must be numeric")
+        if mode == "percent_stacked" and (values < 0).any():
+            raise ValueError("percent_stacked bars require nonnegative values")
+        state = self.figure.get_settings()
+        cfg = projection if projection is not None else copy.deepcopy(self._config(state))
         axis = "bottom_x" if orientation == "vertical" else "left_y"
-        cfg[axis]["categories"] = [
-            dict(id=f"category_{i}", label=str(v)) for i, v in enumerate(labels)
-        ]
+        existing = self.figure.subplots[self.subplot_id].axes._owned_series(state)
+        existing_bars = [spec for spec in existing if "CategoryBars" in spec["render_type"]]
+        if existing_bars:
+            previous = cfg.get("bar_groups") or {}
+            if previous.get("direction", "Vertical") != orientation.title():
+                raise ValueError("all category bars on a panel must use the same orientation")
+        categories = cfg[axis].get("categories")
+        labels = [str(value) for value in labels]
+        columns = []
+        value_columns = set()
+        category_columns = {}
+        if categories is None:
+            cfg[axis]["categories"] = [
+                dict(id=f"category_{i}", label=value) for i, value in enumerate(labels)
+            ]
+        else:
+            current = [category["label"] for category in categories]
+            if labels != current:
+                slots = {name: index for index, name in enumerate(current)}
+                if len(slots) != len(current) or len(set(labels)) != len(labels):
+                    raise ValueError("use the existing category order when labels are repeated")
+                extra = [name for name in labels if name not in slots]
+                if extra:
+                    dimension = "x" if orientation == "vertical" else "y"
+                    linked = any(group["axis"] == dimension and self.subplot_id in group["members"]
+                                 for group in state["identity"]["groups"].values())
+                    other_categories = any(
+                        set(spec["render_type"]) & {"BoxPlot", "Radar", "EnergyLevels"}
+                        for spec in existing
+                    )
+                    if self.overlay_id or cfg.get("overlays") or linked or other_categories:
+                        raise ValueError("declare all categories before drawing on a shared category axis")
+                    used = {category["id"] for category in categories}
+                    index = len(categories)
+                    for name in extra:
+                        while f"category_{index}" in used:
+                            index += 1
+                        categories.append(dict(id=f"category_{index}", label=name))
+                        slots[name] = len(current)
+                        current.append(name)
+                        index += 1
+                    size = len(current)
+                    positions = np.arange(size, dtype=np.float32)
+                    for spec in existing_bars:
+                        sid = spec["series_id"]
+                        value = spec["y_column"] if orientation == "vertical" else spec["x_column"]
+                        previous = np.asarray(self.figure._native.category_column_values(value))
+                        if previous.size != size - len(extra):
+                            raise ValueError("existing category bar does not match the category axis")
+                        previous = np.pad(previous, (0, len(extra)), constant_values=np.nan)
+                        prefix = f"{sid}/categories/{self.figure._next_series}"
+                        x_name, y_name = prefix + "/x", prefix + "/y"
+                        columns.extend([
+                            (x_name, positions if orientation == "vertical" else previous),
+                            (y_name, previous if orientation == "vertical" else positions),
+                        ])
+                        category_columns[sid] = [x_name, y_name]
+                        value_columns.add(y_name if orientation == "vertical" else x_name)
+                aligned = np.full((len(values), len(current)), np.nan, dtype=_float_dtype(values.dtype))
+                aligned[:, [slots[name] for name in labels]] = values
+                values = aligned
+            labels = current
         cfg["bar_groups"] = dict(
             mode={
                 "grouped": "Grouped",
@@ -1186,7 +1264,6 @@ class AdvancedMethods:
             bar_gap=2.0,
         )
         specs = []
-        columns = []
         names = (
             [label]
             if isinstance(label, str)
@@ -1215,6 +1292,7 @@ class AdvancedMethods:
                 s["label"] = copy.deepcopy(cfg["legend"]["content"])
                 s["label"]["segments"] = _segments(names[i])
             p = np.arange(len(labels), dtype=np.float32)
+            value_columns.add(s["y_column"] if orientation == "vertical" else s["x_column"])
             columns.extend(
                 [
                     (sid + "/x", p if orientation == "vertical" else row),
@@ -1222,10 +1300,12 @@ class AdvancedMethods:
                 ]
             )
             specs.append(s)
-        return self._install_series(specs, columns, config=cfg)
+        return self._install_series(
+            specs, columns, config=cfg, missing_columns=value_columns, category_columns=category_columns,
+        )
 
     def radar(self, categories, values, *, labels=None, colors=None, **properties):
-        from .figure import _color, _COLORS, _segments
+        from .figure import _color, _COLORS, _numeric_array, _segments
 
         style_patch = properties.pop("style", {})
         if not isinstance(style_patch, dict):raise TypeError("style must be a mapping")
@@ -1244,7 +1324,7 @@ class AdvancedMethods:
                 raise ValueError("radar value range must be increasing")
             bounds = (low, high)
         categories = list(categories)
-        a = np.asarray(values)
+        a = _numeric_array(values)
         if a.ndim == 1:
             a = a[None, :]
         if a.ndim != 2 or a.shape[1] != len(categories) or not np.isfinite(a).all():

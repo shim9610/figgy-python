@@ -92,6 +92,9 @@ class ChartMethods:
         from .figure import _color, _COLORS
         labels = list(x)
         values = np.asarray(height, dtype=object)
+        if np.ma.is_masked(height):
+            values = values.copy()
+            values[np.ma.getmaskarray(height)] = None
         if values.ndim == 1:
             values = values[None, :]
         if values.ndim != 2 or values.shape[1] != len(labels):
@@ -158,13 +161,15 @@ class ChartMethods:
         """
         if not math.isfinite(float(whis)) or whis < 0:
             raise ValueError('whis must be finite and nonnegative')
-        rows = list(x)
+        rows = [x] if np.ma.isMaskedArray(x) and x.ndim == 1 else list(x)
         if not rows:
             raise ValueError('boxplot needs samples')
         if np.isscalar(rows[0]):
             rows = [rows]
         stats = []
         for row in rows:
+            if np.ma.isMaskedArray(row) and row.ndim == 1:
+                row = row.compressed()
             a = np.asarray(row, dtype=float)
             if a.ndim != 1 or not a.size or not np.isfinite(a).all():
                 raise ValueError('each box needs a nonempty finite one-dimensional sample')

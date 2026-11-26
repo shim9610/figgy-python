@@ -1248,6 +1248,7 @@ impl FigureAccess<'_> {
         json: &str,
         config: &str,
         identity: Option<&str>,
+        category_columns: Option<&str>,
     ) -> PyResult<()> {
         if self.data.document.is_some() {
             return Err(invalid("bounded charts cannot contain coordinate series"));
@@ -1257,9 +1258,17 @@ impl FigureAccess<'_> {
         let history = self.data.history.clone();
         let result = (|| {
             let mut series = self.data.series.clone();
+            if let Some(bindings) = category_columns {
+                identity::rebind_category_columns(&mut series, bindings, |id| {
+                    self.data.columns.get(id).map(|v| v.0)
+                })?;
+            }
             series.extend(parse::<Vec<SeriesConfig>>(json)?);
             identity::validate_range_rows(&series, |id| self.data.columns.get(id).map(|v| v.0))?;
             let config: Config = parse(config)?;
+            identity::validate_percent_stacks(&config, &series, |id| {
+                self.data.columns.get(id).map(|v| v.1)
+            })?;
             let metadata = identity.map(parse::<Value>).transpose()?;
             if let Some(metadata) = &metadata {
                 identity::validate_identity(Some(metadata), &config, 2)?;
@@ -1334,6 +1343,9 @@ impl FigureAccess<'_> {
         validate_config(&next.config)?;
         validate_background(next.background)?;
         identity::validate_range_rows(&next.series, |id| self.data.columns.get(id).map(|v| v.0))?;
+        identity::validate_percent_stacks(&next.config, &next.series, |id| {
+            self.data.columns.get(id).map(|v| v.1)
+        })?;
         self.format_value_labels(&next.config, &mut next.series)?;
         validate_draw_style(&next.config, &next.series)?;
         let document = next.document()?;
@@ -2187,15 +2199,30 @@ impl NativeFigure {
     ) -> PyResult<()> {
         self.with(|core| core.add_series_fitted(py, json, config, bounds))
     }
-    #[pyo3(signature=(json, config, identity=None))]
+    #[pyo3(signature=(json, config, identity=None, category_columns=None))]
     fn add_series_batch(
         &self,
         py: Python<'_>,
         json: &str,
         config: &str,
         identity: Option<&str>,
+        category_columns: Option<&str>,
     ) -> PyResult<()> {
-        self.with(|core| core.add_series_batch(py, json, config, identity))
+        self.with(|core| core.add_series_batch(py, json, config, identity, category_columns))
+    }
+    fn category_column_values(&self, id: &str) -> PyResult<Vec<f64>> {
+        self.with(|core| {
+            let rows = core
+                .data
+                .columns
+                .get(id)
+                .ok_or_else(|| invalid("unknown category column"))?
+                .0;
+            let samples = (0..rows)
+                .map(|index| (id.to_owned(), index))
+                .collect::<Vec<_>>();
+            core.read_samples(&samples)
+        })
     }
     #[pyo3(signature=(json, dpi=None))]
     fn apply_settings(&self, json: &str, dpi: Option<f64>) -> PyResult<()> {

@@ -1,5 +1,13 @@
 //! GPU-free document model for a browser-owned resident renderer.
 use super::*;
+
+type AxisExtent = renderer::chart::FitExtent;
+type ExtentInput = (f64, f64, Option<f64>);
+struct PairedExtents {
+    points: [AxisExtent; 2],
+    segments: [AxisExtent; 2],
+}
+
 #[pyclass(module = "figgyplot._native")]
 pub struct NotebookFigure {
     identity: Option<Value>,
@@ -15,6 +23,7 @@ pub struct NotebookFigure {
     revision: u64,
     history: edit_history::History,
     fit_extents: HashMap<String, [renderer::chart::FitExtent; 2]>,
+    paired_extents: HashMap<String, HashMap<String, PairedExtents>>,
 }
 #[pymethods]
 impl NotebookFigure {
@@ -47,6 +56,7 @@ impl NotebookFigure {
             revision: 0,
             history: Default::default(),
             fit_extents: HashMap::new(),
+            paired_extents: HashMap::new(),
         })
     }
     fn set_radial(&mut self, json: &str) -> PyResult<()> {
@@ -145,6 +155,11 @@ impl NotebookFigure {
         self.range_endpoints.remove(id);
         self.edge_samples.remove(id);
         self.center_cells.remove(id);
+        self.paired_extents.remove(id);
+        self.paired_extents.retain(|_, pairs| {
+            pairs.remove(id);
+            !pairs.is_empty()
+        });
     }
     fn add_series(&mut self, json: &str) -> PyResult<()> {
         let s: SeriesConfig = parse(json)?;
@@ -248,13 +263,14 @@ impl NotebookFigure {
         self.history = Default::default();
         Ok(())
     }
-    #[pyo3(signature=(json, config, formatted=None, identity=None))]
+    #[pyo3(signature=(json, config, formatted=None, identity=None, category_columns=None))]
     fn add_series_batch(
         &mut self,
         json: &str,
         config: &str,
         formatted: Option<&str>,
         identity: Option<&str>,
+        category_columns: Option<&str>,
     ) -> PyResult<()> {
         let previous_config = self.chart.config().clone();
         let previous_series = self.series.clone();
@@ -270,6 +286,11 @@ impl NotebookFigure {
                 self.identity = Some(metadata);
             }
             self.chart = Chart::new(config);
+            if let Some(bindings) = category_columns {
+                identity::rebind_category_columns(&mut self.series, bindings, |id| {
+                    self.column_lengths.get(id).copied()
+                })?;
+            }
             for spec in parse::<Vec<SeriesConfig>>(json)? {
                 self.add_series(&serde_json::to_string(&spec).map_err(invalid)?)?;
             }
@@ -287,6 +308,9 @@ impl NotebookFigure {
                 validate_draw_style(self.chart.config(), &all)?;
                 self.series = all;
             }
+            identity::validate_percent_stacks(self.chart.config(), &self.series, |id| {
+                self.columns.get(id).map(|v| v.min)
+            })?;
             self.fit_domain(0.05, false, false)
         })();
         if let Err(error) = result {
@@ -332,6 +356,9 @@ impl NotebookFigure {
         validate_draw_style(&s.config, &s.series)?;
         validate_columns(&s.series, &self.columns.keys().cloned().collect())?;
         identity::validate_range_rows(&s.series, |id| self.column_lengths.get(id).copied())?;
+        identity::validate_percent_stacks(&s.config, &s.series, |id| {
+            self.columns.get(id).map(|v| v.min)
+        })?;
         for series in &s.series {
             validate_model_numbers(series, "series")?;
         }
@@ -432,21 +459,23 @@ impl NotebookFigure {
         x: (f64, f64, Option<f64>),
         y: (f64, f64, Option<f64>),
     ) -> PyResult<()> {
-        let make = |(min, max, min_positive): (f64, f64, Option<f64>)| {
-            if !min.is_finite()
-                || !max.is_finite()
-                || min > max
-                || min_positive.is_some_and(|v| !v.is_finite() || v <= 0.)
-            {
-                return Err(invalid("invalid fit extent"));
-            }
-            Ok(renderer::chart::FitExtent {
-                min,
-                max,
-                min_positive,
-            })
-        };
-        self.fit_extents.insert(id, [make(x)?, make(y)?]);
+        self.fit_extents
+            .insert(id, [fit_extent(Some(x))?, fit_extent(Some(y))?]);
+        Ok(())
+    }
+    fn cache_paired_extents(
+        &mut self,
+        x: String,
+        y: String,
+        points: [Option<ExtentInput>; 2],
+        segments: [Option<ExtentInput>; 2],
+    ) -> PyResult<()> {
+        let points = [fit_extent(points[0])?, fit_extent(points[1])?];
+        let segments = [fit_extent(segments[0])?, fit_extent(segments[1])?];
+        self.paired_extents
+            .entry(x)
+            .or_default()
+            .insert(y, PairedExtents { points, segments });
         Ok(())
     }
     fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
@@ -502,6 +531,7 @@ impl NotebookFigure {
             let [mut a, mut b] = self
                 .fit_extents
                 .get(&s.series_id)
+                .or_else(|| self.paired_extent(s))
                 .copied()
                 .unwrap_or_else(|| {
                     [
@@ -685,6 +715,24 @@ fn edge_sample_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
     ext
 }
 
+fn fit_extent(input: Option<ExtentInput>) -> PyResult<AxisExtent> {
+    let Some((min, max, min_positive)) = input else {
+        return Ok(AxisExtent::EMPTY);
+    };
+    if !min.is_finite()
+        || !max.is_finite()
+        || min > max
+        || min_positive.is_some_and(|v| !v.is_finite() || v <= 0.)
+    {
+        return Err(invalid("invalid fit extent"));
+    }
+    Ok(AxisExtent {
+        min,
+        max,
+        min_positive,
+    })
+}
+
 fn center_cell_extent<T: Number>(a: &[T]) -> renderer::chart::FitExtent {
     if a.len() < 2 {
         return renderer::chart::FitExtent::EMPTY;
@@ -732,6 +780,23 @@ fn extent<T: Number>(a: &[T], allow_missing: bool) -> PyResult<renderer::chart::
 }
 
 impl NotebookFigure {
+    fn paired_extent(&self, spec: &SeriesConfig) -> Option<&[AxisExtent; 2]> {
+        let renderer::DataRenderType::Xy(style) = &spec.render_type else {
+            return None;
+        };
+        let extents = self
+            .paired_extents
+            .get(&spec.x_column)?
+            .get(&spec.y_column)?;
+        if style.scatter.is_some() {
+            Some(&extents.points)
+        } else if style.line.is_some() {
+            Some(&extents.segments)
+        } else {
+            None
+        }
+    }
+
     fn fit_extra_axes(&self, config: &mut Config, padding: f64, active_only: bool) {
         use renderer::chart::FitExtent;
         use renderer::data_config::{VectorComponents, VectorScale};

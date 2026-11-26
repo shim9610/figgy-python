@@ -189,9 +189,9 @@ class FeatureMethods:
 
     @_style_runtime.styled
     def radar(self, categories, values, *, labels=None, colors=None, **properties):
-        from .figure import _color, _COLORS
+        from .figure import _color, _COLORS, _numeric_array
         categories = list(categories)
-        values = np.asarray(values, dtype=float)
+        values = np.asarray(_numeric_array(values), dtype=float)
         if values.ndim == 1:
             values = values[None, :]
         if values.ndim != 2 or values.shape[1] != len(categories) or not np.isfinite(values).all():

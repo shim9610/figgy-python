@@ -146,6 +146,59 @@ pub(super) fn validate_columns(series: &[SeriesConfig], names: &HashSet<String>)
     Ok(())
 }
 
+pub(super) fn validate_percent_stacks(
+    config: &Config,
+    series: &[SeriesConfig],
+    minimum: impl Fn(&str) -> Option<f64>,
+) -> PyResult<()> {
+    for spec in series {
+        let groups = config.bar_groups_of(config.layer_of_series(&spec.series_id));
+        if spec.render_type.category_bars().is_some()
+            && groups.mode == renderer::CategoryBarMode::PercentStacked
+        {
+            let (_, values) = spec.category_bar_columns(groups.direction);
+            if minimum(values).is_some_and(|value| value.is_finite() && value < 0.) {
+                return Err(invalid(format!(
+                    "percent_stacked bars require nonnegative values (series {:?})",
+                    spec.series_id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn rebind_category_columns(
+    series: &mut [SeriesConfig],
+    bindings: &str,
+    count: impl Fn(&str) -> Option<usize>,
+) -> PyResult<()> {
+    let bindings: HashMap<String, [String; 2]> = parse(bindings)?;
+    for (id, [x, y]) in bindings {
+        let spec = series
+            .iter_mut()
+            .find(|spec| spec.series_id == id)
+            .ok_or_else(|| invalid(format!("unknown category bar series: {id}")))?;
+        let renderer::DataRenderType::CategoryBars(bars) = &mut spec.render_type else {
+            return Err(invalid(
+                "only category bars can extend their category columns",
+            ));
+        };
+        let rows = count(&x)
+            .filter(|rows| Some(*rows) == count(&y))
+            .ok_or_else(|| invalid("category columns need the same number of rows"))?;
+        if !bars.labels.text.is_empty() {
+            bars.labels.text.resize(rows, String::new());
+        }
+        if !bars.labels.offsets.is_empty() {
+            bars.labels.offsets.resize(rows, [0., 0.]);
+        }
+        spec.x_column = x;
+        spec.y_column = y;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_range_rows(
     series: &[SeriesConfig],
     count: impl Fn(&str) -> Option<usize>,

@@ -220,6 +220,110 @@ def test_triangle_contour_publishes_only_the_complete_mesh(backend, filled):
         assert (mesh.get("fill") is not None) == filled
 
 
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("method, axis, column", [
+    ("bar", "bottom_x", "y_column"), ("barh", "left_y", "x_column"),
+])
+def test_additional_bars_align_to_the_accepted_category_axis(backend, method, axis, column):
+    with fg.Figure(backend=backend) as fig:
+        bar = getattr(fig.axes[0], method)
+        bar(["A", "B", "C"], [1, 2, None])
+        before = fig.get_settings()
+        bar(["C", "B"], [11, 10])
+        state = fig.get_settings()
+        assert state["config"][axis]["categories"] == before["config"][axis]["categories"]
+        assert state["series"][0][column] == before["series"][0][column]
+        if backend == "native":
+            for index, category, value in [(0, "A", 1), (1, "B", 10)]:
+                state["config"]["picked_data"] = {"refs": [dict(
+                    kind="histogram_bin", bin_index=index, series_id=state["series"][index]["series_id"],
+                )]}
+                fig.apply_settings(state)
+                selected = json.loads(fig._native.selection_details_json())
+                assert (selected["category_label"], selected["value"]) == (category, value)
+        else:
+            dtype, payload = fig._native.columns[state["series"][1][column]]
+            np.testing.assert_equal(np.frombuffer(payload, dtype=dtype), [np.nan, 10, 11])
+        revision = fig.revision
+        bar(["B", "D"], [30, 40])
+        state = fig.get_settings()
+        assert fig.revision == revision + 1
+        assert state["config"][axis]["categories"][:3] == before["config"][axis]["categories"]
+        assert state["config"][axis]["categories"][3]["label"] == "D"
+        for spec, expected in zip(state["series"], [[1, 2, np.nan, np.nan],
+                                                  [np.nan, 10, 11, np.nan],
+                                                  [np.nan, 30, np.nan, 40]]):
+            np.testing.assert_equal(np.asarray(fig._native.category_column_values(spec[column])), expected)
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_masked_bars_and_invalid_percent_stacks_are_handled_before_rendering(backend):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        before = fig.get_settings()
+        with pytest.raises(ValueError, match="nonnegative"):
+            ax.bar(["A", "B"], [[12, -2], [1, 5]], mode="percent_stacked")
+        assert fig.get_settings() == before and fig.info["columns"] == 0
+        ax.bar(["A", "B"], np.ma.array([-2, 999], mask=[0, 1], dtype=np.float32))
+        assert json.loads(fig._native.column_extents_json())["series_0/y"] == [-2, -2]
+        before = fig.get_settings()
+        with pytest.raises(ValueError, match="nonnegative"):
+            ax.bar(["B", "C"], [1, 5], mode="percent_stacked")
+        with pytest.raises(ValueError, match="nonnegative"):
+            fig.configure(config={"bar_groups": {"mode": "PercentStacked"}})
+        assert fig.get_settings() == before and fig.info["columns"] == 2
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_hidden_samples_do_not_change_box_statistics_or_radar_vertices(backend):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        with pytest.raises(ValueError, match="finite"):
+            ax.radar(["A", "B", "C"], np.ma.array([1, 999, 3], mask=[0, 1, 0]))
+        assert not fig.get_settings()["series"]
+        ax.boxplot(np.ma.array([1, 2, 1000, 1001], mask=[0, 0, 1, 1]))
+        state = fig.get_settings()
+        spec = state["series"][0]
+        if backend == "native":
+            state["config"]["picked_data"] = dict(refs=[dict(
+                kind="histogram_bin", bin_index=0, series_id=spec["series_id"],
+            )])
+            fig.apply_settings(state)
+            details = json.loads(fig._native.selection_details_json())
+            assert (details["median"], details["sample_count"]) == (1.5, 2)
+        else:
+            for field, expected in [("median", 1.5), ("sample_count", 2)]:
+                assert fig._native._label_column(spec["y_column"], field).tolist() == [expected]
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_plot_keywords_win_over_format(backend):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.plot([0, 1], [0, 1], "ro:", color="blue", linestyle="--", marker="s")
+        ax.plot([0, 1], "k.")
+        ax.plot([0, 1], "o", linestyle="-")
+        first, dot, explicit_solid = [s["render_type"] for s in fig.get_settings()["series"]]
+        style = first["ScatterLine"]
+        assert style["line"]["line_style"] == "Dash"
+        assert style["line"]["line_color"] == dict(r=0, g=0, b=1, a=1)
+        assert style["scatter"]["point_shape"] == "SquareFilled"
+        assert list(dot) == ["Scatter"]
+        assert list(explicit_solid) == ["ScatterLine"]
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("kind, upper", [("plot", 3), ("scatter", 7)])
+def test_fit_matches_rendered_points_or_connected_line_segments(backend, kind, upper):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        getattr(ax, kind)([0, 1, np.nan, 2, 3, np.nan, 7], [0, 1, 1000, 2, 3, 900, 7])
+        assert ax.get_ylim() == pytest.approx([-upper * 0.05, upper * 1.05])
+        ax.set_ylim(0, 1)
+        fig.fit(0)
+        assert ax.get_ylim() == pytest.approx([0, upper])
+
+
 def test_float32_input_is_preserved_without_changing_original():
     from figgyplot.figure import _array
 

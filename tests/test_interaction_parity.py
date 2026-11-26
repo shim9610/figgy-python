@@ -3075,6 +3075,7 @@ def test_renderer_019_theme_layout_exports_share_host_state(backend, kind):
 @pytest.mark.skipif(os.environ.get('FIGGY_TEST_JUPYTER')!='1',reason='requires real Jupyter WebGPU')
 @pytest.mark.parametrize('source,reference,expected',[
     ("ax.boxplot([[1,2,3],[2,4,6]])",dict(kind='histogram_bin',bin_index=1),dict(median=4)),
+    ("ax.bar(['A','B'],[1,2]); ax.bar(['B','C'],[10,11])",dict(kind='histogram_bin',bin_index=0),dict(category_label='A',value=1)),
     ("ax.tripcolor([0,1,0],[0,0,1],[1,2,3],triangles=[[0,1,2]])",dict(kind='mesh_triangle',triangle_index=0),dict(vertices=[0,1,2],values=[1,2,3])),
     ("ax.hexbin(np.ma.array([0,0,1,1,100],mask=[0,0,0,1,0]),[0,0,1,1,100],gridsize=(3,3),extent=(0,1,0,1))",dict(kind='matrix_cell',x_index=2,y_index=2),dict(value=1)),
     ("ax.scatter([0,1],[0,1],[10,20],c=[3,8],s=[2,4],id='points')",dict(kind='point',point_index=1),dict(x=1,y=1,z=20,color_value=8,size_value=4)),
@@ -3087,7 +3088,7 @@ def test_renderer_019_browser_sources_selection_themes_and_vector_exports(tmp_pa
     with notebook(tmp_path,code) as (page,execute):
         execute("state=fig.get_settings();ref="+repr(reference)+";ref['series_id']=state['series'][0]['series_id'];state['config']['picked_data']={'refs':[ref]};fig.apply_settings(state);await fig.sync()")
         details=page.evaluate(ROOT+'.details()')
-        for key,value in expected.items():assert details[key]==pytest.approx(value)
+        for key,value in expected.items():assert details[key]==(value if isinstance(value,str) else pytest.approx(value))
         if reference.get('kind')=='value_label' and reference.get('part')=='level':
             assert details['id']=='b' and details['text']=='excited' and details['part']=='level'
         for name in ('gallery','cool-slate','midnight','warm-paper'):
@@ -3095,6 +3096,26 @@ def test_renderer_019_browser_sources_selection_themes_and_vector_exports(tmp_pa
             execute('await fig.sync()')
         page.locator('[data-auto-layout]').click()
         execute("await fig.sync();svg=await fig.export_async('svg');pdf=await fig.export_async('pdf');assert '<svg' in svg and pdf.startswith(b'%PDF-')")
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real Jupyter WebGPU')
+def test_jupyter_python_fit_matches_browser_fit_after_transfer_release(tmp_path):
+    source = """import figgyplot as fg
+fig, ax = fg.subplots(backend='webgpu')
+ax.plot([0, 1, float('nan'), 2, 3], [0, 1, 1000, 2, 3])
+display(fig.widget())
+"""
+    with notebook(tmp_path, source) as (page, execute):
+        limits = 'await fig.sync(); print(list(ax.get_ylim()))'
+        expected = pytest.approx([-0.15, 3.15])
+        assert json.loads(execute(limits)) == expected
+        execute("assert fig.info['transfer_snapshot_bytes'] == 0; ax.set_ylim(0, 1000); await fig.sync()")
+        click_button(page, '[data-fit]')
+        assert json.loads(execute(limits)) == expected
+        execute('ax.set_ylim(0, 1000); await fig.sync()')
+        assert json.loads(execute('fig.fit(); ' + limits)) == expected
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')
 def test_layout_selects_plot_on_first_click_and_exposes_real_geometry(tmp_path):
     from PIL import ImageGrab
