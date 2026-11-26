@@ -119,7 +119,7 @@ pub(crate) fn set_mode_at(
                     meta["tick_modes"][&id] = json!({});
                 }
                 meta["tick_modes"][id][key] = json!(if automatic { "Auto" } else { "Fixed" });
-            } else if let Some(modes) = meta["tick_modes"].as_object_mut() {
+            } else if let Some(modes) = meta.get_mut("tick_modes").and_then(Value::as_object_mut) {
                 if let Some(mode) = modes.get_mut(&id).and_then(Value::as_object_mut) {
                     mode.remove(key);
                     if mode.is_empty() {

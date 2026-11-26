@@ -94,6 +94,7 @@ pub(crate) fn apply(
     address: &AxisAddress,
     axis: Value,
     tick_mode: Option<bool>,
+    retick_ranges: bool,
     bounds: impl FnOnce() -> PyResult<(f64, f64)>,
 ) -> PyResult<()> {
     // JSON sent by the browser has one numeric type. Compare renderer-typed
@@ -115,7 +116,8 @@ pub(crate) fn apply(
     if changed_scale {
         apply_scale(&mut axis, bounds, explicit_spacing)?;
     } else if tick_mode == Some(true)
-        || (changed_range
+        || (retick_ranges
+            && changed_range
             && !explicit_spacing
             && tick_policy::automatic(state.get("identity"), address.layer, address.side))
     {
@@ -236,14 +238,23 @@ pub(crate) fn complete_axis_edit_json(
     candidate: &str,
     tick_mode: Option<bool>,
     positive: Option<(f64, f64)>,
+    retick_ranges: bool,
 ) -> PyResult<String> {
     let mut state: Value = serde_json::from_str(settings).map_err(invalid)?;
     let layer = serde_json::from_str(layer).map_err(invalid)?;
     let axis = address(&state, target, layer).ok_or_else(|| invalid("unknown axis owner"))?;
     let candidate = serde_json::from_str(candidate).map_err(invalid)?;
-    apply(&mut state, &axis, candidate, tick_mode, || {
-        positive.ok_or_else(|| invalid("positive data limits are required for a logarithmic axis"))
-    })?;
+    apply(
+        &mut state,
+        &axis,
+        candidate,
+        tick_mode,
+        retick_ranges,
+        || {
+            positive
+                .ok_or_else(|| invalid("positive data limits are required for a logarithmic axis"))
+        },
+    )?;
     Ok(state.to_string())
 }
 

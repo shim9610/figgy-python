@@ -739,7 +739,7 @@ class Figure(FigureMethods):
             axis = axis[int(part)] if isinstance(axis, list) else axis[part]
         return address, axis
 
-    def _complete_axis_form(self, state, target, layer, axis, automatic=None):
+    def _complete_axis_form(self, state, target, layer, axis, automatic=None, *, retick_ranges=True):
         from ._native import complete_axis_edit_json
 
         address, previous = self._axis_form(state, target, layer)
@@ -749,7 +749,7 @@ class Figure(FigureMethods):
         subset = {"config": state["config"], "identity": state.get("identity")}
         state.update(json.loads(complete_axis_edit_json(
             json.dumps(subset, allow_nan=False), json.dumps(layer), target,
-            json.dumps(axis, allow_nan=False), automatic, positive,
+            json.dumps(axis, allow_nan=False), automatic, positive, retick_ranges,
         )))
         return state
 
@@ -921,7 +921,7 @@ class Figure(FigureMethods):
                     cfg["chart_title"]["top_margin"] = fitted_chart_title_margin(json.dumps(cfg, allow_nan=False))
                 if axis_target:
                     automatic = False if target.startswith("axis_") and "major_spacing" in properties else None
-                    state = self._complete_axis_form(state, target, layer, candidate, automatic)
+                    state = self._complete_axis_form(state, target, layer, candidate, automatic, retick_ranges=False)
             # Reject bad sizes before they reach GPU geometry creation.
             for spec in ([series] if series is not None else []):
                 for style in spec["render_type"].values():

@@ -1638,9 +1638,10 @@ impl Editor {
             if let Some(address) = &axis_target {
                 let key = axis_key(target.rsplit('_').next().unwrap());
                 let axis = std::mem::take(&mut config[key]);
-                let result = crate::axis_edit::apply(&mut state, address, axis, tick_mode, || {
-                    c.log_bounds_for(address.dimension, address.layer)
-                });
+                let result =
+                    crate::axis_edit::apply(&mut state, address, axis, tick_mode, true, || {
+                        c.log_bounds_for(address.dimension, address.layer)
+                    });
                 if let Err(error) = result {
                     self.error = error.to_string();
                     return;

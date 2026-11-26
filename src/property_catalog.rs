@@ -2027,7 +2027,7 @@ pub(crate) fn apply(
             };
             node[key.replace("~1", "/").replace("~0", "~")] = value;
         }
-        crate::axis_edit::apply(&mut result, &axis, candidate, mode, positive)?;
+        crate::axis_edit::apply(&mut result, &axis, candidate, mode, true, positive)?;
         return Ok(result);
     }
     if let Some(node) = result.pointer_mut(&field.path) {

@@ -27,7 +27,7 @@
     ],
     "shared_sources": {
       "src/view_gesture.rs": "6c651d2e3f1bf4eb7f5412cc12e26eaebd0e0f89bd504de80291ce57892ea704",
-      "src/tick_policy.rs": "9b0fd5a9e2948292f22eeb03292dd3ce6bb776d86d9a00f31f9930b6a82a779b"
+      "src/tick_policy.rs": "4e347b53485aaa42d3bc1b71f4b200a8a3e05b031060a9a6fb8ffe1e8afa5b8e"
     }
   },
   "wasm_bindgen_version": "0.2.129",

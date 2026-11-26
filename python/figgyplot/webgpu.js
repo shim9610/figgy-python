@@ -780,28 +780,47 @@ export function render({model,el}) {
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
     if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
     const propertyLayer=clone(layerOf(local)),propertyOwners=JSON.stringify(local.identity?.panels);
-    const axisTarget=/^(axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
-    function applyProperty(apply,value,field){
+    const axisTarget=!kind&&/^(axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
+    const axisKey=axisTarget&&side[axisTarget[2]],axisForm=axisKey&&clone(cfg[axisKey]);
+    function scopedConfig(state){
+      return configOf({...state,config:{...state.config,active_layer:propertyLayer}});
+    }
+    function applyProperty(apply,value){
       const base=snapshot(),state=clone(base);
       if(JSON.stringify(state.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
       const owner=kind?state[kind]:state.config,visibleLayer=owner.active_layer??'Base';
       owner.active_layer=clone(propertyLayer);
-      apply?.(state,value);
-      if(!kind&&axisTarget){
-        const automatic=field==='auto_ticks'?value:field==='major_spacing'?false:null;
-        return {target,layer:propertyLayer,axis:configOf(state)[side[axisTarget[2]]],automatic,revision};
-      }
+      apply(state,value);
       owner.active_layer=visibleLayer;
       install(state);commit(propertyDraft(base,snapshot()));
     }
+    async function submitAxis(draft,automatic){
+      for(let attempt=0;attempt<2;attempt++){
+        const proposal=await enqueue(()=>{
+          const state=snapshot();
+          if(JSON.stringify(state.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
+          const axis=rebasePropertyDraft(draft,scopedConfig(state)[axisKey]);
+          if(!axis)throw Error('stale edit: the axis property changed; refresh and retry');
+          return {target,layer:propertyLayer,axis,automatic,revision};
+        },true);
+        const result=await requestReplay('axis_edit',proposal);
+        if(!result?.error?.startsWith('stale edit:')||attempt===1)return result;
+      }
+    }
     function submitProperty(apply,value,field,onError=()=>{}){
+      let draft=null;
+      if(axisKey){
+        const state=clone(local);state.config.active_layer=clone(propertyLayer);
+        const config=configOf(state);config[axisKey]=clone(axisForm);
+        apply?.(state,value);
+        draft=propertyDraft(axisForm,config[axisKey]);
+      }
       const operation=controlQueue.then(async()=>{
         await queue;await flush();
-        const axisChange=await enqueue(()=>applyProperty(apply,value,field),true);
-        if(axisChange){
-          const result=await requestReplay('axis_edit',axisChange);
-          if(result?.error)onError();
-        }
+        if(!draft)return enqueue(()=>applyProperty(apply,value),true);
+        const automatic=field==='auto_ticks'?value:field==='major_spacing'?false:null;
+        const result=await submitAxis(draft,automatic);
+        if(result?.error)onError();
       });
       controlQueue=operation.catch(e=>{onError();fail(e);});
     }
