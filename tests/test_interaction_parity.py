@@ -2407,8 +2407,12 @@ ax.activate()
         changed=page.evaluate(ROOT+'.snapshot()')
         assert changed['config']['overlays'][0]['y_axis']['min']==10
         assert changed['config']['left_y']==before['config']['left_y']
+        # A focused field holds the rendered controls while the kernel accepts
+        # new limits. Starting another field edit must use those accepted limits.
+        page.locator('[data-property=max]').focus()
         execute("state=fig.get_settings();state['config']['overlays'][0]['y_axis'].update(min=0,max=10,major_spacing=2);fig.apply_settings(state);print('matched')")
         page.wait_for_function(ROOT+'.snapshot().config.overlays[0].y_axis.max===10')
+        assert page.locator('[data-property=min]').input_value()=='10'
         page.locator('[data-property=min]').fill('1');page.locator('[data-property=min]').press('Tab');page.evaluate(ROOT+'.flush()')
         assert page.evaluate(ROOT+'.snapshot().config.overlays[0].y_axis.min')==1
         assert page.evaluate(ROOT+'.snapshot().config.left_y')==before['config']['left_y']

@@ -782,9 +782,18 @@ export function render({model,el}) {
     const propertyLayer=clone(layerOf(local)),propertyOwners=JSON.stringify(local.identity?.panels);
     const axisTarget=!kind&&/^(axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
     const axisKey=axisTarget&&side[axisTarget[2]];
-    let axisForm=axisKey&&clone(cfg[axisKey]);
     function scopedConfig(state){
       return configOf({...state,config:{...state.config,active_layer:propertyLayer}});
+    }
+    function axisEditBase(input){
+      if(!axisKey)return ()=>null;
+      let base={axis:clone(cfg[axisKey])};
+      input.addEventListener('focus',()=>{
+        if(JSON.stringify(local.identity?.panels)===propertyOwners){
+          base={axis:clone(scopedConfig(local)[axisKey])};
+        }
+      });
+      return ()=>base;
     }
     function applyProperty(apply,value){
       const base=snapshot(),state=clone(base);
@@ -808,24 +817,25 @@ export function render({model,el}) {
         if(!result?.error?.startsWith('stale edit:')||attempt===1)return result;
       }
     }
-    function submitProperty(apply,value,field,onError=()=>{}){
+    function submitProperty(apply,value,field,base,onError=()=>{}){
       const operation=controlQueue.then(async()=>{
         await queue;await flush();
         if(!axisKey)return enqueue(()=>applyProperty(apply,value),true);
         const state=clone(local);state.config.active_layer=clone(propertyLayer);
-        const config=configOf(state);config[axisKey]=clone(axisForm);
+        const config=configOf(state);config[axisKey]=clone(base.axis);
         apply?.(state,value);
-        const draft=propertyDraft(axisForm,config[axisKey]);
+        const draft=propertyDraft(base.axis,config[axisKey]);
         const automatic=field==='auto_ticks'?value:field==='major_spacing'?false:null;
         const result=await submitAxis(draft,automatic);
         if(result?.error)onError();
-        else if(result)axisForm=rebasePropertyDraft(draft,axisForm);
+        else if(result)base.axis=rebasePropertyDraft(draft,base.axis);
       });
       controlQueue=operation.catch(e=>{onError();fail(e);});
     }
     function field(label,value,type,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;trace('property.changed',{field:label,type});submitProperty(apply,value,label);});row.append(input);fields.append(row);return input;
+      const base=axisEditBase(input);
+      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;trace('property.changed',{field:label,type});submitProperty(apply,value,label,base());});row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
@@ -834,7 +844,8 @@ export function render({model,el}) {
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
       for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Auto:'Automatic',Decimal:'Decimal (123.45)',Plain:'Plain number',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Percent:'Percent (25%)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>submitProperty(apply,input.value,label,()=>{input.value=value;}));row.append(input);fields.append(row);
+      const base=axisEditBase(input);
+      input.addEventListener('change',()=>submitProperty(apply,input.value,label,base(),()=>{input.value=value;}));row.append(input);fields.append(row);
     }
     function scaleControl(label,axis,find){
       choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{find(s).scale=v;});
@@ -851,7 +862,7 @@ export function render({model,el}) {
         find(s).significant_digits=v;
       });digits.min='1';digits.max='15';digits.step='1';
     }
-    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>submitProperty(apply,input.checked,label));row.append(input);fields.append(row);}
+    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;const base=axisEditBase(input);input.addEventListener('change',()=>submitProperty(apply,input.checked,label,base()));row.append(input);fields.append(row);}
     function legendSeries(state){
       const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
       const index=layer?.Subplot??layer?.SubplotOverlay?.[0],children=state.config.subplots??[];
