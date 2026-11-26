@@ -1,5 +1,6 @@
 """Exercise real 0.19 public chart sources, exports and shared host settings."""
 
+import copy
 import hashlib
 import json
 import numpy as np
@@ -613,6 +614,41 @@ def test_three_dimensional_scatter_maps_and_z_axis_are_independent(backend):
             ]
         ax.set_zlabel("Height", visible=False)
         assert not fig.get_settings()["config"]["right_y"]["title_option"]["visible"]
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_y_and_z_limits_apply_to_their_own_axis_and_tick_mode(backend):
+    with fg.Figure(backend=backend, grid=[["reference", "height"]]) as fig:
+        reference = fig.subplots["reference"].axes
+        ax = fig.subplots["height"].axes
+        ax.scatter3D([1, 2, 3], [2, 4, 7], [20, 40, 80])
+        ax.set_xlim(1, 4)
+        ax.set_ylim(1, 10)
+        ax.configure(right_y={"major_spacing": 8})
+
+        before_y = fig.get_settings()
+        assert before_y["identity"]["tick_modes"]["height"]["right_y"] == "Fixed"
+        ax.set_ylim(2, 9)
+        after_y = fig.get_settings()
+        panel = after_y["config"]["subplots"][0]["config"]
+        assert (panel["left_y"]["min"], panel["left_y"]["max"]) == (2, 9)
+        assert panel["right_y"] == before_y["config"]["subplots"][0]["config"]["right_y"]
+        assert after_y["identity"]["tick_modes"] == before_y["identity"]["tick_modes"]
+
+        ax.set_zscale("log")
+        reference.activate()
+        before_z = fig.get_settings()
+        assert ax.set_zlim(1, 1000) == (1, 1000)
+        after_z = fig.get_settings()
+        panel = after_z["config"]["subplots"][0]["config"]
+        assert (panel["right_y"]["min"], panel["right_y"]["max"]) == (1, 1000)
+        assert panel["right_y"]["major_spacing"] == 1
+        expected = copy.deepcopy(before_z)
+        expected["config"]["subplots"][0]["config"]["right_y"] = panel["right_y"]
+        expected["identity"]["tick_modes"]["height"]["right_y"] = "Auto"
+        assert after_z == expected
+        fig.undo()
+        assert fig.get_settings() == before_z
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])

@@ -182,6 +182,8 @@ pub(super) fn set_range(config: &Config, axis: &str, min: f64, max: f64) -> PyRe
         cfg.overlays[overlay.unwrap()].x_axis = chart.config().bottom_x.clone();
     } else if own_y && axis == "y" {
         cfg.overlays[overlay.unwrap()].y_axis = chart.config().left_y.clone();
+    } else if axis == "y" && cfg.view_3d().is_some() {
+        cfg.left_y = chart.config().left_y.clone();
     } else {
         *cfg = chart.config().clone();
     }

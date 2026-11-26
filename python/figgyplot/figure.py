@@ -1688,8 +1688,14 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             return low, high
         state['config']['active_layer'] = _document.target_layer(state, self.subplot_id, self.overlay_id)
         state['config'] = json.loads(fitted_range_json(json.dumps(state['config']), dimension, low, high))
-        for key in (('bottom_x','top_x') if dimension=='x' else ('right_y',) if self.overlay_id else ('left_y','right_y')):
-            _document.set_tick_mode(state,self.subplot_id,self.overlay_id,key,True)
+        if dimension == 'x':
+            keys = ('bottom_x', 'top_x')
+        elif self._config(state).get('view_3d') is not None:
+            keys = ('left_y',)
+        else:
+            keys = ('right_y',) if self.overlay_id else ('left_y', 'right_y')
+        for key in keys:
+            _document.set_tick_mode(state, self.subplot_id, self.overlay_id, key, True)
         self.figure.apply_settings(state)
         return low, high
 

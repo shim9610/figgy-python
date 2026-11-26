@@ -1983,14 +1983,19 @@ class AdvancedMethods:
         return self.figure._axes_for(self.subplot_id, oid)
 
     def set_zlim(self, bottom, top):
-        cfg = copy.deepcopy(self._config(self.figure.get_settings()))
-        if cfg.get("view_3d") is None:
-            raise ValueError("z limits require a 3D projection")
+        """Set the height-axis bounds and derive its tick spacing."""
         low, high = float(bottom), float(top)
         if not math.isfinite(low) or not math.isfinite(high) or low >= high:
             raise ValueError("limits must increase and be finite")
-        cfg["right_y"].update(min=low, max=high, major_spacing=(high - low) / 5)
-        self.configure(**cfg)
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            cfg = self._config(state)
+            if cfg.get("view_3d") is None:
+                raise ValueError("z limits require a 3D projection")
+            layer = _document.target_layer(state, self.subplot_id)
+            axis = {**cfg["right_y"], "min": low, "max": high}
+            self.figure._complete_axis_form(state, "axis_right", layer, axis, automatic=True)
+            self.figure.apply_settings(state)
         return low, high
 
     def set_zlabel(self, text, **kwargs):
