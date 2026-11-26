@@ -781,7 +781,8 @@ export function render({model,el}) {
     if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
     const propertyLayer=clone(layerOf(local)),propertyOwners=JSON.stringify(local.identity?.panels);
     const axisTarget=!kind&&/^(axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
-    const axisKey=axisTarget&&side[axisTarget[2]],axisForm=axisKey&&clone(cfg[axisKey]);
+    const axisKey=axisTarget&&side[axisTarget[2]];
+    let axisForm=axisKey&&clone(cfg[axisKey]);
     function scopedConfig(state){
       return configOf({...state,config:{...state.config,active_layer:propertyLayer}});
     }
@@ -808,19 +809,17 @@ export function render({model,el}) {
       }
     }
     function submitProperty(apply,value,field,onError=()=>{}){
-      let draft=null;
-      if(axisKey){
+      const operation=controlQueue.then(async()=>{
+        await queue;await flush();
+        if(!axisKey)return enqueue(()=>applyProperty(apply,value),true);
         const state=clone(local);state.config.active_layer=clone(propertyLayer);
         const config=configOf(state);config[axisKey]=clone(axisForm);
         apply?.(state,value);
-        draft=propertyDraft(axisForm,config[axisKey]);
-      }
-      const operation=controlQueue.then(async()=>{
-        await queue;await flush();
-        if(!draft)return enqueue(()=>applyProperty(apply,value),true);
+        const draft=propertyDraft(axisForm,config[axisKey]);
         const automatic=field==='auto_ticks'?value:field==='major_spacing'?false:null;
         const result=await submitAxis(draft,automatic);
         if(result?.error)onError();
+        else if(result)axisForm=rebasePropertyDraft(draft,axisForm);
       });
       controlQueue=operation.catch(e=>{onError();fail(e);});
     }
