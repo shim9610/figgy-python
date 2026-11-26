@@ -691,8 +691,10 @@ fn positive_data_bounds(
     geometry: impl Fn(&SeriesConfig) -> Option<renderer::chart::FitExtent>,
     mut column: impl FnMut(&str) -> PyResult<renderer::chart::FitExtent>,
 ) -> PyResult<(f64, f64)> {
-    if !matches!(axis, "x" | "y" | "z") {
-        return Err(invalid("log bounds axis must be x, y or z"));
+    if !matches!(axis, "x" | "y" | "z" | "height") {
+        return Err(invalid(
+            "log bounds axis must be x, y, z (color), or height",
+        ));
     }
     let mut extent = renderer::chart::FitExtent::EMPTY;
     for s in series {
@@ -730,6 +732,15 @@ fn positive_data_bounds(
         match axis {
             "x" => extent.union(&column(&s.x_column)?),
             "y" => extent.union(&column(&s.y_column)?),
+            "height" => {
+                if let renderer::DataRenderType::Field(field) = &s.render_type {
+                    for id in &field.matrix.columns {
+                        extent.union(&column(id)?);
+                    }
+                } else if let Some(id) = &s.z_column {
+                    extent.union(&column(id)?);
+                }
+            }
             "z" => {
                 let value = serde_json::to_value(&s.render_type).map_err(invalid)?;
                 let style = value.as_object().unwrap().values().next().unwrap();
@@ -749,7 +760,7 @@ fn positive_data_bounds(
                     }
                 }
             }
-            _ => return Err(invalid("log bounds axis must be x, y or z")),
+            _ => unreachable!("validated log bounds axis"),
         }
         if let renderer::DataRenderType::Histogram(renderer::data_config::HistogramSeries { bar }) =
             &s.render_type
@@ -785,6 +796,13 @@ fn positive_data_bounds(
 
 fn validate_config(config: &Config) -> PyResult<()> {
     validate_model_numbers(config, "config")?;
+    for panel in std::iter::once(config).chain(config.subplots.iter().map(|p| &p.config)) {
+        if let Some(camera) = panel.view_3d() {
+            camera
+                .validate()
+                .map_err(|e| invalid(format!("invalid 3D camera: {e:?}")))?;
+        }
+    }
     let rect = config.chart_area.0;
     if (config.subplots.is_empty() && (rect.x != 0 || rect.y != 0))
         || rect.width == 0

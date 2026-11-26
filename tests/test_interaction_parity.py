@@ -3626,6 +3626,133 @@ assert fig.get_settings() == before
             assert not page.locator('.figgy-error').inner_text()
 
 
+@pytest.mark.skipif(NEEDS_UI, reason='requires actual native and notebook 3D input')
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('subplot', [False, True], ids=['single', 'subplot'])
+def test_3d_camera_gestures_and_settings_stay_in_the_selected_panel(tmp_path, backend, subplot):
+    setup = "ax = fig.axes[0]\n"
+    if subplot:
+        setup += """
+fig.set_layout([['left','right']])
+fig.subplots['left'].axes.plot([0,1],[1,3],id='reference')
+ax = fig.subplots['right'].axes
+"""
+    setup += """
+ax.plot_surface([0,1,2],[0,1,2],[[0,1,2],[3,1,2],[4,2,5]],id='surface')
+ax.view_init(18,35,projection='persp')
+ax.configure(view_3d={'distance':5})
+ax.set_ylim(-1,10)
+ax.set_zlim(-1,10)
+"""
+    target = 'subplot_0:data_area' if subplot else 'data_area'
+    owner = 'right' if subplot else 'main'
+    distance = '3D camera/distance'
+    panel_expr = "cfg['subplots'][0]['config']" if subplot else "cfg"
+
+    def panel(cfg):
+        return cfg['subplots'][0]['config'] if subplot else cfg
+
+    def check(before, orbit, zoom):
+        original, rotated, zoomed = (panel(config)['view_3d'] for config in (before, orbit, zoom))
+        assert rotated['azimuth_degrees'] < original['azimuth_degrees']
+        assert rotated['elevation_degrees'] > original['elevation_degrees']
+        assert rotated['distance'] == original['distance']
+        assert zoomed['distance'] > rotated['distance']
+        assert {**zoomed, 'distance': rotated['distance']} == rotated
+        for side in ('bottom_x', 'top_x', 'left_y', 'right_y'):
+            assert panel(before)[side] == panel(orbit)[side] == panel(zoom)[side]
+            if subplot:
+                assert before[side] == orbit[side] == zoom[side]
+        if subplot:
+            assert all('view_3d' not in config for config in (before, orbit, zoom))
+
+    def check_height_scale(config, prior):
+        axis = panel(config)['right_y']
+        assert (axis['scale'], axis['min'], axis['max']) == ('Logarithmic', 1, 5)
+        assert panel(config)['left_y'] == panel(prior)['left_y']
+
+    if backend == 'native':
+        with figgy.Figure(backend=backend) as fig:
+            exec(setup, {'fig': fig})
+            handle = fig.show(block=False)
+            try:
+                inputs = Inputs(handle)
+                uploads = fig.info['column_uploads']
+                if subplot:
+                    center = native_point(inputs.info(), (720, 300))
+                    inputs.click_rect([*center, 0, 0])
+                    assert inputs.info()['focused_panel'] == owner
+                before = fig.get_settings()['config']
+                x, y, w, h = inputs.info()['decorations'][target]
+                drag_native(inputs, (x+w/2, y+h/2), (36, 20))
+                orbit = fig.get_settings()['config']
+                inputs.xdo('click', 5)
+                inputs.pump()
+                zoom = fig.get_settings()['config']
+                check(before, orbit, zoom)
+                inputs.click('properties')
+                choose_native_object(inputs, owner, f'panel/{owner}')
+                inputs.click('section:3D camera')
+                inputs.click('property:'+distance)
+                inputs.key('ctrl+a')
+                inputs.xdo('type','--clearmodifiers','7')
+                inputs.key('Return')
+                assert panel(fig.get_settings()['config'])['view_3d']['distance'] == 7
+                inputs.click('undo')
+                assert panel(fig.get_settings()['config'])['view_3d'] == panel(zoom)['view_3d']
+                choose_native_object(inputs, 'right axis', f'panel/{owner}/axis_right')
+                inputs.click('axis_scale')
+                inputs.click('axis_scale_Logarithmic')
+                check_height_scale(fig.get_settings()['config'], zoom)
+                assert fig.info['column_uploads'] == uploads
+                assert not inputs.info()['error']
+            finally:
+                handle.close()
+                Inputs.pump()
+        return
+
+    source = "import json\nimport figgyplot as figgy\nfig=figgy.Figure(backend='webgpu')\n"
+    with notebook(tmp_path, source+setup+"\ndisplay(fig.widget())") as (page, execute):
+        snapshot = ROOT+'.snapshot().config'
+        uploads = page.evaluate(ROOT+'.stats.column_uploads')
+        if subplot:
+            page.mouse.click(*browser_point(page, (720, 300)))
+            page.wait_for_function(f"() => {ROOT}.stats.focused_panel === 'right'")
+        before = page.evaluate(snapshot)
+        x, y, w, h = page.evaluate(ROOT+'.decorations()')[target]['rect']
+        x, y = browser_surface_point(page, (x+w/2, y+h/2))
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x+36, y+20, steps=4)
+        page.mouse.up()
+        page.evaluate(ROOT+'.flush()')
+        orbit = page.evaluate(snapshot)
+        page.mouse.wheel(0, 120)
+        config = snapshot+('.subplots[0].config' if subplot else '')
+        page.wait_for_function(f"() => {config}.view_3d.distance > 5")
+        execute('await fig.sync()')
+        zoom = page.evaluate(snapshot)
+        check(before, orbit, zoom)
+        click_button(page, '[data-properties]')
+        ObjectNavigator(page).panel(owner)
+        page.locator('[data-property-section="3D camera"] summary').click()
+        field = page.locator(f'[data-catalog-field="{distance}"]')
+        field.fill('7')
+        field.press('Tab')
+        execute('await fig.sync()')
+        read_camera = f"cfg=fig.get_settings()['config']; print(json.dumps({panel_expr}['view_3d']))"
+        assert json.loads(execute(read_camera))['distance'] == 7
+        click_button(page, '[data-undo]')
+        execute('await fig.sync()')
+        assert json.loads(execute(read_camera)) == panel(zoom)['view_3d']
+        ObjectNavigator(page).choose('axis_right', node=f'panel/{owner}/axis_right')
+        page.locator('[data-property=axis_scale]').select_option('Logarithmic')
+        execute('await fig.sync()')
+        check_height_scale(json.loads(execute("print(json.dumps(fig.get_settings()['config']))")), zoom)
+        assert page.evaluate(ROOT+'.stats.column_uploads') == uploads
+        assert not page.locator('.figgy-error').inner_text()
+
+
 @pytest.mark.skipif(NEEDS_UI, reason='requires actual native and notebook label geometry')
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
 def test_colorbar_requested_label_is_visible_and_separate_in_both_hosts(tmp_path, backend):

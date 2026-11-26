@@ -87,8 +87,8 @@ pub(crate) fn set_mode(state: &mut Value, side: &str, automatic: bool) {
     let peer = match key.as_str() {
         "bottom_x" => Some("top_x"),
         "top_x" => Some("bottom_x"),
-        "left_y" => Some("right_y"),
-        "right_y" => Some("left_y"),
+        "left_y" if cfg["view_3d"].is_null() => Some("right_y"),
+        "right_y" if cfg["view_3d"].is_null() => Some("left_y"),
         _ => None,
     };
     let peer = peer.filter(|other| {

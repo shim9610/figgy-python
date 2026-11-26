@@ -1293,6 +1293,29 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
         }
         if short == "data_area" || target == "figure" {
             links::fields(fields, state, node.layer);
+            if let Some(camera) = config.get("view_3d") {
+                let path = format!("{panel}/view_3d");
+                for (key, label) in [
+                    ("azimuth_degrees", "Azimuth (degrees)"),
+                    ("elevation_degrees", "Elevation (degrees)"),
+                    ("distance", "Camera distance"),
+                    ("projection", "Projection"),
+                    ("box_aspect", "Box proportions (X, Y, Z)"),
+                ] {
+                    let value = camera
+                        .get(key)
+                        .cloned()
+                        .unwrap_or_else(|| json!(renderer::view3d::DEFAULT_BOX_ASPECT));
+                    field(
+                        fields,
+                        value,
+                        &format!("{path}/{key}"),
+                        "3D camera",
+                        key,
+                        label,
+                    );
+                }
+            }
             if let Some(polar) = config.get("polar") {
                 walk(
                     fields,

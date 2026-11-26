@@ -2003,6 +2003,10 @@ class AdvancedMethods:
 
     def _axis_nodes(self, state, axis):
         cfg = self._config(state)
+        if axis == "z":
+            if cfg.get("view_3d") is None:
+                raise ValueError("z scaling requires a 3D projection")
+            return (cfg["right_y"],)
         if self.overlay_id:
             o = self._overlay(state)
             if axis == "x" and not o.get("link_x", True):

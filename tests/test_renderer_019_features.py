@@ -616,6 +616,30 @@ def test_three_dimensional_scatter_maps_and_z_axis_are_independent(backend):
 
 
 @pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_height_scale_uses_z_data_without_editing_y_or_the_color_scale(backend):
+    with fg.Figure(backend=backend, grid=[["reference", "height"]]) as fig:
+        reference = fig.subplots["reference"].axes
+        reference.plot([0, 1], [1000, 2000])
+        ax = fig.subplots["height"].axes
+        ax.scatter3D([0, 1, 2], [3, 6, 8], [20, 40, 80], c=[200, 400, 800])
+        reference.activate()
+        ax.set_ylim(-1, 100)
+        for edit in (lambda: ax.set_zscale("log"),
+                     lambda: fig.update("axis_right", _axes=ax, scale="log")):
+            ax.set_zlim(-1, 100)
+            before = fig.get_settings()["config"]["subplots"][0]["config"]
+            edit()
+            after = fig.get_settings()["config"]["subplots"][0]["config"]
+            assert ax.get_zscale() == "log"
+            assert [after["right_y"][key] for key in ("min", "max")] == [20, 80]
+            assert after["left_y"] == before["left_y"]
+            assert after["colorbar"] == before["colorbar"]
+            ax.set_zscale("linear")
+        with pytest.raises(ValueError, match="3D projection"):
+            reference.set_zscale("log")
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
 def test_adding_projected_series_preserves_authored_projection(backend):
     with fg.Figure(backend=backend) as fig:
         ax = fig.axes[0]

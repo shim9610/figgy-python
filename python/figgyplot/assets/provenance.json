@@ -19,7 +19,7 @@
   },
   "wasm_host_patch": {
     "path": "scripts/wasm-host.patch",
-    "sha256": "16207fff0afd571924c4ddb990703642e37fbc1f99671a87286989e23fc1ba8f",
+    "sha256": "7e62d01dec4a911ce81775d9354323f1ddf673c51e3aa74dcc643bdfb369c18e",
     "files": [
       "crates/web/src/radial.rs",
       "crates/web/src/web/chart/frame.rs",
@@ -29,12 +29,12 @@
   "wasm_bindgen_version": "0.2.129",
   "assets": {
     "figgy.js": {
-      "sha256": "d0a09ef2a59606f6057fdf5d4671c3d34426135ba153817a55f686e45c6d7099",
-      "bytes": 340426
+      "sha256": "b2a9041c0ed6adbb688f6ccbcd194fc7b4f592033211bed35211887890e0b953",
+      "bytes": 340871
     },
     "figgy_bg.wasm": {
-      "sha256": "09c81e0edbbe1c9814c39be0a6caed22c4e9ddbb78aa48e901c1d2be4df228c2",
-      "bytes": 32608403
+      "sha256": "83af0bca0b4959deab7bab48316b96c2b98da514dae32c0d3834c8bdd5ceadb7",
+      "bytes": 32608353
     }
   }
 }

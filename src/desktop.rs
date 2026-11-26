@@ -767,6 +767,18 @@ impl SurfaceWindow {
                             self.pan_moved = true;
                             self.pending_choices = None;
                         }
+                        let mut cfg = c.data.chart.config().clone();
+                        let panel = active_panel_mut(&mut cfg);
+                        if panel.view_3d().is_some() {
+                            let dx = (self.cursor.0 - old.0) / scale;
+                            let dy = (self.cursor.1 - old.1) / scale;
+                            if panel.orbit_view(dx, dy) {
+                                c.commit_config(cfg)?;
+                            }
+                            self.last_input = Some(input_received);
+                            self.window.request_redraw();
+                            return Ok(());
+                        }
                         let bounds = c
                             .data
                             .hitmap
@@ -777,7 +789,6 @@ impl SurfaceWindow {
                             )
                             .unwrap()
                             .rect();
-                        let mut cfg = c.data.chart.config().clone();
                         let dx = -(self.cursor.0 - old.0) as f64 / bounds.width.max(1.) as f64;
                         let dy = (self.cursor.1 - old.1) as f64 / bounds.height.max(1.) as f64;
                         navigate_document_axis(
@@ -1141,11 +1152,12 @@ impl SurfaceWindow {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
-                if active_coordinate_config(&display).polar().is_some() {
+                let display_panel = active_coordinate_config(&display);
+                if display_panel.polar().is_some() {
                     return Ok(());
                 }
                 // Decorations and the surrounding canvas do not own plot zoom.
-                let Ok(area) = active_coordinate_config(&display).data_area() else {
+                let Ok(area) = display_panel.data_area() else {
                     return Ok(());
                 };
                 let area = area.0;
@@ -1160,6 +1172,18 @@ impl SurfaceWindow {
                     MouseScrollDelta::LineDelta(x, y) => (*x as f64, *y as f64),
                     MouseScrollDelta::PixelDelta(p) => (p.x / 40., p.y / 40.),
                 };
+                let mut cfg = c.data.chart.config().clone();
+                let delta = if dy != 0. { dy } else { dx };
+                let factor = (-delta.clamp(-12., 12.) * 0.1).exp();
+                let panel = active_panel_mut(&mut cfg);
+                if panel.view_3d().is_some() {
+                    if panel.zoom_view(factor.recip()) {
+                        c.commit_config(cfg)?;
+                        self.last_input = Some(input_received);
+                        self.window.request_redraw();
+                    }
+                    return Ok(());
+                }
                 let bounds = c
                     .data
                     .hitmap
@@ -1173,9 +1197,6 @@ impl SurfaceWindow {
                 let x = ((self.cursor.0 - bounds.x) / bounds.width.max(1.)).clamp(0., 1.) as f64;
                 let y =
                     1. - ((self.cursor.1 - bounds.y) / bounds.height.max(1.)).clamp(0., 1.) as f64;
-                let mut cfg = c.data.chart.config().clone();
-                let delta = if dy != 0. { dy } else { dx };
-                let factor = (-delta.clamp(-12., 12.) * 0.1).exp();
                 let ctrl = self.modifiers.control_key();
                 let shift = self.modifiers.shift_key();
                 // Ctrl isolates X, Shift isolates Y; plain wheel zooms both.
@@ -2170,6 +2191,14 @@ fn active_coordinate_config(config: &Config) -> Config {
             config.subplot_config(i).unwrap_or_else(|| config.clone())
         }
         _ => config.clone(),
+    }
+}
+fn active_panel_mut(config: &mut Config) -> &mut Config {
+    match config.active_layer() {
+        renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+            &mut config.subplots[i].config
+        }
+        _ => config,
     }
 }
 fn navigate_document_axis(

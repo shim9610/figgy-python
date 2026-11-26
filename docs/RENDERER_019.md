@@ -224,7 +224,10 @@ python examples/renderer_019_editing.py --formats png svg pdf
 `ax.twiny()` creates an overlay with its own X axis and a linked Y axis;
 `ax.twinx()` provides the converse. Axis units, discontinuities and probability
 paper are available through `set_axis_unit`, `set_axis_breaks` and
-`set_probability_scale`. `view_init`, `set_zlim` and `set_zlabel` edit a 3-D view.
+`set_probability_scale`. For 3D charts, `view_init` sets the camera and
+`set_zlim`, `set_zlabel` and `set_zscale` edit the height axis. In the desktop
+and Jupyter editors, drag inside a 3D plot to rotate and use the wheel to zoom.
+Select the plot area in Properties to enter exact values under **3D camera**.
 
 `ax.set_line_offsets([first, second], y=5)` places successive line series five
 units apart in Y. Pass artists or series IDs in the desired order. X and Y

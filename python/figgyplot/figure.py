@@ -894,7 +894,8 @@ class Figure(FigureMethods):
                     axis = _axis_key(target[len("axis_"):])
                     node = cfg[axis]
                     if node["scale"] == "Logarithmic" and before_config[axis]["scale"] != "Logarithmic" and node["min"] <= 0:
-                        node["min"], node["max"] = self._native.log_bounds("x" if axis.endswith("_x") else "y")
+                        dimension = "height" if axis == "right_y" and cfg.get("view_3d") else axis[-1]
+                        node["min"], node["max"] = self._native.log_bounds(dimension)
                     if "major_spacing" not in properties:
                         node["major_spacing"] = 1.0 if node["scale"] == "Logarithmic" else (node["max"] - node["min"]) / 5
                 reconciled = json.loads(sync_linked_axis_edit_json(
@@ -2111,7 +2112,7 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             bounds = None
             if scale == "log" and any(node["min"] <= 0 for node in nodes):
                 layer = _document.target_layer(state, self.subplot_id, self.overlay_id)
-                bounds = self.figure._native.log_bounds_at(axis, json.dumps(layer))
+                bounds = self.figure._native.log_bounds_at("height" if axis == "z" else axis, json.dumps(layer))
             for node in nodes:
                 if bounds is not None and node["min"] <= 0:
                     node["min"], node["max"] = bounds
@@ -2127,11 +2128,19 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
         """Choose linear/log scaling; fit positive data if current limits cross zero."""
         return self._set_scale("y", scale)
 
+    def set_zscale(self, scale):
+        """Choose linear/log scaling for the height axis of a 3D chart."""
+        return self._set_scale("z", scale)
+
     def get_xscale(self):
         return self._scale_name("x")
 
     def get_yscale(self):
         return self._scale_name("y")
+
+    def get_zscale(self):
+        """Return the current scale of the 3D chart's height axis."""
+        return self._scale_name("z")
 
     def _scale_name(self, axis):
         self.figure._require_cartesian()

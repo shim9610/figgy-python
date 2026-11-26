@@ -26,6 +26,8 @@ def build(fig, case):
         ax.contour([[0, 1], [2, 3]], levels=[.5, 1.5, 2.5], id="signal")
     elif case == "field":
         ax.imshow([[0, 1], [2, 3]], id="signal")
+    elif case == "surface":
+        ax.plot_surface([0, 1], [0, 1], [[0, 1], [2, 3]], id="signal")
     elif case == "vector_points":
         ax.quiver([0, 1], [1, 2], [2, 1], [1, 3], id="signal")
     elif case == "vector_grid":
@@ -74,7 +76,7 @@ def build(fig, case):
 
 def rows():
     inventory = set()
-    for case in ("line", "mapped_points", "histogram", "errors", "contour", "field", "vector_points", "vector_grid", "polar", "panels", "radial", "radial_split", "categorical", "boxplot", "radar", "range_links", "energy"):
+    for case in ("line", "mapped_points", "histogram", "errors", "contour", "field", "surface", "vector_points", "vector_grid", "polar", "panels", "radial", "radial_split", "categorical", "boxplot", "radar", "range_links", "energy"):
         with fg.Figure(backend="webgpu", id="inventory", **({"grid": [["left", "right"]]} if case == "panels" else {})) as fig:
             build(fig, case)
 

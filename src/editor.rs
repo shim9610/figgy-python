@@ -673,9 +673,13 @@ impl Editor {
             .frame(egui::Frame::NONE.fill(Color32::from_rgb(248, 249, 251))
                 .inner_margin(egui::Margin::symmetric(18, 3)))
             .show(root, |ui| {
+                let config = c.data.chart.config();
+                let panel = interaction::panel(config, interaction::panel_index(config.active_layer()));
                 let help = ui.label(RichText::new(
-                    if interaction::panel(c.data.chart.config(),interaction::panel_index(c.data.chart.config().active_layer())).polar().is_some() {
+                    if panel.polar().is_some() {
                         "Polar coordinates · Wheel zoom disabled · Set ranges in Properties · Click: Edit"
+                    } else if panel.view_3d().is_some() {
+                        "Drag plot: Rotate  ·  Wheel: Zoom camera  ·  Click: Edit"
                     } else {"Ctrl + wheel: Zoom X  ·  Shift + wheel: Zoom Y  ·  Wheel: Zoom XY  ·  Drag plot: Pan  ·  Click: Edit"})
                     .size(12.).color(Color32::from_rgb(105, 116, 131)));
                 self.controls.insert("navigation_help".into(), help.rect);
@@ -1625,11 +1629,16 @@ impl Editor {
         if changed {
             // A scale switch is a view helper: use the positive data domain if
             // the old linear limits cross zero, without editing source arrays.
+            let right_dimension = if config["view_3d"].is_object() {
+                "height"
+            } else {
+                "y"
+            };
             for (key, dimension) in [
                 ("bottom_x", "x"),
                 ("top_x", "x"),
                 ("left_y", "y"),
-                ("right_y", "y"),
+                ("right_y", right_dimension),
                 ("colorbar", "z"),
             ] {
                 if !config[key].is_object() {

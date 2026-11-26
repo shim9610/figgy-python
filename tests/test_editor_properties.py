@@ -43,6 +43,34 @@ def test_contextual_styles_have_real_commands_and_replay(backend,kind):
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])
+def test_camera_properties_share_validation_history_and_code_replay(backend):
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot_surface([0, 1], [0, 1], [[0, 1], [2, 3]])
+        configured = dict(azimuth_degrees=43.5, elevation_degrees=16.5,
+                          distance=6.5, projection='Perspective', box_aspect=[1.5, 1, .75])
+        before = fig.get_settings()
+        owner = object_for(fig, 'data_area')
+        assert {field['id'].split('/', 1)[1] for field in owner['fields']
+                if field['group'] == '3D camera'} == configured.keys()
+        for key, value in configured.items():
+            edit(fig, 'data_area', f'3D camera/{key}', value)
+        accepted = fig.get_settings()
+        assert accepted['config']['view_3d'] == configured
+        revision = fig.revision
+        with pytest.raises(ValueError):
+            edit(fig, 'data_area', '3D camera/distance', 1000)
+        assert fig.get_settings() == accepted and fig.revision == revision
+        for _ in configured:
+            fig.undo()
+        assert fig.get_settings() == before
+        for _ in configured:
+            fig.redo()
+        assert fig.get_settings() == accepted
+        exec(fig.to_code(mode='exact'), {'fig': fig})
+        assert fig.get_settings() == accepted
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
 def test_enable_contour_labels_then_edit_their_typography(backend):
     with fg.Figure(backend=backend) as fig:
         fig.axes[0].contour([[0,1],[2,3]],levels=[.5,1.5,2.5],id='field')

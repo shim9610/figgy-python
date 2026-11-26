@@ -68,6 +68,7 @@ function reconcilePairedAxisEdit(before,state,target){
   const match=/^(?:axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
   if(!match)return;
   const key=side[match[1]],other={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[key];
+  if(before.config?.view_3d&&key.endsWith('_y'))return;
   const previous=before.config?.[key],peerBefore=before.config?.[other],axis=state.config?.[key],peer=state.config?.[other];
   if(!previous||!peerBefore||!axis||!peer)return;
   if(!['min','max','scale','inverted'].every(name=>previous[name]===peerBefore[name]))return;
@@ -306,7 +307,8 @@ export function render({model,el}) {
     const overlaps=index===null?[]:overlappingPanels(index);switchChart.hidden=overlaps.length<2;
     if(!switchChart.hidden){const [x,y,w]=panelRect(index);switchChart.textContent=`Switch chart (${overlaps.length})`;switchChart.style.left=`${(x+w)/canvas.width*100}%`;switchChart.style.top=`${y/canvas.height*100}%`;switchChart.onclick=()=>enqueue(()=>openChooser(overlaps.map(panelChoice),[x+w,y+30]));}
     const name=index===null?'':text(panelConfig(index).chart_title?.text)||panelId(index);
-    root.querySelector('[data-hint]').textContent=(kind==='radar'||(!kind&&configOf(local).polar))?'Polar coordinates · Wheel zoom disabled · Set radial range in Properties':hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
+    const camera=!kind&&(!hasPanels()||index!==null)&&activePanel(local).view_3d;
+    root.querySelector('[data-hint]').textContent=(kind==='radar'||(!kind&&configOf(local).polar))?'Polar coordinates · Wheel zoom disabled · Set radial range in Properties':camera?'Drag plot: Rotate · Wheel: Zoom camera · Click: Edit':hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
   }
   function layersInPanel(index){const cfg=panelConfig(index);return [baseLayer(index),...(cfg.overlays??[]).map((_,i)=>index===0?{Overlay:i}:{SubplotOverlay:[index-1,i]})];}
   function setPointerLayer(layer){chart.set_active_layer(JSON.stringify(layer));local.config.active_layer=clone(layer);}
@@ -702,7 +704,7 @@ export function render({model,el}) {
   function tickAutomatic(state,key){const [owner,side]=tickAddress(state,key);return [...tickOwners(state,owner,side)].every(id=>state.identity?.tick_modes?.[id]?.[side]!=='Fixed');}
   function tickMode(state,key,automatic){const [owner,side]=tickAddress(state,key);if(owner===undefined)return;state.identity.tick_modes??={};
     const peer={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[side],cfg=activePanel(state),keys=[side];
-    if(peer&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))keys.push(peer);
+    if(peer&&!(cfg.view_3d&&side.endsWith('_y'))&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))keys.push(peer);
     for(const key of keys)for(const id of tickOwners(state,owner,key)){state.identity.tick_modes[id]??={};state.identity.tick_modes[id][key]=automatic?'Auto':'Fixed';}
   }
   function syncTickSpacing(state,key){
@@ -1003,7 +1005,7 @@ export function render({model,el}) {
       choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
       toggle('auto_ticks',tickAutomatic(local,key),(s,v)=>{tickMode(s,key,v);if(v)retick(configOf(s)[key]);});
-      scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key.endsWith('_x')?'x':'y');
+      scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key==='right_y'&&cfg.view_3d?'height':key.at(-1));
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>configOf(s)[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>configOf(s)[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>configOf(s)[key].tick=v);
@@ -1448,7 +1450,18 @@ export function render({model,el}) {
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
     if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
     else if(gesture.diagram){if(gesture.moved)chart.on_move(next[0]-old[0],next[1]-old[1]);}
-    else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;navigateDocumentAxis(s,'x',1,.5,-(next[0]-old[0])/r[2]);navigateDocumentAxis(s,'y',1,.5,(next[1]-old[1])/r[3]);install(s);}}
+    else if(gesture.pan){
+      if(gesture.moved){
+        const s=snapshot(),dx=next[0]-old[0],dy=next[1]-old[1];selected=null;
+        if(activePanel(s).view_3d){
+          if(s.config.picked_data)chart.set_picked_data('null');
+          chart.navigate_camera(dx,dy,1);
+        }else{
+          stats.pan_updates=(stats.pan_updates??0)+1;
+          const r=bounds();delete s.config.picked_data;navigateDocumentAxis(s,'x',1,.5,-dx/r[2]);navigateDocumentAxis(s,'y',1,.5,dy/r[3]);install(s);
+        }
+      }
+    }
     else if(!gesture.choices){chart.set_snap_modifier(e.altKey);chart.on_move(next[0]-old[0],next[1]-old[1]);}dirty=true;
   });});
   function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(gesture.focusOnly)return;if(!kind){chart.on_release();dirty=true;}if(gesture.choices&&!gesture.moved&&e.type!=='pointercancel'){openChooser(gesture.choices,gesture.origin);return;}if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
@@ -1477,7 +1490,12 @@ export function render({model,el}) {
     }
     if(!chart||kind||!wheelArea||(hasPanels()&&focusIndex()===null))return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX,pointSize=[canvas.width,canvas.height];enqueue(()=>{
     point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];
-    const s=snapshot(),r=bounds(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
+    const s=snapshot(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1);
+    if(activePanel(s).view_3d){
+      if(chart.navigate_camera(0,0,1/factor)){dirty=true;commit();}
+      return;
+    }
+    const r=bounds(),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
     if(!shift||ctrl)navigateDocumentAxis(s,'x',factor,x);
     if(!ctrl||shift)navigateDocumentAxis(s,'y',factor,y);
     install(s);commit();

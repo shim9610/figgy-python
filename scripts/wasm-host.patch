@@ -23,7 +23,7 @@ diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.
 index 918964b..4001af2 100644
 --- a/crates/web/src/web/chart/frame.rs
 +++ b/crates/web/src/web/chart/frame.rs
-@@ -188,6 +188,229 @@ impl FiggyChart {
+@@ -188,6 +188,247 @@ impl FiggyChart {
          Ok(())
      }
  
@@ -44,6 +44,24 @@ index 918964b..4001af2 100644
 +        }
 +        self.color_seq = self.color_seq.max(len);
 +        Ok(())
++    }
++
++    /// Orbit or zoom the active panel's camera with the renderer model's rules.
++    pub fn navigate_camera(&mut self, dx: f32, dy: f32, factor: f64) -> Result<bool, JsValue> {
++        let (dx, dy) = self.display_delta_to_document(dx, dy)?;
++        let mut config = self.chart_config()?.clone();
++        let panel = match config.active_layer() {
++            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
++                &mut config.subplots[i].config
++            }
++            _ => &mut config,
++        };
++        let orbited = panel.orbit_view(dx, dy);
++        let zoomed = panel.zoom_view(factor);
++        if orbited || zoomed {
++            self.replace_chart_config(config)?;
++        }
++        Ok(orbited || zoomed)
 +    }
 +
 +    /// Refresh the registered chart's data and pick masks without presenting it.

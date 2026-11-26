@@ -14,6 +14,10 @@ pub(crate) fn sync_linked_axis_edit(before: &Value, after: &mut Value, target: &
         Some("right") => ("right_y", "left_y"),
         _ => return,
     };
+    // In a 3D view, left_y is Y and right_y is Z even when their ranges match.
+    if before["view_3d"].is_object() && matches!(source, "left_y" | "right_y") {
+        return;
+    }
     let old = &before[source];
     let peer = &before[opposite];
     if !old.is_object()
