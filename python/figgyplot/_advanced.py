@@ -1926,11 +1926,11 @@ class AdvancedMethods:
     def set_axis_unit(self, axis, scale=1.0, offset=0.0):
         if axis not in ("x", "y"):
             raise ValueError("axis must be x or y")
-        state = self.figure.get_settings()
-        cfg = self._config(state)
-        for key in (("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")):
-            cfg[key]["unit"] = dict(scale=float(scale), offset=float(offset))
-        self.figure.apply_settings(state)
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            for node in self._axis_nodes(state, axis):
+                node["unit"] = dict(scale=float(scale), offset=float(offset))
+            self.figure.apply_settings(state)
         return self
 
     def set_axis_breaks(self, axis, intervals, *, gap=8.0):
@@ -1956,11 +1956,11 @@ class AdvancedMethods:
         }.get(distribution)
         if kind is None:
             raise ValueError("distribution must be normal, weibull or logistic")
-        state = self.figure.get_settings()
-        cfg = self._config(state)
-        for key in (("bottom_x", "top_x") if axis == "x" else ("left_y", "right_y")):
-            cfg[key].update(scale={"Probability": kind}, min=0.001, max=0.999)
-        self.figure.apply_settings(state)
+        with self.figure._lock:
+            state = self.figure.get_settings()
+            for node in self._axis_nodes(state, axis):
+                node.update(scale={"Probability": kind}, min=0.001, max=0.999)
+            self.figure.apply_settings(state)
         return self
 
     def twiny(self, *, id=None):
@@ -1999,14 +1999,21 @@ class AdvancedMethods:
         return self.figure.update("axis_title_right", _axes=self, text=text, **kwargs)
 
     def _axis_node(self, state, axis):
+        return self._axis_nodes(state, axis)[0]
+
+    def _axis_nodes(self, state, axis):
         cfg = self._config(state)
         if self.overlay_id:
             o = self._overlay(state)
             if axis == "x" and not o.get("link_x", True):
-                return o["x_axis"]
+                return (o["x_axis"],)
             if axis == "y" and not o.get("link_y", False):
-                return o["y_axis"]
-        return cfg["bottom_x" if axis == "x" else "left_y"]
+                return (o["y_axis"],)
+        if axis == "x":
+            return cfg["bottom_x"], cfg["top_x"]
+        if cfg.get("view_3d") is not None:
+            return (cfg["left_y"],)
+        return cfg["left_y"], cfg["right_y"]
 
 
 # Preserve the same execution-local style and explicit-argument handling as the

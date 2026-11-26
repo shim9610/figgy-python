@@ -1832,7 +1832,10 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             uploaded = []
             try:
                 for name, values in zip(names, (x, lower, upper)):
-                    fig._native.upload_column(name, values)
+                    if name == names[0]:
+                        fig._native.upload_column(name, values)
+                    else:
+                        fig._native.upload_column(name, values, allow_missing=True)
                     uploaded.append(name)
                 fig._native.add_series_batch(json.dumps(specs, allow_nan=False), json.dumps(state['config'], allow_nan=False))
             except Exception:
@@ -2104,11 +2107,14 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
             raise ValueError("scale must be 'linear' or 'log'")
         with self.figure._lock:
             state = self.figure.get_settings()
-            keys = ("bottom_x", "top_x") if axis == "x" else (("left_y",) if self._config(state).get('view_3d') is not None else ("left_y", "right_y"))
-            for key in keys:
-                node = self._axis_node(state,axis) if self.overlay_id else self._config(state)[key]
-                if scale == "log" and node["min"] <= 0:
-                    node["min"], node["max"] = self.figure._native.log_bounds_at(axis, json.dumps(_document.target_layer(state, self.subplot_id, self.overlay_id)))
+            nodes = self._axis_nodes(state, axis)
+            bounds = None
+            if scale == "log" and any(node["min"] <= 0 for node in nodes):
+                layer = _document.target_layer(state, self.subplot_id, self.overlay_id)
+                bounds = self.figure._native.log_bounds_at(axis, json.dumps(layer))
+            for node in nodes:
+                if bounds is not None and node["min"] <= 0:
+                    node["min"], node["max"] = bounds
                 node["scale"] = scales[scale]
                 node["major_spacing"] = 1.0 if scale == "log" else (node["max"] - node["min"]) / 5
             self.figure.apply_settings(state)
@@ -2122,12 +2128,15 @@ class Axes(AdvancedMethods, AxesMethods, FeatureMethods, ChartMethods):
         return self._set_scale("y", scale)
 
     def get_xscale(self):
-        self.figure._require_cartesian()
-        return "log" if self._axis_node(self.figure.get_settings(),"x")["scale"] == "Logarithmic" else "linear"
+        return self._scale_name("x")
 
     def get_yscale(self):
+        return self._scale_name("y")
+
+    def _scale_name(self, axis):
         self.figure._require_cartesian()
-        return "log" if self._axis_node(self.figure.get_settings(),"y")["scale"] == "Logarithmic" else "linear"
+        scale = self._axis_node(self.figure.get_settings(), axis)["scale"]
+        return "probability" if isinstance(scale, dict) else {"Linear": "linear", "Logarithmic": "log"}[scale]
 
     def set_xlim(self, left=None, right=None, *, emit=True, auto=False, xmin=None, xmax=None):
         """Set both X bounds and derive ticks/labels for the new range.

@@ -189,9 +189,10 @@ class ChartMethods:
         """Symmetric or asymmetric errors: scalar, (N,), or (2,N) magnitudes.
 
         ``linestyle=None`` draws points and errors without connecting lines.
+        Masked or NaN magnitudes omit their error endpoints.
         Widths, marker diameter and cap sizes use Python points.
         """
-        from .figure import _array, _color, _COLORS, _MARKERS, _LINES
+        from .figure import _array, _color, _numeric_array, _COLORS, _MARKERS, _LINES
         x, y = _array(x), _array(y)
         if x.size != y.size or not x.size:
             raise ValueError('x and y must have the same nonzero length')
@@ -204,11 +205,12 @@ class ChartMethods:
         for axis, data in [('x', xerr), ('y', yerr)]:
             if data is None:
                 continue
-            a = np.asarray(data)
+            a = _numeric_array(data)
             if a.ndim == 0:
                 a = np.full(x.size, a, dtype=float)
-            if a.shape not in [(x.size,), (2, x.size)] or not np.isfinite(a).all() or (a < 0).any():
-                raise ValueError('errors must be finite nonnegative scalar, (N,), or (2,N)')
+            if (a.shape not in [(x.size,), (2, x.size)] or a.dtype.kind not in 'fiub'
+                    or np.isinf(a).any() or (a < 0).any()):
+                raise ValueError('errors must be nonnegative scalar, (N,), or (2,N), with NaN for missing endpoints')
             if a.ndim == 1:
                 name = f'{sid}/err_{axis}'
                 columns.append((name, _array(a)))
@@ -227,7 +229,8 @@ class ChartMethods:
             style['line'] = dict(line_style=_LINES.get(linestyle, linestyle), line_color=color, line_width=float(linewidth)*px)
             prefix = 'LineScatterErrorbar'
         suffix = 'XY' if len(errors) == 2 else 'X' if xerr is not None else 'Y'
-        return self._add(x, y, {prefix+suffix: style}, label, id, extra_columns=columns)
+        return self._add(x, y, {prefix+suffix: style}, label, id, extra_columns=columns,
+                         allow_missing_values=True)
 
     @_style_runtime.styled
     def stairs(self, values, edges, *, orientation='vertical', color=None, edgecolor='black',

@@ -135,6 +135,11 @@ class FeatureMethods:
         lower = _array(y2)
         if lower.size != x.size:
             raise ValueError('y2 must match x')
+        valid = np.isfinite(x) & np.isfinite(lower) & np.isfinite(upper)
+        if not valid.all():
+            # A fill segment requires both boundaries at each endpoint.
+            lower = np.where(valid, lower, np.nan)
+            upper = np.where(valid, upper, np.nan)
         # Introduce both lines in one native transaction. Their data column is
         # shared by reference, with no resampling or persistent CPU array copy.
         return self._add_fill_pair(x, lower, upper, line, label, sid)
@@ -143,8 +148,8 @@ class FeatureMethods:
     def quiver(self, x, y, u, v, *, values=None, cmap='viridis', vmin=None, vmax=None,
                scale=1., units='pixels', pivot='tail', color='black', width=1.,
                head_length=6., head_width=4., min_length=0., label=None, id=None):
-        from .figure import _array, _color
-        x, y, u, v = _array(x), _array(y), np.asarray(u), np.asarray(v)
+        from .figure import _array, _color, _numeric_array
+        x, y, u, v = _array(x), _array(y), _numeric_array(u), _numeric_array(v)
         if u.shape != v.shape or u.ndim not in (1, 2):
             raise ValueError('u and v must have identical point-vector or grid shapes')
         if units not in ('pixels', 'data') or pivot not in ('tail', 'middle', 'tip'):
@@ -175,7 +180,7 @@ class FeatureMethods:
             head_width_px=float(head_width)*px, min_length_px=float(min_length)*px)
         cfg = copy.deepcopy(self._config(self.figure.get_settings()))
         if values is not None:
-            values = np.asarray(values)
+            values = _numeric_array(values)
             if values.shape != u.shape:
                 raise ValueError('vector color values must match component shape')
             if u.ndim == 1:
@@ -185,7 +190,7 @@ class FeatureMethods:
                 style['color_map'] = {'Grid': matrix('color', values)}
             colorbar(cfg, values, cmap, vmin, vmax)
         return self._add(x, y, {'Vector': dict(components=components, style=style)}, label, sid,
-                         extra_columns=columns, config=cfg)
+                         extra_columns=columns, config=cfg, allow_missing_values=True)
 
     @_style_runtime.styled
     def radar(self, categories, values, *, labels=None, colors=None, **properties):

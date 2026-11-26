@@ -8,6 +8,12 @@ struct PairedExtents {
     segments: [AxisExtent; 2],
 }
 
+struct ErrorbarExtents {
+    columns: [String; 2],
+    errors: [Option<renderer::data_config::ErrorRef>; 2],
+    bounds: [AxisExtent; 2],
+}
+
 #[pyclass(module = "figgyplot._native")]
 pub struct NotebookFigure {
     identity: Option<Value>,
@@ -24,6 +30,7 @@ pub struct NotebookFigure {
     history: edit_history::History,
     fit_extents: HashMap<String, [renderer::chart::FitExtent; 2]>,
     paired_extents: HashMap<String, HashMap<String, PairedExtents>>,
+    errorbar_extents: HashMap<String, ErrorbarExtents>,
 }
 #[pymethods]
 impl NotebookFigure {
@@ -57,6 +64,7 @@ impl NotebookFigure {
             history: Default::default(),
             fit_extents: HashMap::new(),
             paired_extents: HashMap::new(),
+            errorbar_extents: HashMap::new(),
         })
     }
     fn set_radial(&mut self, json: &str) -> PyResult<()> {
@@ -252,6 +260,7 @@ impl NotebookFigure {
                 && !old_series.iter().any(|s| s.series_id == spec.series_id)
             {
                 self.fit_extents.remove(&spec.series_id);
+                self.errorbar_extents.remove(&spec.series_id);
             }
             self.chart = Chart::new(old_config);
             self.series = old_series;
@@ -453,14 +462,15 @@ impl NotebookFigure {
         let state = serde_json::from_str(&self.settings_json()?).map_err(runtime)?;
         self.history.mark_baseline(state)
     }
+    #[pyo3(signature=(id, x, y))]
     fn cache_fit_extent(
         &mut self,
         id: String,
-        x: (f64, f64, Option<f64>),
-        y: (f64, f64, Option<f64>),
+        x: Option<ExtentInput>,
+        y: Option<ExtentInput>,
     ) -> PyResult<()> {
         self.fit_extents
-            .insert(id, [fit_extent(Some(x))?, fit_extent(Some(y))?]);
+            .insert(id, [fit_extent(x)?, fit_extent(y)?]);
         Ok(())
     }
     fn cache_paired_extents(
@@ -478,6 +488,31 @@ impl NotebookFigure {
             .insert(y, PairedExtents { points, segments });
         Ok(())
     }
+    #[pyo3(signature=(spec, x, y))]
+    fn cache_errorbar_extents(
+        &mut self,
+        spec: &str,
+        x: Option<ExtentInput>,
+        y: Option<ExtentInput>,
+    ) -> PyResult<()> {
+        let series: SeriesConfig = parse(spec)?;
+        let renderer::DataRenderType::Xy(renderer::XySeries {
+            errors: Some(errors),
+            ..
+        }) = series.render_type
+        else {
+            return Err(invalid("expected a series with error bars"));
+        };
+        self.errorbar_extents.insert(
+            series.series_id,
+            ErrorbarExtents {
+                columns: [series.x_column, series.y_column],
+                errors: [errors.x, errors.y],
+                bounds: [fit_extent(x)?, fit_extent(y)?],
+            },
+        );
+        Ok(())
+    }
     fn log_bounds(&self, axis: &str) -> PyResult<(f64, f64)> {
         self.log_bounds_at(
             axis,
@@ -492,29 +527,25 @@ impl NotebookFigure {
             .filter(|s| identity::fit_member(self.chart.config(), &s.series_id, axis, layer))
             .cloned()
             .collect();
-        let mut extra = renderer::chart::FitExtent::EMPTY;
-        if matches!(axis, "x" | "y") {
-            for series in &selected {
-                if !matches!(
-                    series.render_type,
-                    renderer::DataRenderType::Xy(renderer::XySeries {
-                        errors: Some(_),
-                        ..
-                    })
-                ) {
-                    continue;
+        positive_data_bounds(
+            axis,
+            &selected,
+            |spec| {
+                if !matches!(axis, "x" | "y")
+                    || !matches!(spec.render_type, renderer::DataRenderType::Xy(_))
+                {
+                    return None;
                 }
-                if let Some(bounds) = self.fit_extents.get(&series.series_id) {
-                    extra.union(&bounds[usize::from(axis == "y")]);
-                }
-            }
-        }
-        positive_data_bounds(axis, &selected, extra, |id| {
-            self.columns
-                .get(id)
-                .copied()
-                .ok_or_else(|| invalid("unknown column"))
-        })
+                self.geometry_extent(spec)
+                    .map(|range| range[usize::from(axis == "y")])
+            },
+            |id| {
+                self.columns
+                    .get(id)
+                    .copied()
+                    .ok_or_else(|| invalid("unknown column"))
+            },
+        )
     }
     fn fit(&mut self, padding: f64) -> PyResult<()> {
         self.fit_domain(padding, false, true)
@@ -528,23 +559,18 @@ impl NotebookFigure {
         }
         let mut extents = Vec::new();
         for s in &self.series {
-            let [mut a, mut b] = self
-                .fit_extents
-                .get(&s.series_id)
-                .or_else(|| self.paired_extent(s))
-                .copied()
-                .unwrap_or_else(|| {
-                    [
-                        self.columns
-                            .get(&s.x_column)
-                            .copied()
-                            .unwrap_or(renderer::chart::FitExtent::EMPTY),
-                        self.columns
-                            .get(&s.y_column)
-                            .copied()
-                            .unwrap_or(renderer::chart::FitExtent::EMPTY),
-                    ]
-                });
+            let [mut a, mut b] = self.geometry_extent(s).unwrap_or_else(|| {
+                [
+                    self.columns
+                        .get(&s.x_column)
+                        .copied()
+                        .unwrap_or(renderer::chart::FitExtent::EMPTY),
+                    self.columns
+                        .get(&s.y_column)
+                        .copied()
+                        .unwrap_or(renderer::chart::FitExtent::EMPTY),
+                ]
+            });
             // Category/box fits follow the public chart.rs statistics policy.
             // Source columns are immutable; retain only their scalar extents.
             if s.render_type.category_bars().is_some() {
@@ -780,6 +806,33 @@ fn extent<T: Number>(a: &[T], allow_missing: bool) -> PyResult<renderer::chart::
 }
 
 impl NotebookFigure {
+    fn geometry_extent(&self, spec: &SeriesConfig) -> Option<[AxisExtent; 2]> {
+        let renderer::DataRenderType::Xy(style) = &spec.render_type else {
+            return self.fit_extents.get(&spec.series_id).copied();
+        };
+        let points = self.paired_extent(spec).copied();
+        let Some(errors) = &style.errors else {
+            return points;
+        };
+        let Some(cached) = self.errorbar_extents.get(&spec.series_id).filter(|cached| {
+            cached.columns[0] == spec.x_column && cached.columns[1] == spec.y_column
+        }) else {
+            return points;
+        };
+        let actual = [&errors.x, &errors.y];
+        let base = points.unwrap_or_else(|| {
+            [&spec.x_column, &spec.y_column]
+                .map(|name| self.columns.get(name).copied().unwrap_or(AxisExtent::EMPTY))
+        });
+        Some(std::array::from_fn(|i| {
+            if actual[i] == &cached.errors[i] {
+                cached.bounds[i]
+            } else {
+                base[i]
+            }
+        }))
+    }
+
     fn paired_extent(&self, spec: &SeriesConfig) -> Option<&[AxisExtent; 2]> {
         let renderer::DataRenderType::Xy(style) = &spec.render_type else {
             return None;

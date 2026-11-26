@@ -5,6 +5,17 @@ import numpy as np
 from ._native import NotebookFigure
 
 
+def _finite_extent(values, valid=None):
+    finite = values[np.isfinite(values) if valid is None else valid]
+    if not finite.size:
+        return None
+    positive = finite[finite > 0]
+    return (
+        float(finite.min()), float(finite.max()),
+        float(positive.min()) if positive.size else None,
+    )
+
+
 class NotebookData:
     def __init__(self, width, height, pool_bytes, retain):
         self.model = NotebookFigure(width, height, pool_bytes)
@@ -86,7 +97,8 @@ class NotebookData:
         # Only bounded extent metadata survives transfer release, never sample arrays.
         spec = json.loads(spec_json)
         kind, style = next(iter(spec["render_type"].items()))
-        if kind in ("Line", "Scatter", "ScatterLine", "Stem"):
+        has_errors = "err_x" in style or "err_y" in style
+        if kind in ("Line", "Scatter", "ScatterLine", "Stem") or has_errors:
             x_column, y_column = spec["x_column"], spec["y_column"]
             x, y = self._label_column(x_column, None), self._label_column(y_column, None)
             if x is not None and y is not None:
@@ -98,20 +110,10 @@ class NotebookData:
                     drawn[:-1] |= connected
                     drawn[1:] |= connected
 
-                    def extent(values, mask):
-                        finite = values[:rows][mask]
-                        if not finite.size:
-                            return None
-                        positive = finite[finite > 0]
-                        return (
-                            float(finite.min()), float(finite.max()),
-                            float(positive.min()) if positive.size else None,
-                        )
-
                     self.model.cache_paired_extents(
                         x_column, y_column,
-                        [extent(x, valid), extent(y, valid)],
-                        [extent(x, drawn), extent(y, drawn)],
+                        [_finite_extent(x[:rows], valid), _finite_extent(y[:rows], valid)],
+                        [_finite_extent(x[:rows], drawn), _finite_extent(y[:rows], drawn)],
                     )
         if style.get("matrix", {}).get("grid_layout") == "Hexagonal":
 
@@ -160,19 +162,9 @@ class NotebookData:
                         (origin + end * factor * component)[valid],
                     )
                 )
-                values = values[np.isfinite(values)]
-                if not values.size:
-                    raise ValueError("vector has no finite geometry")
-                positive = values[values > 0]
-                extents.append(
-                    (
-                        float(values.min()),
-                        float(values.max()),
-                        float(positive.min()) if positive.size else None,
-                    )
-                )
+                extents.append(_finite_extent(values))
             self.model.cache_fit_extent(spec["series_id"], *extents)
-        if "err_x" in style or "err_y" in style:
+        if has_errors:
 
             def array(name):
                 dtype, data = self.columns[name]
@@ -197,18 +189,8 @@ class NotebookData:
                     values = np.concatenate(
                         (values[valid], (values - lo)[valid], (values + hi)[valid])
                     )
-                values = values[np.isfinite(values)]
-                if not values.size:
-                    raise ValueError("errorbar has no finite paired samples")
-                positive = values[values > 0]
-                extents.append(
-                    (
-                        float(values.min()),
-                        float(values.max()),
-                        float(positive.min()) if positive.size else None,
-                    )
-                )
-            self.model.cache_fit_extent(spec["series_id"], *extents)
+                extents.append(_finite_extent(values))
+            self.model.cache_errorbar_extents(spec_json, *extents)
 
     def add_series_fitted(self, spec_json, config=None, bounds=None):
         self.cache_series_extents(spec_json)

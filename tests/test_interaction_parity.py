@@ -3114,6 +3114,13 @@ display(fig.widget())
         assert json.loads(execute(limits)) == expected
         execute('ax.set_ylim(0, 1000); await fig.sync()')
         assert json.loads(execute('fig.fit(); ' + limits)) == expected
+        assert json.loads(execute("ax.set_yscale('log'); " + limits)) == pytest.approx([1, 3])
+        assert page.evaluate(ROOT + '.snapshot().config.left_y.max') == 3
+        execute("ax.set_yscale('linear'); ax.set_ylim(0, 1000); await fig.sync()")
+        click_button(page, '[data-properties]')
+        ObjectNavigator(page).choose('axis_left')
+        page.locator('[data-property=axis_scale]').select_option('Logarithmic')
+        assert json.loads(execute(limits)) == pytest.approx([1, 3])
 
 
 @pytest.mark.skipif(NEEDS_UI, reason='requires native and real Jupyter input')

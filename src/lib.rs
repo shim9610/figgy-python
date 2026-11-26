@@ -688,13 +688,18 @@ impl FigureAccess<'_> {
 fn positive_data_bounds(
     axis: &str,
     series: &[SeriesConfig],
-    mut extent: renderer::chart::FitExtent,
+    geometry: impl Fn(&SeriesConfig) -> Option<renderer::chart::FitExtent>,
     mut column: impl FnMut(&str) -> PyResult<renderer::chart::FitExtent>,
 ) -> PyResult<(f64, f64)> {
     if !matches!(axis, "x" | "y" | "z") {
         return Err(invalid("log bounds axis must be x, y or z"));
     }
+    let mut extent = renderer::chart::FitExtent::EMPTY;
     for s in series {
+        if let Some(drawn) = geometry(s) {
+            extent.union(&drawn);
+            continue;
+        }
         if s.render_type.range_links().is_some() {
             continue;
         }
@@ -1440,48 +1445,35 @@ impl FigureAccess<'_> {
             .filter(|s| identity::fit_member(self.data.chart.config(), &s.series_id, axis, layer))
             .cloned()
             .collect();
-        let mut extra = renderer::chart::FitExtent::EMPTY;
+        let mut geometry = HashMap::new();
         if matches!(axis, "x" | "y") {
-            let errorbars: Vec<_> = gpu::series(self.data.figure_id, &selected)
-                .into_iter()
-                .filter(|s| {
-                    matches!(
-                        s.render_type,
-                        renderer::DataRenderType::Xy(renderer::XySeries {
-                            errors: Some(_),
-                            ..
-                        })
-                    )
-                })
+            let xy: Vec<_> = selected
+                .iter()
+                .filter(|s| matches!(s.render_type, renderer::DataRenderType::Xy(_)))
+                .cloned()
                 .collect();
-            if !errorbars.is_empty() {
-                pollster::block_on(self.renderer.ensure_errorbar_extent_engine())
-                    .map_err(runtime)?;
-                let jobs = errorbars
-                    .iter()
-                    .map(|s| self.renderer.begin_series_fit_extent(s))
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(runtime)?;
-                self.renderer.wait_idle().map_err(runtime)?;
-                for job in jobs.into_iter().flatten() {
-                    if let Some(bounds) = pollster::block_on(job.resolve()).map_err(runtime)? {
-                        let bounds = if axis == "x" { bounds.x } else { bounds.y };
-                        extra.union(&renderer::chart::FitExtent {
-                            min: bounds.min,
-                            max: bounds.max,
-                            min_positive: bounds.min_positive,
-                        });
+            if !xy.is_empty() {
+                let scoped = gpu::series(self.data.figure_id, &xy);
+                let bounds = self.drawn_fit_extents(&scoped)?;
+                for (spec, range) in xy.into_iter().zip(bounds) {
+                    if let Some(range) = range {
+                        geometry.insert(spec.series_id, range[usize::from(axis == "y")]);
                     }
                 }
             }
         }
-        positive_data_bounds(axis, &selected, extra, |id| {
-            Chart::slot_extent(
-                self.renderer.pool(),
-                &gpu::column_id(self.data.figure_id, id),
-            )
-            .map_err(runtime)
-        })
+        positive_data_bounds(
+            axis,
+            &selected,
+            |spec| geometry.get(&spec.series_id).copied(),
+            |id| {
+                Chart::slot_extent(
+                    self.renderer.pool(),
+                    &gpu::column_id(self.data.figure_id, id),
+                )
+                .map_err(runtime)
+            },
+        )
     }
     fn fit_range_link_exits(&mut self, state: &mut Settings, active_only: bool) -> PyResult<()> {
         let link_in_scope = |s: &SeriesConfig| {
@@ -1577,6 +1569,34 @@ impl FigureAccess<'_> {
     }
     fn fit(&mut self, py: Python<'_>, padding: f64) -> PyResult<()> {
         self.fit_domain(py, padding, false, true)
+    }
+    fn drawn_fit_extents(
+        &mut self,
+        specs: &[SeriesConfig],
+    ) -> PyResult<Vec<Option<[renderer::chart::FitExtent; 2]>>> {
+        use renderer::chart::FitExtent;
+        pollster::block_on(self.renderer.ensure_errorbar_extent_engine()).map_err(runtime)?;
+        let jobs = specs
+            .iter()
+            .map(|spec| self.renderer.begin_series_fit_extent(spec))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(runtime)?;
+        self.renderer.wait_idle().map_err(runtime)?;
+        jobs.into_iter()
+            .map(|job| {
+                let Some(job) = job else {
+                    return Ok(None);
+                };
+                let bounds = pollster::block_on(job.resolve()).map_err(runtime)?;
+                Ok(Some(bounds.map_or([FitExtent::EMPTY; 2], |e| {
+                    [e.x, e.y].map(|axis| FitExtent {
+                        min: axis.min,
+                        max: axis.max,
+                        min_positive: axis.min_positive,
+                    })
+                })))
+            })
+            .collect()
     }
     fn fit_domain(
         &mut self,
@@ -1692,57 +1712,34 @@ impl FigureAccess<'_> {
             return self.apply_settings_model(state);
         }
         let extents = py.detach(|| -> PyResult<Vec<[renderer::chart::FitExtent; 2]>> {
-            pollster::block_on(self.renderer.ensure_errorbar_extent_engine()).map_err(runtime)?;
             let specs = gpu::series(self.data.figure_id, &self.data.series);
-            let mut jobs = Vec::new();
-            let mut extents = Vec::new();
-            for series in &specs {
-                let a =
-                    Chart::slot_extent(self.renderer.pool(), &series.x_column).map_err(runtime)?;
-                let b =
-                    Chart::slot_extent(self.renderer.pool(), &series.y_column).map_err(runtime)?;
-                extents.push([a, b]);
-                jobs.push(
-                    self.renderer
-                        .begin_series_fit_extent(series)
-                        .map_err(runtime)?,
-                );
-            }
-            self.renderer.wait_idle().map_err(runtime)?;
-            for (i, job) in jobs.into_iter().enumerate() {
-                if let Some(job) = job {
-                    extents[i] =
-                        if let Some(e) = pollster::block_on(job.resolve()).map_err(runtime)? {
-                            [
-                                renderer::chart::FitExtent {
-                                    min: e.x.min,
-                                    max: e.x.max,
-                                    min_positive: e.x.min_positive,
-                                },
-                                renderer::chart::FitExtent {
-                                    min: e.y.min,
-                                    max: e.y.max,
-                                    min_positive: e.y.min_positive,
-                                },
-                            ]
-                        } else {
-                            [renderer::chart::FitExtent::EMPTY; 2]
-                        };
-                }
+            let drawn = self.drawn_fit_extents(&specs)?;
+            let mut extents = Vec::with_capacity(specs.len());
+            for (spec, bounds) in specs.iter().zip(drawn) {
+                let mut bounds = match bounds {
+                    Some(bounds) => bounds,
+                    None => [
+                        Chart::slot_extent(self.renderer.pool(), &spec.x_column)
+                            .map_err(runtime)?,
+                        Chart::slot_extent(self.renderer.pool(), &spec.y_column)
+                            .map_err(runtime)?,
+                    ],
+                };
                 if let renderer::DataRenderType::Histogram(
                     renderer::data_config::HistogramSeries { bar },
-                ) = &specs[i].render_type
+                ) = &spec.render_type
                 {
                     let dimension = usize::from(matches!(
                         bar.orientation,
                         renderer::data_config::BarOrientation::Vertical
                     ));
-                    extents[i][dimension].union(&renderer::chart::FitExtent {
+                    bounds[dimension].union(&renderer::chart::FitExtent {
                         min: bar.baseline,
                         max: bar.baseline,
                         min_positive: (bar.baseline > 0.).then_some(bar.baseline),
                     });
                 }
+                extents.push(bounds);
             }
             Ok(extents)
         })?;

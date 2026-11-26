@@ -238,6 +238,13 @@ def test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers(backe
         for key in keys:
             axis = fig.get_settings()["config"][key]
             assert (axis["min"], axis["max"]) == pytest.approx((1, 10))
+        # Replaying the original settings must recover the matching endpoints
+        # even when the kernel has already released all source snapshots.
+        fig.apply_settings(before)
+        getattr(ax, "set_" + dimension + "scale")("log")
+        for key in keys:
+            axis = fig.get_settings()["config"][key]
+            assert (axis["min"], axis["max"]) == pytest.approx((100, 200))
         np.testing.assert_array_equal(other, [1., 2.])
 
 

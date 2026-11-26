@@ -324,6 +324,94 @@ def test_fit_matches_rendered_points_or_connected_line_segments(backend, kind, u
         assert ax.get_ylim() == pytest.approx([0, upper])
 
 
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("axis, dual, primary", [
+    ("y", "twinx", "left_y"), ("x", "twiny", "bottom_x"),
+])
+@pytest.mark.parametrize("edit", ["unit", "probability"])
+def test_axis_edits_resolve_the_owner_of_an_independent_overlay(backend, axis, dual, primary, edit):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.plot([.1, .3, .8], [.2, .4, .7])
+        overlay = getattr(ax, dual)()
+        overlay.plot([.15, .5, .9], [.12, .24, .61])
+        before = fig.get_settings()["config"]
+        if edit == "unit":
+            overlay.set_axis_unit(axis, scale=2, offset=3)
+        else:
+            overlay.set_probability_scale(axis)
+        config = fig.get_settings()["config"]
+        assert config[primary] == before[primary]
+        node = config["overlays"][0][axis + "_axis"]
+        if edit == "unit":
+            assert node["unit"] == {"scale": 2, "offset": 3}
+        else:
+            assert node["scale"] == {"Probability": "Normal"}
+            assert getattr(overlay, "get_" + axis + "scale")() == "probability"
+            assert getattr(ax, "get_" + axis + "scale")() == "linear"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("all_masked", [False, True])
+def test_masked_errorbar_keeps_the_points_and_excludes_hidden_endpoints(backend, all_masked):
+    errors = np.ma.array([.2, 1000, .2], mask=[all_masked, True, all_masked], dtype=np.float32)
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.errorbar([0, 1, 2], [1, 2, 3], yerr=errors, id="error")
+        assert ax.get_ylim() == pytest.approx([.9, 3.1] if all_masked else [.68, 3.32])
+        extents = json.loads(fig._native.column_extents_json())
+        assert extents["error/y"] == [1, 3]
+        assert extents["error/err_y"] == ([None, None] if all_masked else pytest.approx([.2, .2]))
+        assert errors.data[1] == 1000 and errors.mask[1]
+        if backend == "native":
+            assert fig.to_png().startswith(b"\x89PNG")
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_masked_quiver_components_and_empty_grid_rows_ignore_the_payload(backend):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        ax.quiver([0, 1], [1, 1], np.ma.array([1, 999], mask=[0, 1]), [1, 1], units="data", id="points")
+        assert ax.get_xlim() == pytest.approx([-.05, 1.05])
+        ax.quiver([0, 1], [0, 1], np.ma.array([[1, 1], [999, 999]], mask=[[0, 0], [1, 1]]),
+                  [[1, 1], [1, 1]], id="grid")
+        extents = json.loads(fig._native.column_extents_json())
+        assert extents["points/u"] == [1, 1]
+        assert extents["grid/u/1"] == [None, None]
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("missing_on_upper", [False, True])
+def test_fill_between_drops_an_unpaired_boundary_from_the_fit(backend, missing_on_upper):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        upper = [1, 2, 1000, 2, 1]
+        lower = [0, 0, 0, 0, 0]
+        if missing_on_upper:
+            upper = np.ma.array([1, 2, 0, 2, 1], mask=[0, 0, 1, 0, 0])
+            lower = [0, 0, -1000, 0, 0]
+        else:
+            lower = np.ma.array(lower, mask=[0, 0, 1, 0, 0])
+        ax.fill_between([0, 1, 2, 3, 4], upper, lower)
+        assert ax.get_ylim() == pytest.approx([-.1, 2.1])
+        fig.fit(0)
+        assert ax.get_ylim() == pytest.approx([0, 2])
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+@pytest.mark.parametrize("axis", ["x", "y"])
+def test_log_scale_switch_uses_the_same_drawable_samples_as_fit(backend, axis):
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        coords = ([0, 1, np.nan, 2, 3], [0, 1, 1000, 2, 3])
+        ax.plot(*(coords if axis == "y" else coords[::-1]))
+        getattr(ax, "set_" + axis + "scale")("log")
+        limits = getattr(ax, "get_" + axis + "lim")
+        assert limits() == pytest.approx([1, 3])
+        fig.fit(0)
+        assert limits() == pytest.approx([1, 3])
+
+
 def test_float32_input_is_preserved_without_changing_original():
     from figgyplot.figure import _array
 
