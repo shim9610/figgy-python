@@ -130,51 +130,119 @@ pub(super) fn refresh_legends(config: &mut Config, series: &[SeriesConfig]) {
 }
 
 pub(super) fn validate_columns(series: &[SeriesConfig], names: &HashSet<String>) -> PyResult<()> {
-    fn visit(value: &Value, names: &HashSet<String>) -> PyResult<()> {
-        if let Some(fields) = value.as_object() {
-            for (key, value) in fields {
-                if matches!(
-                    key.as_str(),
-                    "column"
-                        | "error_bar_style_index_column"
-                        | "x_column"
-                        | "y_column"
-                        | "point_style_index_column"
-                        | "lower"
-                        | "upper"
-                        | "u"
-                        | "v"
-                ) && let Some(name) = value.as_str()
-                    && !names.contains(name)
-                {
-                    return Err(invalid(format!("unregistered source column: {name}")));
-                }
-                if key == "columns"
-                    && let Some(columns) = value.as_array()
-                {
-                    for name in columns {
-                        if !name.as_str().is_some_and(|n| names.contains(n)) {
-                            return Err(invalid("unregistered matrix column"));
-                        }
-                    }
-                }
-                if key == "Column"
-                    && let Some(name) = value.as_str()
-                    && !names.contains(name)
-                {
-                    return Err(invalid("unregistered vector color column"));
-                }
-                visit(value, names)?;
+    for series in series {
+        let mut missing = None;
+        let mut check = |id: &str| {
+            if !id.is_empty() && !names.contains(id) {
+                missing = Some(id.to_owned());
             }
-        } else if let Some(items) = value.as_array() {
-            for item in items {
-                visit(item, names)?;
+        };
+        series.visit_columns(&mut check);
+        series.visit_composite_columns(&mut check);
+        if let Some(id) = missing {
+            return Err(invalid(format!("unregistered source column: {id}")));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_percent_stacks(
+    config: &Config,
+    series: &[SeriesConfig],
+    minimum: impl Fn(&str) -> Option<f64>,
+) -> PyResult<()> {
+    for spec in series {
+        let groups = config.bar_groups_of(config.layer_of_series(&spec.series_id));
+        if spec.render_type.category_bars().is_some()
+            && groups.mode == renderer::CategoryBarMode::PercentStacked
+        {
+            let (_, values) = spec.category_bar_columns(groups.direction);
+            if minimum(values).is_some_and(|value| value.is_finite() && value < 0.) {
+                return Err(invalid(format!(
+                    "percent_stacked bars require nonnegative values (series {:?})",
+                    spec.series_id
+                )));
             }
         }
-        Ok(())
     }
-    for series in series {
-        visit(&serde_json::to_value(series).map_err(invalid)?, names)?;
+    Ok(())
+}
+
+pub(super) fn rebind_category_columns(
+    series: &mut [SeriesConfig],
+    bindings: &str,
+    count: impl Fn(&str) -> Option<usize>,
+) -> PyResult<()> {
+    let bindings: HashMap<String, [String; 2]> = parse(bindings)?;
+    for (id, [x, y]) in bindings {
+        let spec = series
+            .iter_mut()
+            .find(|spec| spec.series_id == id)
+            .ok_or_else(|| invalid(format!("unknown category bar series: {id}")))?;
+        let renderer::DataRenderType::CategoryBars(bars) = &mut spec.render_type else {
+            return Err(invalid(
+                "only category bars can extend their category columns",
+            ));
+        };
+        let rows = count(&x)
+            .filter(|rows| Some(*rows) == count(&y))
+            .ok_or_else(|| invalid("category columns need the same number of rows"))?;
+        if !bars.labels.text.is_empty() {
+            bars.labels.text.resize(rows, String::new());
+        }
+        if !bars.labels.offsets.is_empty() {
+            bars.labels.offsets.resize(rows, [0., 0.]);
+        }
+        spec.x_column = x;
+        spec.y_column = y;
+    }
+    Ok(())
+}
+
+pub(super) fn validate_range_rows(
+    series: &[SeriesConfig],
+    count: impl Fn(&str) -> Option<usize>,
+) -> PyResult<()> {
+    for spec in series {
+        if let Some(progress) = spec
+            .render_type
+            .range_bars()
+            .and_then(|bars| bars.progress.as_ref())
+        {
+            if let Some(rows) = count(&spec.x_column)
+                && count(&progress.column) != Some(rows)
+            {
+                return Err(invalid(format!(
+                    "series {} needs one progress value per bar ({} rows)",
+                    spec.series_id, rows
+                )));
+            }
+        }
+        let Some(links) = spec.render_type.range_links() else {
+            continue;
+        };
+        let Some(bars) = series.iter().find(|s| s.series_id == links.bars) else {
+            return Err(invalid(format!("unknown range bar series: {}", links.bars)));
+        };
+        let Some(range) = bars.render_type.range_bars() else {
+            return Err(invalid(format!("{} is not a range bar series", links.bars)));
+        };
+        let Some(rows) = [&bars.x_column, &bars.y_column, &range.start]
+            .into_iter()
+            .map(|id| count(id))
+            .collect::<Option<Vec<_>>>()
+            .and_then(|counts| counts.into_iter().min())
+        else {
+            continue;
+        };
+        for link in &links.links {
+            if link.from as usize >= rows || link.to as usize >= rows {
+                return Err(invalid(format!(
+                    "range link {} → {} is outside series {} ({} rows)",
+                    link.from, link.to, links.bars, rows,
+                )));
+            }
+        }
     }
     Ok(())
 }
@@ -189,6 +257,8 @@ struct Identity {
     retired: Vec<String>,
     #[serde(default)]
     tick_modes: HashMap<String, HashMap<String, TickMode>>,
+    #[serde(default)]
+    energy_units: HashMap<String, String>,
 }
 #[derive(Deserialize)]
 enum TickMode {
@@ -263,11 +333,18 @@ pub(super) fn validate_identity(
         }
     }
     let panel_ids: HashSet<_> = meta.panels.iter().map(|p| p.id.as_str()).collect();
+    if meta
+        .energy_units
+        .iter()
+        .any(|(owner, unit)| !panel_ids.contains(owner.as_str()) || unit.trim().is_empty())
+    {
+        return Err(invalid("energy units must reference existing panels"));
+    }
     for (owner, modes) in &meta.tick_modes {
         let sides: &[&str] = if panel_ids.contains(owner.as_str()) {
             &["bottom_x", "top_x", "left_y", "right_y"]
         } else if meta.panels.iter().any(|p| p.overlays.contains(owner)) {
-            &["y_axis"]
+            &["x_axis", "y_axis"]
         } else {
             return Err(invalid("tick mode references unknown axes owner"));
         };
@@ -330,7 +407,11 @@ pub(super) fn validate_identity(
             }
         }
         let placed: HashSet<_> = layout.placement.values().map(String::as_str).collect();
-        if placed != panel_ids
+        let missing_slot = meta.panels.iter().enumerate().any(|(i, p)| {
+            !placed.contains(p.id.as_str()) && (i == 0 || config.subplots[i - 1].anchor.is_none())
+        });
+        if missing_slot
+            || !placed.is_subset(&panel_ids)
             || placed.len() != layout.placement.len()
             || layout
                 .placement
@@ -415,9 +496,13 @@ impl FigureAccess<'_> {
     }
 
     pub(super) fn annotation_view(&self) -> PyResult<renderer::ChartView> {
+        let started = self.data.host_work.start();
         let chart = Chart::new(gpu::config(self.data.figure_id, self.data.chart.config()));
-        self.renderer
+        let result = self
+            .renderer
             .create_chart_view(&chart, chart.config().chart_area.0)
-            .map_err(runtime)
+            .map_err(runtime);
+        self.data.host_work.finish("annotation_view", started);
+        result
     }
 }

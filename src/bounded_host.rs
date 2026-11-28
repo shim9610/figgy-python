@@ -18,7 +18,7 @@ impl SurfaceWindow {
         let ctx = self.ctx.clone();
         let overlay = self.inspector_overlay();
         let mut error = None;
-        let output = ctx.run_ui(input, |root| {
+        let mut output = ctx.run_ui(input, |root| {
             self.editor.show_bounded(root, c, overlay);
             // Side-panel frame margins must not enlarge the chart when the
             // window grows to accommodate the docked inspector.
@@ -58,7 +58,7 @@ impl SurfaceWindow {
                         RendererDevice::new(
                             c.renderer.device().clone(),
                             c.renderer.queue().clone(),
-                        ),
+                        ).map_err(runtime)?,
                         &c.data.document.as_ref().unwrap().chart,
                     )
                     .map_err(runtime)?;
@@ -160,7 +160,7 @@ impl SurfaceWindow {
                     } else {
                         !modifiers.ctrl || modifiers.shift
                     };
-                    if delta != 0. && allowed {
+                    if delta != 0. && allowed && view["axis"] != "radius" {
                         let [low, high]: [f64; 2] =
                             serde_json::from_value(view["range"].clone()).unwrap();
                         let area = surface
@@ -207,6 +207,22 @@ impl SurfaceWindow {
                         (p.y - image_rect.min.y) * logical_size.1 as f32 / image_rect.height(),
                     ]
                 };
+                if self.editor.review_enabled() && ctx.input(|i|i.pointer.secondary_clicked()) && let Some(p)=ctx.input(|i|i.pointer.interact_pos()).filter(|p|image_rect.contains(*p)) {
+                    let point=to_local(p);
+                    let annotation=surface.annotations.annotations().hit_test(point).and_then(|id|surface.annotations.annotations().element(id)).map(|a|(renderer::LayerRef::Annotations,format!("annotation_{}",a.index)));
+                    let targets=if let Some(hit)=annotation {vec![hit]} else {
+                        let mut candidates=map.entries().filter_map(|(id,e)|map.bounds(id).filter(|r|point[0]>=r.x&&point[0]<=r.x+r.width&&point[1]>=r.y&&point[1]<=r.y+r.height).map(|_|(renderer::LayerRef::Base,e.id.element_id()))).collect::<Vec<_>>();
+                        if candidates.len()>1 {candidates.retain(|(_,t)|t!="data_area");}
+                        if candidates.iter().all(|(_,t)|t=="data_area") {
+                            let mut probe=c.data.document.as_ref().unwrap().chart.clone();probe.select_at(&surface.frame,point,false);
+                            let hit=probe.selected_json();
+                            if let Some(id)=hit["series_id"].as_str().map(str::to_owned).or_else(||hit["index"].as_u64().map(|i|format!("slice_{}_{i}",hit["group"].as_u64().unwrap_or(0)))) {candidates=vec![(renderer::LayerRef::Base,id)];}
+                        }
+                        if candidates.is_empty() {candidates.push((renderer::LayerRef::Base,"data_area".into()));}
+                        candidates
+                    };
+                    self.editor.review_target(p,&c,targets);
+                }
                 if self.editor.drawing.tool != crate::drawing::Tool::Select {
                     // press_origin is cleared when egui processes a release.
                     // A short press/release can arrive in the same frame.
@@ -307,7 +323,7 @@ impl SurfaceWindow {
                         matches!(chart.annotations().items[index].kind, renderer::annotation::AnnotationKind::Text { .. })
                             .then_some(renderer::DecorationId::Annotation(index))
                     }).flatten();
-                    let key = if let Some(text) = text { text } else { match surface.annotations.hit_test_active_layer(
+                    let key = if let Some(text) = text { text } else { match crate::radial_compat::hit_test_layer(&surface.annotations,
                         chart.active_layer(),
                         map,
                         point,
@@ -473,6 +489,7 @@ impl SurfaceWindow {
             if let Err(e) = prepared {
                 error = Some(e);
             }
+            self.editor.review_context_ui(root);
             if let Some((space, logical_size)) = inline_space {
                 self.editor.inline_text_ui(
                     root,
@@ -488,6 +505,18 @@ impl SurfaceWindow {
                 );
             }
         });
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                self.ui_renderer.update_texture(
+                    c.renderer.device(),
+                    c.renderer.queue(),
+                    *id,
+                    delta,
+                );
+            }
+        }
+        let freed_textures = std::mem::take(&mut output.textures_delta.free);
+        output.textures_delta.clear();
         if std::mem::take(&mut self.editor.history_replayed) {
             self.editor.property_text.clear();
         }
@@ -536,20 +565,10 @@ impl SurfaceWindow {
                 })],
                 ..Default::default()
             });
-            radial.annotations.draw_underlay(&mut pass);
             radial.frame.draw(&mut pass);
             radial.annotations.draw_overlay(&mut pass);
         }
-        for (id, deltas) in &output.textures_delta.set {
-            for delta in deltas {
-                self.ui_renderer.update_texture(
-                    c.renderer.device(),
-                    c.renderer.queue(),
-                    *id,
-                    delta,
-                );
-            }
-        }
+
         let jobs = ctx.tessellate(output.shapes, output.pixels_per_point);
         let screen = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [self.config.width, self.config.height],
@@ -584,7 +603,7 @@ impl SurfaceWindow {
             .submit(extra.into_iter().chain(std::iter::once(encoder.finish())));
         c.renderer.queue().present(frame);
         radial.renderer.end_frame();
-        for id in &output.textures_delta.free {
+        for id in &freed_textures {
             self.ui_renderer.free_texture(id);
         }
         self.repaint_at = output
@@ -622,6 +641,7 @@ impl SurfaceWindow {
             "layout_probe":self.editor.layout_probe,
             "column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,
             "revision":c.data.revision,
+            "property_catalog_builds":self.editor.property_builds,
             "decorations":self.bounded_surface.as_ref().map(|s|s.frame.decorations().entries().filter_map(|(id,e)|s.frame.decorations().bounds(id).map(|r|(e.id.element_id(),json!([r.x,r.y,r.width,r.height])))).collect::<serde_json::Map<_,_>>()),
             "decoration_selected":c.data.document.as_ref().unwrap().chart.decorations().selected,
 

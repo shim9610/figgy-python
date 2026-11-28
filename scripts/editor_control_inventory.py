@@ -26,6 +26,8 @@ def build(fig, case):
         ax.contour([[0, 1], [2, 3]], levels=[.5, 1.5, 2.5], id="signal")
     elif case == "field":
         ax.imshow([[0, 1], [2, 3]], id="signal")
+    elif case == "surface":
+        ax.plot_surface([0, 1], [0, 1], [[0, 1], [2, 3]], id="signal")
     elif case == "vector_points":
         ax.quiver([0, 1], [1, 2], [2, 1], [1, 3], id="signal")
     elif case == "vector_grid":
@@ -36,6 +38,7 @@ def build(fig, case):
         for name in ("left", "right"):
             fig.subplots[name].axes.plot([0, 1], [1, 2], id=name+"/signal")
         fig.subplots["right"].axes.twinx(id="secondary").plot([0, 1], [3, 4], id="secondary/data")
+        fig.subplots["right"].axes.inset_axes([.25, .15, .7, .7], id="zoom").subplot.set_inset_marker()
     elif case in ("radial", "radial_split"):
         ax.pie([3, 2, 1])
         if case=="radial_split":
@@ -47,6 +50,21 @@ def build(fig, case):
         ax.bar(["A", "B"], [3, 5])
     elif case == "boxplot":
         ax.boxplot([[1, 2, 3], [2, 4, 6]])
+    elif case == "energy":
+        diagram = ax.energy_levels(
+            [{"id": "g", "column": "S", "energy": 0}, {"id": "e", "column": "P", "energy": 3}],
+            transitions=[{"id": "t", "lower": "g", "upper": "e", "wavelength": 530}],
+            id="spectrum",
+        )
+        diagram.set_wavelength_colors()
+        diagram.set_wavelength_labels(unit="nm", decimals=1)
+        diagram.transition("t").set_color("red")
+    elif case == "range_links":
+        bars = ax.range_bars([0, 1], [0, 2], [1, 3], labels=["A", "B"], timeline=True,
+                             progress=[.2, .75], id="tasks")
+        bars.set_connector()
+        ax.yaxis.set_category_window(-.5, 1.5)
+        ax.range_links(bars, [(0, 1)], id="dependencies")
     else:
         ax.radar(["A", "B", "C"], [[2, 3, 4]])
     if case != "panels":
@@ -58,7 +76,7 @@ def build(fig, case):
 
 def rows():
     inventory = set()
-    for case in ("line", "mapped_points", "histogram", "errors", "contour", "field", "vector_points", "vector_grid", "polar", "panels", "radial", "radial_split", "categorical", "boxplot", "radar"):
+    for case in ("line", "mapped_points", "histogram", "errors", "contour", "field", "surface", "vector_points", "vector_grid", "polar", "panels", "radial", "radial_split", "categorical", "boxplot", "radar", "range_links", "energy"):
         with fg.Figure(backend="webgpu", id="inventory", **({"grid": [["left", "right"]]} if case == "panels" else {})) as fig:
             build(fig, case)
 
@@ -77,7 +95,9 @@ def rows():
             # layer, so their nested fields are part of the inventory too.
             enable = {"Area fill/enabled", "Contours/show_labels", "Contours/level_colors",
                       "Contour labels/background", "Series style/custom", "Slice labels/custom_labels",
-                      "Slice labels/custom_label_format", "Slice labels/custom_label_color", "Polar coordinates/limit_sector"}
+                      "Slice labels/custom_label_format", "Slice labels/custom_label_color", "Polar coordinates/limit_sector",
+                      "Polar coordinates/fixed/radial_label_angle_degrees",
+                      "Polar coordinates/fixed/radius_labels_skipped"}
             for _ in range(3):
                 for owner in fig.editor_properties():
                     for field in owner["fields"]:
@@ -92,12 +112,15 @@ def rows():
             for owner in fig.editor_properties():
                 for field in owner["fields"]:
                     changes={"Vectors/scale_mode":"Data", "Polar coordinates/interpolation_mode":"Arc", "Pie / donut/mode":"Donut", "Detail shape/mode":"Donut"}
+                    if case == "radar" and field["id"] == "Polar coordinates/interpolation_mode":
+                        continue  # Radar requires straight edges.
                     if field["id"] in changes:
                         command(owner["id"],field["id"],changes[field["id"]])
             if case in ("categorical", "boxplot"):
-                state=fig.get_settings();state[case]["selected"]={"series_id":state[case]["series"][0]["id"],"category_id":state[case]["categories"][0]["id"]};fig.apply_settings(state)
-                owner=next(v for v in fig.editor_properties() if v["id"].startswith("bounded/series/"))
-                command(owner["id"],"Selected item/custom",True)
+                chart = fig.axes[0].chart
+                series_id = next(iter(chart.get_series()))
+                category_id = next(iter(chart.get_categories()))
+                chart.cell(category_id, series_id).set_color("red").set_style(outline=True)
             collect()
             if case=="line":
                 owner=next(v for v in fig.editor_properties() if v['target']=='tick_labels_bottom')
@@ -106,6 +129,9 @@ def rows():
                 for prop,value in [('timezone/mode','FixedOffsetMinutes'),('label/mode','Pattern'),('fractional/mode','Fixed')]:
                     command(owner['id'],field['id']+'/Timestamp/'+prop,value)
                 collect()
+                for prop, value in [('step/mode', 'Week'), ('label/mode', 'Relative'), ('label/mode', 'Custom')]:
+                    command(owner['id'], field['id']+'/Timestamp/'+prop, value)
+                    collect()
     grouped = {}
     for row in inventory:
         grouped.setdefault(row[1:], set()).add(row[0])

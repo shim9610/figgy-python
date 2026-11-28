@@ -40,15 +40,13 @@ def test_boxplot_limits_control_the_actual_value_model_and_fit_restores_auto(bac
         ax.boxplot([[1, 2, 4], [2, 5, 9]], orientation='horizontal' if horizontal else 'vertical')
         bounds = (0., 12.)
         (ax.set_xlim if horizontal else ax.set_ylim)(*bounds)
-        assert figure.get_settings()['boxplot']['value_range'] == list(bounds)
-        before, revision = figure.get_settings(), figure.revision
-        with pytest.raises(ValueError, match='value axis'):
-            (ax.set_ylim if horizontal else ax.set_xlim)(*bounds)
-        assert figure.get_settings() == before and figure.revision == revision
+        cfg=figure.get_settings()['config'];axis='bottom_x' if horizontal else 'left_y'
+        assert [cfg[axis][key] for key in ('min','max')]==list(bounds)
         if backend == 'native':
             assert figure.render_rgba().shape == (600, 960, 4)
         figure.fit()
-        assert figure.get_settings()['boxplot']['value_range'] is None
+        fitted=figure.get_settings()['config'][axis]
+        assert fitted['min']<1 and fitted['max']>9 and fitted['max']<12
 
 
 @pytest.mark.parametrize('backend', ['native', 'webgpu'])
@@ -57,6 +55,7 @@ def test_radar_value_range_is_editable_and_fit_restores_auto(backend):
         ax = figure.axes[0]
         ax.radar(['A', 'B', 'C'], [2, 4, 3])
         ax.set_ylim(0, 8)
-        assert figure.get_settings()['radar']['value_range'] == [0, 8]
+        assert [figure.get_settings()['config']['left_y'][key] for key in ('min','max')]==[0,8]
         figure.fit()
-        assert figure.get_settings()['radar']['value_range'] is None
+        axis=figure.get_settings()['config']['left_y']
+        assert axis['min']<2 and axis['max']>4 and axis['max']<8

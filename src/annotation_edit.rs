@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Coordinate conversion delegates to the upstream anchor/axis transforms.
 use super::*;
 use renderer::annotation::{AxisMap, AxisSpace, PixelSpace};
@@ -25,9 +26,24 @@ pub(crate) fn space(settings: &Settings) -> PyResult<PixelSpace> {
     let (horizontal, count, range) = if let Some(chart) = &settings.categorical {
         use renderer::categorical::{CategoryBarDirection, CategoryBarLabels, CategoryBarMode};
         let (mut low, mut high) = (0.0f64, 0.0f64);
-        for segment in chart.segments().map_err(invalid)? {
-            low = low.min(segment.start).min(segment.end);
-            high = high.max(segment.start).max(segment.end);
+        for i in 0..chart.categories.len() {
+            let mut positive = 0.0f64;
+            let mut negative = 0.0f64;
+            for series in &chart.series {
+                if let Some(v) = series.values[i] {
+                    low = low.min(v);
+                    high = high.max(v);
+                    if v > 0. {
+                        positive += v;
+                    } else {
+                        negative += v;
+                    }
+                }
+            }
+            if chart.mode != CategoryBarMode::Grouped {
+                low = low.min(negative);
+                high = high.max(positive);
+            }
         }
         let percent = chart.mode == CategoryBarMode::PercentStacked;
         if percent {
@@ -81,10 +97,12 @@ pub(crate) fn space(settings: &Settings) -> PyResult<PixelSpace> {
             max: range[1],
         },
         inverted: false,
+        breaks: AxisSpace::NONE.breaks,
     };
     let category = AxisSpace {
         map: AxisMap::Index { count },
         inverted: horizontal,
+        breaks: AxisSpace::NONE.breaks,
     };
     if horizontal {
         space.x = value;

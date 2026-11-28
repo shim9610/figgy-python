@@ -62,7 +62,10 @@ requested scale, independently of which layer currently receives interaction.
 | Secondary Y | `right = ax.twinx(id='pressure')`; `right.plot(...)`, `right.set_ylim(...)` | Shares the parent X mapping/plot rectangle; Cartesian only |
 | Subplots | `Figure(grid=...)`, `set_layout`, `subplots`, `share_axes` | Cartesian/polar panels; one level; bounded families require separate Figures |
 | Annotations | `axhline`, `axvline`, `axhspan`, `axvspan`, `text`, `arrow`, `annotate` | One parent-panel annotation layer; subplot-local annotation spaces rejected |
-| Independent bounded titles | `ax.set_title(text, fontsize=..., color=..., visible=...)` | Rich title no longer changes category/data-label font sizes |
+| Independent bounded titles | `ax.set_title(text, fontsize=..., color=..., visible=...)` | Up to 512 rich characters / eight lines; preserved before construction; independent of category/data-label fonts |
+| Bounded axis names | `ax.set_xlabel`, `ax.set_ylabel` before or after construction | Bars/boxes map names by orientation; explicit constructor axis names override inherited names; single-line |
+| Cartesian legend location | `ax.legend(loc='upper left')`; `fig.update('legend', corner='TopLeft')` | Four upper/lower left/right corners; bounded legends support visibility only |
+| Cartesian axis inversion | `ax.invert_xaxis()`, `ax.invert_yaxis()` | Keeps increasing limits and ticks; secondary Y is local; polar and bounded charts rejected |
 | Heatmap legend swatches | `ax.imshow(..., cmap=...)`, series label, `ax.legend()` | Uses the current colormap and preserves independently edited legend text |
 
 For mixed documents containing fields, vectors, histograms or errorbars, renderer
@@ -119,6 +122,27 @@ reports `u`/`v` and optional `color_value`. Native readback is limited to select
 samples, with no whole-array or display-image readback.
 
 ## Settings and Copy Python
+
+Copy Python and `to_code()` share the compact exporter. A grid, overlay, mapped
+series or annotation no longer forces a fully expanded Config/text dump. The
+export stores nondefault Config leaves and each panel rectangle, while keeping
+the complete topology, series references, identity and tick intent. Its one
+`apply_settings(..., reset=True)` call expands root/subplot/overlay/colorbar
+defaults and validates the complete result before committing; it does not merge
+with the target's edited defaults or upload source arrays.
+
+Categorical/box/radar and radial exports use `configure_bounded(reset=True, ...)`
+or `configure_radial(reset=True, ...)`: chart-level appearance defaults are
+restored, exported per-item properties are applied, and destination data values
+are retained. Omit `reset` for the ordinary selective-patch behavior. Expanded
+diagnostic output remains available as `fig.to_code(compact=False)`.
+
+Plain rich text becomes `text_segments('Text')`; adjacent equal formatting is a
+run, such as `text_segments('Note', bold=True)`. Renderer legend rule/field
+segments, superscripts, colors and per-character overrides remain exact. A run
+is abbreviated only when reconstructing it produces identical segment values.
+Unsupported segment shapes fall back to explicit dictionaries. Repeated literal
+colors use local bindings without rounding their channel values.
 
 `get_settings` / `apply_settings` now use schema 2, adding `identity` metadata:
 Figure ID, panel/overlay IDs, grid placement and shared-axis membership. Visual

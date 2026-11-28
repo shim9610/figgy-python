@@ -42,3 +42,10 @@ display(fig.widget())
         image=np.asarray(Image.open(io.BytesIO(png)).convert('RGBA'))
         assert_feature_image(image,feature)
         (tmp_path/'visual-contract.json').write_text(json.dumps(dict(feature=feature,geometry=geometry,alignment=alignment)))
+
+@pytest.mark.skipif(not os.environ.get('DISPLAY') or os.environ.get('FIGGY_TEST_JUPYTER')!='1',
+                    reason='requires real Jupyter WebGPU')
+def test_initial_kernel_failure_reports_the_error_before_gpu_readiness(tmp_path):
+    with pytest.raises(AssertionError,match='Initial notebook execution failed:.*deliberate initialization probe'):
+        with notebook(tmp_path/'initial-error',"raise ValueError('deliberate initialization probe')"):
+            pytest.fail('failed notebook was treated as a ready chart')

@@ -93,3 +93,61 @@ def test_numeric_format_and_precision_editing_in_both_hosts(tmp_path):
         execute("copy=fig.to_code(); other,bx=figgy.subplots(backend='webgpu'); bx.imshow(np.array([[0.,.3],[.6,.91475]]),id='field'); exec(copy,{'fig':other}); assert other.get_settings()['config']==fig.get_settings()['config']; other.close()")
         path=tmp_path/'browser-formatted.png'
         execute(f'await fig.savefig_async({str(path)!r})')
+
+
+@pytest.mark.skipif(NEEDS_UI, reason='requires real native and Jupyter UI')
+@pytest.mark.parametrize('draft_kind',['property','snapshot','late_property','conflict_property'])
+def test_numeric_draft_survives_external_update_before_selection_ack(tmp_path,draft_kind):
+    source="import copy\nimport numpy as np\nimport figgyplot as figgy\nfig,ax=figgy.subplots(backend='webgpu')\n"+SETUP+"w=fig.widget(); display(w)"
+    with notebook(tmp_path/'pending-number',source) as (page,execute):
+        page.locator('[data-properties]').click()
+        execute("""saved_send=w.send
+held_acks=[]
+def hold_ack(content,*args,**kwargs):
+    if content.get('action')=='ack': held_acks.append((copy.deepcopy(content),args,kwargs))
+    else: saved_send(content,*args,**kwargs)
+w.send=hold_ack
+""")
+        if draft_kind in ('late_property','conflict_property'):execute("saved_send_state=w.send_state\nw.send_state=lambda *args,**kwargs:None")
+        ObjectNavigator(page).choose('tick_labels_left')
+        page.wait_for_function(ROOT+'.diagnostics().edit_inflight !== null')
+        for _ in range(20):
+            if int(execute('print(len(held_acks))').strip()): break
+        else:pytest.fail('selection acknowledgement was not held')
+        digits=page.locator('[data-property=significant_digits]')
+        if draft_kind!='snapshot':digits.fill('2')
+        update="fig.configure(config={'grid':{'show_minor_x':True}})"
+        if draft_kind=='conflict_property':update+=";fig.configure(config={'left_y':{'label_style':{'significant_digits':4}}})"
+        accepted=int(execute(update+";print(fig.revision)").strip())
+        if draft_kind not in ('late_property','conflict_property'):page.wait_for_function('(revision)=>'+ROOT+'.diagnostics().accepted_revision>=revision',arg=accepted)
+        if draft_kind!='snapshot':
+            assert digits.input_value()=='2'
+            digits.press('Tab')
+        else:
+            before_axis=page.evaluate(ROOT+".snapshot().config.left_y")
+            area=page.evaluate('async()=>(await '+ROOT+'.decorations()).data_area.rect')
+            canvas=page.locator('.figgy-editor canvas');box=canvas.bounding_box()
+            size=canvas.evaluate('(c)=>[c.width,c.height]')
+            page.mouse.move(box['x']+(area[0]+area[2]/2)*box['width']/size[0],box['y']+(area[1]+area[3]/2)*box['height']/size[1])
+            page.mouse.wheel(0,-120)
+            page.wait_for_function(ROOT+'.diagnostics().edit_pending')
+        execute("w.send=saved_send\nfor content,args,kwargs in held_acks: saved_send(content,*args,**kwargs)")
+        page.evaluate(ROOT+'.flush()')
+        result=page.evaluate("({state:"+ROOT+".snapshot(),diagnostics:"+ROOT+".diagnostics(),events:figgyBrowserTrace.events.filter(e=>/^(edit|state|property)\\./.test(e.stage??''))})")
+        (tmp_path/'numeric-edit-events.json').write_text(json.dumps(result,indent=2))
+        expected=7 if draft_kind=='snapshot' else 4 if draft_kind=='conflict_property' else 2
+        assert style(result['state'],'left_y')['significant_digits']==expected
+        assert result['state']['config']['grid']['show_minor_x']
+        if draft_kind=='snapshot':
+            assert any(event.get('error','').startswith('stale edit:') for event in result['events'])
+            for limit in ('min','max'):
+                assert result['state']['config']['left_y'][limit]==before_axis[limit]
+        assert int(execute("print(fig.get_settings()['config']['left_y']['label_style']['significant_digits'])").strip())==expected
+
+        if draft_kind in ('snapshot','conflict_property'):
+            assert 'stale edit:' in page.locator('.figgy-error').inner_text()
+            digits.fill('3');digits.press('Tab');page.evaluate(ROOT+'.flush()')
+            assert style(page.evaluate(ROOT+'.snapshot()'),'left_y')['significant_digits']==3
+            assert page.evaluate(ROOT+'.snapshot().config.grid.show_minor_x')
+
+        if draft_kind in ('late_property','conflict_property'):execute('w.send_state=saved_send_state; w.send_state()')

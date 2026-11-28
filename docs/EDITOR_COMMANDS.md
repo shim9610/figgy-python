@@ -20,6 +20,14 @@ Ordinary commands resolve the object and property again against the current
 document. An invalid choice, removed object, stale revision or failed renderer
 validation preserves the accepted document and its history.
 
+Notebook form drafts wait for earlier selection/edit acknowledgements before
+submission. If a newer Python revision arrives later, a form can retry once
+using the actual before/after SSOT field changes. Retry requires unchanged
+figure/panel ownership and no conflicting changes to those fields. Arrays are
+compared atomically, so insertion or reordering cannot redirect an index edit.
+Unrelated accepted changes are retained; conflicting fields and stale full
+snapshots remain explicit errors. A subsequent valid edit clears the error.
+
 The source arrays stay resident. Mapping controls choose registered columns;
 they do not infer numbers from rendered colors or upload replacement data.
 The panel colorbar owns the colormap and value domain. Explicit point-color
@@ -84,6 +92,10 @@ when its order changes.
 | Point overrides | Add/remove sparse index overrides and edit their appearance | `Marker point overrides/*`, `Error-bar point overrides/*` |
 | Histogram / error bars | Bar dimensions, baseline, orientation, error stem/caps | `Bars/*`, `Error bars/*` |
 | Contour | Explicit levels, strokes, per-level colors, labels | `Contours/*`, `Contour labels/*`, `Label positions/*` |
+| Range bars / waterfall | Progress column, unfinished opacity and adjacent-bar connectors | `Progress/*`, `Connector/*` |
+| Category axis | Visible category range and alternating fill on rectangular bottom/left axes | `Category window/*`, `Category bands/*` |
+| Energy-level series | Wavelength label visibility, format and typography | `Wavelength labels/*` |
+| Parent panel / inset | Create an anchored inset, adjust its text scaling and show its marker | `Inset/add`, `Inset/Text scale`, `Inset marker/*` |
 | Vector | Pivot, head/shaft dimensions, pixel/data length units and factor | `Vectors/*`, `Color mapping/*` for point vectors |
 | Colorbar or mapped series | Colormap, scale/domain, layout, tick/label appearance | `Color scale/*`, `Colorbar layout/*`, `Colorbar ticks and labels/*` |
 | Colorbar title / tick labels | Direct title text with retained character styles; focused typography and numeric label formatting | `Title/*`, `Tick labels/*` |

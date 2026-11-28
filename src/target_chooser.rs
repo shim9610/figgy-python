@@ -91,7 +91,7 @@ impl Choice {
     pub fn apply(&self, c: &mut FigureAccess<'_>) -> PyResult<()> {
         let mut cfg = c.data.chart.config().clone();
         cfg.set_active_layer(self.layer);
-        cfg.picked_points = None;
+
         cfg.picked_data = self
             .pick
             .clone()

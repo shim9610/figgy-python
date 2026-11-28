@@ -4,10 +4,10 @@ from pathlib import PurePosixPath
 import subprocess
 
 NATIVE = {'src/desktop.rs', 'src/editor.rs', 'src/bounded_host.rs',
-          'src/target_chooser.rs', 'src/bounded.rs', 'src/interaction.rs', 'src/drawing.rs', 'src/navigation.rs', 'src/radial_host.rs', 'src/radial_editor.rs', 'src/radial.rs', 'src/selection.rs'}
+          'src/target_chooser.rs', 'src/bounded.rs', 'src/interaction.rs', 'src/drawing.rs', 'src/navigation.rs', 'src/radial_host.rs', 'src/radial_editor.rs', 'src/radial.rs', 'src/selection.rs', 'src/selection_019.rs', 'src/radial_compat.rs', 'src/composite.rs'}
 BROWSER = {'python/figgyplot/webgpu.js', 'python/figgyplot/editor.css', 'python/figgyplot/widget.py', 'src/notebook.rs'}
 SHARED = {'python/figgyplot/figure.py', 'python/figgyplot/_charts.py',
-          'python/figgyplot/notebook.py', 'src/lib.rs'}
+          'python/figgyplot/notebook.py', 'python/figgyplot/_advanced.py', 'src/chart_api.rs', 'src/lib.rs'}
 CONTRACT = {'tests/test_interaction_parity.py'}
 
 

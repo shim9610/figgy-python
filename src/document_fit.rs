@@ -1,17 +1,94 @@
 //! Fit each coordinate owner, unioning linked domains before choosing ranges.
 use super::*;
-use renderer::{CellRef, chart::FitExtent};
+use renderer::chart::FitExtent;
 
-fn root(config: &Config, mut cell: usize, x: bool) -> usize {
-    while cell > 0 {
-        let panel = &config.subplots[cell - 1];
-        match if x { panel.link_x } else { panel.link_y } {
-            Some(CellRef::Parent) => cell = 0,
-            Some(CellRef::Subplot(i)) if i + 1 < cell => cell = i + 1,
-            _ => break,
+pub(super) fn energy_extent(spec: &SeriesConfig, series: &[SeriesConfig]) -> FitExtent {
+    let Some(diagram) = spec.render_type.energy_levels() else {
+        return FitExtent::EMPTY;
+    };
+    let source = diagram
+        .source
+        .as_ref()
+        .and_then(|id| {
+            series
+                .iter()
+                .find(|s| &s.series_id == id)?
+                .render_type
+                .energy_levels()
+        })
+        .unwrap_or(diagram);
+    let Some((min, max)) = source.energy_extent(diagram.show) else {
+        return FitExtent::EMPTY;
+    };
+    let min_positive = if min > 0. {
+        Some(min)
+    } else {
+        source
+            .levels
+            .iter()
+            .filter(|level| level.role.drawn_in(diagram.show))
+            .map(|level| level.energy)
+            .chain(source.limits.iter().map(|limit| limit.energy))
+            .filter(|energy| energy.is_finite() && *energy > 0.)
+            .reduce(f64::min)
+    };
+    FitExtent {
+        min,
+        max,
+        min_positive,
+    }
+}
+
+pub(super) fn include_energy_levels(
+    chart: &mut Chart,
+    layer: renderer::LayerRef,
+    series: &[SeriesConfig],
+    padding: f64,
+) {
+    let config = chart.config();
+    let mut extent = FitExtent::EMPTY;
+    let mut has_other_data = false;
+    for spec in series {
+        if config.series_fit_roles(layer, &spec.series_id).1 {
+            extent.union(&energy_extent(spec, series));
+            has_other_data |= (!spec.is_dataless() && spec.render_type.range_links().is_none())
+                || spec.render_type.feynman().is_some();
         }
     }
-    cell
+    if !extent.min.is_finite() {
+        return;
+    }
+    if !has_other_data {
+        chart.auto_fit_layer_extent(layer, &FitExtent::EMPTY, &extent, padding);
+        return;
+    }
+    // The native renderer already fit the ordinary sources. Union the two
+    // independently padded ranges so neither side receives padding twice.
+    let bounds = |config: &Config| {
+        let panel = match layer {
+            renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+                &config.subplots[i].config
+            }
+            _ => config,
+        };
+        let overlay = match layer {
+            renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) => Some(i),
+            _ => None,
+        };
+        let axis = panel.scaling_axes(overlay).1;
+        (axis.min, axis.max)
+    };
+    let mut candidate = Chart::as_given(config.clone());
+    candidate.auto_fit_layer_extent(layer, &FitExtent::EMPTY, &extent, padding);
+    let (a, b) = bounds(config);
+    let (c, d) = bounds(candidate.config());
+    if c < a || d > b {
+        let mut merged = FitExtent::point(a);
+        for value in [b, c, d] {
+            merged.union(&FitExtent::point(value));
+        }
+        chart.auto_fit_layer_extent(layer, &FitExtent::EMPTY, &merged, 0.);
+    }
 }
 
 pub(super) fn fit(
@@ -21,104 +98,56 @@ pub(super) fn fit(
     padding: f64,
     active_only: bool,
 ) -> Config {
-    let mut groups: HashMap<(usize, usize, Option<usize>), FitExtent> = HashMap::new();
-    for (spec, extent) in series.iter().zip(extents) {
-        let panel = config
-            .subplots
-            .iter()
-            .position(|p| p.owns_series(&spec.series_id))
-            .map_or(0, |i| i + 1);
-        let cfg = if panel == 0 {
-            config
-        } else {
-            &config.subplots[panel - 1].config
-        };
-        let overlay = cfg
-            .overlays
-            .iter()
-            .position(|p| p.owns_series(&spec.series_id));
-        for (dimension, value) in extent.iter().enumerate() {
-            let mut value = *value;
-            if dimension == 1
-                && value.min.is_finite()
-                && value.max.is_finite()
-                && value.min <= value.max
-            {
-                use renderer::DataRenderType as T;
-                let line = match &spec.render_type {
-                    T::Line { line }
-                    | T::ScatterLine { line, .. }
-                    | T::LineScatterErrorbarX { line, .. }
-                    | T::LineScatterErrorbarY { line, .. }
-                    | T::LineScatterErrorbarXY { line, .. } => Some(line),
-                    _ => None,
-                };
-                if let Some(renderer::data_config::LineFill::ToBaseline(baseline)) =
-                    line.and_then(|line| line.fill.as_ref())
-                {
-                    value.union(&FitExtent {
-                        min: *baseline,
-                        max: *baseline,
-                        min_positive: (*baseline > 0.).then_some(*baseline),
-                    });
+    let mut result = Chart::new(config.clone());
+    let mut layers = vec![renderer::LayerRef::Base];
+    layers.extend((0..config.overlays.len()).map(renderer::LayerRef::Overlay));
+    for (i, subplot) in config.subplots.iter().enumerate() {
+        layers.push(renderer::LayerRef::Subplot(i));
+        layers.extend(
+            (0..subplot.config.overlays.len()).map(|o| renderer::LayerRef::SubplotOverlay(i, o)),
+        );
+    }
+    for layer in layers {
+        if active_only && layer != config.active_layer() {
+            continue;
+        }
+        let mut x = FitExtent::EMPTY;
+        let mut y = FitExtent::EMPTY;
+        for (spec, extent) in series.iter().zip(extents) {
+            let (fit_x, fit_y) = config.series_fit_roles(layer, &spec.series_id);
+            let (member_x, member_y) =
+                Chart::line_offset_fit_extents(config, &spec.series_id, extent[0], extent[1]);
+            if let renderer::DataRenderType::Xy(xy) = &spec.render_type {
+                if let Some(stem) = &xy.stem {
+                    if stem.direction == renderer::data_config::CategoryBarDirection::Horizontal {
+                        if fit_x {
+                            x.union(&FitExtent::point(stem.baseline));
+                        }
+                    } else if fit_y {
+                        y.union(&FitExtent::point(stem.baseline));
+                    }
                 }
             }
-            let owner = if dimension == 1 && overlay.is_some() {
-                panel
-            } else {
-                root(config, panel, dimension == 0)
-            };
-            groups
-                .entry((
-                    owner,
-                    dimension,
-                    if dimension == 1 { overlay } else { None },
-                ))
-                .or_insert(FitExtent::EMPTY)
-                .union(&value);
-        }
-    }
-    let (active_panel, active_overlay) = match config.active_layer() {
-        renderer::LayerRef::Subplot(i) => (i + 1, None),
-        renderer::LayerRef::SubplotOverlay(i, o) => (i + 1, Some(o)),
-        renderer::LayerRef::Overlay(o) => (0, Some(o)),
-        _ => (0, None),
-    };
-    let x_root = root(config, active_panel, true);
-    let y_root = root(config, active_panel, false);
-    let mut result = config.clone();
-    for index in 0..=config.subplots.len() {
-        let cfg = if index == 0 {
-            &mut result
-        } else {
-            &mut result.subplots[index - 1].config
-        };
-        let mut chart = Chart::new(cfg.clone());
-        if (!active_only || index == x_root)
-            && let Some(extent) = groups.get(&(index, 0, None))
-        {
-            chart.auto_fit_x_extent(extent, padding);
-        }
-        if (!active_only || (active_overlay.is_none() && index == y_root))
-            && let Some(extent) = groups.get(&(index, 1, None))
-        {
-            chart.auto_fit_y_extent(extent, padding);
-        }
-        *cfg = chart.config().clone();
-        for overlay in 0..cfg.overlays.len() {
-            if (!active_only || (index == active_panel && active_overlay == Some(overlay)))
-                && let Some(extent) = groups.get(&(index, 1, Some(overlay)))
-            {
-                let mut local = cfg.clone();
-                local.left_y = cfg.overlays[overlay].y_axis.clone();
-                let mut chart = Chart::new(local);
-                chart.auto_fit_y_extent(extent, padding);
-                cfg.overlays[overlay].y_axis = chart.config().left_y.clone();
+            if fit_x {
+                x.union(&member_x);
+            }
+            if fit_y {
+                y.union(&member_y);
+                if let renderer::DataRenderType::Xy(renderer::XySeries {
+                    line: Some(line), ..
+                }) = &spec.render_type
+                {
+                    if let Some(renderer::data_config::LineFill::ToBaseline(baseline)) =
+                        line.fill.as_ref()
+                    {
+                        y.union(&FitExtent::point(*baseline));
+                    }
+                }
             }
         }
+        result.auto_fit_layer_extent(layer, &x, &y, padding);
     }
-    result.sync_subplot_links(None);
-    result
+    result.config().clone()
 }
 
 pub(super) fn set_range(config: &Config, axis: &str, min: f64, max: f64) -> PyResult<Config> {
@@ -135,10 +164,13 @@ pub(super) fn set_range(config: &Config, axis: &str, min: f64, max: f64) -> PyRe
         &mut result.subplots[panel - 1].config
     };
     let mut local = cfg.clone();
-    if axis == "y"
-        && let Some(i) = overlay
-    {
-        local.left_y = cfg.overlays[i].y_axis.clone();
+    let own_x = overlay.is_some_and(|i| !cfg.overlays[i].link_x);
+    let own_y = overlay.is_some_and(|i| !cfg.overlays[i].link_y);
+    if own_x && axis == "x" {
+        local.bottom_x = cfg.overlays[overlay.unwrap()].x_axis.clone();
+    }
+    if own_y && axis == "y" {
+        local.left_y = cfg.overlays[overlay.unwrap()].y_axis.clone();
     }
     let mut chart = Chart::new(local);
     match axis {
@@ -146,10 +178,12 @@ pub(super) fn set_range(config: &Config, axis: &str, min: f64, max: f64) -> PyRe
         "y" => chart.set_y_range(min, max),
         _ => return Err(invalid("axis must be x or y")),
     };
-    if axis == "y"
-        && let Some(i) = overlay
-    {
-        cfg.overlays[i].y_axis = chart.config().left_y.clone();
+    if own_x && axis == "x" {
+        cfg.overlays[overlay.unwrap()].x_axis = chart.config().bottom_x.clone();
+    } else if own_y && axis == "y" {
+        cfg.overlays[overlay.unwrap()].y_axis = chart.config().left_y.clone();
+    } else if axis == "y" && cfg.view_3d().is_some() {
+        cfg.left_y = chart.config().left_y.clone();
     } else {
         *cfg = chart.config().clone();
     }

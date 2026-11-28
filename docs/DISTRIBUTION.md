@@ -14,7 +14,10 @@ import figgyplot.pyplot as pyplot
 ```
 
 Version 0.3.0 is published (registry and sdist checked 2026-10-20); it uses
-renderer 0.17.0 and model 0.11.0. This source tree adds the renderer 0.18 migration.
+renderer 0.17.0 and model 0.11.0. The 0.4.0 integration uses renderer
+0.19.0-beta.3 and model 0.13.0-beta.3. The coordinated release uses the
+published renderer and model pins and the distribution installation checks.
+See the [publishing guide](PUBLISHING.md).
 The GitHub repository remains `shim9610/figgy-python`.
 No `figgy` compatibility package is shipped: that name belongs to an unrelated
 PyPI package. Existing source users should change `import figgy` to

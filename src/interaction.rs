@@ -95,7 +95,7 @@ pub(super) fn decorations_at(
         .rev()
     {
         let mut probe = config.clone();
-        probe.set_active_layer(layer);
+        probe.set_active_layer(probe_layer(config, layer, [point.0, point.1]));
         let map = HitMap::for_active_layer(&probe);
         if let Some(target) = map
             .hit_test(&probe, &measure, point.0, point.1)
@@ -124,6 +124,17 @@ pub(super) fn panels_at(config: &Config, point: (f32, f32)) -> Vec<usize> {
         .filter(|&i| contains(panel(config, i).chart_area.0, point))
         .collect()
 }
+
+// Base routes into any subplot under the pointer. The annotation layer uses
+// the root data axes without that automatic routing. Decorations and data
+// queries use it only while probing the panel the host explicitly selected.
+fn probe_layer(config: &Config, layer: LayerRef, point: [f32; 2]) -> LayerRef {
+    if layer == LayerRef::Base && config.subplot_at(point[0], point[1]).is_some() {
+        LayerRef::Annotations
+    } else {
+        layer
+    }
+}
 pub(super) fn overlapping_panels(config: &Config, index: usize) -> Vec<usize> {
     let a = panel(config, index).chart_area.0;
     (0..=config.subplots.len())
@@ -142,25 +153,28 @@ pub(super) struct DataHit {
     pub layer: LayerRef,
     pub reference: renderer::config::PickedDataRef,
     pub distance: f32,
+    pub extent: Option<f32>,
 }
-// Fills are not pick primitives. Removing them from a temporary picker registry
-// keeps cross-series fills valid while already-found series are excluded.
+// A fill to an excluded series cannot be drawn by the temporary registry.
 fn picker_series(
     input: &[SeriesConfig],
     excluded: &std::collections::HashSet<String>,
 ) -> Vec<SeriesConfig> {
-    use renderer::data_config::DataRenderType as T;
+    use renderer::data_config::{DataRenderType as T, LineFill};
     input
         .iter()
-        .filter(|s| !excluded.contains(&s.series_id))
+        .filter(|s| {
+            !excluded.contains(&s.series_id)
+                && !s.render_type.range_links().is_some_and(|link| excluded.contains(&link.bars))
+        })
         .cloned()
         .map(|mut s| {
             match &mut s.render_type {
-                T::Line { line }
-                | T::ScatterLine { line, .. }
-                | T::LineScatterErrorbarX { line, .. }
-                | T::LineScatterErrorbarY { line, .. }
-                | T::LineScatterErrorbarXY { line, .. } => line.fill = None,
+                T::Xy(renderer::XySeries {
+                    line: Some(line), ..
+                }) if matches!(&line.fill, Some(LineFill::ToSeries(target)) if excluded.contains(target.as_str())) => {
+                    line.fill = None;
+                }
                 _ => {}
             }
             s
@@ -168,6 +182,16 @@ fn picker_series(
         .collect()
 }
 impl FigureAccess<'_> {
+    pub(super) fn prepare_pick_view(&mut self, view: &mut renderer::ChartView) -> PyResult<()> {
+        self.renderer
+            .prepare_registered(&mut [renderer::RegisteredChartDrawItem {
+                chart_id: self.data.chart_id,
+                view,
+            }])
+            .map_err(runtime)?;
+        Ok(())
+    }
+
     /// Enumerate all nearby series, including coincident series on the same
     /// axis. Only renderer metadata and compact pick identities change. The
     /// authoritative document, columns, legend and order are restored exactly.
@@ -179,13 +203,31 @@ impl FigureAccess<'_> {
         self.renderer.enable_gpu_picking().map_err(runtime)?;
         let original = self.data.chart.config().clone();
         let original_gpu = gpu::config(self.data.figure_id, &original);
+        let offset_panel = panel(&original, index).line_offsets.is_some();
+        let mut displayed = renderer::place_document(
+            &original_gpu,
+            request.display_scale,
+            request.display_panel_px,
+        );
         let series = self.gpu_series(&self.data.series);
-        let mut probe = original_gpu.clone();
-        probe.picked_data = None;
-        probe.picked_points = None;
+        // The picker reads ink in the same physical placement in which it was
+        // recorded. Desktop uses its own document placement within the window.
+        displayed.layout_state = renderer::LayoutState::Fixed;
+        displayed.picked_data = None;
+        let chart = Chart::new(displayed.clone());
+        let mut view = self
+            .renderer
+            .create_chart_view(&chart, displayed.chart_area.0)
+            .map_err(runtime)?;
+        let request = GpuPickRequest {
+            display_panel_px: displayed.document_area(),
+            display_scale: 1.,
+            ..request
+        };
+
         let result = (|| {
             self.renderer
-                .set_chart_config(self.data.chart_id, probe)
+                .set_chart_config(self.data.chart_id, displayed.clone())
                 .map_err(runtime)?;
             let mut hits = vec![];
             let mut excluded = std::collections::HashSet::new();
@@ -196,7 +238,10 @@ impl FigureAccess<'_> {
                 .rev()
             {
                 self.renderer
-                    .set_active_layer(self.data.chart_id, layer)
+                    .set_active_layer(
+                        self.data.chart_id,
+                        probe_layer(&displayed, layer, request.canvas_position_px),
+                    )
                     .map_err(runtime)?;
                 loop {
                     let remaining = self
@@ -209,27 +254,40 @@ impl FigureAccess<'_> {
                     {
                         break;
                     }
+                    self.prepare_pick_view(&mut view)?;
                     let ticket = self
                         .renderer
                         .pick_chart_data(self.data.chart_id, request)
                         .map_err(runtime)?;
-                    self.renderer.wait_idle();
+                    self.renderer.wait_idle().map_err(runtime)?;
                     let Some(pick) = pollster::block_on(ticket.resolve()).map_err(runtime)? else {
                         break;
                     };
                     let mut reference = pick.to_ref();
+                    let extent = match &pick {
+                        renderer::PickedData::HistogramBin { extent_px, .. } => *extent_px,
+                        _ => None,
+                    };
                     if !excluded.insert(reference.series_id().to_owned()) {
                         return Err(runtime("picker repeated an excluded series"));
                     }
+                    let hit_layer = original_gpu.layer_of_series(reference.series_id());
                     gpu::local_selection(self.data.figure_id, &mut reference);
                     hits.push(DataHit {
-                        layer,
+                        layer: hit_layer,
                         reference,
                         distance: pick.distance_px(),
+                        extent,
                     });
+                    if offset_panel {
+                        break;
+                    }
                     self.renderer
                         .set_chart_series(self.data.chart_id, picker_series(&series, &excluded))
                         .map_err(runtime)?;
+                }
+                if offset_panel && !hits.is_empty() {
+                    break;
                 }
             }
             hits.sort_by(|a, b| a.distance.total_cmp(&b.distance));
@@ -247,5 +305,99 @@ impl FigureAccess<'_> {
         restore_series?;
         restore_config?;
         result
+    }
+}
+
+impl FigureAccess<'_> {
+    /// Route diagram gestures through the renderer model's public movement API.
+    /// Only configuration is copied; source columns stay resident.
+    pub(super) fn drag_selected_record(
+        &mut self,
+        reference: &renderer::config::PickedDataRef,
+        dx: f32,
+        dy: f32,
+        extent: Option<f32>,
+    ) -> PyResult<()> {
+        use renderer::config::PickedDataRef as R;
+        let id = reference.series_id();
+        let mut next = self.snapshot();
+        let layer = next.config.layer_of_series(id);
+        let overlay = match layer {
+            LayerRef::Overlay(i) | LayerRef::SubplotOverlay(_, i) => Some(i),
+            _ => None,
+        };
+        let (x, y) = next.config.series_chart(id).scaling_axes(overlay);
+        let horizontal = next.config.bar_groups_of(layer).direction
+            == renderer::CategoryBarDirection::Horizontal;
+        let along = if horizontal {
+            if x.inverted { -dx } else { dx }
+        } else if y.inverted {
+            dy
+        } else {
+            -dy
+        };
+        let Some(series) = next.series.iter_mut().find(|s| s.series_id == id) else {
+            return Ok(());
+        };
+        let moved = if let R::HistogramBin { bin_index, .. } = reference {
+            let Some(links) = series.render_type.range_links_mut() else {
+                return Ok(());
+            };
+            links.drag_link_exit(*bin_index, along, extent)
+        } else if let R::FeynmanLabel { part, index, .. } = reference {
+            let Some(diagram) = series.render_type.feynman_mut() else {
+                return Ok(());
+            };
+            diagram.drag_label(*part, *index, dx, dy)
+        } else if let R::ValueLabel {
+            category_index,
+            part,
+            ..
+        } = reference
+        {
+            if let (Some(part), Some(levels)) = (part, series.render_type.energy_levels_mut()) {
+                levels.drag_label(*part, *category_index, dx, dy)
+            } else {
+                let count = series.value_label_text().map_or(0, <[String]>::len);
+                series.drag_value_label(*category_index, count, dx, dy)
+            }
+        } else {
+            let hit = match reference {
+                R::FeynmanVertex { vertex_index, .. } => {
+                    renderer::FeynmanHit::Vertex(*vertex_index)
+                }
+                R::FeynmanPropagator {
+                    propagator_index, ..
+                } => renderer::FeynmanHit::Propagator(*propagator_index),
+                _ => return Ok(()),
+            };
+            let gpu_id = gpu::column_id(self.data.figure_id, id);
+            let moved = self
+                .renderer
+                .drag_feynman(self.data.chart_id, &gpu_id, hit, dx, dy)
+                .map_err(runtime)?;
+            if moved == renderer::layout::NudgeResult::Moved {
+                let result = self
+                    .renderer
+                    .chart_series(self.data.chart_id)
+                    .map_err(runtime)?
+                    .iter()
+                    .find(|s| s.series_id == gpu_id)
+                    .map(|s| s.render_type.clone());
+                // Commit through the normal SSOT transaction and history below.
+                self.renderer
+                    .set_chart_series(
+                        self.data.chart_id,
+                        gpu::series(self.data.figure_id, &self.data.series),
+                    )
+                    .map_err(runtime)?;
+                series.render_type = result.ok_or_else(|| runtime("dragged series disappeared"))?;
+            }
+            moved
+        };
+        if moved == renderer::layout::NudgeResult::Moved {
+            self.apply_settings_model(next)?;
+        }
+        Ok(())
     }
 }

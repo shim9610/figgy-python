@@ -11,6 +11,8 @@ The font notices are shipped in `figgyplot/licenses/LICENSE-LiberationSans.txt` 
 `figgyplot/licenses/LICENSE-ComicNeue.txt`, including when fonts are embedded in the
 native extension.
 The native desktop uses winit/wgpu and egui. PySide6 is optional benchmark-only tooling.
+Review image attachments use arboard, image, base64 and sha2 (MIT OR Apache-2.0)
+and rfd (MIT) for clipboard access, image decoding, content hashes and native file selection.
 The notebook extra uses anywidget and ipywidgets under their respective licenses.
 
 ## Packaged browser kernel
@@ -27,3 +29,9 @@ The native egui UI embeds `epaint_default_fonts 0.36.2`'s Hack Regular,
 Ubuntu Light, Noto Emoji Regular and emoji-icon-font. Their complete font
 license texts are included as `python/figgyplot/licenses/LICENSE-Egui-*.txt`
 (Hack/Bitstream terms, Ubuntu Font Licence, SIL OFL and icon-font MIT).
+
+## pdf-lib
+
+Browser PDF page-size normalization bundles pdf-lib 1.17.1 (MIT), from
+https://github.com/Hopding/pdf-lib. The license is included as
+`python/figgyplot/licenses/pdf-lib-MIT.txt`.

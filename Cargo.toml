@@ -1,6 +1,6 @@
 [package]
 name = "figgyplot"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.29", features = ["extension-module"] }
 numpy = "0.29"
-renderer = { package = "figgy-renderer", version = "=0.18.1", features = ["serde"] }
+renderer = { package = "figgy-renderer", git = "https://github.com/shim9610/figgy.git", rev = "8c955cd62fa4fec660c55033e058b4eb0dadaaf6", features = ["serde"] }
 wgpu = "30"
 pollster = "1"
 serde = { version = "1", features = ["derive"] }
@@ -24,11 +24,16 @@ egui = "0.36.2"
 egui-wgpu = "0.36.2"
 egui-winit = "0.36.2"
 fontdb = "0.24"
+arboard = "3.6.1"
+base64 = "0.22"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+rfd = "0.15.4"
+sha2 = "0.10"
 
 [profile.release]
 lto = "thin"
 codegen-units = 1
 
-# Cargo.lock pins the crates.io renderer/model versions and checksums. The asset
-# gate pairs them with the published source revision used to build bundled WASM;
+# During 0.19 integration, Cargo.lock and bundled WASM pin the same upstream Git
+# revision. Switch to the exact published registry version for the final release;
 # see python/figgyplot/assets/provenance.json and docs/PUBLISHING.md.

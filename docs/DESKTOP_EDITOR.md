@@ -196,7 +196,7 @@ ratio with surrounding space. PNG document dimensions stay unchanged.
 | Annotation | Visibility, text, anchors/endpoints, line and fill properties |
 | Axis | Limits, scale, tick spacing/direction/visibility, number format, significant digits, line width and color |
 | Copy Python | Export common setters and readable `fig.configure(...)` patches |
-| Save PNG | Enter a path, then Save image; export the chart at document resolution |
+| Export | Choose PNG, SVG or PDF, then set scale and path and select Save image |
 | Advanced settings… | Open full settings JSON in a separate OS window; Apply settings commits it |
 | Esc, empty-space click or repeated data click | Clear selection |
 | Arrow keys | Step samples or histogram bins, switch compatible series, step matrix cells or nudge decorations |
@@ -422,3 +422,39 @@ Members of an explicitly shared X/Y group also share the primary axis's
 automatic/fixed tick policy. A numeric spacing edit from any member updates the
 shared spacing; enabling automatic spacing from any member restores it for the
 group. Opposite-edge styling and secondary Y axes remain locally owned.
+
+## Figure, panel and plot geometry
+
+Use **Layout**, then click a chart. The first click selects its plot area and
+opens its resize handles and geometry controls. **Panel geometry** changes the
+outer chart rectangle; **Plot area** changes the inner region used by its axes
+and data. X/Y/width/height use logical document pixels, independent of window
+DPI. Moving plot edges preserves axis ranges and resident data. Bounded charts
+show their current measured plot rectangle while automatic, materialize a manual
+rectangle on the first edit, and offer **Use automatic plot layout**.
+
+Select the parent panel in **Objects** and press **Plot area → Add inset**.
+Select the new inset in **Objects** to adjust its frame and text scaling.
+Configure its zoom range on the inset axes. The same controls are available
+in Jupyter WebGPU. [Runnable inset and timeline example](../examples/renderer_019_editing.py)
+
+![Plot geometry controls in the actual Jupyter editor](images/layout-plot-controls.png)
+
+Select **Figure** in Objects to change document width/height. Grid documents
+reflow their named slots and preserve their row/column weights and gaps. Manual
+panel layouts scale their outer rectangles. These are accepted SSOT edits with
+Undo/Redo and code replay. Window resizing scales the document view to the
+available stage while preserving its aspect ratio. Widen the properties pane by
+dragging its separator in native windows or its resize grip in the browser.
+
+Polar and radar charts do not use wheel zoom, including modifier-wheel input.
+Change their declared radial ranges explicitly in Properties. Cartesian and
+box-plot wheel navigation retain their existing behavior.
+
+Dragging reuses native property descriptions and defers browser property-form
+reconstruction until release. Chart edits and their final values still commit;
+this is a host UI optimization, not a change to renderer drawing or caches.
+Dragging an annotation changes only that annotation's coordinates; other
+annotations, series, axes and layout stay unchanged. Renderer redraw policy
+remains upstream-owned. The host regression checks dump and compare complete
+SSOT snapshots and verify no additional column upload during the gesture.

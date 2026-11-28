@@ -78,6 +78,10 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
                 execute("ax.set_title('Deferred title')")
             report=json.loads(execute("import json; print(json.dumps(await fig.prepare_async()))"))
             assert report['ready'] and report['backend']=='webgpu' and report['stages']
+            assert report['stages'][-1]['stage'] == 'first-frame'
+            assert report['prewarm_complete'] == (report['prewarm_warning'] is None)
+            if not report['prewarm_complete']:
+                assert 'Missing checked' in report['prewarm_warning']
             assert report['persistent_cache_supported'] is False and report['elapsed_ms'] > 0
             page.wait_for_function("document.querySelector('.figgy-editor [data-status]')?.textContent.includes('Ready')")
             assert page.evaluate('window.figgyAdapterRequests') >= 1
@@ -115,7 +119,9 @@ display(widget)'''.replace('widget = fig.widget()', f'widget = fig.widget(auto_p
             page.mouse.move(rect['x']+rect['width']/2+20,rect['y']+18,steps=4);page.mouse.up()
             page.wait_for_function(root+'.snapshot().config.chart_title.offset_x > 0')
             execute("await fig.sync(); assert fig.get_settings()['config']['chart_title']['offset_x'] > 0")
-            ObjectNavigator(page).choose('signal');page.locator('[data-fields] input[type=color]').fill('#ff0000');page.locator('[data-fields] input[type=color]').dispatch_event('change')
+            ObjectNavigator(page).choose('signal')
+            line_color=page.locator('[data-catalog-field="Line/line_color"]')
+            line_color.fill('#ff0000');line_color.dispatch_event('change')
             execute("await fig.sync(); assert fig.get_settings()['series'][0]['render_type']['Line']['line']['line_color']['r'] == 1")
             # Inspect the actual composited canvas, not only export output.
             page.evaluate('()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')

@@ -74,13 +74,13 @@ def test_bounded_history_restores_authored_document_and_ignores_selection(backen
         fig.update('chart_title',text='Updated')
         after=fig.get_settings();count=fig.edit_history['undo_count']
         state=copy.deepcopy(after)
-        state[kind]['active_layer']='Annotations'
+        state['radial' if kind=='radial' else 'config']['active_layer']='Annotations'
         if kind=='radial':state[kind]['interaction'].update(hovered={'group':0,'index':1},hover_progress=.5)
         fig.apply_settings(state)
         assert fig.edit_history['undo_count']==count
-        expected=copy.deepcopy(before);expected[kind]['active_layer']='Annotations'
+        expected=copy.deepcopy(before);expected['radial' if kind=='radial' else 'config']['active_layer']='Annotations'
         fig.undo();assert fig.get_settings()==expected
-        expected=copy.deepcopy(after);expected[kind]['active_layer']='Annotations'
+        expected=copy.deepcopy(after);expected['radial' if kind=='radial' else 'config']['active_layer']='Annotations'
         fig.redo();assert fig.get_settings()==expected
 
 

@@ -1,0 +1,455 @@
+//! One accepted-state path for document, panel and plot geometry.
+use super::*;
+
+pub(super) fn fields(out: &mut Vec<Field>, state: &Value, node: &navigation::Node) {
+    let bounded = ["radial", "categorical", "boxplot", "radar"]
+        .into_iter()
+        .find(|k| state[*k].is_object());
+    if node.kind == "figure" {
+        let config: Config = serde_json::from_value(state["config"].clone()).unwrap();
+        let area = config.document_area();
+        for (key, value) in [("width", area.width), ("height", area.height)] {
+            field(
+                out,
+                json!(value),
+                &format!("/config/chart_area/{key}"),
+                "Figure size",
+                key,
+                if key == "width" {
+                    "Width (logical px)"
+                } else {
+                    "Height (logical px)"
+                },
+            );
+        }
+        if bounded.is_none() {
+            field(
+                out,
+                json!(config.snaps_while_dragging()),
+                "/config/snap_to_guides",
+                "Interaction",
+                "Snap to guides",
+                "Snap decorations to guides",
+            );
+        }
+    }
+    if node.kind != "panel" {
+        return;
+    }
+    if bounded.is_none() {
+        let panel = panel_path(node.layer);
+        let path = format!("{panel}/line_offsets");
+        field(
+            out,
+            state.pointer(&path).cloned().unwrap_or(Value::Null),
+            &path,
+            "Line offsets",
+            "settings",
+            "Line series and offsets",
+        );
+        if state["identity"]["panels"].is_array() {
+            out.push(Field {
+                id: "Inset/add".into(),
+                path: "/config/subplots".into(),
+                group: "Plot area".into(),
+                label: "Add inset".into(),
+                kind: "action".into(),
+                value: json!(true),
+                choices: vec![],
+                integer: false,
+            });
+        }
+    }
+    if let Some(index) = object_subplot(node.layer) {
+        let path = format!("/config/subplots/{index}");
+        let subplot = state.pointer(&path).unwrap();
+        optional::choice(
+            out,
+            "Inset/Text scale",
+            &format!("{path}/text_scale"),
+            "Inset",
+            "Text scale",
+            subplot.get("text_scale").cloned().unwrap_or(json!("Auto")),
+            vec![json!("Auto"), json!("Fixed")],
+        );
+        let marker = subplot.get("marker");
+        field(
+            out,
+            json!(marker.is_some()),
+            &format!("{path}/marker"),
+            "Inset marker",
+            "enabled",
+            "Show magnified region",
+        );
+        if let Some(marker) = marker {
+            field(
+                out,
+                marker["window"].clone(),
+                &format!("{path}/marker/window"),
+                "Inset marker",
+                "window",
+                "Data bounds (null uses inset limits)",
+            );
+            walk(
+                out,
+                &marker["line"],
+                &format!("{path}/marker/line"),
+                "Inset marker",
+                "line",
+            );
+            field(
+                out,
+                marker["connectors"].clone(),
+                &format!("{path}/marker/connectors"),
+                "Inset marker",
+                "connectors",
+                "Show connectors",
+            );
+        }
+    }
+    let path = bounded.map_or_else(
+        || panel_path(node.layer),
+        |kind| format!("/{kind}/decorations"),
+    );
+    let value = if bounded.is_some() {
+        let a = &state.pointer(&path).unwrap()["data_area"];
+        if a.is_object() {
+            json!([a["x"], a["y"], a["width"], a["height"]])
+        } else {
+            json!([])
+        }
+    } else {
+        let config: Config = serde_json::from_value(state.pointer(&path).unwrap().clone()).unwrap();
+        match config.data_area() {
+            Ok(a) => json!([
+                a.0.x as f64 - config.chart_area.0.x as f64,
+                a.0.y as f64 - config.chart_area.0.y as f64,
+                a.0.width,
+                a.0.height
+            ]),
+            Err(_) => json!([]),
+        }
+    };
+    out.push(Field {
+        id: "Plot area/bounds".into(),
+        path: format!("{path}/data_area"),
+        group: "Plot area".into(),
+        label: "Position and size (logical px)".into(),
+        kind: "rectangle".into(),
+        value,
+        choices: vec![],
+        integer: false,
+    });
+    if bounded.is_some() {
+        out.push(Field {
+            id: "Plot area/automatic".into(),
+            path: format!("{path}/data_area"),
+            group: "Plot area".into(),
+            label: "Use automatic plot layout".into(),
+            kind: "action".into(),
+            value: json!(true),
+            choices: vec![],
+            integer: false,
+        });
+    }
+}
+
+fn object_subplot(layer: renderer::LayerRef) -> Option<usize> {
+    match layer {
+        renderer::LayerRef::Subplot(i) => Some(i),
+        _ => None,
+    }
+}
+
+fn add_inset(
+    state: &mut Value,
+    parent: usize,
+    bounds: [f64; 4],
+    mut config: Config,
+    requested_id: Option<&str>,
+) -> PyResult<String> {
+    let [left, bottom, width, height] = bounds;
+    let (right, upper) = (left + width, bottom + height);
+    if !(0. <= left && left < right && right <= 1. && 0. <= bottom && bottom < upper && upper <= 1.)
+    {
+        return Err(invalid("inset bounds must fit within the parent axes"));
+    }
+    let identity = &state["identity"];
+    let panels = identity["panels"]
+        .as_array()
+        .ok_or_else(|| invalid("insets require a named panel"))?;
+    let parent_id = panels
+        .get(parent)
+        .and_then(|v| v["id"].as_str())
+        .ok_or_else(|| invalid("unknown inset parent"))?;
+    let taken = |id: &str| {
+        identity["figure"] == id
+            || panels.iter().any(|p| {
+                p["id"] == id
+                    || p["overlays"]
+                        .as_array()
+                        .is_some_and(|a| a.iter().any(|v| v == id))
+            })
+            || identity["retired"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|v| v == id))
+    };
+    let panel_id = if let Some(id) = requested_id {
+        if id.is_empty() || taken(id) {
+            return Err(invalid(format!("inset ID is empty or already used: {id}")));
+        }
+        id.to_owned()
+    } else {
+        (panels.len()..)
+            .map(|i| format!("{parent_id}/inset{i}"))
+            .find(|id| !taken(id))
+            .unwrap()
+    };
+    let mut root: Config = serde_json::from_value(state["config"].clone()).map_err(invalid)?;
+    let (owner, cell) = match parent.checked_sub(1) {
+        None => (&root, renderer::CellRef::Parent),
+        Some(index) => (
+            &root
+                .subplots
+                .get(index)
+                .ok_or_else(|| invalid("unknown inset parent"))?
+                .config,
+            renderer::CellRef::Subplot(index),
+        ),
+    };
+    let area = owner
+        .data_area()
+        .map_err(|e| invalid(format!("cannot place an inset: {e:?}")))?;
+    let (top, lower) = (1. - bottom - height, 1. - bottom);
+    let x = |fraction: f64| (f64::from(area.x) + f64::from(area.width) * fraction).round() as u32;
+    let y = |fraction: f64| (f64::from(area.y) + f64::from(area.height) * fraction).round() as u32;
+    config.chart_area.0.x = x(left);
+    config.chart_area.0.y = y(top);
+    config.chart_area.0.width = x(right) - x(left);
+    config.chart_area.0.height = y(lower) - y(top);
+    config.subplots.clear();
+    config.overlays.clear();
+    config.annotations = Default::default();
+    config.active_layer = renderer::LayerRef::Base;
+    let mut subplot = renderer::Subplot {
+        config,
+        anchor: Some(renderer::InsetAnchor {
+            parent: cell,
+            frame: [[left, right], [top, lower]],
+        }),
+        ..Default::default()
+    };
+    if subplot.config.data_area().is_err() {
+        root.subplots.push(subplot);
+        let before = root.clone();
+        root.follow_parent_areas(&before, None);
+        subplot = root.subplots.pop().unwrap();
+    }
+    if state["config"]["subplots"].is_null() {
+        state["config"]["subplots"] = json!([]);
+    }
+    state["config"]["subplots"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(subplot));
+    state["identity"]["panels"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":panel_id,"overlays":[]}));
+    Ok(panel_id)
+}
+
+#[pyfunction]
+#[pyo3(signature=(settings,parent,bounds,config,id=None))]
+pub(crate) fn add_inset_json(
+    settings: &str,
+    parent: usize,
+    bounds: [f64; 4],
+    config: &str,
+    id: Option<&str>,
+) -> PyResult<(String, String)> {
+    let mut state: Value = crate::parse(settings)?;
+    let id = add_inset(&mut state, parent, bounds, crate::parse(config)?, id)?;
+    Ok((state.to_string(), id))
+}
+
+#[pyfunction]
+pub(crate) fn reposition_panel_json(config: &str, panel: usize, area: &str) -> PyResult<String> {
+    let mut config: Config = crate::parse(config)?;
+    reposition_panel(&mut config, panel, crate::parse(area)?)?;
+    serde_json::to_string(&config).map_err(runtime)
+}
+
+pub(super) fn reposition_panel(
+    config: &mut Config,
+    panel: usize,
+    area: renderer::layout::ChartArea,
+) -> PyResult<()> {
+    if panel == 0 {
+        let before = config.clone();
+        config.chart_area = area;
+        config.follow_parent_areas(&before, None);
+    } else {
+        config
+            .set_subplot_area(panel - 1, area)
+            .map_err(|e| invalid(format!("{e:?}")))?;
+    }
+    Ok(())
+}
+
+pub(super) fn carry_insets(result: &mut Value, before: &Config) -> PyResult<()> {
+    if !before.has_insets() {
+        return Ok(());
+    }
+    let mut config: Config = serde_json::from_value(result["config"].clone()).map_err(invalid)?;
+    config.follow_parent_areas(before, None);
+    result["config"] = serde_json::to_value(config).map_err(runtime)?;
+    Ok(())
+}
+
+#[pyfunction]
+pub(crate) fn follow_insets_json(before: &str, after: &str) -> PyResult<String> {
+    let before: Config = crate::parse(before)?;
+    let mut after: Config = crate::parse(after)?;
+    after.follow_parent_areas(&before, None);
+    serde_json::to_string(&after).map_err(runtime)
+}
+
+pub(super) fn apply(
+    result: &mut Value,
+    object: &Object,
+    field: &Field,
+    value: &Value,
+) -> PyResult<bool> {
+    if field.id == "Inset/add" {
+        if value != true {
+            return Err(invalid("add inset requires an action"));
+        }
+        let parent = object_subplot(object.layer).map_or(0, |i| i + 1);
+        add_inset(
+            result,
+            parent,
+            [0.55, 0.45, 0.4, 0.45],
+            default::default_config(),
+            None,
+        )?;
+        return Ok(true);
+    }
+    if field.id == "Inset marker/enabled" {
+        let index = object_subplot(object.layer).ok_or_else(|| invalid("inset panel changed"))?;
+        let marker = value
+            .as_bool()
+            .ok_or_else(|| invalid("marker visibility must be boolean"))?;
+        result["config"]["subplots"][index]["marker"] =
+            if marker { json!({}) } else { Value::Null };
+        return Ok(true);
+    }
+    if field.group == "Figure size" {
+        let before: Config = serde_json::from_value(result["config"].clone()).map_err(invalid)?;
+        let size = value
+            .as_u64()
+            .filter(|v| (100..=16384).contains(v))
+            .ok_or_else(|| {
+                invalid("Figure dimensions must be integers from 100 to 16384 logical pixels")
+            })?;
+        let key = field.path.rsplit('/').next().unwrap();
+        let dimension = if key == "width" { 0 } else { 1 };
+        if result["identity"]["layout"].is_object() {
+            result["identity"]["layout"]["size"][dimension] = json!(size);
+            reflow_grid(result)?;
+            return Ok(true);
+        } else {
+            let old = field.value.as_f64().unwrap();
+            for config in std::iter::once(&mut result["config"]) {
+                let scale = size as f64 / old;
+                for name in [if dimension == 0 { "x" } else { "y" }, key] {
+                    let v = config["chart_area"][name].as_f64().unwrap();
+                    config["chart_area"][name] = json!((v * scale).round() as u32);
+                }
+                if let Some(panels) = config.get_mut("subplots").and_then(Value::as_array_mut) {
+                    for panel in panels {
+                        for name in [if dimension == 0 { "x" } else { "y" }, key] {
+                            let v = panel["config"]["chart_area"][name].as_f64().unwrap();
+                            panel["config"]["chart_area"][name] = json!((v * scale).round() as u32);
+                        }
+                    }
+                }
+            }
+        }
+        carry_insets(result, &before)?;
+        return Ok(true);
+    }
+    if field.id == "Plot area/automatic" {
+        let (parent, key) = field.path.rsplit_once('/').unwrap();
+        result
+            .pointer_mut(parent)
+            .ok_or_else(|| invalid("plot layout is unavailable"))?[key] = Value::Null;
+        return Ok(true);
+    }
+    if field.id != "Plot area/bounds" {
+        return Ok(false);
+    }
+    let a = value
+        .as_array()
+        .filter(|a| a.len() == 4)
+        .ok_or_else(|| invalid("Plot bounds require x, y, width and height"))?;
+    let a = a
+        .iter()
+        .map(|v| {
+            v.as_f64()
+                .filter(|v| v.is_finite())
+                .ok_or_else(|| invalid("Plot bounds must be finite"))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    if a[2] < 1. || a[3] < 1. {
+        return Err(invalid("Plot dimensions must be positive"));
+    }
+    if field.path.starts_with("/config") {
+        let before: Config = serde_json::from_value(result["config"].clone()).map_err(invalid)?;
+        let path = panel_path(object.layer);
+        let mut config: Config =
+            serde_json::from_value(result.pointer(&path).unwrap().clone()).map_err(invalid)?;
+        let current = config.data_area().map_err(|e| invalid(format!("{e:?}")))?.0;
+        let ca = config.chart_area.0;
+        let changes = [
+            (a[0] + ca.x as f64 - current.x as f64, "left_y"),
+            (
+                current.x as f64 + current.width as f64 - ca.x as f64 - a[0] - a[2],
+                "right_y",
+            ),
+            (a[1] + ca.y as f64 - current.y as f64, "top_x"),
+            (
+                current.y as f64 + current.height as f64 - ca.y as f64 - a[1] - a[3],
+                "bottom_x",
+            ),
+        ];
+        for (delta, key) in changes {
+            let axis = match key {
+                "left_y" => &mut config.left_y,
+                "right_y" => &mut config.right_y,
+                "top_x" => &mut config.top_x,
+                _ => &mut config.bottom_x,
+            };
+            axis.out_margin += delta as f32;
+            if key == "right_y" {
+                for overlay in &mut config.overlays {
+                    overlay.y_axis.out_margin += delta as f32;
+                }
+            }
+        }
+        config.layout_state = renderer::LayoutState::Fixed;
+        config.validate().map_err(|e| invalid(format!("{e:?}")))?;
+        *result.pointer_mut(&path).unwrap() = serde_json::to_value(config).unwrap();
+        // The document-level fitter also recomputes subplot margins.
+        result["config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("layout_state");
+        carry_insets(result, &before)?;
+    } else {
+        let (parent, key) = field.path.rsplit_once('/').unwrap();
+        result.pointer_mut(parent).unwrap()[key] =
+            json!({"x":a[0],"y":a[1],"width":a[2],"height":a[3]});
+    }
+    Ok(true)
+}

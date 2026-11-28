@@ -12,29 +12,58 @@ async function loadKernel(model) {
   return kernelModule;
 }
 function bytes(v) {return v instanceof DataView ? new Uint8Array(v.buffer,v.byteOffset,v.byteLength) : new Uint8Array(v.buffer ?? v,v.byteOffset ?? 0,v.byteLength ?? v.length);}
+// Only timestamp labels have an integer "origin" in the renderer document.
+// Match complete JSON strings so quoted user text is never rewritten.
+const calendarOriginTokens=/"origin"(\s*:\s*)("-?\d+"|-?\d+(?=\s*[,}]))|"(?:\\.|[^"\\])*"/g;
+function calendarOriginWire(json, quoted){
+  return json.replace(calendarOriginTokens,(token,separator,origin)=>{
+    if(origin===undefined)return token;
+    const digits=origin.startsWith('"')?origin.slice(1,-1):origin;
+    return '"origin"'+separator+(quoted?'"'+digits+'"':digits);
+  });
+}
 const clone = value => JSON.parse(JSON.stringify(value));
-const rendererVersion = '0.18.1';
-const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0',rendererVersion].includes(settings.renderer_version);
+// Property retries compare actual before/after SSOT leaves, never guessed setter effects.
+const owns=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
+function equalValue(a,b){
+  if(Object.is(a,b))return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;
+  const keys=Object.keys(a);return keys.length===Object.keys(b).length&&keys.every(key=>owns(b,key)&&equalValue(a[key],b[key]));
+}
+function propertyChanges(before,after,path=[],changes=[]){
+  if(equalValue(before,after))return changes;
+  // Arrays are atomic: an external insertion/reordering must never redirect an index edit.
+  if(before&&after&&typeof before==='object'&&typeof after==='object'&&!Array.isArray(before)&&!Array.isArray(after)){
+    for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
+      if(owns(before,key)&&owns(after,key))propertyChanges(before[key],after[key],[...path,key],changes);
+      else changes.push({path:[...path,key],before:before[key],after:after[key],had:owns(before,key),has:owns(after,key)});
+    }
+  }else changes.push({path,before,after,had:true,has:true});
+  return changes;
+}
+function propertyDraft(before,after){return {base:clone(before),changes:propertyChanges(before,after),attempts:0};}
+function rebasePropertyDraft(draft,accepted){
+  if(!equalValue(draft.base.identity?.figure,accepted.identity?.figure)||!equalValue(draft.base.identity?.panels,accepted.identity?.panels))return null;
+  const state=clone(accepted);
+  for(const change of draft.changes){
+    let parent=state;
+    for(const key of change.path.slice(0,-1)){if(!parent||typeof parent!=='object'||!owns(parent,key))return null;parent=parent[key];}
+    const key=change.path.at(-1);if(key===undefined||!parent||typeof parent!=='object')return null;
+    const found=owns(parent,key),value=parent[key];
+    const original=found===change.had&&(!found||equalValue(value,change.before));
+    const applied=found===change.has&&(!found||equalValue(value,change.after));
+    if(!original&&!applied)return null;
+    if(change.has)Object.defineProperty(parent,key,{value:clone(change.after),enumerable:true,configurable:true,writable:true});else delete parent[key];
+  }
+  return state;
+}
+const rendererVersion = '0.19.0';
+const supportedSettings = settings => [1,2].includes(settings.schema_version) && ['0.17.0','0.18.0','0.18.1',rendererVersion].includes(settings.renderer_version);
 const text = rich => rich?.segments?.map(s=>s.text).join('') ?? '';
 function segments(value) {return Array.from(value,c=>({text:c,superscript:false,subscript:false,italic:false,bold:false,underline:false,greek:false}));}
 const side = {bottom:'bottom_x',top:'top_x',left:'left_y',right:'right_y'};
 // Properties controls edit both sides of an implicitly shared axis. Raw SSOT
 // installation deliberately bypasses this helper, preserving independent axes.
-function reconcilePairedAxisEdit(before,state,target){
-  const match=/^(?:axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
-  if(!match)return;
-  const key=side[match[1]],other={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[key];
-  const previous=before.config?.[key],peerBefore=before.config?.[other],axis=state.config?.[key],peer=state.config?.[other];
-  if(!previous||!peerBefore||!axis||!peer)return;
-  if(!['min','max','scale','inverted'].every(name=>previous[name]===peerBefore[name]))return;
-  const changed=(old,value)=>JSON.stringify(old)!==JSON.stringify(value);
-  for(const name of ['min','max','scale','inverted','major_spacing','minor_count','tick','major_tick_length','minor_tick_length','line_color','line_width','line_style']){
-    if(changed(previous[name],axis[name]))peer[name]=clone(axis[name]);
-  }
-  for(const [name,value] of Object.entries(axis.label_style??{})){
-    if(!['label_offset_x','label_offset_y'].includes(name)&&changed(previous.label_style?.[name],value))peer.label_style[name]=clone(value);
-  }
-}
 const ids = ['chart_title','legend','data_area','colorbar','colorbar_axis','colorbar_tick_labels','colorbar_title',...Object.keys(side).flatMap(s=>[`axis_title_${s}`,`axis_${s}`,`tick_labels_${s}`])];
 const labels={chart_title:'Chart title',data_area:'Plot area',legend:'Legend',colorbar:'Color scale',colorbar_axis:'Color scale axis',colorbar_tick_labels:'Color scale labels',colorbar_title:'Color scale title',axis_scale:'Scale',color_scale:'Scale',axis_bottom:'X axis',axis_left:'Y axis',axis_top:'Top axis',axis_right:'Right axis',axis_title_bottom:'X axis title',axis_title_left:'Y axis title',axis_title_top:'Top axis title',axis_title_right:'Right axis title',tick_labels_bottom:'X tick labels',tick_labels_left:'Y tick labels',tick_labels_top:'Top tick labels',tick_labels_right:'Right tick labels',ticks_visible:'Tick marks',tick_labels_visible:'Tick labels',tick_direction:'Tick direction',label_format:'Number format',significant_digits:'Significant digits',auto_ticks:'Automatic tick spacing',font_size:'Font size',font:'Font family',line_width:'Line width'};
 const caption=key=>labels[key]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
@@ -51,30 +80,107 @@ export function render({model,el}) {
   controls.forEach(control=>control.disabled=true);
   const client=crypto.randomUUID();
   let chart,disposed=false,dirty=true,raf=0,selected=null,pointer=null,queue=Promise.resolve();
-  let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,barriers=[],local=clone(model.get('state').settings);
+  let revision=model.get('state').revision,sequence=0,inflight=null,pending=null,pendingDraft=null,barriers=[],local=clone(model.get('state').settings);
+  let scheduledRadiusFit=null,radiusFitError=null;
   let editHistory=model.get('state').edit_history??{},historyBusy=false;
   let propertyColumns=clone(model.get('state').property_columns??[]),propertyCatalog=clone(model.get('state').property_catalog??[]),controlQueue=Promise.resolve(),controlFinish=null;
   // Session metadata is separate from chart SSOT and ordinary inspector fields.
   const reviewPanel=document.createElement('section');reviewPanel.className='figgy-review';reviewPanel.hidden=true;
-  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><span data-review-status role="status"></span></div>';
+  reviewPanel.innerHTML='<label><strong>Review comments</strong><textarea data-review-comments rows="2" placeholder="Describe changes for the next version…"></textarea></label><div><button data-review-changes>Request changes</button><button data-review-accept>Accept</button><button data-review-finish>Save and finish</button><span data-review-status role="status"></span></div>';
   root.append(reviewPanel);
   const reviewComment=reviewPanel.querySelector('textarea'),reviewStatus=reviewPanel.querySelector('[data-review-status]');
-  let reviewBusy=false,reviewLoaded=false;
+  let reviewBusy=false,reviewLoaded=false,reviewTargets=[],reviewFontLoaded='',reviewAttachments=[],reviewImagesUploading=0;
+  const reviewImageRequests=new Map(),reviewImagePreviews=new Map();
+  const imagePreview=document.createElement('dialog');imagePreview.className='figgy-review-image-preview';root.append(imagePreview);
+  function previewReviewImage(item){
+    imagePreview.replaceChildren();const img=document.createElement('img');img.src=reviewImagePreviews.get(item.id)??'';img.alt=item.name;
+    const close=document.createElement('button');close.textContent='Close';close.onclick=()=>imagePreview.close();imagePreview.append(img,close);imagePreview.showModal();
+  }
+  function uploadReviewImage(file){
+    return new Promise(async(resolve,reject)=>{
+      if(file.size>20*1024*1024){reject(Error('Review images must be at most 20 MiB'));return;}
+      const request=crypto.randomUUID();let timer;
+      try{
+        const data=await file.arrayBuffer();
+        timer=setTimeout(()=>{reviewImageRequests.delete(request);reject(Error('Image upload timed out; please try again'));},60000);
+        reviewImageRequests.set(request,{resolve:item=>{clearTimeout(timer);const old=reviewImagePreviews.get(item.id);if(old?.startsWith('blob:'))URL.revokeObjectURL(old);reviewImagePreviews.set(item.id,URL.createObjectURL(file));resolve(item);},reject:error=>{clearTimeout(timer);reject(Error(error));}});
+        model.send({action:'review_image',request,name:file.name??'Clipboard image.png'},{},[data]);
+      }catch(error){clearTimeout(timer);reviewImageRequests.delete(request);reject(error);}
+    });
+  }
+  function imageEditor(container,input,getItems,setItems,prefix){
+    container.className='figgy-review-images';
+    const attach=document.createElement('button');attach.dataset[prefix+'Attach']='';attach.textContent='Attach image…';
+    const files=document.createElement('input');files.type='file';files.accept='image/png,image/jpeg,image/webp';files.multiple=true;files.hidden=true;
+    const hint=document.createElement('span');hint.textContent='Paste or drop an image here';
+    const list=document.createElement('div');list.className='figgy-review-image-list';
+    const error=document.createElement('span');error.setAttribute('role','alert');
+    container.append(attach,files,hint,list,error);
+    const render=()=>{
+      list.replaceChildren();
+      for(const item of getItems()){
+        const group=document.createElement('span'),view=document.createElement('button'),img=document.createElement('img'),remove=document.createElement('button');
+        view.dataset[prefix+'Image']=item.id;view.title=item.name;img.src=reviewImagePreviews.get(item.id)??'';img.alt=item.name;view.append(img);view.onclick=()=>previewReviewImage(item);
+        remove.dataset[prefix+'ImageRemove']=item.id;remove.textContent='×';remove.title='Remove attachment';remove.setAttribute('aria-label',`Remove ${item.name}`);
+        remove.onclick=()=>{if(reviewBusy)return;setItems(getItems().filter(v=>v.id!==item.id));render();};group.append(view,remove);list.append(group);
+      }
+      attach.disabled=reviewBusy||!!(model.get('review')??{}).approved;
+    };
+    const add=async files=>{
+      if(reviewBusy||(model.get('review')??{}).approved)return;
+      reviewImagesUploading++;reviewState();error.textContent='Uploading image…';
+      try{
+        for(const file of files){const item=await uploadReviewImage(file);if(!getItems().some(v=>v.id===item.id))setItems([...getItems(),item]);}
+        error.textContent='';
+      }catch(e){error.textContent=String(e);}
+      finally{reviewImagesUploading--;render();reviewState();}
+    };
+    attach.onclick=()=>files.click();files.onchange=()=>{add([...files.files]);files.value='';};
+    input.addEventListener('paste',event=>{const images=[...(event.clipboardData?.items??[])].filter(v=>v.kind==='file'&&v.type.startsWith('image/')).map(v=>v.getAsFile()).filter(Boolean);if(images.length){event.preventDefault();add(images);}});
+    container.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
+    container.addEventListener('drop',event=>{const images=[...(event.dataTransfer?.files??[])].filter(v=>v.type.startsWith('image/'));if(images.length){event.preventDefault();add(images);}});
+    render();return render;
+  }
+  function disposeReviewImages(){for(const pending of reviewImageRequests.values())pending.reject('Review closed');reviewImageRequests.clear();for(const url of reviewImagePreviews.values())if(url.startsWith('blob:'))URL.revokeObjectURL(url);reviewImagePreviews.clear();if(imagePreview.open)imagePreview.close();}
+  const generalImages=document.createElement('div');reviewComment.parentElement.after(generalImages);
+  const renderReviewImages=imageEditor(generalImages,reviewComment,()=>reviewAttachments,items=>{reviewAttachments=items;saveReviewDraft();},'review');
+  const reviewDialog=document.createElement('dialog');reviewDialog.className='figgy-review-dialog';root.append(reviewDialog);
+  const reviewMenu=document.createElement('div');reviewMenu.className='figgy-review-menu';reviewMenu.popover='auto';root.append(reviewMenu);
+  const closeReviewMenu=()=>{if(reviewMenu.matches(':popover-open'))reviewMenu.hidePopover();};
+  function openReviewMenu(objects,point){
+    closeReviewMenu();reviewMenu.replaceChildren();
+    for(const node of objects){const button=document.createElement('button');button.dataset.reviewTarget=node.key;button.textContent=`Add review comment · ${node.label}`;button.onclick=()=>editTargetComment(node.key,node.label);reviewMenu.append(button);}
+    if(!objects.length)return;
+    reviewMenu.style.left='0px';reviewMenu.style.top='0px';reviewMenu.showPopover();
+    const rect=reviewMenu.getBoundingClientRect();
+    reviewMenu.style.left=`${Math.max(8,Math.min(point[0],innerWidth-rect.width-8))}px`;
+    reviewMenu.style.top=`${Math.max(8,Math.min(point[1],innerHeight-rect.height-8))}px`;
+    reviewMenu.querySelector('button')?.focus({preventScroll:true});
+  }
   function reviewState(){
     const state=model.get('review')??{};reviewPanel.hidden=!state.enabled;
-    reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||model.get('status')!=='ready'||!!state.approved);
-    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewLoaded=true;}
+    reviewPanel.querySelectorAll('button').forEach(button=>button.disabled=reviewBusy||reviewImagesUploading>0||model.get('status')!=='ready'||!!state.approved);
+    reviewDialog.querySelectorAll('[data-review-target-save]').forEach(button=>button.disabled=reviewImagesUploading>0||reviewBusy);
+    if(state.enabled&&!reviewLoaded){reviewComment.value=state.comments??'';reviewTargets=clone(state.target_comments??[]);reviewAttachments=clone(state.attachments??[]);for(const [id,url] of Object.entries(state.image_previews??{}))reviewImagePreviews.set(id,url);reviewLoaded=true;renderReviewImages();}
+    reviewComment.style.fontSize=reviewDialog.style.fontSize=`${state.font_size??14}px`;
+    if(state.font_family&&reviewFontLoaded!==state.font_family){
+      reviewFontLoaded=state.font_family;
+      const data=model.get('review_font_data');
+      const bytes=data instanceof DataView?data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength):data;
+      const face=new FontFace(`figgy-review-${client}`,bytes);
+      face.load().then(font=>{document.fonts.add(font);root.style.setProperty('--figgy-review-font',JSON.stringify(font.family));}).catch(e=>{reviewStatus.textContent=`Review font could not be loaded: ${e}`;});
+    }
     if(state.approved)reviewStatus.textContent='Review saved';
   }
-  async function submitReview(disposition){
-    if(reviewBusy)return;
+  async function submitReview(disposition,intent='revise'){
+    if(reviewBusy||reviewImagesUploading>0)return;
     reviewBusy=true;reviewPanel.querySelectorAll('button,textarea').forEach(v=>v.disabled=true);
     reviewStatus.textContent='Saving review…';
     try{
       await finishInline(true);await controlQueue;await queue;await flush();
       root.querySelector('.figgy-body').inert=true;root.querySelector('.figgy-toolbar').inert=true;
       trace('review.send',{revision,disposition});
-      model.send({action:'review_submit',disposition,comments:reviewComment.value,revision});
+      model.send({action:'review_submit',disposition,intent,comments:reviewComment.value,target_comments:reviewTargets,attachments:reviewAttachments,revision});
     }catch(e){reviewFailure(String(e));}
   }
   function reviewFailure(message){
@@ -83,12 +189,49 @@ export function render({model,el}) {
     reviewStatus.textContent=message;
     reviewState();
   }
-  const reviewMessage=message=>{if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
+  const reviewMessage=message=>{if(message.action==='review_image_result'){const pending=reviewImageRequests.get(message.request);reviewImageRequests.delete(message.request);if(pending){if(message.error)pending.reject(message.error);else pending.resolve(message.attachment);}}else if(message.action==='review_result'){trace('review.result',{error:message.error});reviewFailure(message.error??'Review could not be saved');}};
   reviewPanel.querySelector('[data-review-changes]').addEventListener('click',()=>submitReview('request_changes'));
   reviewPanel.querySelector('[data-review-accept]').addEventListener('click',()=>submitReview('accept'));
-  reviewComment.addEventListener('change',()=>model.send({action:'review_comment',comments:reviewComment.value}));
+  reviewPanel.querySelector('[data-review-finish]').addEventListener('click',()=>submitReview('accept','finish'));
+  function saveReviewDraft(){model.send({action:'review_comment',comments:reviewComment.value,target_comments:reviewTargets,attachments:reviewAttachments});}
+  reviewComment.addEventListener('input',saveReviewDraft);
+  function editTargetComment(target,label,existing=null){
+    closeReviewMenu();reviewDialog.replaceChildren();
+    const heading=document.createElement('h3');heading.textContent=`Review comment · ${label}`;
+    const input=document.createElement('textarea');input.dataset.reviewTargetText='';input.value=existing?.text??'';input.rows=4;
+    const save=document.createElement('button');save.dataset.reviewTargetSave='';save.textContent='Save comment';
+    const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>reviewDialog.close();
+    let attachments=clone(existing?.attachments??[]);const images=document.createElement('div');
+    imageEditor(images,input,()=>attachments,items=>{attachments=items;},'reviewTarget');
+    save.onclick=()=>{if(reviewImagesUploading||(!input.value.trim()&&!attachments.length))return;const item={id:existing?.id??crypto.randomUUID(),target,label,text:input.value,channel:'ui_target'};if(attachments.length)item.attachments=attachments;reviewTargets=reviewTargets.filter(v=>v.id!==item.id);reviewTargets.push(item);saveReviewDraft();reviewDialog.close();};
+    reviewDialog.append(heading,input,images,save,cancel);reviewDialog.showModal();input.focus();
+  }
+  const commentsButton=document.createElement('button');commentsButton.dataset.reviewTargetList='';commentsButton.textContent='Element comments';reviewPanel.querySelector('[data-review-changes]').parentElement.append(commentsButton);
+  commentsButton.onclick=()=>{reviewDialog.replaceChildren();for(const item of reviewTargets){const row=document.createElement('section'),name=document.createElement('strong'),text=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');name.textContent=item.label??item.target;text.textContent=item.text;edit.textContent='Edit';edit.onclick=()=>{reviewDialog.close();editTargetComment(item.target,item.label??item.target,item);};remove.textContent='Delete';remove.onclick=()=>{reviewTargets=reviewTargets.filter(v=>v.id!==item.id);saveReviewDraft();row.remove();};row.append(name,text,edit,remove);reviewDialog.append(row);}const close=document.createElement('button');close.textContent='Close';close.onclick=()=>reviewDialog.close();reviewDialog.append(close);reviewDialog.showModal();};
+  canvas.addEventListener('contextmenu',event=>{if(!chart||!(model.get('review')??{}).enabled||reviewBusy)return;event.preventDefault();event.stopPropagation();const point=localPoint(event),clientPoint=[event.clientX,event.clientY];enqueue(async()=>{
+    await geometryFrame();let hits=[];
+    const index=kind?0:panelAt(point)??0;
+    const owner=kind?snapshot()[kind]:snapshot().config;
+    let annotation=null;
+    if(owner.annotations?.visible!==false&&owner.annotations?.items?.length){await annotationGeometry();annotation=chart.hit_annotation(...point);}
+    if(Number.isInteger(annotation))hits=[{layer:'Annotations',target:kind?`annotation_${annotation}`:`annotation:${owner.annotations.items[annotation].id}`}];
+    else if(kind){const target=chart.hit_decoration(...point,true);if(target)hits=[{layer:'Base',target}];if(!hits.length||hits.every(v=>v.target==='data_area')){const hit=JSON.parse(chart.pick(...point,false));if(hit)hits=[{layer:'Base',target:kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id}];}}
+    else{hits=decorationsAt(point,index);if(hits.every(v=>v.target.endsWith('data_area'))){const data=await pickPanelCandidates(point,index);if(data.length)hits=data.map(v=>({layer:v.layer,target:v.ref.series_id}));}}
+    const objects=hits.map(hit=>allNodes().find(v=>v.node.target===hostTarget(hit.target)&&sameLayer(v.node.layer,hit.layer))?.node).filter(Boolean);
+    openReviewMenu(objects,clientPoint);
+  });});
+  root.addEventListener('pointerdown',event=>{if(!reviewMenu.contains(event.target))closeReviewMenu();});
+  root.addEventListener('contextmenu',event=>{
+    const row=event.target.closest('[role=treeitem]');if(!row||!(model.get('review')??{}).enabled||reviewBusy)return;
+    const node=allNodes().find(v=>v.node.key===row.dataset.node)?.node;if(!node?.target)return;
+    event.preventDefault();event.stopPropagation();openReviewMenu([node],[event.clientX,event.clientY]);
+  });
   model.on('change:review',reviewState);model.on('change:status',reviewState);model.on('msg:custom',reviewMessage);reviewState();
   function historyControls(){for(const action of ['undo','redo']){const button=root.querySelector(`[data-${action}]`);button.disabled=historyBusy||!!inflight||!!pending||!editHistory[`can_${action}`];}root.querySelectorAll('[data-reset-edits]').forEach(button=>button.disabled=historyBusy||!!inflight||!!pending||!editHistory.can_reset);}
+  function requestReplay(action,args){
+    historyBusy=true;historyControls();
+    return new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args});});
+  }
   function replayEdit(action,args={}){
     const operation=controlQueue.then(async()=>{
       await queue;await flush();if(disposed)throw Error('Widget disposed');
@@ -97,8 +240,7 @@ export function render({model,el}) {
         const field=propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id);
         if(!field||JSON.stringify(field.value)!==JSON.stringify(base_value))throw Error('stale edit: the property changed; refresh and retry');
       }
-      historyBusy=true;historyControls();
-      const response=await new Promise(resolve=>{controlFinish=resolve;model.send({action,client,revision,...args,...(action==='property'?{base_value}:{})});});
+      const response=await requestReplay(action,{...args,...(action==='property'?{base_value}:{})});
       return {ok:!!response&&!response.error,value:propertyCatalog.find(v=>v.id===args.object_id)?.fields.find(v=>v.id===args.property_id)?.value};
     });
     controlQueue=operation.catch(e=>{historyBusy=false;historyControls();fail(e);return {ok:false};});return controlQueue;
@@ -152,34 +294,55 @@ export function render({model,el}) {
     const overlaps=index===null?[]:overlappingPanels(index);switchChart.hidden=overlaps.length<2;
     if(!switchChart.hidden){const [x,y,w]=panelRect(index);switchChart.textContent=`Switch chart (${overlaps.length})`;switchChart.style.left=`${(x+w)/canvas.width*100}%`;switchChart.style.top=`${y/canvas.height*100}%`;switchChart.onclick=()=>enqueue(()=>openChooser(overlaps.map(panelChoice),[x+w,y+30]));}
     const name=index===null?'':text(panelConfig(index).chart_title?.text)||panelId(index);
-    root.querySelector('[data-hint]').textContent=hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
+    const camera=!kind&&(!hasPanels()||index!==null)&&activePanel(local).view_3d;
+    root.querySelector('[data-hint]').textContent=(kind==='radar'||(!kind&&configOf(local).polar))?'Polar coordinates · Wheel zoom disabled · Set radial range in Properties':camera?'Drag plot: Rotate · Wheel: Zoom camera · Click: Edit':hasPanels()?(index===null?'Click a chart to select it, then click or drag inside to edit':`${name} selected · Click an axis or data to edit · Click another chart to switch · Esc: leave chart`):'Click an element to edit · Drag to move · Wheel to zoom · Esc: clear · Arrows: move selection';
   }
   function layersInPanel(index){const cfg=panelConfig(index);return [baseLayer(index),...(cfg.overlays??[]).map((_,i)=>index===0?{Overlay:i}:{SubplotOverlay:[index-1,i]})];}
   function setPointerLayer(layer){chart.set_active_layer(JSON.stringify(layer));local.config.active_layer=clone(layer);}
+  // Base automatically routes into an overlapping subplot. The annotation
+  // layer uses the root data axes without that implicit subplot routing.
+  function probeLayer(layer, point) {
+    const overlapsSubplot = layer === 'Base' && focusedPanel === panelId(0)
+      && panelsAt(point).some(index => index !== 0);
+    return overlapsSubplot ? 'Annotations' : layer;
+  }
   function decorationsAt(point,index){
     const original=JSON.parse(chart.active_layer()),hits=[];
     try{for(const layer of layersInPanel(index).reverse()){
-      chart.set_active_layer(JSON.stringify(layer));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
+      chart.set_active_layer(JSON.stringify(probeLayer(layer,point)));const target=chart.hit_test(...point);if(target===null||target===undefined)continue;
       if(!hits.some(h=>h.target===target))hits.push({layer:target.includes('overlay_')?layer:baseLayer(index),target});
     }return hits.some(h=>!h.target.endsWith('data_area'))?hits.filter(h=>!h.target.endsWith('data_area')):hits;}finally{chart.set_active_layer(JSON.stringify(original));}
   }
   async function pickPanelCandidates(point,index){
     const config=JSON.parse(chart.get_config()),series=JSON.parse(chart.get_series()),hits=[],excluded=new Set();
     const owner=id=>{for(let i=0;i<=(config.subplots?.length??0);i++){const cfg=i?config.subplots[i-1].config:config;if(i&&!(config.subplots[i-1].series??[]).includes(id))continue;if(!i&&(config.subplots??[]).some(p=>(p.series??[]).includes(id)))continue;const o=(cfg.overlays??[]).findIndex(o=>(o.series??[]).includes(id));return o<0?baseLayer(i):i?{SubplotOverlay:[i-1,o]}:{Overlay:o};}return 'Base';};
-    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)).map(v=>{const item=clone(v);for(const style of Object.values(item.render_type))if(style.line)style.line.fill=null;return item;});
+    const remaining=()=>series.filter(v=>!excluded.has(v.series_id)&&!excluded.has(v.render_type.RangeLinks?.bars)).map(v=>{
+      const item=clone(v);
+      for(const style of Object.values(item.render_type)){
+        if(excluded.has(style.line?.fill?.ToSeries))style.line.fill=null;
+      }
+      return item;
+    });
     try{
-      chart.set_picked_data('null');chart.set_picked_points('null');
+      chart.set_picked_data('null');
       for(const layer of layersInPanel(index).reverse()){
-        chart.set_active_layer(JSON.stringify(layer));
+        chart.set_active_layer(JSON.stringify(probeLayer(layer,point)));
         while(series.some(v=>!excluded.has(v.series_id)&&sameLayer(owner(v.series_id),layer))){
+          await chart.prepare_data_pick();
           const value=await chart.pick_data(...point,6);if(!value)break;
-          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>k!=='distance_px'));
+          const identity=JSON.parse(value),ref=Object.fromEntries(Object.entries(identity).filter(([k])=>!['distance_px','extent_px','label_id','vertex_index'].includes(k)));
+          // Pick answers use `index`; persistent Feynman selections use typed row keys.
+          if(ref.kind==='feynman_vertex'){ref.vertex_index=ref.index;delete ref.index;}
+          else if(ref.kind==='feynman_propagator'){ref.propagator_index=ref.index;delete ref.index;}
           if(excluded.has(ref.series_id))throw Error('Picker repeated an excluded series');
-          excluded.add(ref.series_id);hits.push({layer,ref,distance:identity.distance_px});
+          excluded.add(ref.series_id);hits.push({layer:owner(ref.series_id),ref,distance:identity.distance_px,extent:identity.extent_px});
+          // Removing a member would move the other series to different offsets.
+          if(panelConfig(index).line_offsets)break;
           chart.set_series(JSON.stringify(remaining()));
         }
+        if(hits.length&&panelConfig(index).line_offsets)break;
       }
-    }finally{try{chart.set_series(JSON.stringify(series));}finally{chart.set_config(JSON.stringify(config));}}
+    }finally{chart.set_host_state(JSON.stringify(config),JSON.stringify(series));}
     hits.sort((a,b)=>a.distance-b.distance);stats.last_pick_candidates=hits.map(h=>({layer:h.layer,series:h.ref.series_id,distance:h.distance}));stats.last_pick_position=point;
     return hits;
   }
@@ -191,13 +354,13 @@ export function render({model,el}) {
   function cancelChooser(){if(!chooser)return;const restoreFocus=choiceBox.contains(document.activeElement);restorePreview();chooser=null;choiceBox.hidden=true;choiceBox.replaceChildren();stats.choice_candidates=null;stats.choice_preview=null;if(restoreFocus)canvas.focus({preventScroll:true});}
   function previewChoice(index){
     if(!chooser)return;restorePreview();chooser.active=index;const choice=chooser.choices[index];if(!choice)return;
-    previewOriginal=JSON.parse(chart.get_config());chart.set_picked_points('null');chart.set_active_layer(JSON.stringify(choice.layer));chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));
+    previewOriginal=JSON.parse(chart.get_config());chart.set_active_layer(JSON.stringify(choice.layer));chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));
     const rect=choice.target?JSON.parse(chart.decoration_bounds(rendererTarget(choice.target)))?.rect:panelRect(panelIndex(choice.layer));
     choicePreview.setAttribute('viewBox',`0 0 ${canvas.width} ${canvas.height}`);
     if(rect){const node=document.createElementNS('http://www.w3.org/2000/svg','rect');for(const [k,v]of Object.entries({x:rect[0],y:rect[1],width:rect[2],height:rect[3],fill:'none',stroke:'#2663ad','stroke-width':2,'stroke-dasharray':'5 3','vector-effect':'non-scaling-stroke'}))node.setAttribute(k,v);choicePreview.append(node);}
     choiceBox.querySelectorAll('[data-choice]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.choice===choice.key)));stats.choice_preview=choice.key;dirty=true;
   }
-  function chooseTarget(choice){cancelChooser();chart.set_picked_points('null');setPointerLayer(choice.layer);chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));selected=choice.target;local=snapshot();focusedPanel=panelId(panelIndex(choice.layer));observedLayer=clone(local.config.active_layer??'Base');if(selected)showProperties();dirty=true;commit();canvas.focus({preventScroll:true});}
+  function chooseTarget(choice){cancelChooser();setPointerLayer(choice.layer);chart.set_picked_data(JSON.stringify(choice.ref?{refs:[choice.ref]}:null));selected=choice.target;local=snapshot();focusedPanel=panelId(panelIndex(choice.layer));observedLayer=clone(local.config.active_layer??'Base');if(selected)showProperties();dirty=true;commit();canvas.focus({preventScroll:true});}
   function renderChooser(){
     if(!chooser)return;const query=chooser.filter.toLowerCase(),visible=chooser.choices.map((c,i)=>({c,i})).filter(({c})=>`${c.label} ${c.detail}`.toLowerCase().includes(query));chooser.visible=visible.map(v=>v.i);
     const rows=choiceBox.querySelector('[data-choices]');rows.replaceChildren();
@@ -316,6 +479,7 @@ export function render({model,el}) {
   });
   inlineInput.addEventListener('blur',()=>finishInline(true));
   async function geometryFrame(){
+    await formatPendingLabels();
     // Prepare the current hit map through the renderer without submitting or
     // awaiting a display frame. Keep display work coalesced behind its fence.
     resizeSurface();
@@ -373,7 +537,7 @@ export function render({model,el}) {
   // Optional CI diagnostics. Never read the WASM chart or wait on GPU work.
   function diagnostics(){return {kind:kind??'cartesian',busy,queued:queuedOperations,
     dirty,frame_pending:!!pendingFrame,frame_error:frameError?String(frameError):null,
-    edit_inflight:inflight?.sequence??null,edit_pending:!!pending,
+    edit_inflight:inflight?.sequence??null,edit_pending:!!pending,accepted_revision:model.get('state').revision,local_revision:revision,
     canvas:[canvas.width,canvas.height],disposed};}
   function trace(stage,details={}){try{globalThis.__figgyTrace?.(stage,{client,...diagnostics(),...details});}catch{}}
   const requested=new Promise(resolve=>{startInit=resolve;});
@@ -436,13 +600,22 @@ export function render({model,el}) {
         }
       }
       if(JSON.stringify(settings.series)===JSON.stringify(old.series)){chart.set_config(JSON.stringify(settings.config));}
-      else{chart.set_picked_data('null');chart.set_series('[]');const staging=clone(settings.config);delete staging.picked_data;delete staging.picked_points;chart.set_config(JSON.stringify(staging));chart.set_series(JSON.stringify(settings.series));chart.set_config(JSON.stringify(settings.config));}clearColor(settings.background);checkNumericConversion(settings,{...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())});
+      else{chart.set_host_state(JSON.stringify(settings.config),JSON.stringify(settings.series));}clearColor(settings.background);checkNumericConversion(settings,{...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())});
     }
-    catch(e){chart.set_series('[]');chart.set_config(JSON.stringify(old.config));chart.set_series(JSON.stringify(old.series));chart.set_config(JSON.stringify(old.config));clearColor(old.background);local=old;throw e;}
+    catch(e){chart.set_host_state(JSON.stringify(old.config),JSON.stringify(old.series));clearColor(old.background);local=old;throw e;}
+    if(valueLabelSignature(settings)!==valueLabelSignature(old))pendingValueLabels=true;
     local={...clone(settings),config:JSON.parse(chart.get_config()),series:JSON.parse(chart.get_series())};dirty=true;error.textContent='';
   }
-  function post(){if(inflight || !pending)return;inflight={sequence:++sequence,settings:pending};pending=null;historyControls();stats.kernel_edit_messages++;model.send({action:'edit',client,sequence,revision,settings:inflight.settings});}
-  function commit(){local=snapshot();pending=clone(local);post();properties();}
+  function post(){
+    if(inflight||!pending)return;
+    inflight={sequence:++sequence,settings:pending,draft:pendingDraft};
+    pending=null;pendingDraft=null;
+    historyControls();stats.kernel_edit_messages++;trace('edit.post',{sequence,revision});
+    const message={action:'edit',client,sequence,revision,settings:inflight.settings};
+    if(inflight.draft?.radiusFit)message.radius_fit=inflight.draft.radiusFit;
+    model.send(message);
+  }
+  function commit(draft=null){local=snapshot();pending=clone(local);pendingDraft=draft;post();properties();}
   function idle(){if(!inflight && !pending){for(const resolve of barriers.splice(0))resolve();}}
   function flush(){post();return !inflight&&!pending ? Promise.resolve() : new Promise(resolve=>barriers.push(resolve));}
   let exportedCode=model.get('state').code ?? '';
@@ -450,6 +623,23 @@ export function render({model,el}) {
   const selectedData=document.createElement('section');selectedData.dataset.selectedData='';selectedData.hidden=true;
   root.querySelector('[data-advanced]').before(selectedData);
   let selectedDataKey=null;
+  async function selectionDetails(){
+    return JSON.parse(await chart.selection_details());
+  }
+  function valueLabelSignature(state){
+    const configs=[state.config,...(state.config.subplots??[]).map(p=>p.config)];
+    const categories=axis=>(axis?.categories??[]).map(c=>[c.id,c.label]);
+    return JSON.stringify([configs.map(c=>[categories(c.bottom_x),categories(c.left_y),c.bar_groups?.direction,(c.overlays??[]).map(o=>[categories(o.x_axis),categories(o.y_axis),o.series,o.link_x,o.link_y])]),
+      state.series.flatMap(s=>Object.entries(s.render_type).filter(([kind])=>['CategoryBars','BoxPlot','Radar'].includes(kind)).map(([kind,b])=>[s.series_id,kind,s.x_column,s.y_column,b.labels?.placement,b.labels?.decimals,b.labels?.value_suffix,b.label_format,(b.overrides??[]).filter(o=>o.labels!=null||o.label_format!=null).map(o=>[o.target,o.labels,o.label_format])]))]);
+  }
+  let pendingValueLabels=false;
+  async function formatPendingLabels(){
+    if(kind||!pendingValueLabels)return;
+    pendingValueLabels=false;
+    const before=JSON.parse(chart.get_series());
+    const after=JSON.parse(await chart.format_value_labels());
+    if(!equalValue(before,after)){local=snapshot();commit();}
+  }
   function selectionProperties(){
     if(kind)return;
     const reference=local.config.picked_data?.refs?.[0]??null,key=JSON.stringify(reference);
@@ -459,10 +649,10 @@ export function render({model,el}) {
     const heading=document.createElement('strong');heading.textContent='SELECTED DATA';selectedData.append(heading);
     enqueue(async()=>{
       if(key!==selectedDataKey)return;
-      const value=JSON.parse(await chart.selection_details());
+      const value=await selectionDetails();
       if(key!==selectedDataKey)return;
       if(!value){selectedData.hidden=true;return;}
-      for(const name of ['index','x_index','y_index','color_value','size_value','u','v','bin_start','bin_end','x','y','value','orientation']){
+      for(const name of ['index','x_index','y_index','color_value','size_value','u','v','bin_start','bin_end','x','y','value','orientation','z','w','c','values','vertices','category_label','position','start','end','low','high','progress','state','total','q1','median','q3','mean','sample_count','whisker_low','whisker_high','red','green','blue','text','offset','role','placed','propagator','record']){
         if(value[name]===undefined)continue;
         const row=document.createElement('div');row.dataset.selectedValue=name;row.textContent=`${caption(name)}: ${value[name]}`;selectedData.append(row);
       }
@@ -479,47 +669,19 @@ export function render({model,el}) {
     const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
     if(overlay===undefined)return cfg;
     const view=Object.create(cfg),node=cfg.overlays[overlay];
-    Object.defineProperty(view,'right_y',{get:()=>node.y_axis,set:value=>node.y_axis=value});
+    if(node.link_y!==true)Object.defineProperty(view,'right_y',{get:()=>node.y_axis,set:value=>node.y_axis=value});
+    if(node.link_x===false)Object.defineProperty(view,'top_x',{get:()=>node.x_axis,set:value=>node.x_axis=value});
     if(node.legend)Object.defineProperty(view,'legend',{get:()=>node.legend,set:value=>node.legend=value});
     return view;
-  }
-  function navigateDocumentAxis(state,dimension,factor,anchor,shift=0){
-    const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
-    if(dimension==='y'&&overlay!==undefined){navigate(cfg.overlays[overlay].y_axis,factor,anchor,shift);if(factor!==1&&tickAutomatic(state,'right_y'))retick(cfg.overlays[overlay].y_axis);}
-    else for(const key of dimension==='x'?['bottom_x','top_x']:['left_y','right_y']){navigate(cfg[key],factor,anchor,shift);if(factor!==1&&tickAutomatic(state,key))retick(cfg[key]);}
-  }
-  function tickAddress(state,key){
-    const layer=state.config.active_layer,index=(layer?.Subplot??layer?.SubplotOverlay?.[0]??-1)+1,panel=state.identity?.panels?.[index];
-    const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
-    return key==='right_y'&&overlay!==undefined?[panel?.overlays?.[overlay],'y_axis']:[panel?.id,key];
-  }
-  function tickOwners(state,owner,key){
-    const owners=new Set([owner]),dimension={bottom_x:'x',left_y:'y'}[key];
-    if(dimension)for(let old=-1;old!==owners.size;){old=owners.size;for(const group of Object.values(state.identity.groups))if(group.axis===dimension&&group.members.some(id=>owners.has(id)))for(const id of group.members)owners.add(id);}
-    return owners;
-  }
-  function tickAutomatic(state,key){const [owner,side]=tickAddress(state,key);return [...tickOwners(state,owner,side)].every(id=>state.identity?.tick_modes?.[id]?.[side]!=='Fixed');}
-  function tickMode(state,key,automatic){const [owner,side]=tickAddress(state,key);if(owner===undefined)return;state.identity.tick_modes??={};
-    const peer={bottom_x:'top_x',top_x:'bottom_x',left_y:'right_y',right_y:'left_y'}[side],cfg=activePanel(state),keys=[side];
-    if(peer&&['min','max','scale','inverted'].every(k=>cfg[key][k]===cfg[peer][k]))keys.push(peer);
-    for(const key of keys)for(const id of tickOwners(state,owner,key)){state.identity.tick_modes[id]??={};state.identity.tick_modes[id][key]=automatic?'Auto':'Fixed';}
-  }
-  function syncTickSpacing(state,key){
-    const [owner,side]=tickAddress(state,key);if(!['bottom_x','left_y'].includes(side))return;
-    const spacing=activePanel(state)[key].major_spacing;
-    for(const id of tickOwners(state,owner,side)){const index=state.identity.panels.findIndex(p=>p.id===id);panelConfig(index,state)[key].major_spacing=spacing;}
-  }
-  function retick(axis){
-    if(axis.scale==='Logarithmic'){const decades=Math.max(1,Math.ceil(Math.log10(axis.max))-Math.floor(Math.log10(axis.min)));axis.major_spacing=decades<=6?1:decades<=12?2:Math.ceil(decades/6);return;}
-    const span=axis.max-axis.min;if(!(span>0&&Number.isFinite(span)))return;
-    const base=10**Math.floor(Math.log10(span)),fraction=span/base;
-    axis.major_spacing=base>0&&Number.isFinite(base)?(fraction>=5?base:fraction>=2?base*.5:base*.2):span;
   }
   function elementName(name,state=local){
     const layer=state.config.active_layer,index=layer?.Subplot??layer?.SubplotOverlay?.[0];
     const overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
     let prefix=index===undefined?'':`subplot_${index}:`;
-    if(overlay!==undefined&&['axis_right','tick_labels_right','axis_title_right'].includes(name))prefix+=`overlay_${overlay}:`;
+    if(overlay!==undefined){
+      const owner=activePanel(state).overlays[overlay];
+      if((owner.link_y!==true&&name.endsWith('_right'))||(owner.link_x===false&&name.endsWith('_top')))prefix+=`overlay_${overlay}:`;
+    }
     return prefix+name;
   }
   const tree=root.querySelector('[data-object-tree]'),search=root.querySelector('[data-object-search]');
@@ -539,7 +701,7 @@ export function render({model,el}) {
     treeSelection=entry?.node.key??null;
     const query=search.value.trim().toLowerCase(),focusKey=tree.contains(document.activeElement)?document.activeElement.closest('[data-node]')?.dataset.node:null;
     const scroll=tree.scrollTop;tree.replaceChildren();
-    const matches=node=>!query||`${node.label} ${node.kind} ${node.key.split('/').at(-1)}`.toLowerCase().includes(query)||node.children.some(matches);
+    const matches=node=>!query||`${node.label} ${node.kind} ${node.key} ${node.target??''}`.toLowerCase().includes(query)||node.children.some(matches);
     const visit=(nodes,depth)=>{for(const node of nodes){
       if(!matches(node))continue;
       const open=Boolean(query)||(expanded.get(node.key)??!node.collapsed);
@@ -571,7 +733,7 @@ export function render({model,el}) {
     const context=root.querySelector('[data-context]');context.textContent=entry?entry.path.slice(1).map(n=>n.label).join(' / '):'Click an object in the chart or tree';context.dataset.target=target??'';
   }
   search.addEventListener('input',()=>navigateTree(!search.value));
-  search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key.split('/').at(-1)}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
+  search.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();const q=search.value.toLowerCase(),entry=allNodes().find(({node:n})=>n.target!==null&&`${n.label} ${n.kind} ${n.key} ${n.target??''}`.toLowerCase().includes(q));(entry?[...tree.querySelectorAll('[role=treeitem]')].find(r=>r.dataset.node===entry.node.key):tree.querySelector('[role=treeitem]'))?.focus();}if(e.key==='Escape'){search.value='';navigateTree();canvas.focus();}});
   function chooseObject(node){
     const target=node.target,generation=++inspectorGeneration;inspectorOwner=node.key;
     if(node.kind==='panel')expanded.set(node.key,true);
@@ -597,6 +759,8 @@ export function render({model,el}) {
   fields.addEventListener('focusout',()=>setTimeout(()=>{if(formRefreshPending&&!sidebarPointer&&!disposed){formRefreshPending=false;enqueue(()=>properties());}},0));
   function properties(refresh=true){
     if(!chart)return;
+    if(pointer?.moved){formRefreshPending=true;return;}
+    stats.inspector_rebuilds=(stats.inspector_rebuilds??0)+1;
     let restoreControl=null;
     try{
     if(refresh){local=snapshot();if(kind)decorationIds=JSON.parse(chart.decorations()).map(d=>d.id).filter(id=>id!=='chart_title');}
@@ -615,17 +779,63 @@ export function render({model,el}) {
     if(inspectorLayer&&!sameLayer(inspectorLayer,layerOf(local))){const pending=document.createElement('p');pending.textContent='Selecting object…';fields.append(pending);return;}
     const target=/^(subplot_|overlay_)/.test(inspectedTarget)?inspectedTarget.split(':').pop():inspectedTarget,cfg=configOf(local);
     if(['series/','bounded/series/slice_'].some(prefix=>inspectedObject(inspectedTarget)?.id.startsWith(prefix))){root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();return;}
+    const propertyLayer=clone(layerOf(local)),propertyOwners=JSON.stringify(local.identity?.panels);
+    const axisTarget=!kind&&/^(axis|tick_labels)_(bottom|top|left|right)$/.exec(target);
+    const axisKey=axisTarget&&side[axisTarget[2]];
+    function scopedConfig(state){
+      return configOf({...state,config:{...state.config,active_layer:propertyLayer}});
+    }
+    function axisEditBase(input){
+      if(!axisKey)return ()=>null;
+      let base={axis:clone(cfg[axisKey])};
+      input.addEventListener('focus',()=>{
+        if(JSON.stringify(local.identity?.panels)===propertyOwners){
+          base={axis:clone(scopedConfig(local)[axisKey])};
+        }
+      });
+      return ()=>base;
+    }
     function applyProperty(apply,value){
-      const before=snapshot(),state=clone(before);
+      const base=snapshot(),state=clone(base);
+      if(JSON.stringify(state.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
+      const owner=kind?state[kind]:state.config,visibleLayer=owner.active_layer??'Base';
+      owner.active_layer=clone(propertyLayer);
       apply(state,value);
-      const secondary=before.config.active_layer?.Overlay??before.config.active_layer?.SubplotOverlay?.[1];
-      if(!kind&&!(secondary!==undefined&&/^(axis|tick_labels)_right$/.test(target)))reconcilePairedAxisEdit({config:configOf(before)},{config:configOf(state)},target);
-      if(/^axis_(bottom|top|left|right)$/.test(target))for(const key of ['bottom_x','left_y'])syncTickSpacing(state,key);
-      install(state);commit();
+      owner.active_layer=visibleLayer;
+      install(state);commit(propertyDraft(base,snapshot()));
+    }
+    async function submitAxis(draft,automatic){
+      for(let attempt=0;attempt<2;attempt++){
+        const proposal=await enqueue(()=>{
+          const state=snapshot();
+          if(JSON.stringify(state.identity?.panels)!==propertyOwners)throw Error('stale edit: chart ownership changed; select the object again');
+          const axis=rebasePropertyDraft(draft,scopedConfig(state)[axisKey]);
+          if(!axis)throw Error('stale edit: the axis property changed; refresh and retry');
+          return {target,layer:propertyLayer,axis,automatic,revision};
+        },true);
+        const result=await requestReplay('axis_edit',proposal);
+        if(!result?.error?.startsWith('stale edit:')||attempt===1)return result;
+      }
+    }
+    function submitProperty(apply,value,field,base,onError=()=>{}){
+      const operation=controlQueue.then(async()=>{
+        await queue;await flush();
+        if(!axisKey)return enqueue(()=>applyProperty(apply,value),true);
+        const state=clone(local);state.config.active_layer=clone(propertyLayer);
+        const config=configOf(state);config[axisKey]=clone(base.axis);
+        apply?.(state,value);
+        const draft=propertyDraft(base.axis,config[axisKey]);
+        const automatic=field==='auto_ticks'?value:field==='major_spacing'?false:null;
+        const result=await submitAxis(draft,automatic);
+        if(result?.error)onError();
+        else if(result)base.axis=rebasePropertyDraft(draft,base.axis);
+      });
+      controlQueue=operation.catch(e=>{onError();fail(e);});
     }
     function field(label,value,type,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type=type;input.value=value;input.dataset.property=label;
-      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;enqueue(()=>{applyProperty(apply,value);});});row.append(input);fields.append(row);return input;
+      const base=axisEditBase(input);
+      input.addEventListener('change',()=>{const value=type==='number'?Number(input.value):input.value;trace('property.changed',{field:label,type});submitProperty(apply,value,label,base());});row.append(input);fields.append(row);return input;
     }
     function color(label,value,find){
       const hex='#'+['r','g','b'].map(k=>Math.round(value[k]*255).toString(16).padStart(2,'0')).join('');
@@ -633,27 +843,26 @@ export function render({model,el}) {
     }
     function choice(label,value,values,apply){
       const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('select');input.dataset.property=label;
-      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Decimal:'Decimal (123.45)',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
-      input.addEventListener('change',()=>{const next=input.value;enqueue(()=>{try{applyProperty(apply,next);}catch(e){input.value=value;throw e;}});});row.append(input);fields.append(row);
+      for(const v of values){const opt=document.createElement('option');opt.value=v;opt.textContent=label==='label_format'?({Auto:'Automatic',Decimal:'Decimal (123.45)',Plain:'Plain number',Scientific:'Scientific (1.23e2)',Power:'Power (1.23 × 10²)',Degrees:'Degrees (90°)',Radians:'Radians (π/2)',Percent:'Percent (25%)',Timestamp:'Timestamp'}[v]):label==='tick_direction'?(v==='None'?'Hidden':v==='Both'?'Both sides':v):v==='Logarithmic'?'Logarithmic (base 10)':v;input.append(opt);}input.value=value;
+      const base=axisEditBase(input);
+      input.addEventListener('change',()=>submitProperty(apply,input.value,label,base(),()=>{input.value=value;}));row.append(input);fields.append(row);
     }
-    function scaleControl(label,axis,find,dimension){
-      choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{
-        const a=find(s);
-        if(v==='Logarithmic'&&a.min<=0){const r=model.get('state').log_bounds[dimension];[a.min,a.max]=r;}
-        a.scale=v;a.major_spacing=v==='Logarithmic'?1:(a.max-a.min)/5;
-      });
+    function scaleControl(label,axis,find){
+      choice(label,axis.scale,['Linear','Logarithmic'],(s,v)=>{find(s).scale=v;});
       const note=document.createElement('p');note.textContent='Log view omits zero and negative values; source data is preserved.';fields.append(note);
     }
     function numberFormat(style,find){
-      const current=typeof style.format==='string'?style.format:'Timestamp';
-      choice('label_format',current,['Decimal','Scientific','Power','Degrees','Radians','Timestamp'],(s,v)=>{find(s).format=v==='Timestamp'?{Timestamp:{}}:v;});
-      if(current==='Timestamp')return;
+      const current=typeof style.format==='string'?style.format:Object.keys(style.format??{})[0]??'Decimal';
+      const structured=['Auto','Plain','Timestamp'];
+      choice('label_format',current,['Auto','Decimal','Plain','Scientific','Power','Degrees','Radians','Percent','Timestamp'],
+        (state,value)=>{find(state).format=structured.includes(value)?{[value]:{}}:value;});
+      if(current==='Timestamp'||current==='Plain')return;
       const digits=field('significant_digits',style.significant_digits,'number',(s,v)=>{
         if(!Number.isInteger(v)||v<1||v>15)throw Error('Significant digits must be an integer from 1 to 15');
         find(s).significant_digits=v;
       });digits.min='1';digits.max='15';digits.step='1';
     }
-    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;input.addEventListener('change',()=>enqueue(()=>{applyProperty(apply,input.checked);}));row.append(input);fields.append(row);}
+    function toggle(label,value,apply){const row=document.createElement('label');row.append(document.createTextNode(label==='visible'&&target.startsWith('axis_')&&!target.startsWith('axis_title_')?'Axis line':caption(label)));const input=document.createElement('input');input.type='checkbox';input.checked=value;input.dataset.property=label;const base=axisEditBase(input);input.addEventListener('change',()=>submitProperty(apply,input.checked,label,base()));row.append(input);fields.append(row);}
     function legendSeries(state){
       const cfg=activePanel(state),layer=state.config.active_layer,overlay=layer?.Overlay??layer?.SubplotOverlay?.[1];
       const index=layer?.Subplot??layer?.SubplotOverlay?.[0],children=state.config.subplots??[];
@@ -741,8 +950,8 @@ export function render({model,el}) {
         if(c.kind?.Donut)field('inner_radius',c.kind.Donut.inner_radius,'number',(s,v)=>s.radial.kind.Donut.inner_radius=v);
         const selectedSlice=/^slice_(\d+)_(\d+)$/.exec(target);
         const t=selectedSlice?{group:Number(selectedSlice[1]),index:Number(selectedSlice[2])}:c.interaction.selected;
-        if(t){const find=s=>t.group?s.radial.split.children[t.index]:s.radial.slices[t.index];const item=find(local);
-          field('label',item.label,'text',(s,v)=>find(s).label=v);field('value',item.value,'number',(s,v)=>find(s).value=v);field('explode',item.explode,'number',(s,v)=>find(s).explode=v);color('color',item.color,s=>find(s).color);
+        if(t){const find=s=>{let ring=s.radial.slices;if(ring.some(n=>n.children?.length)){for(let g=0;g<t.group;g++)ring=ring.flatMap(n=>n.children??[]);return ring[t.index];}return t.group?s.radial.split.children[t.index]:ring[t.index];};const item=find(local);
+          field('label',item.label,'text',(s,v)=>{find(s).label=v;delete find(s).text;});field('value',item.value,'number',(s,v)=>{find(s).value=v;const clear=nodes=>nodes.forEach(n=>{delete n.text;clear(n.children??[]);});clear(s.radial.slices);});field('explode',item.explode,'number',(s,v)=>find(s).explode=v);color('color',item.color,s=>find(s).color);
         }
       }else{
         for(const name of (kind==='radar'?[]:['category_title','value_title']))field(name,c[name],'text',(s,v)=>s[kind][name]=v);
@@ -785,13 +994,14 @@ export function render({model,el}) {
       richControls(find,inspectedTarget,textInput);}
       choice('align',rich.align??'Left',['Left','Center','Right'],(s,v)=>find(s).align=v);
     }else if(target.startsWith('axis_')){const key=side[target.slice(5)];
-      toggle('auto_ticks',tickAutomatic(local,key),(s,v)=>{tickMode(s,key,v);if(v)retick(configOf(s)[key]);});
-      scaleControl('axis_scale',cfg[key],s=>configOf(s)[key],key.endsWith('_x')?'x':'y');
+      const automatic=inspectedObject(inspectedTarget)?.fields.find(field=>field.id==='Layout and appearance/auto_ticks')?.value;
+      toggle('auto_ticks',automatic??true);
+      scaleControl('axis_scale',cfg[key],s=>configOf(s)[key]);
       toggle('tick_labels_visible',cfg[key].label_style.visible,(s,v)=>configOf(s)[key].label_style.visible=v);
       toggle('ticks_visible',cfg[key].tick!=='None',(s,v)=>configOf(s)[key].tick=v?'Outside':'None');
       choice('tick_direction',cfg[key].tick,['None','Outside','Inside','Both'],(s,v)=>configOf(s)[key].tick=v);
       numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);
-      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;if(name==='major_spacing')tickMode(s,key,false);else if(['min','max'].includes(name)&&tickAutomatic(s,key))retick(configOf(s)[key]);});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
+      for(const name of ['min','max','major_spacing','line_width'])field(name,cfg[key][name],'number',(s,v)=>{configOf(s)[key][name]=v;});color('color',cfg[key].line_color,s=>configOf(s)[key].line_color);
     }else if(target.startsWith('tick_labels_')){const key=side[target.slice(12)];field('label_font',cfg[key].label_style.label_font,'text',(s,v)=>configOf(s)[key].label_style.label_font=v);field('font_size',cfg[key].label_style.font_size,'number',(s,v)=>configOf(s)[key].label_style.font_size=v);color('color',cfg[key].label_style.color,s=>configOf(s)[key].label_style.color);numberFormat(cfg[key].label_style,s=>configOf(s)[key].label_style);}
     root.querySelector('[data-settings]').value=JSON.stringify(local,null,2);root.querySelector('[data-code]').value=code();
     }finally{
@@ -822,11 +1032,21 @@ export function render({model,el}) {
     let groupIndex=0;
     for(const [group,entries]of groups){
       const section=document.createElement('details');section.dataset.propertySection=group;
-      const sectionKey=JSON.stringify([object.id,group]),defaultOpen=primary&&groupIndex++<2;
+      const sectionKey=JSON.stringify([object.id,group]),defaultOpen=(primary&&groupIndex++<2)||['Figure size','Panel geometry','Plot area'].includes(group);
       section.open=propertySections.get(sectionKey)??defaultOpen;
       section.addEventListener('toggle',()=>propertySections.set(sectionKey,section.open));
       const heading=document.createElement('summary');heading.textContent=group;section.append(heading);
       for(const field of entries){
+        if(field.kind==='rectangle'){
+          const current=field.value.length?field.value:(kind?JSON.parse(chart.decorations()).find(d=>d.id==='data_area')?.rect:null);
+          if(!current)continue;
+          const inputs=[];
+          for(const [i,key]of ['x','y','width','height'].entries()){
+            const row=document.createElement('label');row.textContent=caption(key);const input=document.createElement('input');input.type='number';input.step='any';input.value=current[i];input.dataset.layoutComponent=key;inputs.push(input);
+            input.addEventListener('change',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:inputs.map(v=>Number(v.value)),base_value:field.value}));row.append(input);section.append(row);
+          }
+          continue;
+        }
         if(field.kind==='action'){
           const button=document.createElement('button');button.textContent=field.label;button.dataset.catalogField=field.id;
           button.addEventListener('click',()=>replayEdit('property',{object_id:object.id,property_id:field.id,value:true,base_value:field.value}));section.append(button);continue;
@@ -841,11 +1061,12 @@ export function render({model,el}) {
         if(field.kind==='choice')for(const value of field.choices_ref==='columns'?[...field.choices,...propertyColumns]:field.choices){const option=document.createElement('option');option.value=value;option.textContent=field.group==='Shared axes'&&value===''?'Independent':field.id.endsWith('/source')||field.id.startsWith('Figure grid/slot/')?value:caption(value);input.append(option);}
         if(field.kind==='boolean'){input.type='checkbox';input.checked=field.value;}
         else if(field.kind==='color'){input.type='color';input.value='#'+['r','g','b'].map(k=>Math.round(field.value[k]*255).toString(16).padStart(2,'0')).join('');}
-        else{if(input.tagName==='INPUT')input.type=field.kind==='number'?'number':'text';input.value=field.kind==='numbers'?field.value.join(', '):field.value;if(field.kind==='number')input.step=field.integer?'1':'any';}
+        else{if(input.tagName==='INPUT')input.type=field.kind==='number'?'number':'text';input.value=field.kind==='json'?JSON.stringify(field.value):field.kind==='numbers'?field.value.join(', '):field.value;if(field.kind==='number')input.step=field.integer?'1':'any';}
         function submit(){try{
           let value=field.kind==='boolean'?input.checked:field.kind==='number'?Number(input.value):field.kind==='numbers'?input.value.split(/[,;\s]+/).filter(Boolean).map(Number):input.value;
           if(field.kind==='color')value={...base,...Object.fromEntries(['r','g','b'].map((k,i)=>[k,parseInt(input.value.slice(1+i*2,3+i*2),16)/255]))};
-          if((typeof value==='number'&&!Number.isFinite(value))||(Array.isArray(value)&&value.some(v=>!Number.isFinite(v))))throw Error('Enter finite numbers');
+          if(field.kind==='json')value=JSON.parse(input.value);
+          if((typeof value==='number'&&!Number.isFinite(value))||(field.kind==='numbers'&&value.some(v=>!Number.isFinite(v))))throw Error('Enter finite numbers');
           replayEdit('property',{object_id:object.id,property_id:field.id,value,base_value:()=>base}).then(result=>{if(result?.ok&&result.value!==undefined)base=clone(result.value);});
         }catch(e){fail(e);}}
         if(field.kind==='choice'){input.title=input.value;input.addEventListener('change',()=>input.title=input.value);}
@@ -868,6 +1089,7 @@ export function render({model,el}) {
   function resize(){if(!chart || disposed)return;const [width,height]=displaySize();if(!resizeQueued&&(canvas.width!==width||canvas.height!==height)){resizeQueued=true;enqueue(()=>{try{return resizeSurface();}finally{resizeQueued=false;}});}}
   function recordFrame(){syncPanelFocus();if(kind)local=snapshot();else{const r=bounds();/* Selection rectangles include the model's 2px handle padding. */wheelArea=[r[0]+2,r[1]+2,r[2]-4,r[3]-4];}dirty=false;stats.surface_frames++;}
   async function readyDisplayedFrame(){
+    await formatPendingLabels();
     if(disposed)throw Error('Widget disposed');
     resizeSurface();
     do{trace('ready_frame.started');await chart.first_frame_ready();trace('ready_frame.completed');if(disposed)throw Error('Widget disposed');recordFrame();}while(resizeSurface());
@@ -889,9 +1111,10 @@ export function render({model,el}) {
     // only when the scale changes.
     const nextPixelRatio=devicePixelRatio||1;
     if(nextPixelRatio!==pixelRatio){pixelRatio=nextPixelRatio;resize();positionInline();}
-    if(kind&&chart&&!busy&&!pendingFrame&&!frameError){const decoration=hoverPoint?chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;}
-    if(chart&&dirty&&!busy&&!pendingFrame&&!frameError)enqueue(()=>{
-      if(!dirty||pendingFrame||frameError)return;
+    if(kind&&chart&&!busy&&!pendingFrame&&!frameError)enqueue(async()=>{const decoration=hoverPoint?await chart.hit_decoration(...hoverPoint,root.querySelector('[data-area]').checked):null;const p=decoration||pointer?null:hoverPoint;if(await chart.hover(p?.[0],p?.[1],Math.min((now-lastFrame)/1000,0.1)))dirty=true;lastFrame=now;});
+    if(chart&&!busy&&!pendingFrame&&!frameError&&(dirty||(!kind&&!chart.frame_complete())))enqueue(async()=>{
+      await formatPendingLabels();
+      if((!dirty&&(kind||chart.frame_complete()))||pendingFrame||frameError)return;
       try{
         chart.frame();
         trace('display.submitted');
@@ -909,22 +1132,61 @@ export function render({model,el}) {
     });
     raf=requestAnimationFrame(frame);
   }
-  async function exporting(scale=1){trace('export.flush_started',{scale});await controlQueue;await flush();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const data=bytes(await chart.export_png(scale));trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
+  let pdfLibrary=null;
+  async function physicalExport(data,format){
+    const dpi=model.get('state').dpi??96,factor=96/dpi;
+    if(format==='png'||factor===1)return data;
+    if(format==='svg'){
+      const text=new TextDecoder().decode(data),doc=new DOMParser().parseFromString(text,'image/svg+xml');
+      if(doc.querySelector('parsererror'))throw new Error('Invalid SVG export');
+      for(const key of ['width','height']){
+        const value=doc.documentElement.getAttribute(key);
+        if(!value?.endsWith('pt'))throw new Error('SVG export has no physical page size');
+        doc.documentElement.setAttribute(key,`${parseFloat(value)*factor}pt`);
+      }
+      return new TextEncoder().encode(new XMLSerializer().serializeToString(doc));
+    }
+    if(!pdfLibrary){
+      const url=URL.createObjectURL(new Blob([model.get('pdf_js')],{type:'text/javascript'}));
+      pdfLibrary=import(url).finally(()=>URL.revokeObjectURL(url));
+    }
+    const {PDFDocument}=await pdfLibrary,doc=await PDFDocument.load(data,{updateMetadata:false});
+    for(const page of doc.getPages())page.scale(factor,factor);
+    return await doc.save({useObjectStreams:false,addDefaultPage:false});
+  }
+  async function exporting(scale=1,format='png'){trace('export.flush_started',{scale});await flushControls();trace('export.flush_completed');return enqueue(async()=>{cancelChooser();await waitForFrame();stats.png_exports++;trace('export.render_started',{scale});const raw=format==='svg'?new TextEncoder().encode(await chart.export_svg(scale)):format==='pdf'?await chart.export_pdf(scale):await chart.export_png(scale);const data=await physicalExport(bytes(raw),format);trace('export.render_completed',{bytes:data.byteLength});return data;},true);}
   const download=data=>{const url=URL.createObjectURL(new Blob([data],{type:'image/png'})),a=document.createElement('a');a.href=url;a.download='figure.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-  function onState(){enqueue(()=>{const state=model.get('state');propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
-    revision=state.revision;pending=null;
+  function onState(){enqueue(()=>{const state=model.get('state');trace('state.received',{incoming_revision:state.revision});propertyColumns=clone(state.property_columns??propertyColumns);propertyCatalog=clone(state.property_catalog??propertyCatalog);editHistory=state.edit_history??{};historyControls();outlineNodes=clone(state.outline??outlineNodes);boundedView=clone(state.bounded_view??boundedView);exportedCode=state.code ?? exportedCode;if(state.revision>revision && !inflight){
+    revision=state.revision;pending=null;pendingDraft=null;
     if(!chart){local=clone(state.settings);return;}
     try {install(state.settings);properties();}
     catch(e){fail(e);model.send({action:'rejected',revision,settings:snapshot(),error:String(e)});}
-  }});}
+  }});scheduleRadiusFit();}
   function onMessage(message){
     if(message.client && message.client!==client)return;
     if(message.action==='ack')enqueue(()=>{
-      if(message.sequence!==inflight?.sequence)return;
-      outlineNodes=clone(message.state.outline??outlineNodes);boundedView=clone(message.state.bounded_view??boundedView);const latest=pending;inflight=null;revision=message.state.revision;exportedCode=message.state.code ?? exportedCode;
-      if(message.error){pending=null;install(message.state.settings);fail(message.error);}
-      else if(latest){pending=latest;install(latest);post();}else{install(message.state.settings);}
-      propertyColumns=clone(message.state.property_columns??propertyColumns);propertyCatalog=clone(message.state.property_catalog??propertyCatalog);editHistory=message.state.edit_history??{};historyControls();properties();idle();
+      trace('edit.ack',{sequence:message.sequence,incoming_revision:message.state.revision,error:message.error,has_pending:!!pending});if(message.sequence!==inflight?.sequence)return;
+      // A queued full-document edit keeps its original base and stale guard.
+      // Deferred form drafts have no snapshot to rebase; use the newest accepted head.
+      const current=model.get('state'),accepted=(message.error||!pending)&&current.revision>message.state.revision?current:message.state;
+      outlineNodes=clone(accepted.outline??outlineNodes);boundedView=clone(accepted.bounded_view??boundedView);const latest=pending,draft=inflight.draft;inflight=null;revision=accepted.revision;exportedCode=accepted.code ?? exportedCode;
+      let retryError=null;
+      if(message.error?.startsWith('stale edit:')&&draft&&draft.attempts<1&&!latest){
+        const rebased=rebasePropertyDraft(draft,accepted.settings);
+        if(rebased){
+          try{install(rebased);pending=snapshot();pendingDraft={...propertyDraft(accepted.settings,pending),attempts:draft.attempts+1};trace('property.retry',{sequence:message.sequence,revision});post();properties();return;}
+          catch(e){retryError=e;}
+        }
+      }
+      if(message.error){
+        pending=null;pendingDraft=null;install(accepted.settings);
+        if(!draft?.radiusFit||!message.error.startsWith('stale edit:')){
+          if(draft?.radiusFit)radiusFitError={request:draft.radiusFit,error:message.error};
+          fail(retryError??message.error);
+        }
+      }
+      else if(latest){pending=latest;install(latest);post();}else{install(accepted.settings);}
+      propertyColumns=clone(accepted.property_columns??propertyColumns);propertyCatalog=clone(accepted.property_catalog??propertyCatalog);editHistory=accepted.edit_history??{};historyControls();properties();idle();
     });
     else if(message.action==='history_result')enqueue(()=>{
       try{
@@ -947,30 +1209,104 @@ export function render({model,el}) {
     else if(message.action==='barrier' || message.action==='export' || message.action==='prepare'){
       const request={requestId:message.id,action:message.action};trace('request.received',request);
       // Do not block the serialized queue while waiting for an ack processed by it.
-      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await controlQueue;await queue;trace('request.queue_drained',request);await flush();trace('request.edits_acknowledged',request);let result=null;
+      (async()=>{const requestedAt=performance.now();try{if(message.action==='prepare')startInit();await initialized;trace('request.initialized',request);await flushControls();trace('request.queue_drained',request);await enqueue(formatPendingLabels,true);await flush();trace('request.edits_acknowledged',request);let result=null;
         if(message.action==='prepare')result=await enqueue(async()=>{
-          const start=performance.now(),stages=[];status.textContent='Preparing…';trace('prepare.started',request);
-          try{await waitForFrame();if(kind){await readyDisplayedFrame();stages.push({scope:kind,stage:"first-frame",phase:"Ready"});}else{await chart.prewarm_all_with_progress(event=>{stages.push(event);trace('prepare.prewarm',{...request,event});status.textContent="Preparing…";});await readyDisplayedFrame();}status.textContent='Ready';trace('prepare.completed',request);
-            return {backend:'webgpu',ready:true,elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
+          const start=performance.now(),stages=[];let prewarmWarning=null;
+          status.textContent='Preparing…';trace('prepare.started',request);
+          try{
+            await waitForFrame();
+            if(!kind){
+              try{
+                await chart.prewarm_all_with_progress(event=>{stages.push(event);trace('prepare.prewarm',{...request,event});});
+              }catch(e){
+                const reason=String(e);
+                // The pinned engine can lack a contract for an unused shader.
+                // Still require successful rendering of the displayed document.
+                if(!/Missing checked (render|compute) prewarm contract for shader [0-9a-f]+/.test(reason))throw e;
+                prewarmWarning=reason;
+                trace('prepare.prewarm_incomplete',{...request,reason});
+              }
+            }
+            await readyDisplayedFrame();
+            stages.push({scope:kind??'cartesian',stage:'first-frame',phase:'Ready'});
+            status.textContent='Ready';trace('prepare.completed',request);
+            return {backend:'webgpu',ready:true,prewarm_complete:prewarmWarning===null,prewarm_warning:prewarmWarning,
+              elapsed_ms:performance.now()-requestedAt,prewarm_ms:performance.now()-start,stages,persistent_cache_supported:false};
           }catch(e){status.textContent='WebGPU failed';throw e;}
         },true);
-        const data=message.action==='export'?await exporting(message.scale):null;trace('response.send_started',request);model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);trace('response.sent',{...request,elapsed_ms:performance.now()-requestedAt});}catch(e){trace('request.failed',{...request,error:String(e)});model.send({action:'result',id:message.id,error:String(e)});}})();
+        // sync() acknowledges accepted edits; GPU presentation belongs to prepare/export.
+        // Awaiting its fence here deadlocks an editor while a slow frame is held.
+        const data=message.action==='export'?await exporting(message.scale,message.format??'png'):null;trace('response.send_started',request);model.send({action:'stats',info:stats});model.send({action:'result',id:message.id,result},{},data?[data]:[]);trace('response.sent',{...request,elapsed_ms:performance.now()-requestedAt});}catch(e){trace('request.failed',{...request,error:String(e)});model.send({action:'result',id:message.id,error:String(e)});}})();
     }
   }
   model.on('change:state',onState);model.on('msg:custom',onMessage);
+  model.on('change:radius_fit_request',scheduleRadiusFit);scheduleRadiusFit();
   // Present the chosen inspector immediately without borrowing the renderer.
   // Apply interaction selection in event order so older keys/picks keep their
   // original target and cannot overwrite a newer pending inspector choice.
   root.querySelector('[data-copy]').addEventListener('click',async()=>{try{await controlQueue;await queue;await flush();await enqueue(async()=>{const value=code();root.querySelector('[data-code]').value=value;root.querySelector('[data-code-panel]').open=true;try{await navigator.clipboard.writeText(value);}catch{root.querySelector('[data-code]').select();}},true);}catch(e){fail(e);}});
-  root.querySelector('[data-save]').addEventListener('click',()=>{exporting().then(download).catch(fail);});
-  root.querySelector('[data-fit]').addEventListener('click',async()=>{
-    if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>Object.values(s.render_type)[0].line?.fill))){
-      try{await queue;await flush();model.send({action:'fit',revision});}catch(e){fail(e);}return;
+  root.querySelector('[data-save]').addEventListener('click',()=>{const format=exportFormat.value;exporting(1,format).then(data=>{const url=URL.createObjectURL(new Blob([data],{type:{png:'image/png',svg:'image/svg+xml',pdf:'application/pdf'}[format]}));const a=document.createElement('a');a.href=url;a.download='figure.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}).catch(fail);});
+  function needsRadiusLabels(){
+    if(kind)return false;
+    const subplots=local.config.subplots??[];
+    return local.series.some(spec=>{
+      if(!spec.render_type.CategoryBars)return false;
+      const panel=subplots.find(v=>v.series?.includes(spec.series_id))?.config??local.config;
+      const polar=panel.polar;
+      return polar&&(polar.radial_label_angle_degrees==null||polar.radius_labels_skipped==null);
+    });
+  }
+  async function flushControls(){
+    // A kernel layout command can schedule a radius fit while its ack is pending.
+    let controls;
+    do{
+      controls=controlQueue;
+      await controls;await queue;await flush();
+    }while(controls!==controlQueue);
+    if(radiusFitError&&radiusFitError.request===model.get('radius_fit_request'))throw Error(radiusFitError.error);
+  }
+  function scheduleRadiusFit(){
+    const request=model.get('radius_fit_request'),base=model.get('state').revision;
+    const key=`${request}:${base}`;
+    if(!request||scheduledRadiusFit===key)return;
+    scheduledRadiusFit=key;
+    const stillCurrent=()=>request===model.get('radius_fit_request')&&base===model.get('state').revision;
+    const operation=controlQueue.then(async()=>{
+      await initialized;await queue;await flush();
+      await enqueue(async()=>{
+        if(!stillCurrent()||revision!==base)return;
+        const owners=model.get('radius_fit_panels');
+        const cells=local.identity.panels.flatMap((panel,index)=>owners.includes(panel.id)?[index]:[]);
+        if(cells.length&&needsRadiusLabels()){
+          const before=chart.get_config();
+          await chart.fit_host_radial_labels(JSON.stringify(cells));
+          if(!stillCurrent()){chart.set_config(before);return;}
+          dirty=true;
+        }
+        // Acknowledge even if the data draws no wedges and the fit has no choice.
+        commit({radiusFit:request});
+      },true);
+      await flush();
+    });
+    controlQueue=operation.catch(error=>{radiusFitError={request,error:String(error)};fail(error);});
+  }
+  root.querySelector('[data-fit]').addEventListener('click',()=>{
+    if(!kind&&(local.config.subplots?.length||local.config.overlays?.length||local.series.some(s=>s.render_type.RangeLinks||s.render_type.EnergyLevels||Object.values(s.render_type)[0].line?.fill))){
+      replayEdit('fit');return;
     }
-    enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
+    enqueue(async()=>{if(kind){const s=snapshot();s[kind].decorations.data_area=null;if(kind==='boxplot'||kind==='radar')s[kind].value_range=null;install(s);}
+      else if(needsRadiusLabels()){chart.set_config(chart.fit_config(chart.get_config(),0.05));await chart.fit_host_radial_labels();}
+      else if(local.series.some(s=>s.render_type.BoxPlot||s.render_type.CategoryBars||s.render_type.RangeBars||s.render_type.Radar))chart.fit_ranges();else await chart.auto_fit_all(local.series.length&&local.series.every(s=>s.render_type.Heatmap||s.render_type.Contour||s.render_type.HeatmapContour)?0:0.05);
       dirty=true;commit();});
   });
-  root.querySelector('[data-apply]').addEventListener('click',()=>enqueue(()=>{install(JSON.parse(root.querySelector('[data-settings]').value));commit();}));
+  root.querySelector('[data-apply]').addEventListener('click',()=>{
+    try{
+      const settings=JSON.parse(calendarOriginWire(root.querySelector('[data-settings]').value,true));
+      if(settings.series?.some(spec=>spec.render_type?.RangeLinks?.links?.some(row=>owns(row,'exit_offset')))){
+        replayEdit('settings',{settings});
+      }else enqueue(()=>{install(settings);commit();});
+    }catch(error){fail(error);}
+  });
   root.querySelector('[data-properties]').addEventListener('click',()=>showProperties(root.querySelector('.figgy-properties').hidden));
   root.querySelector('[data-close-properties]').addEventListener('click',()=>showProperties(false));
   root.querySelector('[data-select]').addEventListener('click',()=>{cancelDrawing();layoutMode(false);});
@@ -1014,19 +1350,23 @@ export function render({model,el}) {
   root.querySelector('[data-style]').addEventListener('click',()=>enqueue(()=>openMenu('style')));
   root.querySelector('[data-visibility]').addEventListener('click',()=>enqueue(()=>openMenu('visibility')));
   root.addEventListener('pointerdown',e=>{if(!menu.contains(e.target)&&!e.target.closest('[data-style],[data-visibility]'))menu.hidden=true;});
+  const toolbar=root.querySelector('.figgy-toolbar');
+  const themeSelect=document.createElement('select');themeSelect.dataset.theme='';themeSelect.title='Theme';themeSelect.setAttribute('aria-label','Theme');
+  themeSelect.innerHTML='<option value="">Theme…</option>'+['gallery','cool-slate','midnight','warm-paper'].map(n=>`<option value="${n}">${n}</option>`).join('');toolbar.append(themeSelect);
+  themeSelect.addEventListener('change',()=>{const name=themeSelect.value;if(name)enqueue(()=>{chart.apply_theme(name);local.background=kind?JSON.parse(chart.get_document()).background:(JSON.parse(chart.get_config()).background??null);if(!kind)clearColor(local.background);dirty=true;commit();});});
+  const autoLayout=document.createElement('button');autoLayout.dataset.autoLayout='';autoLayout.textContent='Auto layout';toolbar.append(autoLayout);
+  autoLayout.addEventListener('click',()=>{
+    if(!kind&&local.series.some(s=>s.render_type.RangeLinks)){replayEdit('layout');return;}
+    enqueue(async()=>{if(kind){const doc=JSON.parse(chart.get_document());doc.decorations.data_area=null;chart.set_document(JSON.stringify(doc),local.config.chart_area.width,local.config.chart_area.height);}else{chart.fit_layout();if(needsRadiusLabels())await chart.fit_host_radial_labels();}dirty=true;commit();});
+  });
+  const exportFormat=document.createElement('select');exportFormat.dataset.exportFormat='';exportFormat.setAttribute('aria-label','Export format');exportFormat.innerHTML=['png','svg','pdf'].map(n=>`<option value="${n}">${n.toUpperCase()}</option>`).join('');toolbar.append(exportFormat);
   const localPoint=e=>{const [x,y]=position(e);return kind?[x*local.config.chart_area.width/canvas.width,y*local.config.chart_area.height/canvas.height]:[x,y];};
   function bounds(){const value=JSON.parse(chart.decoration_bounds(elementName('data_area')));return value?.rect??[0,0,canvas.width,canvas.height];}
-  function navigate(a,factor,anchor,shift=0){
-    const log=a.scale==='Logarithmic';let lo=log?Math.log10(a.min):a.min,hi=log?Math.log10(a.max):a.max;
-    const span=hi-lo;if(a.inverted){anchor=1-anchor;shift=-shift;}const pivot=lo+span*anchor;
-    const low=pivot+(lo-pivot)*factor+shift*span,high=pivot+(hi-pivot)*factor+shift*span;
-    a.min=log?10**low:low;a.max=log?10**high:high;
-  }
   function selectPanelAt(point){
     const panels=panelsAt(point);if(focusIndex()===null&&panels.length>1){openChooser(panels.map(panelChoice),point);return;}
     const at=panelAt(point);selected=null;chart.on_press(-100,-100);chart.on_release();chart.set_picked_data('null');
     if(at!==null)setPointerLayer(baseLayer(at));
-    local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;dirty=true;commit();
+    local=snapshot();focusedPanel=at===null?null:panelId(at);observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;if(at!==null&&root.querySelector('[data-area]').checked){selected=elementName('data_area');inspectorTarget=selected;showProperties();}dirty=true;commit();
   }
   canvas.addEventListener('pointerdown',e=>{if(!chart||e.button!==0)return;inspectorOwner=null;if(inlineText){finishInline(true);canvas.focus({preventScroll:true});return;}e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const point=localPoint(e),pointSize=[canvas.width,canvas.height];
     if(drawingTool!=='select'){
@@ -1036,7 +1376,7 @@ export function render({model,el}) {
     }
     pointer={point,origin:point,moved:false,pan:false,target:null,handle:null};const gesture=pointer;inputAt=performance.now();enqueue(async()=>{
     await geometryFrame();
-    if(!kind){point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];gesture.size=[canvas.width,canvas.height];}
+    if(!kind){chart.set_snap_modifier(e.altKey);point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];gesture.size=[canvas.width,canvas.height];}
     const [x,y]=point;
     if(hasPanels()&&(panelAt(point)!==focusIndex()||focusIndex()===null)){
       gesture.focusOnly=true;selectPanelAt(point);return;
@@ -1044,16 +1384,16 @@ export function render({model,el}) {
     if(kind){
       if(await textAnnotationAt(point))chart.set_active_layer(JSON.stringify('Annotations'));
       gesture.handle=selected?chart.resize_handle(selected,x,y):null;
-      gesture.target=gesture.handle?selected:chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
+      gesture.target=gesture.handle?selected:await chart.hit_decoration(x,y,root.querySelector('[data-area]').checked);
       selected=gesture.target;
-      if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
+      if(selected)chart.select_decoration(selected);else{const hit=JSON.parse(await chart.pick(x,y,true));selected=hit?(kind==='radial'?`slice_${hit.group}_${hit.index}`:hit.series_id):null;}
     }else{
       // Keep existing resize handles before probing other axis owners.
       if(selectedHandleAt(point)){chart.on_press(x,y);dirty=true;return;}
       const index=panelIndex(local.config.active_layer);
       const annotations=local.config.annotations;
       let annotation=null;
-      if(index===0&&annotations?.visible!==false&&annotations?.items?.length){await annotationGeometry();const at=chart.hit_annotation(x,y);if(at!==undefined&&at!==null)annotation=at;}
+      if(annotations?.visible!==false&&annotations?.items?.length){await annotationGeometry();const at=chart.hit_annotation(x,y);if(at!==undefined&&at!==null)annotation=at;}
       const hits=annotation===null?decorationsAt(point,index):[{layer:'Annotations',target:`annotation_${annotation}`}];
       const probeState=snapshot();probeState.config.active_layer=baseLayer(index);
       const original=JSON.parse(chart.active_layer());chart.set_active_layer(JSON.stringify(baseLayer(index)));
@@ -1062,12 +1402,24 @@ export function render({model,el}) {
       gesture.pan=annotation===null&&hits.every(h=>h.target.endsWith('data_area'))&&inside&&!root.querySelector('[data-area]').checked;
       stats.last_pointer_hit=hits[0]?.target??null;stats.last_pointer_pan=gesture.pan;
       if(gesture.pan){
+        const previousPick=JSON.parse(chart.get_config()).picked_data?.refs?.[0];
         chart.on_press(-100,-100);chart.on_release();const picks=await pickPanelCandidates(point,index);
         if(picks.length>1){gesture.choices=picks.map(dataChoice);return;}
-        const picked=picks[0],old=JSON.parse(chart.get_config()).picked_data?.refs?.[0],same=picked&&JSON.stringify(picked.ref)===JSON.stringify(old);
+        const picked=picks[0],old=previousPick;
+        const rangeLink=picked?.ref.kind==='histogram_bin'&&local.series.some(s=>s.series_id===picked.ref.series_id&&s.render_type.RangeLinks);
+        const same=picked&&!rangeLink&&!picked.ref.kind.startsWith('feynman_')&&picked.ref.kind!=='value_label'&&equalValue({...picked.ref,source_id:picked.ref.source_id??null},{...old,source_id:old?.source_id??null});
         if(picked)setPointerLayer(picked.layer);
         selected=same?null:picked?.ref.series_id??null;
         chart.set_picked_data(JSON.stringify(!same&&picked?{refs:[picked.ref]}:null));
+        if(picked?.ref.kind.startsWith('feynman_')){
+          const ref=picked.ref;
+          gesture.diagram=chart.press_feynman(ref.series_id,ref.kind,ref.vertex_index??ref.propagator_index??ref.index,ref.part);
+        }else if(rangeLink){
+          gesture.diagram=chart.press_range_link(picked.ref.series_id,picked.ref.bin_index,picked.extent);
+        }else if(picked?.ref.kind==='value_label'){
+          const ref=picked.ref;
+          gesture.diagram=ref.part?chart.press_energy_label(ref.series_id,ref.part,ref.category_index):chart.press_value_label(`series:${ref.series_id}:label:${ref.category_index}`);
+        }
       }else if(hits.length>1){gesture.choices=hits.map(elementChoice);return;}
       else{
         const hit=hits[0];chart.set_picked_data('null');if(hit)setPointerLayer(hit.layer);
@@ -1082,15 +1434,33 @@ export function render({model,el}) {
     const distance=Math.hypot(next[0]-gesture.origin[0],next[1]-gesture.origin[1]);if(distance>=3)gesture.moved=true;
     const old=gesture.point;if(gesture.moved||(!kind&&!gesture.pan))gesture.point=next;
     if(kind){if(gesture.target&&gesture.moved&&(next[0]!==old[0]||next[1]!==old[1]))chart.drag(gesture.target,next[0]-old[0],next[1]-old[1],gesture.handle??undefined);}
-    else if(gesture.pan){if(gesture.moved){stats.pan_updates=(stats.pan_updates??0)+1;const s=snapshot(),r=bounds();delete s.config.picked_data;selected=null;navigateDocumentAxis(s,'x',1,.5,-(next[0]-old[0])/r[2]);navigateDocumentAxis(s,'y',1,.5,(next[1]-old[1])/r[3]);install(s);}}
-    else if(!gesture.choices)chart.on_move(next[0]-old[0],next[1]-old[1]);dirty=true;
+    else if(gesture.diagram){if(gesture.moved)chart.on_move(next[0]-old[0],next[1]-old[1]);}
+    else if(gesture.pan){
+      if(gesture.moved){
+        const dx=next[0]-old[0],dy=next[1]-old[1],r=bounds();
+        selected=null;
+        if(!activePanel(local).view_3d)stats.pan_updates=(stats.pan_updates??0)+1;
+        if(!gesture.panningStarted){
+          chart.set_picked_data('null');
+          gesture.panningStarted=true;
+        }
+        chart.pan_host_view(JSON.stringify(local.identity??null),dx,dy,r[2],r[3]);
+      }
+    }
+    else if(!gesture.choices){chart.set_snap_modifier(e.altKey);chart.on_move(next[0]-old[0],next[1]-old[1]);}dirty=true;
   });});
-  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(gesture.focusOnly)return;if(!kind)chart.on_release();if(gesture.choices&&!gesture.moved&&e.type!=='pointercancel'){openChooser(gesture.choices,gesture.origin);return;}if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
+  function release(e){if(drawingGesture){const g=drawingGesture;if(e.type==='pointercancel'){cancelDrawing();return;}g.end=localPoint(e);g.released=true;enqueue(()=>finishDrawing(g));return;}if(!pointer)return;const gesture=pointer;pointer=null;enqueue(()=>{if(gesture.focusOnly)return;if(!kind){chart.on_release();dirty=true;}if(gesture.choices&&!gesture.moved&&e.type!=='pointercancel'){openChooser(gesture.choices,gesture.origin);return;}if(selected&&!gesture.moved&&!selectedAnnotation()?.kind.Text)showProperties();commit();});}
   root.querySelector('.figgy-stage').addEventListener('pointerdown',e=>{if(e.target===e.currentTarget&&hasPanels())enqueue(()=>selectPanelAt([-100,-100]));});
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('pointerleave',()=>{hoverPoint=null;});
+  function snapModifier(e){
+    if(chart&&!kind&&pointer&&e.key==='Alt')enqueue(()=>{chart.set_snap_modifier(e.altKey);dirty=true;});
+  }
+  canvas.addEventListener('keydown',snapModifier);
+  canvas.addEventListener('keyup',snapModifier);
   canvas.addEventListener('wheel',e=>{
     if(chooser){e.preventDefault();return;}
     if(inlineText){e.preventDefault();return;}
+    if(chart&&(kind==='radar'||(!kind&&configOf(snapshot()).polar)))return;
     if(chart&&kind&&boundedView){
       const horizontal=boundedView.axis==='x';if(horizontal?e.shiftKey&&!e.ctrlKey:e.ctrlKey&&!e.shiftKey)return;
       e.preventDefault();const point=localPoint(e),delta=e.deltaY||e.deltaX;
@@ -1105,16 +1475,17 @@ export function render({model,el}) {
     }
     if(!chart||kind||!wheelArea||(hasPanels()&&focusIndex()===null))return;const point=position(e),a=wheelArea;if(point[0]<a[0]||point[0]>=a[0]+a[2]||point[1]<a[1]||point[1]>=a[1]+a[3])return;e.preventDefault();inputAt=performance.now();const ctrl=e.ctrlKey,shift=e.shiftKey,delta=e.deltaY||e.deltaX,pointSize=[canvas.width,canvas.height];enqueue(()=>{
     point[0]*=canvas.width/pointSize[0];point[1]*=canvas.height/pointSize[1];
-    const s=snapshot(),r=bounds(),factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
-    if(!shift||ctrl)navigateDocumentAxis(s,'x',factor,x);
-    if(!ctrl||shift)navigateDocumentAxis(s,'y',factor,y);
-    install(s);commit();
+    const factor=Math.exp(Math.max(-12,Math.min(12,delta/(e.deltaMode===1?1:40)))*.1);
+    const r=bounds(),x=Math.max(0,Math.min(1,(point[0]-r[0])/r[2])),y=1-Math.max(0,Math.min(1,(point[1]-r[1])/r[3]));
+    if(chart.zoom_host_view(JSON.stringify(local.identity??null),factor,x,y,!shift||ctrl,!ctrl||shift)){
+      dirty=true;commit();
+    }
   });},{passive:false});
   canvas.addEventListener('keydown',e=>{if(!chart)return;if(e.key==='F11'){e.preventDefault();fullscreen().catch(fail);return;}if(drawingTool!=='select')return;if((e.key==='Delete'||e.key==='Backspace')&&selected&&(selected.startsWith('annotation:')||/^annotation_\d+$/.test(selected))){e.preventDefault();enqueue(()=>{const s=snapshot(),owner=kind?s[kind]:s.config,index=kind?Number(selected.slice(11)):owner.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)owner.annotations.items.splice(index,1);if(kind)owner.decorations.selected=null;selected=null;install(s);commit();});return;}if(e.key!=='Escape'&&!e.key.startsWith('Arrow'))return;e.preventDefault();const step=e.shiftKey?10:1;enqueue(()=>{
     if(e.key==='Escape'){selected=null;focusedPanel=null;observedLayer=clone(local.config.active_layer??'Base');wheelArea=null;if(kind)chart.clear_selection();else{chart.set_picked_data('null');chart.on_press(-100,-100);chart.on_release();}}
     else{const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0,dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
       if(kind){if(selected&&!selected.startsWith('slice_')&&!local[kind].series?.some(s=>s.id===selected))chart.drag(selected,dx,dy,undefined);else if(dx!==0)chart.step_selection(dx<0);}
-      else{const cfg=JSON.parse(chart.get_config());if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected?.startsWith('annotation:')){const index=local.config.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)chart.drag_annotation(index,dx,dy,undefined);}else if(selected){const b=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));if(b){chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx,dy);chart.on_release();}}}
+      else{const cfg=JSON.parse(chart.get_config()),scale=panelRect(0)[2]/local.config.chart_area.width;if(cfg.picked_data)chart.step_selection(cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.bottom_x.inverted?-dx:dx,cfg.picked_data.refs[0]?.kind==='matrix_cell'&&cfg.left_y.inverted?dy:-dy);else if(selected?.startsWith('annotation:')){const index=local.config.annotations.items.findIndex(v=>'annotation:'+v.id===selected);if(index>=0)chart.drag_annotation(index,dx*scale,dy*scale,undefined);}else if(selected){const b=JSON.parse(chart.decoration_bounds(rendererTarget(selected)));if(b){chart.set_snap_modifier(true);try{chart.on_press(b.rect[0]+b.rect[2]/2,b.rect[1]+b.rect[3]/2);chart.on_move(dx*scale,dy*scale);chart.on_release();}finally{chart.set_snap_modifier(false);}}}}
     }dirty=true;commit();
   });});
   layoutMode(false);
@@ -1133,30 +1504,31 @@ export function render({model,el}) {
     canvas.style.aspectRatio=`${canvas.width}/${canvas.height}`;
     chart=kind?await module.FiggyBoundedChart.create(canvas,kind,JSON.stringify(local[kind]),local.config.chart_area.width,local.config.chart_area.height):await module.FiggyChart.create(canvas);if(!kind)chart.set_pool_auto_growth(true);
     if(!kind){
-      const getConfig=chart.get_config.bind(chart),setConfig=chart.set_config.bind(chart);
-      let projectedColorbar=false;
-      chart.set_config=json=>{
-        const config=JSON.parse(json);let projected=false;
-        if(!config.colorbar){const bar=config.subplots?.find(p=>p.config.colorbar)?.config.colorbar;if(bar){config.colorbar={...clone(bar),visible:false};projected=true;}}
-        setConfig(JSON.stringify(config));projectedColorbar=projected;
-      };
-      chart.get_config=()=>{const config=JSON.parse(getConfig());if(projectedColorbar)delete config.colorbar;return JSON.stringify(config);};
+      const getConfig=chart.get_config.bind(chart),setConfig=chart.set_config.bind(chart),setState=chart.set_host_state.bind(chart);
+      chart.get_config=()=>calendarOriginWire(getConfig(),true);
+      chart.set_config=config=>setConfig(calendarOriginWire(config,false));
+      chart.set_host_state=(config,series)=>setState(calendarOriginWire(config,false),series);
     }
-
     if(disposed)return;
     const manifest=model.get('manifest'),buffers=model.get('columns');
     if(manifest.length!==buffers.length)throw Error('Transfer snapshots were released. Recreate the Figure, or use retain_notebook_data=True before display.');
+    const composites=new Map();
     for(let i=0;i<manifest.length;i++){
       const spec=manifest[i],data=bytes(buffers[i]);
       // wasm-bindgen copies this input into WASM memory; upload creates GPU storage.
       const aligned=data.byteOffset%8===0?data:data.slice();
-      if(spec.dtype==='float32')chart.register_column_f32(spec.id,new Float32Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/4));
-      else if(spec.dtype==='float64')chart.register_column_f64(spec.id,new Float64Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/8));
-      else throw Error(`Unsupported binary dtype: ${spec.dtype}`);
+      const values=spec.dtype==='float32'?new Float32Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/4):spec.dtype==='float64'?new Float64Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/8):spec.dtype==='uint32'?new Uint32Array(aligned.buffer,aligned.byteOffset,aligned.byteLength/4):null;
+      if(!values)throw Error(`Unsupported binary dtype: ${spec.dtype}`);
+      if(spec.resource){let entry=composites.get(spec.resource);if(!entry){entry={kind:spec.kind,fields:{}};composites.set(spec.resource,entry);}entry.fields[spec.field]=values;}
+      else if(spec.dtype==='float32')chart.register_column_f32(spec.id,values);
+      else chart.register_column_f64(spec.id,values);
       stats.column_uploads++;stats.binary_upload_bytes+=data.byteLength;
     }
-    if(!kind){chart.set_config(JSON.stringify(local.config));chart.set_series(JSON.stringify(local.series));chart.set_config(JSON.stringify(local.config));
-    clearColor(local.background);}
+    for(const [id,entry]of composites){if(entry.kind==='record')chart.register_record(id,entry.fields);else if(entry.kind==='ragged')chart.register_ragged(id,entry.fields.values,entry.fields.offsets);else if(entry.kind==='triangles')chart.register_triangles(id,entry.fields.indices);}
+    if(!kind){
+      chart.set_host_state(JSON.stringify(local.config),JSON.stringify(local.series));
+      clearColor(local.background);
+    }
     properties();
     // Ready covers the displayed surface, including a resize during compilation.
     // Do not immediately submit a second, unawaited frame at another resolution.
@@ -1164,10 +1536,10 @@ export function render({model,el}) {
     observer.observe(canvas);status.textContent='Ready';
     if(disposed)return;
     controls.forEach(control=>control.disabled=false);historyControls();drawingUI();
-    root.figgy={stats,diagnostics,annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
+    root.figgy={stats,diagnostics,details:()=>enqueue(async()=>kind?null:await selectionDetails(),true),annotations:()=>enqueue(annotationGeometry,true),snapshot:()=>clone(local),flush:async()=>{await controlQueue;await queue;await flush();},resize,pick:(x,y,distance)=>enqueue(()=>kind?chart.pick(x,y,false):chart.pick_data(x,y,distance),true),decorations:()=>enqueue(async()=>{await geometryFrame();if(kind)return JSON.parse(chart.decorations());return Object.fromEntries(ids.map(name=>{const id=elementName(name);return [id,JSON.parse(chart.decoration_bounds(id))];}));},true)};
     model.send({action:'ready',client,info:stats});initializedResolve();raf=requestAnimationFrame(frame);
     },true);
-  }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',error:String(e)});}}})();
-  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
+  }catch(e){initializedReject(e);if(!disposed){fail(e);status.textContent='WebGPU failed';model.send({action:'failed',client,error:String(e)});}}})();
+  return ()=>{window.removeEventListener('pointerup',releaseSidebar,true);window.removeEventListener('pointercancel',releaseSidebar,true);window.removeEventListener('blur',blurDrawing);disposed=true;controlFinish?.();controlFinish=null;startInit();initializedReject(Error('Widget disposed'));cancelAnimationFrame(raf);observer.disconnect();model.off('change:state',onState);model.off('change:radius_fit_request',scheduleRadiusFit);model.off('msg:custom',onMessage);model.off('change:review',reviewState);model.off('change:status',reviewState);model.off('msg:custom',reviewMessage);if(reviewDialog.open)reviewDialog.close();disposeReviewImages();queue.finally(async()=>{try{await pendingFrame;}catch{}chart?.free();chart=null;}).catch(()=>{});model.send({action:'unmounted',client});root.remove();};
 }
 export default {render};

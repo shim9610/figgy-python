@@ -1,5 +1,6 @@
 """Keep content-addressed web assets intact through Windows-style checkout."""
 from pathlib import Path
+import re
 import runpy
 import shutil
 import subprocess
@@ -89,7 +90,7 @@ def registry_pairing(tmp_path):
     (tmp_path / "Cargo.lock").write_text(lock)
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/build-wasm.sh").write_text("revision=" + revision + "\n")
-    shutil.copyfile(ROOT / "scripts/wasm-host.patch", tmp_path / "scripts/wasm-host.patch")
+    copy_host_sources(tmp_path)
     patch = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"](tmp_path)
     assets = tmp_path / "python/figgyplot/assets"
     assets.mkdir(parents=True)
@@ -102,6 +103,13 @@ def registry_pairing(tmp_path):
 def check_pairing(root):
     runpy.run_path(str(ROOT / "scripts/check_assets.py"))["check_renderer_revision"](root)
 
+def copy_host_sources(root):
+    sources = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["SHARED_HOST_SOURCES"]
+    for relative in ("scripts/wasm-host.patch", *sources):
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, path)
+
 
 def test_host_patch_check_does_not_depend_on_callers_git_subdirectory(registry_pairing, monkeypatch):
     monkeypatch.chdir(ROOT / "scripts")
@@ -113,12 +121,12 @@ def test_host_patch_inside_another_checkout(tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     nested = tmp_path / "ci-results" / "fixture"
     (nested / "scripts").mkdir(parents=True)
-    shutil.copyfile(ROOT / "scripts/wasm-host.patch", nested / "scripts/wasm-host.patch")
+    copy_host_sources(nested)
     checker = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"]
     assert checker(nested) == checker(ROOT)
 
 
-@pytest.mark.parametrize("change", ["bytes", "missing", "hash", "path", "files"])
+@pytest.mark.parametrize("change", ["bytes", "shared", "missing", "hash", "path", "files"])
 def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
     import json
     check_pairing(registry_pairing)
@@ -126,7 +134,10 @@ def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
     provenance = json.loads(path.read_text())
     if change == "bytes":
         patch = registry_pairing / "scripts/wasm-host.patch"
-        patch.write_text(patch.read_text().replace("Observe completion", "Await completion"))
+        patch.write_text(patch.read_text().replace("Host fence", "Host wait"))
+    elif change == "shared":
+        source = registry_pairing / "src/view_gesture.rs"
+        source.write_text(source.read_text() + "\n")
     elif change == "missing":
         del provenance["wasm_host_patch"]
     elif change == "hash":
@@ -144,9 +155,10 @@ def test_host_patch_must_match_built_asset_provenance(registry_pairing, change):
 def test_host_patch_cannot_change_native_sources_or_build_configuration(registry_pairing, change):
     patch = registry_pairing / "scripts/wasm-host.patch"
     data = patch.read_text()
+    original = data
     if change in ("renderer", "model", "manifest"):
         destination = "Cargo.toml" if change == "manifest" else "crates/" + change + "/src/lib.rs"
-        data = data.replace("crates/web/src/lib.rs", destination)
+        data = data.replace("crates/web/src/web/chart/frame.rs", destination)
     elif change == "mode":
         data = data.replace("--- a/", "old mode 100644\nnew mode 100755\n--- a/", 1)
     elif change == "crlf":
@@ -154,10 +166,12 @@ def test_host_patch_cannot_change_native_sources_or_build_configuration(registry
     elif change == "deletion":
         # A syntactically valid patch that removes existing bridge code is
         # outside this deliberately additive host extension's scope.
-        data = data.replace("@@ -5756,6 +5756,20 @@", "@@ -5756,6 +5756,19 @@")
-        data = data.replace("             Ok(())\n", "-            Ok(())\n", 1)
+        hunk = re.search(r"^@@ -\d+,\d+ \+\d+,(\d+) @@[^\n]*\n ", data, re.MULTILINE)
+        start, end = hunk.span(1)
+        data = data[:start] + str(int(hunk[1]) - 1) + " @@\n-" + data[hunk.end():]
     else:
         data = "not a patch\n"
+    assert data != original
     patch.write_bytes(data.encode())
     checker = runpy.run_path(str(ROOT / "scripts/check_assets.py"))["host_patch_record"]
     with pytest.raises(ValueError, match="host patch"):
@@ -301,3 +315,11 @@ def test_published_archive_matches_exact_wasm_source(tmp_path, archive_checker, 
     else:
         with pytest.raises(ValueError):
             verify(data, "figgy-model", package, tmp_path, revision)
+
+
+def test_webgpu_host_calls_exist_in_packaged_wasm_api():
+    """A stale method in a conditional UI path must fail before a user clicks it."""
+    import re
+    calls=set(re.findall(r"\bchart\.([A-Za-z_][A-Za-z_0-9]*)\s*\(", (ROOT / "python/figgyplot/webgpu.js").read_text()))
+    exported=set(re.findall(r"^\s*(\w+)\(", (ASSETS / "figgy.d.ts").read_text(), re.M))
+    assert calls <= exported, "Unavailable packaged WASM methods: " + ", ".join(sorted(calls-exported))

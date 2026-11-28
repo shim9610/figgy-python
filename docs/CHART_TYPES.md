@@ -1,5 +1,8 @@
 # Charts, materials and draw styles
 
+See the [renderer 0.19 API](RENDERER_019.md) for the current column-backed
+constructors, saved-settings migration, themes, SVG/PDF and MCP tools.
+
 The Python package calls the public upstream models and GPU renderers. Pies and
 donuts use `RadialChart` / `RadialRenderer`; handwriting and star modes use
 Cartesian `DrawStyle`. No chart images are synthesized by a Python drawing engine.
@@ -160,9 +163,8 @@ so replay does not reroll stars or handwriting.
 
 Cartesian styles are exposed in native and WebGPU document models and their
 Style menus. Unsupported chart/style combinations are rejected in both hosts.
-Pies, donuts, categorical bars and boxplots also support browser WebGPU editing
-and async PNG export. An explicit native `widget(backend="png")` remains available
-as a kernel-GPU fallback; it uses the separate PNG transport editor.
+The Jupyter WebGPU editor supports asynchronous PNG, SVG and PDF export.
+The explicit native `widget(backend="png")` uses the kernel GPU and sends PNGs.
 
 ## Python constructors and host coverage
 
@@ -178,8 +180,12 @@ host transports a PNG for ordinary redraws.
 | `imshow` | Heatmap |
 | `contour`, `contourf` | Contour, HeatmapContour |
 | `pie`, `donut` | RadialChart |
-| `bar`, `barh` | CategoricalChart |
-| `boxplot`, `bxp` | BoxPlotChart |
+| `bar`, `barh` | CategoryBars |
+| `boxplot`, `bxp` | BoxPlot |
+| `radar` | Radar |
+| `range_bars`, `waterfall` | RangeBars |
+| `range_links` | RangeLinks |
+| `energy_levels`, `feynman` | EnergyLevels, Feynman |
 
 ```python
 fig, ax = figgy.subplots()  # auto: Jupyter WebGPU in a kernel, native elsewhere
@@ -190,8 +196,9 @@ ax.set_ylabel("Count")
 # Choose fig.show() on desktop or display(fig.widget()) in Jupyter.
 ```
 
-Use separate Figures for these examples (bounded families cannot mix with
-Cartesian series):
+Each call below is a separate recipe. Cartesian, category-bar, box and radar
+plots can occupy separate panels in a named grid. Pie, donut and sunburst charts
+use a dedicated Figure.
 
 ```python
 ax.errorbar([1, 2, 3], [2, 4, 3], yerr=[[.1, .2, .3], [.2, .1, .2]], xerr=.1)
@@ -212,12 +219,15 @@ accept a 2-D scalar array with optional 1-D x/y center coordinates.
 
 `bar` accepts one value per category or a series-by-category matrix. `None`
 is missing, zero is a real value. Modes are `grouped`, `stacked` and
-`percent_stacked`; horizontal direction is available through `barh`. Upstream
-bounds are 64 categories, 16 series and 512 bars. `boxplot` treats a 1-D array as
-one box and a sequence of arrays as one box per array; it computes NumPy linear
-quartiles, actual sample whiskers within `whis * IQR` (default 1.5), and all
-outliers. It does not silently drop outliers to fit the bounded limits (128 per
-box, 4096 total). `bxp` uses supplied statistics without recomputing them.
+`percent_stacked`. Use `barh` for horizontal bars. `boxplot` reads one box per
+array and uses NumPy linear quartiles. It computes sample whiskers within
+`whis * IQR` (default 1.5) and includes every outlier. `bxp` uses supplied
+statistics.
+Axis names may be set before or after `bar`/`barh`/`boxplot`/`bxp`. Horizontal
+charts map the X name to the value axis and the Y name to the category axis.
+Explicit `category_title`/`value_title` constructor properties override inherited
+names, including an explicit empty string. Category labels and these axis names
+are single-line; use the chart title or annotations for longer descriptions.
 The hollow circles beyond the whiskers are these individual outlier values.
 They are data points, not extra boxes or selection handles. With the default
 `whis=1.5`, the fences are `Q1 - 1.5*IQR` and `Q3 + 1.5*IQR`; whiskers extend
@@ -229,6 +239,30 @@ these setters do not perform automatic layout or adjust ticks. Constructors and
 `fit()` are convenience helpers that may compute statistics, ranges, ticks or
 layout. Copy Python replays style/configuration against matching category and
 series IDs, preserving the destination's data values.
+
+Copy Python writes rich text in compact runs and preserves the destination's
+category and series values. Radial replay restores chart-level defaults before
+applying appearance patches. Use `fig.to_code(compact=False)` to inspect
+expanded dictionaries and `get_settings()` to read the complete document.
+See [saved settings and replay](RENDERER_019.md#saved-settings).
+
+`ax.set_title("Comparison\nObserved sample", fontsize=18)` uses the independent
+rich title, with up to 512 characters and eight lines. It does not change the
+category/data-label font. Titles set before construction keep their text and
+rich formatting. The legacy single-line `title` is only a compatibility fallback;
+`chart_title.text.segments` holds the complete displayed wording. Raw SSOT edits
+still have to satisfy both fields' model constraints.
+
+For Cartesian charts, `ax.legend(loc="upper left")` accepts upper/lower left/right
+and their renderer names (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`).
+`fig.update("legend", corner="TopLeft", fontsize=11)` edits the existing legend.
+Bounded legends expose visibility through `ax.legend(False)`; `loc` is rejected.
+
+Use `ax.invert_yaxis()` for depth increasing downwards, after setting increasing
+limits such as `ax.set_ylim(0, 700)`. Inversion preserves limits and tick spacing;
+on `twinx` it affects only that Y axis. Cartesian tick spacing is configurable
+with `fig.update("axis_bottom", major_spacing=2, minor_count=0)`. Explicit
+arbitrary tick-position setters are not part of the API.
 
 Both hosts open the property panel on selection. Drag annotations to move them;
 use Layout and plot-area handles to resize; Fit restores automatic plot layout.

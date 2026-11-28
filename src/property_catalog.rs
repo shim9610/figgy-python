@@ -2,6 +2,8 @@
 //! Descriptions are derived from accepted SSOT; they are not a second model.
 use super::*;
 use renderer::annotation::AnnotationSpace;
+pub(crate) mod diagrams;
+pub(crate) mod layout;
 mod links;
 mod optional;
 
@@ -16,7 +18,7 @@ pub(crate) struct Field {
     pub choices: Vec<Value>,
     pub integer: bool,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub(crate) struct Object {
     pub id: String,
     pub target: Option<String>,
@@ -64,6 +66,28 @@ fn control_key(field: &Field) -> &str {
 fn choices(path: &str, value: &Value) -> Vec<Value> {
     let key = path.rsplit('/').next().unwrap_or("");
     let values: &[&str] = match key {
+        "particle" if path.contains("/Feynman/") => &[
+            "Plain",
+            "Fermion",
+            "AntiFermion",
+            "Photon",
+            "ChargedBoson",
+            "Gluon",
+            "Scalar",
+            "ChargedScalar",
+            "Ghost",
+            "Majorana",
+            "Graviton",
+            "DoubleLine",
+        ],
+        "side" if path.contains("/Feynman/") => &["Left", "Right"],
+        "role" if path.contains("/Feynman/") => &["Internal", "Incoming", "Outgoing"],
+        "direction" if path.contains("/Feynman/layout/") => &["LeftToRight", "BottomToTop"],
+        "direction" if path.contains("/EnergyLevels/style/transition/") => {
+            &["Emission", "Absorption", "None"]
+        }
+        "show" if path.contains("/EnergyLevels/") => &["Main", "Components"],
+        "label_side" if path.contains("/EnergyLevels/") => &["Left", "Right", "Above"],
         "material" if path.starts_with("/radial/") => &[
             "Flat",
             "Matte",
@@ -77,7 +101,9 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
             "Hatch",
             "Pearl",
         ],
-        "material" if path.starts_with("/boxplot/") => &["Flat", "Matte", "SatinMetal"],
+        "material" if path.starts_with("/boxplot/") || path.contains("/BoxPlot/") => {
+            &["Flat", "Matte", "SatinMetal"]
+        }
         "material" => &["Flat", "Matte", "SatinMetal", "Enamel", "Paper"],
         "labels" if path.starts_with("/radial/") => &["None", "Inside", "Outside"],
         "labels" if path.starts_with("/boxplot/") => &["None", "Median", "MedianAndCount"],
@@ -93,10 +119,16 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
             "NameValuePercent",
         ],
         "label_format" => &["Value", "Percent", "ValuePercent", "CategoryValue"],
-        "mode" if path.starts_with("/categorical/") => &["Grouped", "Stacked", "PercentStacked"],
+        "mode" if path.starts_with("/categorical/") || path.contains("/bar_groups/") => {
+            &["Grouped", "Stacked", "PercentStacked"]
+        }
         "outlier_shape" => &["Circle", "Square"],
         "marker" => &["None", "Circle", "Square"],
-        "grid_layout" => &["Centers", "Edges"],
+        "grid_layout" => &["Centers", "Edges", "Hexagonal"],
+        "shading" => &["Flat", "Interpolated"],
+        "mode" if value == "Continuous" || value == "Bands" => &["Continuous", "Bands"],
+        "placement" if path.contains("/Radar/") => &["None", "Values", "Emphasized"],
+        "projection" if value.is_string() => &["Orthographic", "Perspective"],
         "orientation" if value == "ColumnsAreY" || value == "ColumnsAreX" => {
             &["ColumnsAreY", "ColumnsAreX"]
         }
@@ -167,11 +199,14 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
         "scale" if value == "Linear" || value == "Logarithmic" => &["Linear", "Logarithmic"],
         "colormap" => &["Viridis", "Magma", "Turbo", "GrayScale", "RdBu"],
         "format" => &[
+            "Auto",
             "Decimal",
+            "Plain",
             "Scientific",
             "Power",
             "Degrees",
             "Radians",
+            "Percent",
             "Timestamp",
         ],
         "unit" if path.contains("/Timestamp/") => {
@@ -187,13 +222,39 @@ fn choices(path: &str, value: &Value) -> Vec<Value> {
     };
     values.iter().map(|v| json!(v)).collect()
 }
-fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: &str, label: &str) {
+fn json_field(path: &str) -> bool {
+    [
+        "/RangeLinks/links",
+        "/Timestamp/label/Custom/labels",
+        "/line_offsets",
+        "/marker/window",
+    ]
+    .iter()
+    .any(|suffix| path.ends_with(suffix))
+}
+
+fn field(
+    out: &mut Vec<Field>,
+    mut value: Value,
+    path: &str,
+    group: &str,
+    relative: &str,
+    label: &str,
+) {
+    if path.contains("/Timestamp/label/")
+        && path.ends_with("/origin")
+        && let Some(origin) = value.as_i64()
+    {
+        value = json!(origin.to_string());
+    }
     let options = if value.is_string() {
         choices(path, &value)
     } else {
         vec![]
     };
-    let kind = if !options.is_empty() {
+    let kind = if json_field(path) {
+        "json"
+    } else if !options.is_empty() {
         "choice"
     } else if value.is_boolean() {
         "boolean"
@@ -219,8 +280,33 @@ fn field(out: &mut Vec<Field>, value: Value, path: &str, group: &str, relative: 
         choices: options,
     });
 }
+pub(super) fn label_format_name(value: &Value) -> &str {
+    value
+        .as_str()
+        .or_else(|| value.as_object()?.keys().next().map(String::as_str))
+        .unwrap_or("Decimal")
+}
+
+pub(super) fn label_format_wire(name: &str) -> Value {
+    match name {
+        "Auto" | "Plain" | "Timestamp" => json!({(name): {}}),
+        _ => json!(name),
+    }
+}
+
 fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: &str) {
-    if path.contains("/colorbar/") && value.get("segments").is_some_and(Value::is_array) {
+    if path.ends_with("/category_window") || path.ends_with("/category_bands") {
+        return;
+    }
+    if diagrams::fields(out, value, path, group, relative) {
+        return;
+    }
+    if (path.contains("/colorbar/")
+        || path.contains("/EnergyLevels/")
+        || path.contains("/Feynman/")
+        || (path.starts_with("/series/") && path.ends_with("/label")))
+        && value.get("segments").is_some_and(Value::is_array)
+    {
         field(
             out,
             json!(crate::editor::display_text(&value["segments"])),
@@ -233,19 +319,63 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
     if path.ends_with("/format") {
         field(
             out,
-            json!(value.as_str().unwrap_or("Timestamp")),
+            json!(label_format_name(value)),
             path,
             group,
             relative,
             "Number format",
         );
         if let Some(timestamp) = value.get("Timestamp") {
+            let mut timestamp = timestamp.clone();
+            let spec = timestamp.as_object_mut().unwrap();
+            spec.entry("step").or_insert(Value::Null);
+            spec.entry("period_labels").or_insert(json!(false));
             walk(
                 out,
-                timestamp,
+                &timestamp,
                 &format!("{path}/Timestamp"),
                 group,
                 &format!("{relative}/Timestamp"),
+            );
+        }
+        return;
+    }
+    if path.ends_with("/Timestamp/step") {
+        let mode = if value.is_null() {
+            "None"
+        } else {
+            label_format_name(value)
+        };
+        optional::choice(
+            out,
+            &format!("{group}/{relative}/mode"),
+            path,
+            group,
+            "Calendar step",
+            json!(mode),
+            ["None", "Day", "Week", "Month", "Quarter", "Year"]
+                .map(|name| json!(name))
+                .to_vec(),
+        );
+        if let Some(start) = value.pointer("/Week/start") {
+            optional::choice(
+                out,
+                &format!("{group}/{relative}/Week/start"),
+                &format!("{path}/Week/start"),
+                group,
+                "Week starts on",
+                start.clone(),
+                [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                ]
+                .map(|name| json!(name))
+                .to_vec(),
             );
         }
         return;
@@ -258,7 +388,15 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
                 "FixedOffsetMinutes",
                 vec![json!("Utc"), json!("FixedOffsetMinutes")],
             ),
-            "label" => ("Pattern", vec![json!("Auto"), json!("Pattern")]),
+            "label" => (
+                "Pattern",
+                vec![
+                    json!("Auto"),
+                    json!("Pattern"),
+                    json!("Relative"),
+                    json!("Custom"),
+                ],
+            ),
             _ => ("Fixed", vec![json!("Auto"), json!("Fixed")]),
         };
         optional::choice(
@@ -267,7 +405,11 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
             path,
             group,
             &human(path.rsplit('/').next().unwrap()),
-            json!(value.as_str().unwrap_or(tag)),
+            json!(if value.is_object() {
+                label_format_name(value)
+            } else {
+                value.as_str().unwrap_or(tag)
+            }),
             options,
         );
         if value.is_object() {
@@ -318,7 +460,10 @@ fn walk(out: &mut Vec<Field>, value: &Value, path: &str, group: &str, relative: 
                 },
             );
         }
-    } else if value.is_array() && !value.as_array().unwrap().iter().all(Value::is_number) {
+    } else if !json_field(path)
+        && value.is_array()
+        && !value.as_array().unwrap().iter().all(Value::is_number)
+    {
         for (i, child) in value.as_array().unwrap().iter().enumerate() {
             walk(
                 out,
@@ -345,6 +490,131 @@ fn panel_path(layer: renderer::LayerRef) -> String {
         _ => "/config".into(),
     }
 }
+/// SSOT roots use the same layer/decoration addresses as the editor. Review
+/// summaries consume these bindings instead of inventing another object model.
+fn decoration_path(state: &Value, node: &navigation::Node) -> Option<String> {
+    let short = node.target.as_deref()?.rsplit(':').next()?;
+    let panel = panel_path(node.layer);
+    Some(match short {
+        "chart_title" => format!("{panel}/chart_title"),
+        "legend" => format!("{panel}/legend"),
+        "data_area" => format!("{panel}/chart_area"),
+        _ if short.starts_with("colorbar") => format!("{panel}/colorbar"),
+        _ if short.starts_with("axis_") || short.starts_with("tick_labels_") => {
+            let (target, suffix) = if let Some(side) = short.strip_prefix("axis_title_") {
+                (format!("axis_{side}"), "/title_option")
+            } else {
+                (
+                    short.to_owned(),
+                    if short.starts_with("tick_labels_") {
+                        "/label_style"
+                    } else {
+                        ""
+                    },
+                )
+            };
+            let axis = crate::axis_edit::address(state, &target, node.layer)?;
+            format!("{}{suffix}", axis.path)
+        }
+        _ => return None,
+    })
+}
+
+#[pyfunction]
+pub(crate) fn review_object_bindings_json(settings: &str) -> PyResult<String> {
+    fn paths(state: &Value, node: &navigation::Node) -> Vec<String> {
+        let family = ["radial", "categorical", "boxplot", "radar"]
+            .into_iter()
+            .find(|k| state[*k].is_object());
+        let target = node.target.as_deref().unwrap_or("");
+        if node.kind == "figure" {
+            return vec![String::new()];
+        }
+        if let Some((_, id)) = node.key.split_once("/annotation/") {
+            let owner = family.map_or("/config".into(), |f| format!("/{f}"));
+            let root = format!("{owner}/annotations/items");
+            return state
+                .pointer(&root)
+                .and_then(Value::as_array)
+                .and_then(|v| v.iter().position(|v| v["id"] == id))
+                .map(|i| vec![format!("{root}/{i}")])
+                .unwrap_or_default();
+        }
+        if let Some(family) = family {
+            let root = format!("/{family}");
+            if node.kind == "panel" {
+                return vec![root];
+            }
+            if target == "chart_title" {
+                return vec![format!("{root}/title"), format!("{root}/chart_title")];
+            }
+            if target == "legend" {
+                return vec![format!("{root}/legend")];
+            }
+            if node.key.starts_with("bounded/series/") {
+                for name in ["series", "slices", "split/children"] {
+                    let path = format!("{root}/{name}");
+                    if let Some(items) = state.pointer(&path).and_then(Value::as_array) {
+                        if let Some(i) = items.iter().enumerate().find_map(|(i, v)| {
+                            let fallback = if name == "slices" {
+                                format!("slice_0_{i}")
+                            } else if name == "split/children" {
+                                format!("slice_1_{i}")
+                            } else {
+                                String::new()
+                            };
+                            (v["id"].as_str().unwrap_or(&fallback) == target).then_some(i)
+                        }) {
+                            return vec![format!("{path}/{i}")];
+                        }
+                    }
+                }
+            }
+            // Fields without a separable bounded object belong to its panel;
+            // the complete raw changes remain available there.
+            return vec![];
+        }
+        if node.key.starts_with("series/") {
+            return state["series"]
+                .as_array()
+                .and_then(|v| v.iter().position(|v| v["series_id"] == target))
+                .map(|i| vec![format!("/series/{i}")])
+                .unwrap_or_default();
+        }
+        let panel = panel_path(node.layer);
+        if node.kind == "panel" {
+            return vec![panel];
+        }
+        if node.kind == "layer" {
+            if let renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) =
+                node.layer
+            {
+                return vec![format!("{panel}/overlays/{i}")];
+            }
+        }
+        if target.ends_with("colorbar_title") {
+            return vec![format!("{panel}/colorbar/axis/title_option")];
+        }
+        if target.ends_with("colorbar_tick_labels") {
+            return vec![format!("{panel}/colorbar/axis/label_style")];
+        }
+        if target.ends_with("colorbar_axis") {
+            return vec![format!("{panel}/colorbar/axis")];
+        }
+        decoration_path(state, node).into_iter().collect()
+    }
+    fn visit(state: &Value, nodes: &[navigation::Node], out: &mut Vec<Value>) {
+        for node in nodes {
+            out.push(json!({"id":node.key,"label":node.label,"kind":node.kind,"paths":paths(state,node)}));
+            visit(state, &node.children, out);
+        }
+    }
+    let settings: Settings = parse(settings)?;
+    let state = serde_json::to_value(&settings).map_err(runtime)?;
+    let mut out = vec![];
+    visit(&state, &navigation::nodes(&settings), &mut out);
+    serde_json::to_string(&out).map_err(runtime)
+}
 fn add_default(
     out: &mut Vec<Field>,
     state: &Value,
@@ -353,7 +623,7 @@ fn add_default(
     key: &str,
     value: Value,
 ) {
-    if state.pointer(path).is_none() {
+    if state.pointer(path).is_none_or(Value::is_null) {
         field(out, value, path, group, key, &human(key));
     }
 }
@@ -472,10 +742,39 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
         .filter(|_| node.key.starts_with("series/"))
         .and_then(|v| v.iter().enumerate().find(|(_, s)| s["series_id"] == target))
     {
+        let mut label = series["label"].clone();
+        if label.is_null() {
+            label = state
+                .pointer(&format!("{panel}/legend/content"))
+                .unwrap()
+                .clone();
+            label["segments"] = json!([]);
+        }
+        walk(
+            fields,
+            &label,
+            &format!("/series/{index}/label"),
+            "Series",
+            "label",
+        );
         for (kind, style) in series["render_type"].as_object().unwrap() {
             let root = format!("/series/{index}/render_type/{kind}");
-            for (key, value) in style.as_object().unwrap() {
+            let mut expanded = diagrams::expanded(
+                kind,
+                style,
+                state.pointer(&format!("{panel}/legend/content")).unwrap(),
+            );
+            if kind == "RangeLinks" && expanded["links"].is_null() {
+                expanded["links"] = json!([]);
+            }
+            if kind == "RangeBars" {
+                optional::range_bars(fields, style, &root);
+            }
+            for (key, value) in expanded.as_object().unwrap() {
                 if ["components", "err_x", "err_y", "yErr"].contains(&key.as_str()) {
+                    continue;
+                }
+                if kind == "RangeBars" && matches!(key.as_str(), "progress" | "connector") {
                     continue;
                 }
                 let group = match key.as_str() {
@@ -485,10 +784,55 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     "err_style" => "Error bars",
                     "contour" => "Contours",
                     "style" if kind == "Vector" => "Vectors",
+                    "labels" => "Labels",
+                    "matrix" => "Grid",
+                    "surface" => "Surface",
+                    "violin" => "Violin",
+                    "stem" => "Stems",
                     _ => "Appearance",
                 };
                 let path = format!("{root}/{key}");
-                walk(fields, value, &path, group, "");
+                let modern = matches!(
+                    kind.as_str(),
+                    "CategoryBars"
+                        | "BoxPlot"
+                        | "RangeBars"
+                        | "RangeLinks"
+                        | "Radar"
+                        | "Ternary"
+                        | "Parallel"
+                        | "RgbImage"
+                        | "Hexbin"
+                        | "TriMesh"
+                        | "EnergyLevels"
+                        | "Feynman"
+                        | "Streamlines"
+                );
+                let relative = if modern && group == "Appearance" {
+                    key.as_str()
+                } else {
+                    ""
+                };
+                if !modern || !matches!(key.as_str(), "triangles" | "start" | "values") {
+                    walk(fields, value, &path, group, relative);
+                }
+                if kind == "Radar" && key == "style" {
+                    for (name, default) in [
+                        ("line_width_px", json!(2.)),
+                        ("fill_opacity", json!(0.25)),
+                        ("marker_size_px", json!(7.)),
+                        ("marker", json!("Circle")),
+                    ] {
+                        add_default(
+                            fields,
+                            state,
+                            &format!("{path}/{name}"),
+                            group,
+                            &format!("style/{name}"),
+                            default,
+                        );
+                    }
+                }
                 if key == "line" {
                     add_default(
                         fields,
@@ -847,19 +1191,6 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     );
                 }
             }
-            if let Some(index) = target
-                .strip_prefix("slice_1_")
-                .and_then(|v| v.parse::<usize>().ok())
-                .filter(|i| *i < chart["split"]["children"].as_array().map_or(0, Vec::len))
-            {
-                optional::bounded_series(
-                    fields,
-                    state,
-                    kind,
-                    &chart["split"]["children"][index],
-                    &format!("{root}/split/children/{index}"),
-                );
-            }
             optional::choice(
                 fields,
                 "Pie / donut/mode",
@@ -902,56 +1233,25 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         }
         if kind == "radial" {
-            if let Some(index) = target
-                .strip_prefix("slice_0_")
-                .and_then(|v| v.parse::<usize>().ok())
-                .filter(|i| *i < chart["slices"].as_array().map_or(0, Vec::len))
+            if let Some((group, index)) = target
+                .strip_prefix("slice_")
+                .and_then(|v| v.split_once('_'))
+                .and_then(|(g, i)| Some((g.parse().ok()?, i.parse().ok()?)))
             {
-                optional::bounded_series(
-                    fields,
-                    state,
-                    kind,
-                    &chart["slices"][index],
-                    &format!("{root}/slices/{index}"),
-                );
+                if let Some(path) = radial_compat::slice_path(chart, group, index) {
+                    optional::bounded_series(
+                        fields,
+                        state,
+                        kind,
+                        chart.pointer(&path).unwrap(),
+                        &format!("{root}{path}"),
+                    );
+                }
             }
         }
     } else {
         let config = state.pointer(&panel).unwrap();
-        let path = if short == "chart_title" {
-            Some(format!("{panel}/chart_title"))
-        } else if short == "legend" {
-            Some(format!("{panel}/legend"))
-        } else if short.starts_with("colorbar") {
-            Some(format!("{panel}/colorbar"))
-        } else if short == "data_area" {
-            Some(format!("{panel}/chart_area"))
-        } else if short.starts_with("axis_") || short.starts_with("tick_labels_") {
-            let side = short.rsplit('_').next().unwrap();
-            let axis = match side {
-                "bottom" => "bottom_x",
-                "top" => "top_x",
-                "left" => "left_y",
-                _ => "right_y",
-            };
-            let base = match node.layer {
-                renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i)
-                    if side == "right" =>
-                {
-                    format!("{panel}/overlays/{i}/y_axis")
-                }
-                _ => format!("{panel}/{axis}"),
-            };
-            Some(if short.starts_with("axis_title_") {
-                format!("{base}/title_option")
-            } else if short.starts_with("tick_labels_") {
-                format!("{base}/label_style")
-            } else {
-                base
-            })
-        } else {
-            None
-        };
+        let path = decoration_path(state, node);
         if short.starts_with("colorbar") {
             colorbar_fields(fields, state, &panel);
             let path = if short == "colorbar_title" {
@@ -969,6 +1269,7 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         } else if let Some(path) = path {
             if let Some(value) = state.pointer(&path) {
+                optional::category_axis(fields, config, value, &path);
                 walk(
                     fields,
                     value,
@@ -982,8 +1283,47 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                 );
             }
         }
+        if node.kind == "axis"
+            && let Some(axis) = crate::axis_edit::address(state, target, node.layer)
+        {
+            field(
+                fields,
+                json!(tick_policy::automatic(
+                    state.get("identity"),
+                    axis.layer,
+                    axis.side
+                )),
+                &format!("{}/auto_ticks", axis.path),
+                "Layout and appearance",
+                "auto_ticks",
+                "Automatic tick spacing",
+            );
+        }
         if short == "data_area" || target == "figure" {
             links::fields(fields, state, node.layer);
+            if let Some(camera) = config.get("view_3d") {
+                let path = format!("{panel}/view_3d");
+                for (key, label) in [
+                    ("azimuth_degrees", "Azimuth (degrees)"),
+                    ("elevation_degrees", "Elevation (degrees)"),
+                    ("distance", "Camera distance"),
+                    ("projection", "Projection"),
+                    ("box_aspect", "Box proportions (X, Y, Z)"),
+                ] {
+                    let value = camera
+                        .get(key)
+                        .cloned()
+                        .unwrap_or_else(|| json!(renderer::view3d::DEFAULT_BOX_ASPECT));
+                    field(
+                        fields,
+                        value,
+                        &format!("{path}/{key}"),
+                        "3D camera",
+                        key,
+                        label,
+                    );
+                }
+            }
             if let Some(polar) = config.get("polar") {
                 walk(
                     fields,
@@ -993,6 +1333,22 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                     "",
                 );
                 fields.retain(|v| v.id != "Polar coordinates/interpolation");
+                for (key, label) in [
+                    (
+                        "radial_label_angle_degrees",
+                        "Use a stored radius-label angle",
+                    ),
+                    ("radius_labels_skipped", "Use a stored inner label count"),
+                ] {
+                    field(
+                        fields,
+                        json!(polar[key].is_number()),
+                        &format!("{panel}/polar/{key}"),
+                        "Polar coordinates",
+                        &format!("fixed/{key}"),
+                        label,
+                    );
+                }
                 optional::choice(
                     fields,
                     "Polar coordinates/interpolation_mode",
@@ -1042,11 +1398,11 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
                         label: format!("Chart in slot {slot}"),
                         kind: "choice".into(),
                         value: value.clone(),
-                        choices: state["identity"]["panels"]
-                            .as_array()
+                        choices: layout["placement"]
+                            .as_object()
                             .unwrap()
-                            .iter()
-                            .map(|v| v["id"].clone())
+                            .values()
+                            .cloned()
                             .collect(),
                         integer: false,
                     });
@@ -1054,8 +1410,10 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
             }
         }
     }
+    layout::fields(fields, state, node);
     out.fields.sort_by_key(|field| {
         let rank = match field.group.as_str() {
+            "Figure size" | "Panel geometry" | "Plot area" => 0,
             "Line" | "Vectors" | "Bars" | "Contours" | "Appearance" | "Figure grid" => 0,
             "Title" | "Tick labels" => 0,
             "Markers" => 1,
@@ -1086,13 +1444,12 @@ fn build(state: &Value, node: &navigation::Node, sources: &[Value]) -> Object {
 }
 
 impl editor::Editor {
-    pub(super) fn catalog_properties(
+    pub(super) fn inspector_object(
         &mut self,
-        ui: &mut egui::Ui,
-        c: &mut FigureAccess<'_>,
+        ui: &egui::Ui,
+        c: &FigureAccess<'_>,
         target: &str,
-        primary: bool,
-    ) {
+    ) -> Option<Object> {
         let layer = c
             .data
             .document
@@ -1100,12 +1457,45 @@ impl editor::Editor {
             .map_or(c.data.chart.config().active_layer(), |d| {
                 d.chart.active_layer()
             });
-        let Some(object) = selected(
+        let dragging = ui.input(|i| {
+            i.pointer.primary_down()
+                && i.pointer
+                    .press_origin()
+                    .is_some_and(|p| self.stage.contains(p))
+        });
+        if let Some((name, owner, preferred, revision, value)) = &self.property_cache {
+            if name == target
+                && *owner == layer
+                && preferred == &self.inspector_owner
+                && (dragging || *revision == c.data.revision)
+            {
+                return Some(value.clone());
+            }
+        }
+        let value = selected(
             &c.snapshot(),
             target,
             layer,
             self.inspector_owner.as_deref(),
-        ) else {
+        )?;
+        self.property_builds += 1;
+        self.property_cache = Some((
+            target.into(),
+            layer,
+            self.inspector_owner.clone(),
+            c.data.revision,
+            value.clone(),
+        ));
+        Some(value)
+    }
+    pub(super) fn catalog_properties(
+        &mut self,
+        ui: &mut egui::Ui,
+        c: &mut FigureAccess<'_>,
+        target: &str,
+        primary: bool,
+    ) {
+        let Some(object) = self.inspector_object(ui, c, target) else {
             return;
         };
         let mut groups = Vec::<String>::new();
@@ -1140,12 +1530,28 @@ impl editor::Editor {
             }
             let response = egui::CollapsingHeader::new(group)
                 .id_salt((&object.id, group))
-                .default_open(primary && index < 2)
+                .default_open((primary && index < 2 && !target.ends_with("data_area")) || matches!(group.as_str(), "Panel geometry" | "Plot area" | "Figure size"))
                 .show(ui, |ui| {
                     for field in fields {
                         let mut value = field.value.clone();
                         let mut changed = false;
                         let response = ui.push_id((&object.id,&field.id),|ui|match field.kind.as_str() {
+                            "rectangle" => {
+                                let mut numbers=value.as_array().unwrap().iter().filter_map(Value::as_f64).collect::<Vec<_>>();
+                                if numbers.is_empty() {
+                                    if let Ok(frame)=c.document_frame() {
+                                        if let Some(r)=frame.decorations().entries().find(|(_,e)|e.id.element_id()=="data_area").and_then(|(id,_)|frame.decorations().bounds(id)) {numbers=vec![r.x as f64,r.y as f64,r.width as f64,r.height as f64];}
+                                    }
+                                }
+                                let mut response=ui.label(&field.label);
+                                if numbers.len()==4 {
+                                    for (i,key) in ["x","y","width","height"].into_iter().enumerate() {
+                                        ui.horizontal(|ui| {ui.label(key);let r=ui.add(egui::DragValue::new(&mut numbers[i]).speed(1.));changed|=r.changed();self.controls.insert(format!("plot_{key}"),r.rect);response=r;});
+                                    }
+                                    value=json!(numbers);
+                                }
+                                response
+                            }
                             "action" => {
                                 let r=ui.button(&field.label);
                                 changed=r.clicked();
@@ -1216,6 +1622,8 @@ impl editor::Editor {
                                         .map(Value::to_string)
                                         .collect::<Vec<_>>()
                                         .join(", ")
+                                } else if field.kind == "json" {
+                                    value.to_string()
                                 } else {
                                     value.as_str().unwrap_or("").to_owned()
                                 };
@@ -1223,7 +1631,7 @@ impl editor::Editor {
                             let focused=ui.memory(|m|m.has_focus(id));
                             let draft=self.property_text.entry(format!("{}/{}",object.id,field.id)).or_insert_with(||(initial.clone(),field.value.clone(),c.data.revision));
                             if !focused&&draft.1!=field.value {*draft=(initial,field.value.clone(),c.data.revision);}
-                            let r = ui.add(egui::TextEdit::singleline(&mut draft.0).id(id));
+                            let r = ui.add_sized([ui.available_width(),ui.spacing().interact_size.y],egui::TextEdit::singleline(&mut draft.0).id(id));
                             if r.gained_focus(){draft.1=field.value.clone();draft.2=c.data.revision;}
                                 if r.lost_focus() {
                                 let text=&draft.0;
@@ -1235,6 +1643,8 @@ impl editor::Editor {
                                             })
                                             .collect::<PyResult<Vec<_>>>()
                                             .map(Value::Array)
+                                    } else if field.kind == "json" {
+                                    serde_json::from_str(text).map_err(invalid)
                                     } else {
                                     Ok(json!(text))
                                     };
@@ -1257,8 +1667,20 @@ impl editor::Editor {
                             .or_insert(response.rect);
                         if changed {
                             let mut extents=json!(c.data.columns.iter().map(|(name,(_,min,max))|(name.clone(),json!([min,max]))).collect::<serde_json::Map<_,_>>());
-                            if field.id=="Color scale/axis/scale"&&value=="Logarithmic" {
-                                if let Ok(bounds)=c.log_bounds_for("z",object.layer){extents["_positive"]=json!(bounds);}
+                            if field.id.ends_with("/scale") && value == "Logarithmic" {
+                                let settings = serde_json::to_value(c.snapshot()).unwrap();
+                                let axis = object.target.as_deref()
+                                    .and_then(|target| crate::axis_edit::address(&settings, target, object.layer));
+                                let domain = if field.id == "Color scale/axis/scale" {
+                                    Some(("z", object.layer))
+                                } else {
+                                    axis.as_ref().map(|a| (a.dimension, a.layer))
+                                };
+                                if let Some((dimension, layer)) = domain
+                                    && let Ok(bounds) = c.log_bounds_for(dimension, layer)
+                                {
+                                    extents["_positive"] = json!(bounds);
+                                }
                             }
                             match apply(&c.snapshot(), &object.id, &field.id, value, &extents)
                                 .and_then(|v| c.apply_settings(&v.to_string()))
@@ -1380,11 +1802,17 @@ pub(crate) fn apply(
     if field.kind != "action" && value == field.value {
         return Ok(result);
     }
+    if layout::apply(&mut result, &object, field, &value)? {
+        return Ok(result);
+    }
     if field.group == "Shared axes" {
         links::apply(&mut result, object.layer, &field.id, &value)?;
         return Ok(result);
     }
     if optional::apply(&mut result, field, &value)? {
+        return Ok(result);
+    }
+    if optional::apply_range_and_categories(&mut result, field, &value, extents)? {
         return Ok(result);
     }
     if field.id == "Annotation/order" {
@@ -1398,8 +1826,30 @@ pub(crate) fn apply(
         crate::annotation_edit::reorder(&mut result, &field.path, index, to)?;
         return Ok(result);
     }
+    let parts: Vec<_> = field.path.split('/').skip(1).collect();
+    if parts.len() >= 4 && parts[0] == "series" && parts[2] == "label" {
+        let path = format!("/series/{}/label", parts[1]);
+        if result.pointer(&path).is_none_or(Value::is_null) {
+            let mut label = result
+                .pointer(&format!("{}/legend/content", panel_path(object.layer)))
+                .unwrap()
+                .clone();
+            label["segments"] = json!([]);
+            *result.pointer_mut(&path).unwrap() = label;
+        }
+    }
+    if diagrams::apply(&mut result, field, &value, object.layer)? {
+        return Ok(result);
+    }
+    diagrams::prepare_edit(&mut result, &field.path, object.layer)?;
     let (parent, key) = field.path.rsplit_once('/').unwrap();
-    let value = if field.id.starts_with("Coordinates/") && field.id != "Coordinates/axis" {
+    let value = if field.path.contains("/Timestamp/label/") && key == "origin" {
+        let origin = value
+            .as_i64()
+            .or_else(|| value.as_str()?.parse().ok())
+            .ok_or_else(|| invalid("calendar origin must be a signed 64-bit integer"))?;
+        json!(origin)
+    } else if field.id.starts_with("Coordinates/") && field.id != "Coordinates/axis" {
         crate::annotation_edit::convert(
             state,
             result
@@ -1528,8 +1978,10 @@ pub(crate) fn apply(
             result.pointer(&field.path).unwrap(),
             json!(renderer::text::rich_segments_from_text(text)),
         )
-    } else if key == "format" && value == "Timestamp" {
-        json!({"Timestamp":{}})
+    } else if key == "format"
+        && let Some(name) = value.as_str()
+    {
+        label_format_wire(name)
     } else {
         value
     };
@@ -1546,6 +1998,38 @@ pub(crate) fn apply(
             placement.insert(other, field.value.clone());
         }
     }
+    let positive = || {
+        serde_json::from_value(extents["_positive"].clone())
+            .map_err(|_| invalid("positive data limits are required for a logarithmic axis"))
+    };
+    if let Some(target) = object.target.as_deref()
+        && let Some(axis) = crate::axis_edit::address(&result, target, object.layer)
+        && let Some(path) = field.path.strip_prefix(&format!("{}/", axis.path))
+        && let Some(mut candidate) = result.pointer(&axis.path).cloned()
+    {
+        let mode = match path {
+            "auto_ticks" => Some(
+                value
+                    .as_bool()
+                    .ok_or_else(|| invalid("automatic ticks must be boolean"))?,
+            ),
+            "major_spacing" => Some(false),
+            _ => None,
+        };
+        if path != "auto_ticks" {
+            let (parent, key) = path.rsplit_once('/').unwrap_or(("", path));
+            let node = if parent.is_empty() {
+                &mut candidate
+            } else {
+                candidate
+                    .pointer_mut(&format!("/{parent}"))
+                    .ok_or_else(|| invalid("axis property owner changed"))?
+            };
+            node[key.replace("~1", "/").replace("~0", "~")] = value;
+        }
+        crate::axis_edit::apply(&mut result, &axis, candidate, mode, true, positive)?;
+        return Ok(result);
+    }
     if let Some(node) = result.pointer_mut(&field.path) {
         *node = value;
     } else {
@@ -1556,51 +2040,7 @@ pub(crate) fn apply(
             .insert(key.replace("~1", "/").replace("~0", "~"), value);
     }
     if field.id == "Color scale/axis/scale" {
-        let axis = result.pointer_mut(parent).unwrap();
-        if axis["scale"] == "Logarithmic" && axis["min"].as_f64().is_some_and(|v| v <= 0.) {
-            let bounds = extents["_positive"]
-                .as_array()
-                .filter(|v| v.len() == 2)
-                .ok_or_else(|| {
-                    invalid("set a positive color domain before choosing logarithmic scale")
-                })?;
-            axis["min"] = bounds[0].clone();
-            axis["max"] = bounds[1].clone();
-        }
-        axis["major_spacing"] = if axis["scale"] == "Logarithmic" {
-            json!(1.)
-        } else {
-            json!((axis["max"].as_f64().unwrap() - axis["min"].as_f64().unwrap()) / 5.)
-        };
-    }
-    // Numeric axis commands carry the same tick intent as the specialised
-    // forms. Resolve the command's owner, not whichever panel happens to have
-    // keyboard focus in another view.
-    if !field.path.contains("/colorbar/")
-        && result
-            .pointer(parent)
-            .is_some_and(|axis| axis.get("major_spacing").is_some() && axis.get("scale").is_some())
-    {
-        let side = parent.rsplit('/').next().unwrap();
-        let side = if side == "y_axis" { "right_y" } else { side };
-        if key == "major_spacing" {
-            let active = result["config"].get("active_layer").cloned();
-            result["config"]["active_layer"] = serde_json::to_value(object.layer).unwrap();
-            crate::tick_policy::set_mode(&mut result, side, false);
-            crate::tick_policy::synchronize_spacing(&mut result, side);
-            if let Some(active) = active {
-                result["config"]["active_layer"] = active;
-            } else {
-                result["config"]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove("active_layer");
-            }
-        } else if matches!(key, "min" | "max")
-            && crate::tick_policy::automatic(state.identity.as_ref(), object.layer, side)
-        {
-            crate::tick_policy::retick_value(result.pointer_mut(parent).unwrap());
-        }
+        crate::axis_edit::apply_scale(result.pointer_mut(parent).unwrap(), positive, false)?;
     }
     if field.path.starts_with("/identity/layout/placement/")
         || field.path == "/identity/layout/gap"
@@ -1611,6 +2051,28 @@ pub(crate) fn apply(
     }
     if field.group == "Panel geometry" {
         result["identity"]["layout"] = Value::Null;
+        if parent == format!("{}/chart_area", panel_path(object.layer)) {
+            let area =
+                serde_json::from_value(result.pointer(parent).unwrap().clone()).map_err(invalid)?;
+            let mut config = state.config.clone();
+            layout::reposition_panel(
+                &mut config,
+                crate::interaction::panel_index(object.layer),
+                area,
+            )?;
+            result["config"] = serde_json::to_value(config).map_err(runtime)?;
+        }
+    }
+    if field.path.starts_with("/radial/")
+        && matches!(
+            key,
+            "label" | "value" | "label_format" | "label_decimals" | "value_suffix"
+        )
+    {
+        let mut chart: renderer::RadialChart =
+            serde_json::from_value(result["radial"].clone()).map_err(invalid)?;
+        chart.format_labels();
+        result["radial"] = serde_json::to_value(chart).map_err(runtime)?;
     }
     Ok(result)
 }
@@ -1646,6 +2108,7 @@ fn ensure_colorbar(
     Ok(())
 }
 fn reflow_grid(state: &mut Value) -> PyResult<()> {
+    let before: Config = serde_json::from_value(state["config"].clone()).map_err(invalid)?;
     let layout = &state["identity"]["layout"];
     let gap = layout["gap"]
         .as_f64()
@@ -1737,7 +2200,7 @@ fn reflow_grid(state: &mut Value) -> PyResult<()> {
         };
         *state.pointer_mut(&path).unwrap() = rect;
     }
-    Ok(())
+    layout::carry_insets(state, &before)
 }
 #[pyfunction]
 #[pyo3(signature=(settings,object_id=None,compact=false))]

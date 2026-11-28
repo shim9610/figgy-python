@@ -1,18 +1,18 @@
 //! Host-owned automatic/fixed tick intent, addressed by persistent axes owner.
-use super::*;
+use renderer::{Chart, default};
+use serde_json::Value;
+#[cfg(not(target_arch = "wasm32"))]
+use serde_json::json;
 
 fn address(meta: &Value, layer: renderer::LayerRef, side: &str) -> Option<(String, String)> {
-    let (panel, overlay) = match layer {
-        renderer::LayerRef::Subplot(i) => (i + 1, None),
-        renderer::LayerRef::SubplotOverlay(i, o) => (i + 1, Some(o)),
-        renderer::LayerRef::Overlay(o) => (0, Some(o)),
-        _ => (0, None),
-    };
+    let (panel, overlay) = super::layer_parts(layer);
+    let panel = panel.map_or(0, |i| i + 1);
     let panel = &meta["panels"][panel];
-    if side == "right_y"
+    if matches!(side, "right_y" | "y_axis" | "x_axis")
         && let Some(overlay) = overlay
     {
-        Some((panel["overlays"][overlay].as_str()?.into(), "y_axis".into()))
+        let key = if side == "x_axis" { side } else { "y_axis" };
+        Some((panel["overlays"][overlay].as_str()?.into(), key.into()))
     } else {
         Some((panel["id"].as_str()?.into(), side.into()))
     }
@@ -67,65 +67,79 @@ pub(crate) fn automatic(meta: Option<&Value>, layer: renderer::LayerRef, side: &
     })
 }
 
-pub(crate) fn set_mode(state: &mut Value, side: &str, automatic: bool) {
-    let layer = state["config"]
-        .get("active_layer")
-        .cloned()
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or(renderer::LayerRef::Base);
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn paired_axis(config: &Value, side: &str) -> Option<&'static str> {
+    let peer = match side {
+        "bottom_x" => "top_x",
+        "top_x" => "bottom_x",
+        "left_y" if config["view_3d"].is_null() => "right_y",
+        "right_y" if config["view_3d"].is_null() => "left_y",
+        _ => return None,
+    };
+    let axis = &config[side];
+    let opposite = &config[peer];
+    (axis.is_object()
+        && opposite.is_object()
+        && ["min", "max"].into_iter().all(|key| {
+            axis[key].as_f64().is_some() && axis[key].as_f64() == opposite[key].as_f64()
+        })
+        && ["scale", "inverted"]
+            .into_iter()
+            .all(|key| axis.get(key).is_some() && axis[key] == opposite[key]))
+    .then_some(peer)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn set_mode_at(
+    state: &mut Value,
+    layer: renderer::LayerRef,
+    side: &str,
+    mode: Option<bool>,
+    paired: bool,
+) {
     let Some((owner, key)) = address(&state["identity"], layer, side) else {
         return;
     };
-    let index = match layer {
-        renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => Some(i),
-        _ => None,
+    let cfg = match layer {
+        renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
+            &state["config"]["subplots"][i]["config"]
+        }
+        _ => &state["config"],
     };
-    let cfg = index.map_or(
-        &state["config"],
-        |i| &state["config"]["subplots"][i]["config"],
-    );
-    let peer = match key.as_str() {
-        "bottom_x" => Some("top_x"),
-        "top_x" => Some("bottom_x"),
-        "left_y" => Some("right_y"),
-        "right_y" => Some("left_y"),
-        _ => None,
-    };
-    let peer = peer.filter(|other| {
-        ["min", "max", "scale", "inverted"]
-            .iter()
-            .all(|field| cfg[&key][field] == cfg[other][field])
-    });
-    let mut targets = vec![key.as_str()];
-    if let Some(peer) = peer {
-        targets.push(peer);
-    }
-    for key in targets {
+    let peer = paired.then(|| paired_axis(cfg, &key)).flatten();
+    for key in std::iter::once(key.as_str()).chain(peer) {
         let ids = owners(&state["identity"], &owner, key);
         let meta = &mut state["identity"];
-        if !meta["tick_modes"].is_object() {
-            meta["tick_modes"] = json!({});
-        }
         for id in ids {
-            if !meta["tick_modes"][&id].is_object() {
-                meta["tick_modes"][&id] = json!({});
+            if let Some(automatic) = mode {
+                if !meta["tick_modes"].is_object() {
+                    meta["tick_modes"] = json!({});
+                }
+                if !meta["tick_modes"][&id].is_object() {
+                    meta["tick_modes"][&id] = json!({});
+                }
+                meta["tick_modes"][id][key] = json!(if automatic { "Auto" } else { "Fixed" });
+            } else if let Some(modes) = meta.get_mut("tick_modes").and_then(Value::as_object_mut) {
+                if let Some(mode) = modes.get_mut(&id).and_then(Value::as_object_mut) {
+                    mode.remove(key);
+                    if mode.is_empty() {
+                        modes.remove(&id);
+                    }
+                }
+                if modes.is_empty() {
+                    meta.as_object_mut().unwrap().remove("tick_modes");
+                }
             }
-            meta["tick_modes"][id][key] = json!(if automatic { "Auto" } else { "Fixed" });
         }
     }
 }
 
-/// The upstream link helper carries spacing with range edits, but resets a
-/// spacing-only member edit to its root. Apply shared spacing before that step.
-pub(crate) fn synchronize_spacing(state: &mut Value, side: &str) {
+/// Carry a spacing-only edit across shared axes before renderer link normalization.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn synchronize_spacing_at(state: &mut Value, layer: renderer::LayerRef, side: &str) {
     if !matches!(side, "bottom_x" | "left_y") {
         return;
     }
-    let layer = state["config"]
-        .get("active_layer")
-        .cloned()
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or(renderer::LayerRef::Base);
     let Some((owner, key)) = address(&state["identity"], layer, side) else {
         return;
     };
@@ -163,6 +177,7 @@ pub(crate) fn retick(axis: &mut renderer::config::AxisOptions) {
     axis.major_spacing = chart.config().bottom_x.major_spacing;
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn retick_value(axis: &mut Value) {
     if let Ok(mut parsed) = serde_json::from_value::<renderer::config::AxisOptions>(axis.clone()) {
         retick(&mut parsed);

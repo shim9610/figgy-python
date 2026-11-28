@@ -27,10 +27,10 @@ def test_previous_settings_preserve_edits_and_reject_unknown_versions(backend, k
         ax.set_title('Temporary edit')
         figure.apply_settings(saved)
         current = figure.get_settings()
-        expected = dict(saved, renderer_version='0.18.1')
+        expected = dict(saved, renderer_version='0.19.0')
         assert current == expected
         revision = figure.revision
-        for key, value in [('renderer_version', '0.19.0'), ('schema_version', 3)]:
+        for key, value in [('renderer_version', '9.0.0'), ('schema_version', 3)]:
             invalid = dict(saved, **{key: value})
             with pytest.raises(ValueError, match='version'):
                 figure.apply_settings(invalid)
@@ -52,7 +52,7 @@ def test_heatmap_legend_updates_colormap_and_replays_without_losing_text(backend
         after = source.get_settings()['config']['legend']['content']['segments']
         assert before != after
         assert 'Temperature' in ''.join(segment['text'] for segment in after)
-        exec(source.to_code(), {'fig': target})
+        exec(source.to_code(mode='exact'), {'fig': target})
         assert target.get_settings() == source.get_settings()
         if backend == 'native':
             assert np.array_equal(source.render_rgba(), target.render_rgba())

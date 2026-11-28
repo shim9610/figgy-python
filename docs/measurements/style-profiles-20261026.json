@@ -1,0 +1,724 @@
+{
+  "publication.nature": {
+    "purpose": "Small final-size scientific figures",
+    "font": 6.5,
+    "title": 7,
+    "print": true,
+    "tick": "Inside",
+    "widths_mm": [
+      89,
+      183
+    ],
+    "name": "publication.nature",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://www.nature.com/nature/for-authors/final-submission",
+      "https://research-figure-guide.nature.com/figures/preparing-figures-our-specifications/",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "89/183 mm typical final widths; ordinary lettering 5\u20137 pt; editable vector/font handling required."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "publication.nature.png",
+    "dpi": 300.0,
+    "size_px": [
+      1051,
+      732
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "publication.ieee-proceedings": {
+    "purpose": "Engineering figures for Proceedings of the IEEE",
+    "font": 9,
+    "title": 10,
+    "print": true,
+    "tick": "Inside",
+    "widths_mm": [
+      88.9,
+      182
+    ],
+    "mono": true,
+    "name": "publication.ieee-proceedings",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://proceedingsoftheieee.ieee.org/resources/guidelines-for-figures-and-tables/",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Proceedings of the IEEE recommends approximately 9\u201310 pt lettering."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 12,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "publication.ieee-proceedings.png",
+    "dpi": 300.0,
+    "size_px": [
+      1050,
+      768
+    ],
+    "category_contrast": [
+      17.9278402530276,
+      8.063288656552828,
+      4.542224959605253
+    ],
+    "semantic_contrast": {
+      "focus": 17.9278402530276,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "publication.kfas": {
+    "purpose": "Four-sided scientific frame with inward ticks",
+    "font": 9,
+    "title": 10,
+    "print": true,
+    "tick": "Inside",
+    "name": "publication.kfas",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://www.e-kfas.org/intro/instructions.asp",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Four-sided frames and inward ticks are specified; this profile's 9 pt size is a product choice."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "publication.kfas.png",
+    "dpi": 300.0,
+    "size_px": [
+      1050,
+      768
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "scientific.precision": {
+    "purpose": "Dense quantitative signals with a full measurement frame",
+    "font": 10,
+    "title": 12,
+    "tick": "Inside",
+    "grid": "both",
+    "name": "scientific.precision",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "scientific.precision.png",
+    "dpi": 100.0,
+    "size_px": [
+      820,
+      460
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "print.monochrome": {
+    "purpose": "Grayscale printing and photocopying",
+    "font": 9,
+    "title": 11,
+    "print": true,
+    "tick": "Inside",
+    "mono": true,
+    "name": "print.monochrome",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 12,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "print.monochrome.png",
+    "dpi": 240.0,
+    "size_px": [
+      840,
+      614
+    ],
+    "category_contrast": [
+      17.9278402530276,
+      8.063288656552828,
+      4.542224959605253
+    ],
+    "semantic_contrast": {
+      "focus": 17.9278402530276,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "presentation.stage": {
+    "purpose": "Projected charts with few large marks",
+    "font": 17,
+    "title": 22,
+    "dark": true,
+    "thick": 2.6,
+    "name": "presentation.stage",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "dark",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "presentation.stage.png",
+    "dpi": 100.0,
+    "size_px": [
+      820,
+      460
+    ],
+    "category_contrast": [
+      9.157485336341699,
+      10.878771269996422,
+      8.355145728320768,
+      9.97086861878996,
+      7.141449431606433,
+      10.678578853458895
+    ],
+    "semantic_contrast": {
+      "focus": 9.157485336341699,
+      "context": 8.780227775442686,
+      "reference": 8.780227775442686,
+      "warning": 10.878771269996422,
+      "critical": 7.141449431606433,
+      "positive": 9.97086861878996
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.executive": {
+    "purpose": "Sparse performance overview with comparison context",
+    "font": 12,
+    "title": 16,
+    "thick": 2,
+    "name": "dashboard.executive",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.executive.png",
+    "dpi": 100.0,
+    "size_px": [
+      820,
+      460
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.operations": {
+    "purpose": "Operational trends with caller-supplied alert roles",
+    "font": 11,
+    "title": 14,
+    "dark": true,
+    "name": "dashboard.operations",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/best-practices/",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "dark",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.operations.png",
+    "dpi": 100.0,
+    "size_px": [
+      1220,
+      470
+    ],
+    "category_contrast": [
+      9.157485336341699,
+      8.355145728320768,
+      9.97086861878996,
+      10.678578853458895,
+      10.044568253567032,
+      9.736866244511031
+    ],
+    "semantic_contrast": {
+      "focus": 9.157485336341699,
+      "context": 8.780227775442686,
+      "reference": 8.780227775442686,
+      "warning": 10.878771269996422,
+      "critical": 7.141449431606433,
+      "positive": 9.97086861878996
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.analysis": {
+    "purpose": "Comparisons, uncertainty and focus versus context",
+    "font": 10,
+    "title": 13,
+    "grid": "both",
+    "name": "dashboard.analysis",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.analysis.png",
+    "dpi": 100.0,
+    "size_px": [
+      1220,
+      470
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.instrument": {
+    "purpose": "Dense measurement traces, units and references",
+    "font": 10,
+    "title": 12,
+    "dark": true,
+    "tick": "Inside",
+    "grid": "both",
+    "name": "dashboard.instrument",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "dark",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.instrument.png",
+    "dpi": 100.0,
+    "size_px": [
+      1220,
+      470
+    ],
+    "category_contrast": [
+      9.157485336341699,
+      8.355145728320768,
+      9.97086861878996,
+      10.678578853458895,
+      10.044568253567032,
+      9.736866244511031
+    ],
+    "semantic_contrast": {
+      "focus": 9.157485336341699,
+      "context": 8.780227775442686,
+      "reference": 8.780227775442686,
+      "warning": 10.878771269996422,
+      "critical": 7.141449431606433,
+      "positive": 9.97086861878996
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.wallboard": {
+    "purpose": "Distant viewing with large labels and strokes",
+    "font": 17,
+    "title": 24,
+    "dark": true,
+    "thick": 2.8,
+    "name": "dashboard.wallboard",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "dark",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.wallboard.png",
+    "dpi": 100.0,
+    "size_px": [
+      820,
+      460
+    ],
+    "category_contrast": [
+      9.157485336341699,
+      8.355145728320768,
+      9.97086861878996,
+      10.678578853458895,
+      10.044568253567032,
+      9.736866244511031
+    ],
+    "semantic_contrast": {
+      "focus": 9.157485336341699,
+      "context": 8.780227775442686,
+      "reference": 8.780227775442686,
+      "warning": 10.878771269996422,
+      "critical": 7.141449431606433,
+      "positive": 9.97086861878996
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.public": {
+    "purpose": "Broad-audience charts with clear redundant encodings",
+    "font": 13,
+    "title": 17,
+    "thick": 2,
+    "name": "dashboard.public",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.public.png",
+    "dpi": 100.0,
+    "size_px": [
+      820,
+      460
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "dashboard.mobile": {
+    "purpose": "Small-screen single-chart reading",
+    "font": 11,
+    "title": 14,
+    "thick": 1.8,
+    "name": "dashboard.mobile",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "dashboard.mobile.png",
+    "dpi": 100.0,
+    "size_px": [
+      410,
+      520
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  },
+  "education.explainer": {
+    "purpose": "Teaching with a clear frame, labels and emphasis",
+    "font": 12,
+    "title": 16,
+    "tick": "Outside",
+    "grid": "both",
+    "thick": 1.8,
+    "name": "education.explainer",
+    "checked": "2026-10-26",
+    "sources": [
+      "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards-design-tips",
+      "https://www.carbondesignsystem.com/building-blocks/data-visualization/color-palettes",
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+      "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html"
+    ],
+    "verified_guidance": [
+      "Task taxonomy, typography, spacing and default colors are product choices informed by the cited guidance."
+    ],
+    "default_theme": "light",
+    "tick_provenance": "product design choice; not a journal requirement",
+    "category_capacity": 24,
+    "limits": [
+      "Appearance only; no thresholds, units, scale domains or text inferred.",
+      "PNG export does not meet editable vector/font submission requirements.",
+      "Default host font must be checked or explicitly replaced; no bundled journal font guarantee.",
+      "Color contrast audit is not whole-chart accessibility or CVD certification.",
+      "Mobile navigation, reflow and wallboard viewing distance belong to the host."
+    ],
+    "image": "education.explainer.png",
+    "dpi": 100.0,
+    "size_px": [
+      820,
+      460
+    ],
+    "category_contrast": [
+      6.028555280407447,
+      5.97268826571777,
+      7.047938004175022,
+      4.971984258030481,
+      5.24180584476409,
+      5.962063909275079
+    ],
+    "semantic_contrast": {
+      "focus": 6.028555280407447,
+      "context": 5.962063909275079,
+      "reference": 5.962063909275079,
+      "warning": 5.24180584476409,
+      "critical": 6.507329548273491,
+      "positive": 4.971984258030481
+    },
+    "inherited_after_scope": true,
+    "renderer": "Figgy native"
+  }
+}

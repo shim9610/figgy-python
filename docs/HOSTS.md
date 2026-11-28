@@ -1,13 +1,9 @@
 # Native surface / notebook WebGPU hosts
 
-The figgyplot 0.3.0 source uses the published `figgy-renderer 0.18.1` and
-`figgy-model 0.12.1` crates from crates.io. `Cargo.lock` pins their versions
-and checksums; packaged WASM uses their release commit
-`f3f569c4c0e32d3d0682632444b6fe7ce84cba8d`.
-Provenance checks preserve this source pairing; see [publishing](PUBLISHING.md).
-Chart layout, styles, data
-rendering, hit maps and drag policies remain renderer APIs. No renderer source is
-vendored. `benchmarks/plot_results.py` continues to render reports with Figgy.
+The figgyplot 0.4.0 integration uses `figgy-renderer 0.19.0-beta.3` and
+`figgy-model 0.13.0-beta.3`. The native extension and bundled WebAssembly
+(WASM) use the same upstream revision. Figgy provides chart layout, drawing,
+hit testing and drag behavior. See the [renderer 0.19 guide](RENDERER_019.md).
 
 ## Desktop
 
@@ -37,8 +33,8 @@ styles. The chart document/export size stays unchanged by window resize/DPI.
 
 A normal frame prepares and paints the chart plus egui into the swapchain,
 submits and presents. It performs no RGBA mapping, PNG encoding, QWebChannel,
-JavaScript or image transfer. GPU picking reads a small result on explicit picks;
-it does not read the whole frame. PNG export alone uses renderer readback.
+JavaScript or image transfer. GPU picking reads a small result on explicit picks.
+Image export reads back the raster content.
 
 The chart-centered toolbar uses vector icons with tooltips and leaves properties
 hidden until an element is selected.
@@ -47,11 +43,12 @@ styles, tick-label format/significant digits/font size/family/color, and matrix
 color range, logarithmic mapping and palettes. The font entry is a family name,
 not a TTF path. Native uses renderer system/registered fonts; a missing family
 falls back to the bundled font.
-Chrome/series selection, renderer drag/resize policies, wheel zoom, Copy Python
-and Save PNG are available; full SSOT JSON covers additional renderer fields.
+The toolbar offers chrome and series selection, dragging, wheel zoom,
+Copy Python and Export. The full JSON settings cover additional renderer fields.
 Copy Python exports common Python setters and readable `fig.configure(...)`
 patches through the shared Python exporter, preserving advanced settings.
-Save PNG opens a file-path popover; Advanced settings opens the full JSON form.
+**Export** opens a format and file-path popover. **Advanced settings** opens the
+full JSON form.
 Opening properties expands a normal window while preserving chart display size
 and aspect ratio; maximized/fullscreen windows use an overlay. The document/export
 canvas remains unchanged. UI names show labels rather than renderer field keys.
@@ -170,15 +167,13 @@ display(fig)
 # In another cell after interactive edits:
 await fig.sync()               # wait for pending browser edits/ack
 print(fig.to_code())
-await fig.savefig_async("edited.png")
+await fig.savefig_async("edited.pdf")
 ```
 
-Synchronous `savefig`/`render_rgba` are native operations. WebGPU PNG requests are
-asynchronous because the kernel cannot block its comm dispatcher. Use
-`await fig.to_png_async()` or `savefig_async()`; browser Save PNG also downloads
-from renderer export. Both export after pending settings edits are acknowledged.
-They return/transfer PNG only on explicit export requests. A visible widget view
-must be mounted for browser requests; they time out if no frontend is connected.
+Synchronous `savefig` and `render_rgba` run on the native host. Use
+`await fig.savefig_async(path)` or `await fig.export_async(format)` for
+PNG, SVG and PDF through Jupyter WebGPU. The browser acknowledges pending
+settings before exporting. Keep a widget view mounted while the request runs.
 
 WebGPU needs a supported browser and secure origin (HTTPS or localhost), with a
 usable GPU driver. No native GPU is required in the remote kernel. Unsupported
@@ -187,42 +182,23 @@ not silently switch backend. Explicit `Figure(backend="native").widget(backend="
 retains the older kernel PNG editor and is labeled **Kernel PNG fallback**. It
 requires a usable kernel GPU and performs image transfers.
 
-## Renderer 0.18 compatibility
+## Saved settings compatibility
 
 Native and browser settings migrate schema 1 documents stamped with renderer
-0.17.0, 0.18.0 or 0.18.1; new snapshots use schema 2 and renderer 0.18.1, with stable
-document identities and grid metadata. Other versions are rejected
-without changing the Figure. Existing stored geometry is preserved. New
-colorbars adopt upstream's 8 px gap (previously 24 px); set `gap_px=24` through
-settings to retain the earlier spacing. The hosts keep their explicit 25 px
-right-axis margin. Heatmap legend symbols now use the chart colormap and
-refresh when it changes, preserving label text.
-
-The 0.18.1 patch uses the drawn geometry for Cartesian tick-label bounds and
-hit regions, preserves both components of label offsets, and corrects GPU
-logarithmic projection for large values. Its model keeps the 0.12.0 serialized
-fields. The host regression checks move bottom/left labels by (45, 30) pixels
-and verify bounds, hits and drawn text; a live browser check covers values from
-1e6 to 1e10. Remaining upstream geometry limits are tracked in
-[figgy #38](https://github.com/shim9610/figgy/issues/38).
-
-This migration keeps the existing single-panel Python API and manual editing
-workflow. See [renderer 0.18 features](RENDERER_018_FEATURES.md) for new
-constructors, ID-addressed panels, layers, annotations and complete-document
-export/replay. Comprehensive editor control coverage remains
-[issue #17](https://github.com/shim9610/figgy-python/issues/17).
+0.17.0, 0.18.0 or 0.18.1. Current snapshots use schema 2 and the renderer
+stamp `0.19.0` with stable identities and grid metadata. The Python API can
+import legacy inline category-bar, box-plot and radar settings into an empty
+Figure. See [saved settings and replay](RENDERER_019.md#saved-settings).
 
 ## Assets and builds
 
 `python/figgyplot/assets/figgy.js` and `figgy_bg.wasm` are generated from upstream
-`crates/web` at commit `f3f569c4c0e32d3d0682632444b6fe7ce84cba8d` (renderer 0.18.1,
-web example 0.15.1). `scripts/build-wasm.sh` rebuilds with its Cargo.lock and
-wasm-bindgen 0.2.129. `assets/provenance.json` records the versions, asset hashes
-and native registry package checksums. Rebuilding verifies the downloaded crate
-archives and their source commit against the WASM checkout. Offline preflight
-rejects native/WASM version, source or checksum mismatches and Git/path overrides.
-The script uses an external checkout; it does not copy Rust sources into this
-repository. It is a maintainer step; pip installation uses packaged artifacts.
+`crates/web`. `scripts/build-wasm.sh` checks the source pairing, applies the
+recorded host patch and rebuilds with the upstream lockfile and wasm-bindgen
+0.2.129. The [asset provenance](../python/figgyplot/assets/provenance.json)
+records the commit, package sources and asset hashes. Published crate pins
+also verify registry checksums against the upstream checkout. Python wheels
+ship the generated assets. See [publishing](PUBLISHING.md).
 
 The wheel/sdist include native bindings, local JS/WASM, CSS and font notices.
 Anywidget sends the packaged JS text and WASM binary to its frontend; a local blob

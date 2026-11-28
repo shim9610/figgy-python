@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 
 from .figure import _display_texts
 
@@ -19,6 +20,7 @@ class EditorSession:
         fig = self.figure
         with fig._lock:
             settings = fig.get_settings()
+            from ._codegen import editor_code_payload
             revision = fig.revision
             if revision != self._image_revision:
                 try:
@@ -31,7 +33,8 @@ class EditorSession:
                     "bounds": fig.selection_bounds(), "handle": self.handle,
                     "width": rect["width"], "height": rect["height"],
                     "dpi": fig.dpi,
-                    "code": fig.to_code(), "error": self.error, "last_request": self.last_request,
+                    **editor_code_payload(settings,fig._default_config,fig.dpi),
+                    "error": self.error, "last_request": self.last_request,
                     "edit_history": fig.edit_history,
                     "texts": _display_texts(settings)}
 
@@ -65,7 +68,8 @@ class EditorSession:
                     fig.select_object(message["target"])
                     self.handle = None
                 elif action == "settings":
-                    fig.apply_settings(message["settings"], expected_revision=message["revision"])
+                    settings = json.loads(message["settings_json"]) if "settings_json" in message else message["settings"]
+                    fig.apply_settings(settings, expected_revision=message["revision"])
                 elif action == "fit":
                     fig.fit()
                 elif action in ('undo', 'redo', 'reset_edits'):

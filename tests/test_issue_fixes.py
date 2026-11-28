@@ -47,7 +47,7 @@ def test_bar_series_recolour_and_code_export(plot):
     fig.update("h", color="#ff0000")
     bar = fig.get_settings()["series"][0]["render_type"]["Histogram"]["bar"]
     assert bar["fill_color"] == _color("#ff0000")
-    assert "fig.update('h', color=" in fig.to_code()
+    assert "fig.artist('h').set_facecolor(" in fig.to_code()
 
 
 def test_sketch_rejects_series_it_cannot_draw(plot):
@@ -160,7 +160,7 @@ def test_title_alignment_is_editable_and_exported(plot):
     ax.plot(np.arange(3.0), np.arange(3.0))
     fig.update("chart_title", text="A wide first line\nab", align="center")
     assert fig.get_settings()["config"]["chart_title"]["text"]["align"] == "Center"
-    assert "align='center'" in fig.to_code()
+    assert "multialignment='center'" in fig.to_code()
     with pytest.raises(ValueError, match="align"):
         fig.update("chart_title", align="middle")
 
@@ -227,6 +227,28 @@ def test_tick_substitution_warns_once_per_change(plot):
     assert not [w for w in caught if issubclass(w.category, figgy.RenderWarning)], "reported once"
 
 
+def test_native_legend_warnings_use_public_series_ids(plot):
+    fig, ax = plot
+    box = ax.boxplot([[1, 2, 3], [2, 4, 5]], legend=True)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", figgy.RenderWarning)
+        fig.render_rgba()
+        fig.render_rgba()
+
+    state = fig.get_settings()
+    segments = state["config"]["legend"]["content"]["segments"]
+    symbol = next(segment for segment in segments if segment.get("series_id"))
+    assert symbol["series_id"] == box.id
+    symbol["series_id"] = "missing"
+    fig.apply_settings(state)
+    with pytest.warns(figgy.RenderWarning, match='names series "missing"'):
+        fig.render_rgba()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", figgy.RenderWarning)
+        fig.render_rgba()
+
+
 def test_to_code_replays_an_injected_title_margin(plot):
     fig, ax = plot
     ax.plot(np.arange(10.0), np.arange(10.0), id="a")
@@ -240,7 +262,7 @@ def test_to_code_replays_an_injected_title_margin(plot):
     target, target_ax = figgy.subplots(figsize=(6, 4), dpi=100)
     try:
         target_ax.plot(np.arange(10.0), np.arange(10.0), id="a")
-        exec(fig.to_code(variable="fig"), {"fig": target})
+        exec(fig.to_code(variable="fig", mode="exact"), {"fig": target})
         assert target.get_settings() == expected
     finally:
         target.close()

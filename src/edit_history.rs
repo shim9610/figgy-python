@@ -96,6 +96,9 @@ impl FigureAccess<'_> {
         self.data.history.begin(state, self.data.revision, label);
     }
     pub(crate) fn end_edit(&mut self) {
+        if self.data.history.gesture.is_none() {
+            return;
+        }
         let state = serde_json::to_value(self.snapshot()).unwrap();
         self.data.history.finish(state, self.data.revision);
     }
@@ -270,6 +273,26 @@ impl History {
         if let Some((before, base, label)) = self.gesture.take() {
             self.record(before, state, base, revision, &label);
         }
+    }
+    /// Two phases of one edit can share an undo entry if no edit came between them.
+    pub fn join_adjacent(&mut self, base: u64, middle: u64, revision: u64) {
+        if base == middle || middle == revision || self.undo.len() < 2 {
+            return;
+        }
+        let first = &self.undo[self.undo.len() - 2];
+        let second = self.undo.back().unwrap();
+        if (
+            first.base_revision,
+            first.revision,
+            second.base_revision,
+            second.revision,
+        ) != (base, middle, middle, revision)
+        {
+            return;
+        }
+        let second = self.undo.pop_back().unwrap();
+        let first = self.undo.pop_back().unwrap();
+        self.record(first.before, second.after, base, revision, &first.label);
     }
     pub fn status(&self) -> Value {
         json!({"can_undo":!self.undo.is_empty(),"can_redo":!self.redo.is_empty(),

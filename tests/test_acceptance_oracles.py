@@ -30,7 +30,7 @@ def semantic_error(figure, feature):
     elif feature in ('baseline_fill','series_fill'):
         state['series'][-1]['render_type']['Line']['line']['fill']={'ToBaseline':0}
     elif feature=='polar':state['config']['polar']['clockwise']=False
-    elif feature=='radar':state['radar']['value_range']=[0,8]
+    elif feature=='radar':state['config']['left_y'].update(min=0,max=8);state['config']['right_y'].update(min=0,max=8)
     elif feature=='annotations':state['config']['annotations']['items'].pop()
     figure.apply_settings(state)
 
@@ -108,7 +108,7 @@ def test_renderer_oracle_rejects_wrong_resident_values(tmp_path,monkeypatch,back
     class WrongDevice:
         def __init__(self,native):self.native=native
         def __getattr__(self,name):return getattr(self.native,name)
-        def upload_column(self,name,array):self.native.upload_column(name,np.zeros_like(array))
+        def upload_column(self,name,array,**options):self.native.upload_column(name,np.zeros_like(array),**options)
     def changed(session,*args,**kwargs):
         with monkeypatch.context() as patch:
             if backend=='native':
@@ -116,8 +116,8 @@ def test_renderer_oracle_rejects_wrong_resident_values(tmp_path,monkeypatch,back
                 patch.setattr(module,'NativeFigure',lambda *a,**k:WrongDevice(constructor(*a,**k)))
             else:
                 upload=NotebookData.upload_column
-                def wrong_transfer(data,name,array):
-                    upload(data,name,array)
+                def wrong_transfer(data,name,array,**options):
+                    upload(data,name,array,**options)
                     dtype,payload=data.columns[name]
                     data.columns[name]=(dtype,bytes(len(payload)))
                 patch.setattr(NotebookData,'upload_column',wrong_transfer)

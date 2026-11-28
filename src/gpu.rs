@@ -34,7 +34,11 @@ pub fn context(pool_bytes: u64) -> PyResult<Arc<GpuContext>> {
         return Ok(Arc::clone(context));
     }
     let instance = create_instance();
-    let adapter = request_adapter(&instance).map_err(runtime)?;
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        apply_limit_buckets: false,
+        ..Default::default()
+    }))
+    .map_err(runtime)?;
     let info = adapter.get_info();
     let available = adapter.limits();
     let mut limits = wgpu::Limits::default();
@@ -48,7 +52,7 @@ pub fn context(pool_bytes: u64) -> PyResult<Arc<GpuContext>> {
     }))
     .map_err(runtime)?;
     let mut renderer = Renderer::try_new(
-        RendererDevice::new(Arc::new(device), Arc::new(queue)),
+        RendererDevice::new(device, queue).map_err(runtime)?,
         wgpu::TextureFormat::Rgba8Unorm,
         capacity,
     )
@@ -88,7 +92,7 @@ impl GpuContext {
                     renderer.remove_chart(chart).map_err(runtime)?;
                 }
                 for id in &columns {
-                    renderer.remove_column(id).map_err(runtime)?;
+                    remove_resource(renderer, id).map_err(runtime)?;
                 }
                 Ok(())
             })();
@@ -145,7 +149,7 @@ pub fn release_gpu(py: Python<'_>) -> PyResult<bool> {
         {
             let mut renderer = context.renderer.lock().map_err(runtime)?;
             context.drain(&mut renderer)?;
-            renderer.wait_idle();
+            renderer.wait_idle().map_err(runtime)?;
         }
         *slot = None;
         Ok(true)
@@ -162,7 +166,12 @@ fn selection_series(reference: &mut renderer::config::PickedDataRef) -> &mut Str
         R::Point { series_id, .. }
         | R::HistogramBin { series_id, .. }
         | R::MatrixCell { series_id, .. }
-        | R::ContourLevel { series_id, .. } => series_id,
+        | R::ContourLevel { series_id, .. }
+        | R::ValueLabel { series_id, .. }
+        | R::MeshTriangle { series_id, .. }
+        | R::FeynmanVertex { series_id, .. }
+        | R::FeynmanPropagator { series_id, .. }
+        | R::FeynmanLabel { series_id, .. } => series_id,
     }
 }
 
@@ -173,11 +182,21 @@ pub fn local_selection(figure: u64, reference: &mut renderer::config::PickedData
     }
 }
 
+fn map_legend_series(legend: &mut renderer::legend::Legend, map: impl Fn(&str) -> String) {
+    for segment in &mut legend.content.segments {
+        if let Some(id) = &mut segment.series_id {
+            *id = map(id);
+        }
+    }
+}
+
 pub fn config(figure: u64, input: &Config) -> Config {
     let mut result = input.clone();
-    if let Some(points) = &mut result.picked_points {
-        for reference in &mut points.refs {
-            reference.series_id = column_id(figure, &reference.series_id);
+    let namespace = |id: &str| column_id(figure, id);
+    map_legend_series(&mut result.legend, namespace);
+    if let Some(offsets) = &mut result.line_offsets {
+        for id in &mut offsets.series {
+            *id = column_id(figure, id);
         }
     }
     if let Some(data) = &mut result.picked_data {
@@ -190,6 +209,9 @@ pub fn config(figure: u64, input: &Config) -> Config {
         for id in &mut overlay.series {
             *id = column_id(figure, id);
         }
+        if let Some(legend) = &mut overlay.legend {
+            map_legend_series(legend, namespace);
+        }
     }
     for subplot in &mut result.subplots {
         for id in &mut subplot.series {
@@ -197,148 +219,116 @@ pub fn config(figure: u64, input: &Config) -> Config {
         }
         subplot.config = config(figure, &subplot.config);
     }
-    // Renderer 0.18's registry validates mapped series against the document
-    // root before expansion. Subplots still draw with their own colorbars.
-    // Supply an invisible validation context only at the GPU boundary; it
-    // never becomes an additional authority in the persisted chart model.
-    if result.colorbar.is_none() {
-        if let Some(bar) = result
-            .subplots
-            .iter()
-            .find_map(|p| p.config.colorbar.as_ref())
-        {
-            let mut bar = bar.clone();
-            bar.visible = false;
-            result.colorbar = Some(bar);
-        }
-    }
     result
 }
 
-/// Names and the derived registry validation context change at this boundary.
-/// Public SSOT retains local ids and its own colorbars;
-/// typed renderer models still own all validation, fitting and rendering.
+/// Namespace series and source IDs at the GPU boundary.
 pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
-    use renderer::data_config::{
-        DataErrorBarStyleConfig, DataRenderType as T, DataScatterStyleConfig, ErrorRef, LineFill,
-        MatrixRef, VectorColorMap, VectorComponents,
-    };
-    fn scatter(figure: u64, style: &mut DataScatterStyleConfig) {
-        if let Some(id) = &mut style.point_style_index_column {
-            *id = column_id(figure, id);
-        }
-        if let Some(map) = &mut style.point_color_map {
-            map.column = column_id(figure, &map.column);
-        }
-        if let Some(map) = &mut style.point_size_map {
-            map.column = column_id(figure, &map.column);
-        }
-    }
-    fn matrix(figure: u64, reference: &mut MatrixRef) {
-        for id in &mut reference.columns {
-            *id = column_id(figure, id);
-        }
-    }
-    fn error(figure: u64, reference: &mut ErrorRef) {
-        match reference {
-            ErrorRef::Symmetric { column } => *column = column_id(figure, column),
-            ErrorRef::Asymmetric { lower, upper } => {
-                *lower = column_id(figure, lower);
-                *upper = column_id(figure, upper);
+    fn remap(
+        value: &mut Value,
+        columns: &std::collections::HashSet<String>,
+        figure: u64,
+        key: &str,
+    ) {
+        match value {
+            Value::String(id) if key == "series_id" => *id = column_id(figure, id),
+            Value::String(id)
+                if columns.contains(id)
+                    && !matches!(
+                        key,
+                        "text" | "label" | "font" | "group" | "source_id" | "series_id"
+                    ) =>
+            {
+                *id = column_id(figure, id)
             }
-        }
-    }
-    fn error_style(figure: u64, style: &mut DataErrorBarStyleConfig) {
-        if let Some(id) = &mut style.error_bar_style_index_column {
-            *id = column_id(figure, id);
-        }
-    }
-    let mut result = input.to_vec();
-    for s in &mut result {
-        // Renderer scratch caches are keyed by series id, not just chart id.
-        s.series_id = column_id(figure, &s.series_id);
-        s.x_column = column_id(figure, &s.x_column);
-        s.y_column = column_id(figure, &s.y_column);
-        if let T::Line { line }
-        | T::ScatterLine { line, .. }
-        | T::LineScatterErrorbarX { line, .. }
-        | T::LineScatterErrorbarY { line, .. }
-        | T::LineScatterErrorbarXY { line, .. } = &mut s.render_type
-        {
-            if let Some(LineFill::ToSeries(id)) = &mut line.fill {
-                *id = column_id(figure, id);
-            }
-        }
-        match &mut s.render_type {
-            T::Line { .. } | T::Histogram { .. } => {}
-            T::Scatter { scatter: style } | T::ScatterLine { scatter: style, .. } => {
-                scatter(figure, style)
-            }
-            T::ScatterErrorbarX {
-                scatter: style,
-                err_x: err,
-                err_style,
-            }
-            | T::ScatterErrorbarY {
-                scatter: style,
-                err_y: err,
-                err_style,
-            }
-            | T::LineScatterErrorbarX {
-                scatter: style,
-                err_x: err,
-                err_style,
-                ..
-            }
-            | T::LineScatterErrorbarY {
-                scatter: style,
-                err_y: err,
-                err_style,
-                ..
-            } => {
-                scatter(figure, style);
-                error(figure, err);
-                error_style(figure, err_style);
-            }
-            T::ScatterErrorbarXY {
-                scatter: style,
-                err_x,
-                err_y,
-                err_style,
-            }
-            | T::LineScatterErrorbarXY {
-                scatter: style,
-                err_x,
-                err_y,
-                err_style,
-                ..
-            } => {
-                scatter(figure, style);
-                error(figure, err_x);
-                error(figure, err_y);
-                error_style(figure, err_style);
-            }
-            T::Heatmap { matrix: grid, .. }
-            | T::Contour { matrix: grid, .. }
-            | T::HeatmapContour { matrix: grid, .. } => matrix(figure, grid),
-            T::Vector { components, style } => {
-                match components {
-                    VectorComponents::Points { u, v } => {
-                        *u = column_id(figure, u);
-                        *v = column_id(figure, v);
-                    }
-                    VectorComponents::Grid { u, v } => {
-                        matrix(figure, u);
-                        matrix(figure, v);
-                    }
-                }
-                match &mut style.color_map {
-                    Some(VectorColorMap::Column(id)) => *id = column_id(figure, id),
-                    Some(VectorColorMap::Grid(grid)) => matrix(figure, grid),
-                    None => {}
+            Value::Array(items) => {
+                for item in items {
+                    remap(item, columns, figure, key);
                 }
             }
+            Value::Object(items) => {
+                for (key, item) in items {
+                    remap(item, columns, figure, key);
+                }
+            }
+            _ => {}
         }
+    }
+    input
+        .iter()
+        .map(|s| {
+            let mut columns = std::collections::HashSet::new();
+            s.visit_columns(&mut |id| {
+                columns.insert(id.to_owned());
+            });
+            s.visit_composite_columns(&mut |id| {
+                columns.insert(id.to_owned());
+            });
+            let mut value = serde_json::to_value(s).expect("valid series model");
+            remap(&mut value, &columns, figure, "");
+            value["series_id"] = json!(column_id(figure, &s.series_id));
+            if let Some(links) = s.render_type.range_links() {
+                value["render_type"]["RangeLinks"]["bars"] = json!(column_id(figure, &links.bars));
+            }
+            if let Some(line) = value["render_type"]
+                .as_object_mut()
+                .and_then(|v| v.values_mut().next())
+                .and_then(|v| v.get_mut("line"))
+            {
+                if let Some(id) = line["fill"]["ToSeries"].as_str().map(str::to_owned) {
+                    line["fill"]["ToSeries"] = json!(column_id(figure, &id));
+                }
+            }
+            serde_json::from_value(value).expect("namespaced series model")
+        })
+        .collect()
+}
+
+pub fn local_config(figure: u64, input: &Config) -> Config {
+    let mut result = input.clone();
+    let prefix = format!("figgy/{figure}/");
+    let local = |id: &str| id.strip_prefix(&prefix).unwrap_or(id).to_owned();
+    map_legend_series(&mut result.legend, local);
+    if let Some(offsets) = &mut result.line_offsets {
+        for id in &mut offsets.series {
+            if let Some(local) = id.strip_prefix(&prefix) {
+                *id = local.to_owned();
+            }
+        }
+    }
+    if let Some(p) = &mut result.picked_data {
+        for r in &mut p.refs {
+            local_selection(figure, r);
+        }
+    }
+    for o in &mut result.overlays {
+        for id in &mut o.series {
+            if let Some(v) = id.strip_prefix(&prefix) {
+                *id = v.into();
+            }
+        }
+        if let Some(legend) = &mut o.legend {
+            map_legend_series(legend, local);
+        }
+    }
+    for p in &mut result.subplots {
+        for id in &mut p.series {
+            if let Some(v) = id.strip_prefix(&prefix) {
+                *id = v.into();
+            }
+        }
+        p.config = local_config(figure, &p.config);
     }
     result
+}
+pub fn remove_resource(renderer: &mut Renderer, id: &str) -> renderer::Result<bool> {
+    if renderer.pool().record(id).is_some() {
+        renderer.remove_record(id)
+    } else if renderer.pool().ragged(id).is_some() {
+        renderer.remove_ragged(id)
+    } else if renderer.pool().triangles(id).is_some() {
+        renderer.remove_triangles(id)
+    } else {
+        renderer.remove_column(id)
+    }
 }

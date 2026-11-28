@@ -59,6 +59,10 @@ def verify_registry_sources(root, upstream, revision):
     patch = host_patch_record(root)
     records = {}
     for name, package in native_registry_packages(root).items():
+        if package['source'].startswith('git+'):
+            if not package['source'].endswith('#'+revision):raise ValueError('Native Git source and WASM commit differ')
+            records[name]=dict(package,upstream_revision=revision,path_in_vcs=NATIVE_PACKAGES[name])
+            continue
         url = "https://static.crates.io/crates/{0}/{0}-{1}.crate".format(name, package["version"])
         with urlopen(url, timeout=60) as response:
             data = response.read()

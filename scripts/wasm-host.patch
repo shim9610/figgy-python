@@ -1,68 +1,318 @@
-diff --git a/crates/web/src/bounded.rs b/crates/web/src/bounded.rs
-index 07b8e02..3abf911 100644
---- a/crates/web/src/bounded.rs
-+++ b/crates/web/src/bounded.rs
-@@ -620,6 +620,20 @@ impl FiggyBoundedChart {
+diff --git a/crates/web/src/radial.rs b/crates/web/src/radial.rs
+index 0406a3a..c80cacb 100644
+--- a/crates/web/src/radial.rs
++++ b/crates/web/src/radial.rs
+@@ -329,6 +329,16 @@ impl FiggyRadialChart {
              .map_err(js_err)
      }
-
-+    /// Observe completion of work already submitted to this chart's GPU queue.
-+    /// The returned Promise owns a queue clone, not a borrow of this chart.
-+    /// Hosts may keep processing edits while waiting, and should coalesce
-+    /// display submissions until it settles. Device loss rejects the Promise.
+ 
++    /// Host fence: keep edits serialized independently of GPU completion.
 +    pub fn gpu_ready(&self) -> js_sys::Promise {
-+        let queue = self.gpu.queue().clone();
++        let (sender, receiver) = futures_channel::oneshot::channel();
++        self.gpu.queue().on_submitted_work_done(move || { let _ = sender.send(()); });
 +        wasm_bindgen_futures::future_to_promise(async move {
-+            renderer::init::wait_browser_submitted_work(&queue)
-+                .await
-+                .map_err(js_err)?;
++            receiver.await.map_err(|_| js_err("GPU completion callback was dropped"))?;
 +            Ok(JsValue::UNDEFINED)
 +        })
 +    }
 +
      pub async fn export_png(&mut self, scale: f32) -> Result<js_sys::Uint8Array, JsValue> {
-         let image = self.renderer.export(&self.chart, self.size, scale).await?;
-         let bytes = renderer::encode_png(&image).map_err(js_err)?;
-diff --git a/crates/web/src/lib.rs b/crates/web/src/lib.rs
-index 8b1224e..d4de9e4 100644
---- a/crates/web/src/lib.rs
-+++ b/crates/web/src/lib.rs
-@@ -6597,6 +6597,38 @@ mod web {
-             Ok(())
-         }
-
-+        /// Observe completion of work already submitted to this chart's GPU queue.
-+        /// The returned Promise owns a queue clone, not a borrow of this chart.
-+        /// Hosts may keep processing edits while waiting, and should coalesce
-+        /// display submissions until it settles. Device loss rejects the Promise.
-+        pub fn gpu_ready(&self) -> js_sys::Promise {
-+            let queue = self.renderer.queue().clone();
-+            wasm_bindgen_futures::future_to_promise(async move {
-+                renderer::init::wait_browser_submitted_work(&queue)
-+                    .await
-+                    .map_err(js_err)?;
-+                Ok(JsValue::UNDEFINED)
-+            })
-+        }
+         self.export_png_with_background(scale, "document").await
+     }
+diff --git a/crates/web/src/web/chart/frame.rs b/crates/web/src/web/chart/frame.rs
+index 918964b..4001af2 100644
+--- a/crates/web/src/web/chart/frame.rs
++++ b/crates/web/src/web/chart/frame.rs
+@@ -2,6 +2,9 @@
+ 
+ use super::*;
+ 
++#[path = "view_gesture.rs"]
++mod view_gesture;
 +
-+        /// Prepare current annotation geometry without submitting a display frame
-+        /// or awaiting GPU completion. Uses the renderer's canonical display
-+        /// config and annotation raster path, preserving resident source data.
-+        pub fn prepare_interaction(&mut self) -> Result<(), JsValue> {
-+            let (config, panel_rect, _) = self.display_config();
-+            let chart = Chart::new(config);
+ #[wasm_bindgen]
+ impl FiggyChart {
+     // ---- frame / resize / export ----
+@@ -188,6 +191,254 @@ impl FiggyChart {
+         Ok(())
+     }
+ 
++    /// Install coupled chart metadata in one renderer transaction.
++    pub fn set_host_state(&mut self, config: &str, series: &str) -> Result<(), JsValue> {
++        let mut config: renderer::Config = serde_json::from_str(config).map_err(js_err)?;
++        let series: Vec<SeriesConfig> = serde_json::from_str(series).map_err(js_err)?;
++        for item in &series {
++            self.ensure_columns_exist(item)?;
++        }
++        self.renderer.preflight_chart_styles(&series).map_err(js_err)?;
++        let managed = self.follow_config_legend(&mut config, &series)?;
++        let config = Chart::new(config).config().clone();
++        let len = series.len();
++        self.replace_chart_state(config, series)?;
++        if managed {
++            self.legend_auto_managed = false;
++        }
++        self.color_seq = self.color_seq.max(len);
++        Ok(())
++    }
++
++    /// Apply a canvas drag to the active panel.
++    pub fn pan_host_view(&mut self, identity: &str, dx: f32, dy: f32, width: f32, height: f32) -> Result<bool, JsValue> {
++        let (x, y) = self.display_delta_to_document(dx, dy)?;
++        self.apply_view_gesture(identity, view_gesture::Gesture::Pan {
++            pixels: [dx, dy], logical: [x, y], area: [width, height],
++        })
++    }
++
++    /// Apply a wheel zoom to the active panel.
++    pub fn zoom_host_view(&mut self, identity: &str, factor: f64, x: f64, y: f64, zoom_x: bool, zoom_y: bool) -> Result<bool, JsValue> {
++        self.apply_view_gesture(identity, view_gesture::Gesture::Zoom {
++            factor, anchor: [x, y], axes: [zoom_x, zoom_y],
++        })
++    }
++
++    fn apply_view_gesture(&mut self, identity: &str, gesture: view_gesture::Gesture) -> Result<bool, JsValue> {
++        let identity = serde_json::from_str(identity).map_err(js_err)?;
++        let mut config = self.chart_config()?.clone();
++        if !view_gesture::apply(&mut config, Some(&identity), gesture) {
++            return Ok(false);
++        }
++        self.replace_chart_config(config)?;
++        Ok(true)
++    }
++
++    /// Refresh the registered chart's data and pick masks without presenting it.
++    /// A host can probe temporary series without replacing the canvas contents.
++    pub async fn prepare_data_pick(&mut self) -> Result<(), JsValue> {
++        loop {
 +            self.renderer
-+                .refresh_annotations(
-+                    &mut self.view,
-+                    &chart,
-+                    panel_rect,
-+                    self.selected_annotation,
-+                )
++                .prepare_registered(&mut [RegisteredChartDrawItem {
++                    chart_id: self.chart_id,
++                    view: &mut self.view,
++                }])
 +                .map_err(js_err)?;
-+            self.redraw_pending = true;
++            if self.renderer.frame_complete() {
++                return Ok(());
++            }
++            if !self.renderer.compiles_pending() {
++                return Err(js_err("pick mask is waiting for a missing draw pipeline"));
++            }
++            self.renderer.compile_progress().await;
++        }
++    }
++
++    /// Format numerical category/box/radar labels from resident GPU values.
++    /// The host supplies no retained source arrays; the public model owns formatting.
++    pub async fn format_value_labels(&mut self) -> Result<String, JsValue> {
++        use renderer::{Config, SeriesConfig};
++        fn format_host_labels(
++            config: &Config,
++            series: &mut [SeriesConfig],
++            mut read: impl FnMut(&str, Option<&str>, usize) -> Result<Vec<Option<f64>>, JsValue>,
++        ) -> Result<(), JsValue> {
++            let mut layers = Vec::new();
++            for s in series.iter() {
++                let l = config.layer_of_series(&s.series_id);
++                if !layers.contains(&l) {
++                    layers.push(l);
++                }
++            }
++            for layer in layers {
++                let panel = match layer {
++                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => {
++                        &config.subplots[i].config
++                    }
++                    _ => config,
++                };
++                let overlay = match layer {
++                    renderer::LayerRef::Overlay(i) | renderer::LayerRef::SubplotOverlay(_, i) => Some(i),
++                    _ => None,
++                };
++                let (x, y) = panel.scaling_axes(overlay);
++                let horizontal =
++                    config.bar_groups_of(layer).direction == renderer::CategoryBarDirection::Horizontal;
++                for kind in 0..3 {
++                    let indices = series
++                        .iter()
++                        .enumerate()
++                        .filter(|(_, s)| {
++                            config.layer_of_series(&s.series_id) == layer
++                                && match kind {
++                                    0 => s.render_type.category_bars().is_some(),
++                                    1 => s.render_type.box_plot().is_some(),
++                                    _ => s.render_type.radar().is_some(),
++                                }
++                        })
++                        .map(|(i, _)| i)
++                        .collect::<Vec<_>>();
++                    if indices.is_empty() {
++                        continue;
++                    }
++                    let categories = if kind == 2 {
++                        panel.bottom_x.categories.as_deref()
++                    } else if horizontal {
++                        y.categories.as_deref()
++                    } else {
++                        x.categories.as_deref()
++                    }
++                    .unwrap_or(&[]);
++                    let mut members = indices
++                        .iter()
++                        .map(|i| series[*i].clone())
++                        .collect::<Vec<_>>();
++                    let values = members
++                        .iter()
++                        .map(|s| {
++                            read(
++                                if kind == 0 && horizontal {
++                                    &s.x_column
++                                } else {
++                                    &s.y_column
++                                },
++                                if kind == 1 { Some("median") } else { None },
++                                categories.len(),
++                            )
++                        })
++                        .collect::<Result<Vec<_>, JsValue>>()?;
++                    let counts = if kind == 1 {
++                        members
++                            .iter()
++                            .map(|s| read(&s.y_column, Some("sample_count"), categories.len()))
++                            .collect::<Result<Vec<_>, JsValue>>()?
++                    } else {
++                        Vec::new()
++                    };
++                    let value =
++                        |k: usize, i: usize| values.get(k).and_then(|v| v.get(i)).copied().flatten();
++                    match kind {
++                        0 => renderer::data_config::format_labels(&mut members, categories, value),
++                        1 => renderer::data_config::format_box_plot_labels(
++                            &mut members,
++                            categories,
++                            |k, i| {
++                                value(k, i).map(|m| {
++                                    (
++                                        m,
++                                        counts
++                                            .get(k)
++                                            .and_then(|v| v.get(i))
++                                            .copied()
++                                            .flatten()
++                                            .filter(|v| *v >= 0.)
++                                            .map(|v| v as u64),
++                                    )
++                                })
++                            },
++                        ),
++                        _ => renderer::data_config::format_radar_labels(&mut members, categories, value),
++                    }
++                    for (index, member) in indices.into_iter().zip(members) {
++                        series[index] = member;
++                    }
++                }
++            }
 +            Ok(())
 +        }
 +
-         /// Alias for [`Self::first_frame_ready`].
-         pub async fn warm_up(&mut self) -> Result<(), JsValue> {
-             self.first_frame_ready().await
++        let config = self.chart_config()?.clone();
++        let original = self.chart_series()?.to_vec();
++        let mut series = original.clone();
++        let mut plan = Vec::new();
++        format_host_labels(&config, &mut series.clone(), |id,field,count| {
++            plan.push((id.to_string(),field.map(str::to_string),count));
++            Ok(Vec::new())
++        })?;
++        let mut samples = Vec::new();
++        let mut spans = Vec::new();
++        for key in plan {
++            let (id,field,count) = &key;
++            let member = if let Some(field) = field {
++                self.renderer.pool().record(id).and_then(|record| renderer::BOX_PLOT_RECORD.iter().position(|(name,_)|*name==field).and_then(|i|record.slot().fields[i].clone()))
++            } else {Some(id.clone())};
++            let start=samples.len();
++            if let Some(id)=member {
++                if let Some(handle)=self.renderer.pool().handle_for(&id) {
++                    samples.extend((0..(*count).min(handle.len_values)).map(|i|(id.clone(),i)));
++                }
++            }
++            spans.push((key,start..samples.len()));
++        }
++        let values=self.read_selection_samples(&samples).await?;
++        let columns=spans.into_iter().map(|(key,span)|(key,values[span].iter().map(|v|v.is_finite().then_some(*v)).collect::<Vec<_>>())).collect::<std::collections::HashMap<_,_>>();
++        format_host_labels(&config,&mut series,|id,field,count|Ok(columns.get(&(id.to_string(),field.map(str::to_string),count)).cloned().unwrap_or_default()))?;
++        if series!=original {self.set_series(&serde_json::to_string(&series).map_err(js_err)?)?;}
++        self.get_series()
++    }
++
++    /// Resolve the renderer's radial-label fit before the host commits the edit.
++    pub async fn fit_host_radial_labels(&mut self, cells_json: Option<String>) -> Result<(), JsValue> {
++        let mut config = self.chart_config()?.clone();
++        let scoped_series = cells_json.map(|encoded| {
++            let cells: Vec<usize> = serde_json::from_str(&encoded).map_err(js_err)?;
++            Ok::<_, JsValue>(self.chart_series()?.iter().filter(|spec| {
++                let cell = match config.layer_of_series(&spec.series_id) {
++                    renderer::LayerRef::Subplot(i) | renderer::LayerRef::SubplotOverlay(i, _) => i + 1,
++                    _ => 0,
++                };
++                cells.contains(&cell)
++            }).cloned().collect::<Vec<_>>())
++        }).transpose()?;
++        let mut cell = 0;
++        let mut changed = false;
++        while let Some(ticket) = self
++            .renderer
++            .begin_radial_label_fit(&config, scoped_series.as_deref().unwrap_or(self.chart_series()?), cell)
++            .map_err(js_err)?
++        {
++            cell = ticket.cell() + 1;
++            changed |= ticket.resolve().await.map_err(js_err)?.write(&mut config).map_err(js_err)?;
++        }
++        if changed {
++            self.set_config(&serde_json::to_string(&config).map_err(js_err)?)?;
++        }
++        Ok(())
++    }
++
++    /// Host fence: does not borrow the chart while GPU work completes.
++    pub fn gpu_ready(&self) -> js_sys::Promise { self.streaming_gpu_ready() }
++
++    /// Refresh renderer-owned annotation geometry without submitting a frame.
++    pub fn prepare_interaction(&mut self) -> Result<(), JsValue> {
++        let (config, panel_rect, _) = self.display_config()?;
++        let chart = Chart::new(config.into_owned());
++        self.renderer.refresh_annotations(&mut self.view, &chart, panel_rect, self.selected_annotation).map_err(js_err)?;
++        self.redraw_pending = true;
++        Ok(())
++    }
++
+     /// Process pending pool maintenance and draw only when visual state is
+     /// dirty. A clean rAF tick returns before touching the pool or surface.
+     pub fn frame(&mut self) -> Result<(), JsValue> {
+diff --git a/crates/web/src/web/chart/state.rs b/crates/web/src/web/chart/state.rs
+index 3933073..693bfc8 100644
+--- a/crates/web/src/web/chart/state.rs
++++ b/crates/web/src/web/chart/state.rs
+@@ -95,6 +95,12 @@ impl FiggyChart {
+         &mut self,
+         mut series: Vec<SeriesConfig>,
+     ) -> Result<(), JsValue> {
++        // Keep authored automatic coordinates in the renderer document.
++        // Geometry and hit tests resolve them when needed.
++        if self.monotonic.is_none() {
++            self.renderer.set_chart_series(self.chart_id, series).map_err(js_err)?;
++            return self.sync_hitmap();
++        }
+         place_feynman_vertices(&mut series)?;
+         match self.monotonic {
+             Some(id) => self
+@@ -113,6 +119,10 @@ impl FiggyChart {
+         config: renderer::Config,
+         mut series: Vec<SeriesConfig>,
+     ) -> Result<(), JsValue> {
++        if self.monotonic.is_none() {
++            self.renderer.set_chart_state(self.chart_id, config, series).map_err(js_err)?;
++            return self.sync_hitmap();
++        }
+         place_feynman_vertices(&mut series)?;
+         match self.monotonic {
+             // The series first; a document the editor refuses puts them back.

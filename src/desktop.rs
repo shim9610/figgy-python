@@ -1,5 +1,6 @@
 //! winit + egui surface host. It shares the existing resident FigureCore.
 use super::*;
+use renderer::layout::{DragSnap, SnapGuides};
 use std::{
     cell::RefCell,
     sync::{
@@ -53,6 +54,29 @@ impl WindowHandle {
             "null".into()
         }
     }
+    fn review_draft_json(&self) -> String {
+        let state = self.control.review.lock().unwrap();
+        json!({"comments":state["comments"],"target_comments":state["target_comments"],"attachments":state["attachments"]}).to_string()
+    }
+    fn review_images_result(&self, json: &str) -> PyResult<()> {
+        let value: Value = parse(json)?;
+        let mut state = self.control.review.lock().unwrap();
+        state["attachments"] = value["attachments"].clone();
+        if let Some(comments) = state["target_comments"].as_array_mut() {
+            for comment in comments {
+                if let Some(updated) = value["target_comments"]
+                    .as_array()
+                    .and_then(|items| items.iter().find(|v| v["id"] == comment["id"]))
+                {
+                    if updated.get("attachments").is_some() {
+                        comment["attachments"] = updated["attachments"].clone();
+                    }
+                }
+            }
+        }
+        self.refresh();
+        Ok(())
+    }
     fn review_result(&self, error: &str) {
         let mut state = self.control.review.lock().unwrap();
         state["request"] = Value::Null;
@@ -93,7 +117,10 @@ struct SurfaceWindow {
     input: egui_winit::State,
     ui_renderer: egui_wgpu::Renderer,
     view: Option<renderer::ChartView>,
+    presented_chart: Option<Chart>,
     styles: Vec<renderer::ChartStyle>,
+    style_specs: Vec<SeriesConfig>,
+    last_stamp: Option<renderer::ChartRenderStamp>,
     last_revision: u64,
     last_scale: f32,
     last_pool_generation: u32,
@@ -104,7 +131,13 @@ struct SurfaceWindow {
     rendered_selection: Option<String>,
     handle: Option<String>,
     dragging: bool,
+    drag_snap: DragSnap,
+    // The live annotation map measures in surface pixels instead of document pixels.
+    annotation_snap: DragSnap,
+    annotation_drag_guides: SnapGuides,
+    rendered_snap_guides: SnapGuides,
     panning: bool,
+    diagram_drag: Option<(renderer::config::PickedDataRef, Option<f32>)>,
     pan_moved: bool,
     drag_origin: (f32, f32),
     chart_pressed: bool,
@@ -217,7 +250,10 @@ impl SurfaceWindow {
             input,
             ui_renderer,
             view: None,
+            presented_chart: None,
             styles: vec![],
+            style_specs: vec![],
+            last_stamp: None,
             last_revision: u64::MAX,
             last_scale: 0.,
             last_pool_generation: 0,
@@ -228,7 +264,12 @@ impl SurfaceWindow {
             rendered_selection: None,
             handle: None,
             dragging: false,
+            drag_snap: DragSnap::off(),
+            annotation_snap: DragSnap::off(),
+            annotation_drag_guides: SnapGuides::NONE,
+            rendered_snap_guides: SnapGuides::NONE,
             panning: false,
+            diagram_drag: None,
             pan_moved: false,
             drag_origin: (0., 0.),
             chart_pressed: false,
@@ -291,7 +332,7 @@ impl SurfaceWindow {
         let mut config = c.data.chart.config().clone();
         if let Some(choice) = self.chooser.as_ref().and_then(|v| v.preview()) {
             config.set_active_layer(choice.layer);
-            config.picked_points = None;
+
             config.picked_data =
                 choice
                     .pick
@@ -349,7 +390,7 @@ impl SurfaceWindow {
             })
     }
     fn sidebar_pixels(&self) -> u32 {
-        (editor::INSPECTOR_WIDTH * self.ctx.pixels_per_point()).round() as u32
+        (self.editor.inspector_width * self.ctx.pixels_per_point()).round() as u32
     }
     fn sync_inspector_size(&mut self) {
         if self.settings_only || self.inspector_overlay() {
@@ -468,7 +509,9 @@ impl SurfaceWindow {
                 .select(c.data.chart.config(), c.data.identity.as_ref(), None);
             self.selected = None;
             self.handle = None;
+            self.diagram_drag = None;
             self.dragging = false;
+            self.finish_snap_drag();
             self.panning = false;
             c.clear_data_selection()?;
         } else {
@@ -618,12 +661,22 @@ impl SurfaceWindow {
                         cfg.set_active_layer(interaction::base_layer(index));
                     }
                     cfg.picked_data = None;
-                    cfg.picked_points = None;
+
                     if cfg != *c.data.chart.config() {
                         c.commit_config(cfg)?;
                     }
                     self.panel_focus
                         .select(c.data.chart.config(), c.data.identity.as_ref(), at);
+                    if self.edit_area
+                        && let Some(index) = at
+                    {
+                        self.selected = Some(if index == 0 {
+                            "data_area".into()
+                        } else {
+                            format!("subplot_{}:data_area", index - 1)
+                        });
+                        self.editor.inspector_open = true;
+                    }
                     self.last_revision = u64::MAX;
                     self.window.request_redraw();
                     return Ok(());
@@ -671,7 +724,7 @@ impl SurfaceWindow {
                         cfg.annotations.items.push(item);
                         cfg.set_active_layer(renderer::LayerRef::Annotations);
                         cfg.picked_data = None;
-                        cfg.picked_points = None;
+
                         if let Err(e) = c.commit_config(cfg) {
                             self.editor.error = e.to_string();
                         } else {
@@ -690,7 +743,21 @@ impl SurfaceWindow {
             WindowEvent::CursorMoved { position, .. } => {
                 let old = self.cursor;
                 self.cursor = (position.x as f32, position.y as f32);
-                if self.panning {
+                if let Some((reference, extent)) = self.diagram_drag.as_ref() {
+                    let distance = (self.cursor.0 - self.drag_origin.0)
+                        .hypot(self.cursor.1 - self.drag_origin.1);
+                    if self.pan_moved || distance >= 3. {
+                        self.pan_moved = true;
+                        c.drag_selected_record(
+                            reference,
+                            (self.cursor.0 - old.0) / scale,
+                            (self.cursor.1 - old.1) / scale,
+                            *extent,
+                        )?;
+                        self.last_input = Some(input_received);
+                        self.window.request_redraw();
+                    }
+                } else if self.panning {
                     let distance = (self.cursor.0 - self.drag_origin.0)
                         .hypot(self.cursor.1 - self.drag_origin.1);
                     if self.pan_moved || distance >= 3. {
@@ -700,6 +767,7 @@ impl SurfaceWindow {
                             self.pan_moved = true;
                             self.pending_choices = None;
                         }
+                        let mut cfg = c.data.chart.config().clone();
                         let bounds = c
                             .data
                             .hitmap
@@ -709,39 +777,86 @@ impl SurfaceWindow {
                                 &CpuTextMeasure::for_style(&display.draw_style),
                             )
                             .unwrap()
-                            .rect;
-                        let mut cfg = c.data.chart.config().clone();
-                        let dx = -(self.cursor.0 - old.0) as f64 / bounds.width.max(1.) as f64;
-                        let dy = (self.cursor.1 - old.1) as f64 / bounds.height.max(1.) as f64;
-                        navigate_document_axis(
+                            .rect();
+                        let dx = self.cursor.0 - old.0;
+                        let dy = self.cursor.1 - old.1;
+                        if crate::view_gesture::apply(
                             &mut cfg,
                             c.data.identity.as_ref(),
-                            "x",
-                            1.,
-                            0.5,
-                            dx,
-                        );
-                        navigate_document_axis(
-                            &mut cfg,
-                            c.data.identity.as_ref(),
-                            "y",
-                            1.,
-                            0.5,
-                            dy,
-                        );
-                        c.commit_config(cfg)?;
+                            crate::view_gesture::Gesture::Pan {
+                                pixels: [dx, dy],
+                                logical: [dx / scale, dy / scale],
+                                area: [bounds.width, bounds.height],
+                            },
+                        ) {
+                            c.commit_config(cfg)?;
+                        }
                         self.last_input = Some(input_received);
                         self.window.request_redraw();
                     }
                 } else if self.dragging
                     && let Some(target) = &self.selected
                 {
-                    c.drag(
-                        target,
-                        (self.cursor.0 - old.0) / scale,
-                        (self.cursor.1 - old.1) / scale,
-                        self.handle.as_deref(),
-                    )?;
+                    let config = c.data.chart.config();
+                    let document = config.document_area();
+                    let from = [document.x as f32, document.y as f32];
+                    let to = [panel.x as f32, panel.y as f32];
+                    let snap = config.snaps_while_dragging() && !self.modifiers.alt_key();
+                    self.drag_snap.set_enabled(snap);
+                    self.annotation_snap.set_enabled(snap);
+                    let stamp = c
+                        .renderer
+                        .chart_render_stamp(c.data.chart_id)
+                        .map_err(runtime)?;
+                    let map = self.view.as_ref().map(|view| view.annotation_map());
+                    let reusable = target.starts_with("annotation:")
+                        && !stamp.needs_raster_since(self.last_stamp.as_ref())
+                        && self.last_panel == Some(panel)
+                        && self.last_scale == scale
+                        && map.is_some_and(|map| {
+                            c.annotation_index(target).ok().is_some_and(|i| {
+                                map.layer().items.get(i).map(|v| &v.id)
+                                    == c.data
+                                        .chart
+                                        .config()
+                                        .annotations
+                                        .items
+                                        .get(i)
+                                        .map(|v| &v.id)
+                            })
+                        });
+                    if reusable {
+                        c.drag_annotation_with_map(
+                            map.unwrap(),
+                            target,
+                            self.cursor.0 - old.0,
+                            self.cursor.1 - old.1,
+                            self.handle.as_deref(),
+                            Some(&mut self.annotation_snap),
+                        )?;
+                        self.annotation_drag_guides = self.annotation_snap.guides();
+                        self.drag_snap.release();
+                    } else {
+                        self.annotation_snap.release();
+                        let at = [
+                            from[0] + (old.0 - to[0]) / scale,
+                            from[1] + (old.1 - to[1]) / scale,
+                        ];
+                        let started = c.data.host_work.start();
+                        let result = c.drag_inner(
+                            target,
+                            (self.cursor.0 - old.0) / scale,
+                            (self.cursor.1 - old.1) / scale,
+                            self.handle.as_deref(),
+                            snap.then_some((at, &mut self.drag_snap)),
+                        );
+                        c.data.host_work.finish("drag", started);
+                        result?;
+                        if target.starts_with("annotation:") {
+                            self.annotation_drag_guides =
+                                self.drag_snap.guides().mapped(from, scale, to);
+                        }
+                    }
                     self.last_input = Some(input_received);
                     self.window.request_redraw();
                 }
@@ -752,6 +867,9 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                self.drag_snap = DragSnap::new(scale);
+                self.annotation_snap = DragSnap::new(1.);
+                self.annotation_drag_guides = SnapGuides::NONE;
                 let text = c
                     .data
                     .chart
@@ -797,11 +915,10 @@ impl SurfaceWindow {
                     let mut cfg = c.data.chart.config().clone();
                     if cfg.active_layer() != renderer::LayerRef::Annotations
                         || cfg.picked_data.is_some()
-                        || cfg.picked_points.is_some()
                     {
                         cfg.set_active_layer(renderer::LayerRef::Annotations);
                         cfg.picked_data = None;
-                        cfg.picked_points = None;
+
                         c.commit_config(cfg)?;
                     }
                     self.selected = Some(format!("annotation:{}", item.id));
@@ -821,6 +938,7 @@ impl SurfaceWindow {
                 self.panning = false;
                 self.pan_moved = false;
                 self.drag_origin = self.cursor;
+                self.diagram_drag = None;
                 let (x, y) = self.cursor;
                 let measure = CpuTextMeasure::for_style(&display.draw_style);
                 self.handle = self
@@ -856,7 +974,7 @@ impl SurfaceWindow {
                             let map = view.annotation_map();
                             map.element(map.hit_test([x, y])?).map(|e| e.index)
                         })
-                        .filter(|_| index == 0 && display.annotations.visible);
+                        .filter(|_| display.annotations.visible);
                     let hits = interaction::decorations_at(&display, index, (x, y));
                     let area = interaction::panel(&display, index)
                         .data_area()
@@ -886,11 +1004,29 @@ impl SurfaceWindow {
                         } else {
                             let mut cfg = c.data.chart.config().clone();
                             let picked = picked.into_iter().next();
-                            let same = picked.as_ref().is_some_and(|p| {
-                                cfg.picked_data
-                                    .as_ref()
-                                    .is_some_and(|s| s.refs.first() == Some(&p.reference))
+                            self.diagram_drag = picked.as_ref().and_then(|p| match p.reference {
+                                renderer::config::PickedDataRef::FeynmanVertex { .. }
+                                | renderer::config::PickedDataRef::FeynmanPropagator { .. }
+                                | renderer::config::PickedDataRef::FeynmanLabel { .. }
+                                | renderer::config::PickedDataRef::ValueLabel { .. } => {
+                                    Some((p.reference.clone(), None))
+                                }
+                                renderer::config::PickedDataRef::HistogramBin { .. }
+                                    if c.data.series.iter().any(|s| {
+                                        s.series_id == p.reference.series_id()
+                                            && s.render_type.range_links().is_some()
+                                    }) =>
+                                {
+                                    Some((p.reference.clone(), p.extent.map(|v| v / scale)))
+                                }
+                                _ => None,
                             });
+                            let same = self.diagram_drag.is_none()
+                                && picked.as_ref().is_some_and(|p| {
+                                    cfg.picked_data
+                                        .as_ref()
+                                        .is_some_and(|s| s.refs.first() == Some(&p.reference))
+                                });
                             self.selected = if same {
                                 None
                             } else {
@@ -907,7 +1043,7 @@ impl SurfaceWindow {
                                     ..Default::default()
                                 })
                             };
-                            cfg.picked_points = None;
+
                             if cfg != *c.data.chart.config() {
                                 c.commit_config(cfg)?;
                             }
@@ -931,7 +1067,7 @@ impl SurfaceWindow {
                             None
                         };
                         cfg.picked_data = None;
-                        cfg.picked_points = None;
+
                         if cfg != *c.data.chart.config() {
                             c.commit_config(cfg)?;
                         }
@@ -958,6 +1094,7 @@ impl SurfaceWindow {
                 button: MouseButton::Left,
                 ..
             } => {
+                self.finish_snap_drag();
                 if let Some((revision, choices)) = self.pending_choices.take() {
                     self.dragging = false;
                     self.panning = false;
@@ -973,6 +1110,7 @@ impl SurfaceWindow {
                     }
                     return Ok(());
                 }
+                self.diagram_drag = None;
                 let chart_pressed = std::mem::take(&mut self.chart_pressed);
                 self.dragging = false;
                 self.panning = false;
@@ -997,8 +1135,12 @@ impl SurfaceWindow {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
+                let display_panel = active_coordinate_config(&display);
+                if display_panel.polar().is_some() {
+                    return Ok(());
+                }
                 // Decorations and the surrounding canvas do not own plot zoom.
-                let Ok(area) = active_coordinate_config(&display).data_area() else {
+                let Ok(area) = display_panel.data_area() else {
                     return Ok(());
                 };
                 let area = area.0;
@@ -1013,6 +1155,9 @@ impl SurfaceWindow {
                     MouseScrollDelta::LineDelta(x, y) => (*x as f64, *y as f64),
                     MouseScrollDelta::PixelDelta(p) => (p.x / 40., p.y / 40.),
                 };
+                let mut cfg = c.data.chart.config().clone();
+                let delta = if dy != 0. { dy } else { dx };
+                let factor = (-delta.clamp(-12., 12.) * 0.1).exp();
                 let bounds = c
                     .data
                     .hitmap
@@ -1022,29 +1167,34 @@ impl SurfaceWindow {
                         &CpuTextMeasure::for_style(&display.draw_style),
                     )
                     .unwrap()
-                    .rect;
+                    .rect();
                 let x = ((self.cursor.0 - bounds.x) / bounds.width.max(1.)).clamp(0., 1.) as f64;
                 let y =
                     1. - ((self.cursor.1 - bounds.y) / bounds.height.max(1.)).clamp(0., 1.) as f64;
-                let mut cfg = c.data.chart.config().clone();
-                let delta = if dy != 0. { dy } else { dx };
-                let factor = (-delta.clamp(-12., 12.) * 0.1).exp();
                 let ctrl = self.modifiers.control_key();
                 let shift = self.modifiers.shift_key();
-                // Ctrl isolates X, Shift isolates Y; plain wheel zooms both.
-                if !shift || ctrl {
-                    navigate_document_axis(&mut cfg, c.data.identity.as_ref(), "x", factor, x, 0.);
+                if crate::view_gesture::apply(
+                    &mut cfg,
+                    c.data.identity.as_ref(),
+                    crate::view_gesture::Gesture::Zoom {
+                        factor,
+                        anchor: [x, y],
+                        axes: [!shift || ctrl, !ctrl || shift],
+                    },
+                ) {
+                    c.commit_config(cfg)?;
                 }
-                if !ctrl || shift {
-                    navigate_document_axis(&mut cfg, c.data.identity.as_ref(), "y", factor, y, 0.);
-                }
-                c.commit_config(cfg)?;
                 self.last_input = Some(input_received);
                 self.window.request_redraw();
             }
             _ => {}
         }
         Ok(())
+    }
+    fn finish_snap_drag(&mut self) {
+        self.drag_snap.release();
+        self.annotation_snap.release();
+        self.annotation_drag_guides = SnapGuides::NONE;
     }
     fn frame(&mut self) -> PyResult<()> {
         let Some(core) = self.core.upgrade() else {
@@ -1058,6 +1208,7 @@ impl SurfaceWindow {
         if c.data.document.is_some() && !self.settings_only {
             return self.frame_bounded(&mut c);
         }
+        let frame_started = c.data.host_work.start();
         c.renderer
             .ensure_target_format(self.config.format)
             .map_err(runtime)?;
@@ -1111,6 +1262,7 @@ impl SurfaceWindow {
         } else {
             "Click a chart to select it, then click or drag inside to edit".into()
         };
+        let ui_started = c.data.host_work.start();
         let mut output = ctx.run_ui(input, |root| {
             if self.chooser.as_ref().is_some_and(|v| {
                 v.rect.is_positive()
@@ -1135,6 +1287,65 @@ impl SurfaceWindow {
                     previous_selection != self.selected && self.selected.is_some(),
                 );
                 self.fit_stage_width();
+                if self.editor.review_enabled()
+                    && root.input(|i| i.pointer.secondary_clicked())
+                    && self.editor.stage.contains(egui::pos2(
+                        self.cursor.0 / ctx.pixels_per_point(),
+                        self.cursor.1 / ctx.pixels_per_point(),
+                    ))
+                {
+                    let (display, panel, scale) = self.display(&c);
+                    let index = interaction::panels_at(&display, self.cursor)
+                        .first()
+                        .copied()
+                        .unwrap_or(0);
+                    let mut targets = interaction::decorations_at(&display, index, self.cursor)
+                        .into_iter()
+                        .map(|(layer, target)| (layer, target))
+                        .collect::<Vec<_>>();
+                    if index == 0 && c.data.chart.config().annotations.visible {
+                        if let Some(i) = self.view.as_ref().and_then(|v| {
+                            let map = v.annotation_map();
+                            map.element(map.hit_test([self.cursor.0, self.cursor.1])?)
+                                .map(|a| a.index)
+                        }) {
+                            targets = vec![(
+                                renderer::LayerRef::Annotations,
+                                format!(
+                                    "annotation:{}",
+                                    c.data.chart.config().annotations.items[i].id
+                                ),
+                            )];
+                        }
+                    }
+                    if targets.iter().all(|(_, v)| v.ends_with("data_area")) {
+                        if let Ok(hits) = c.pick_panel_candidates(
+                            index,
+                            GpuPickRequest {
+                                canvas_position_px: [self.cursor.0, self.cursor.1],
+                                display_panel_px: panel,
+                                display_scale: scale,
+                                max_distance_px: 6.,
+                            },
+                        ) {
+                            if !hits.is_empty() {
+                                targets = hits
+                                    .into_iter()
+                                    .map(|h| (h.layer, h.reference.series_id().to_owned()))
+                                    .collect();
+                            }
+                        }
+                    }
+                    self.editor.review_target(
+                        egui::pos2(
+                            self.cursor.0 / ctx.pixels_per_point(),
+                            self.cursor.1 / ctx.pixels_per_point(),
+                        ),
+                        &c,
+                        targets,
+                    );
+                }
+                self.editor.review_context_ui(root);
                 // Tree/toolbar edits cancel a stale chooser before applying anything.
                 if self
                     .chooser
@@ -1215,6 +1426,19 @@ impl SurfaceWindow {
                     });
             }
         });
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                self.ui_renderer.update_texture(
+                    c.renderer.device(),
+                    c.renderer.queue(),
+                    *id,
+                    delta,
+                );
+            }
+        }
+        let freed_textures = std::mem::take(&mut output.textures_delta.free);
+        output.textures_delta.clear();
+        c.data.host_work.finish("native_ui", ui_started);
         if std::mem::take(&mut self.editor.history_replayed) {
             fn contains(nodes: &[navigation::Node], target: &str) -> bool {
                 nodes
@@ -1288,112 +1512,183 @@ impl SurfaceWindow {
                     egui::vec2(r.width as f32 / dpr, r.height as f32 / dpr),
                 )
                 .shrink(2.);
-                output.shapes.push(egui::epaint::ClippedShape {
-                    clip_rect: self.editor.stage,
-                    shape: egui::Shape::rect_stroke(
-                        rect,
-                        3.,
-                        egui::Stroke::new(1.5, egui::Color32::from_rgb(38, 99, 173)),
-                        egui::StrokeKind::Inside,
-                    ),
-                });
+                // This is a chart-stage decoration. Keep it below egui's
+                // floating windows and menus, including their opaque fills.
+                // Appending it paints the outline through review text inputs.
+                output.shapes.insert(
+                    0,
+                    egui::epaint::ClippedShape {
+                        clip_rect: self.editor.stage,
+                        shape: egui::Shape::rect_stroke(
+                            rect,
+                            3.,
+                            egui::Stroke::new(1.5, egui::Color32::from_rgb(38, 99, 173)),
+                            egui::StrokeKind::Inside,
+                        ),
+                    },
+                );
             }
         }
-        if !self.settings_only && self.view.is_none() {
-            self.view = Some(
-                c.renderer
-                    .create_chart_view(&Chart::new(display.clone()), display.chart_area.0)
-                    .map_err(runtime)?,
-            );
-        }
-        if !self.settings_only
-            && (c.data.revision != self.last_revision
-                || self.selected != self.rendered_selection
-                || scale != self.last_scale
-                || self.last_pool_generation != c.renderer.pool().generation()
-                || self.last_panel != Some(panel))
+        let current_stamp = c
+            .renderer
+            .chart_render_stamp(c.data.chart_id)
+            .map_err(runtime)?;
+        let specs = c.gpu_series(&c.data.series);
+        let view_changed = scale != self.last_scale || self.last_panel != Some(panel);
+        let pool_changed = self.last_pool_generation != c.renderer.pool().generation();
+        let document = c.data.chart.config().document_area();
+        let placed = display.document_area();
+        let snap_guides = if self.dragging
+            && self
+                .selected
+                .as_deref()
+                .is_some_and(|id| !id.starts_with("annotation:"))
         {
-            let preview_target = self
+            self.drag_snap.guides().mapped(
+                [document.x as f32, document.y as f32],
+                scale,
+                [placed.x as f32, placed.y as f32],
+            )
+        } else {
+            SnapGuides::NONE
+        };
+        if !self.settings_only {
+            let preview = self
                 .chooser
                 .as_ref()
                 .and_then(|v| v.preview())
-                .and_then(|v| v.target.clone());
-            let preview_map = HitMap::for_active_layer(&display);
-            let boxes = preview_target
-                .as_ref()
-                .or(self.selected.as_ref())
-                .as_deref()
-                .and_then(|t| preview_map.find(t))
-                .and_then(|id| {
-                    preview_map.selection_box(
-                        id,
-                        &display,
-                        &CpuTextMeasure::for_style(&display.draw_style),
-                    )
-                })
-                .into_iter()
-                .collect::<Vec<_>>();
+                .and_then(|v| v.target.as_deref());
+            if self.presented_chart.is_none()
+                || c.data.revision != self.last_revision
+                || view_changed
+            {
+                self.presented_chart =
+                    Some(Chart::as_given(gpu::config(c.data.figure_id, &display)));
+            }
+            let chart = self.presented_chart.as_mut().unwrap();
+            chart.select(preview.or(self.selected.as_deref()));
+            chart.set_snap_guides(snap_guides);
+            if self.view.is_none() {
+                self.view = Some(
+                    c.renderer
+                        .create_chart_view(chart, display.chart_area.0)
+                        .map_err(runtime)?,
+                );
+            }
+        }
+        let snap_changed = self.rendered_snap_guides != snap_guides;
+        let annotation_guides_changed = self
+            .view
+            .as_ref()
+            .is_some_and(|view| view.annotation_snap_guides() != self.annotation_drag_guides);
+        if !self.settings_only
+            && (c.data.revision != self.last_revision
+                || self.selected != self.rendered_selection
+                || current_stamp.needs_draw_since(self.last_stamp.as_ref())
+                || view_changed
+                || snap_changed
+                || annotation_guides_changed
+                || pool_changed)
+        {
+            let chart = self.presented_chart.as_ref().unwrap();
             let annotation_selected = self
                 .selected
                 .as_deref()
                 .and_then(|target| c.annotation_index(target).ok());
-            c.renderer
-                .refresh_axis_with_selection(
-                    self.view.as_mut().unwrap(),
-                    &Chart::new(display.clone()),
-                    display.chart_area.0,
-                    &boxes,
-                )
-                .map_err(runtime)?;
-            // Let the renderer draw the selection from the current annotation
-            // raster. A box taken from the previous view is stale after an edit.
-            if self.view.as_ref().unwrap().annotation_selected() != annotation_selected {
+            // Follow the renderer's invalidation contract, like its web host.
+            // A document revision alone does not mean axes or styles changed.
+            let refresh_axis = current_stamp.needs_raster_since(self.last_stamp.as_ref())
+                || view_changed
+                || snap_changed
+                || self.last_revision == u64::MAX
+                || (self.selected != self.rendered_selection
+                    && self
+                        .selected
+                        .iter()
+                        .chain(self.rendered_selection.iter())
+                        .any(|target| !target.starts_with("annotation:")));
+            if refresh_axis {
+                let raster_started = c.data.host_work.start();
                 c.renderer
-                    .refresh_annotations(
+                    .refresh_axis_with_selection_at(
                         self.view.as_mut().unwrap(),
-                        &Chart::new(display.clone()),
+                        chart,
                         display.chart_area.0,
-                        annotation_selected,
+                        chart.selected(),
+                        scale,
                     )
                     .map_err(runtime)?;
+                c.data
+                    .host_work
+                    .finish("native_axis_refresh", raster_started);
             }
-            let specs = c.gpu_series(&c.data.series);
-            self.styles = specs
-                .iter()
-                .zip(&c.data.series)
-                .map(|(s, local)| {
-                    let mut style_spec = s.clone();
-                    style_spec.series_id = local.series_id.clone();
-                    c.renderer
-                        .create_style_for_series_scaled(&style_spec, scale)
-                        .map_err(runtime)
-                })
-                .collect::<PyResult<Vec<_>>>()?;
+            // Let the renderer draw the selection from the current annotation
+            // raster. A box taken from the previous view is stale after an edit.
+            if (!refresh_axis
+                && current_stamp.needs_annotation_raster_since(self.last_stamp.as_ref()))
+                || annotation_guides_changed
+                || (refresh_axis && !self.annotation_drag_guides.is_empty())
+                || self.view.as_ref().unwrap().annotation_selected() != annotation_selected
+            {
+                let annotation_started = c.data.host_work.start();
+                c.renderer
+                    .refresh_annotations_with_guides(
+                        self.view.as_mut().unwrap(),
+                        chart,
+                        display.chart_area.0,
+                        annotation_selected,
+                        self.annotation_drag_guides,
+                    )
+                    .map_err(runtime)?;
+                c.data
+                    .host_work
+                    .finish("native_annotation_refresh", annotation_started);
+            }
+            if self.style_specs != specs || scale != self.last_scale || pool_changed {
+                let styles_started = c.data.host_work.start();
+                self.styles = specs
+                    .iter()
+                    .zip(&c.data.series)
+                    .map(|(s, local)| {
+                        let mut style_spec = s.clone();
+                        style_spec.series_id = local.series_id.clone();
+                        c.renderer
+                            .create_style_for_series_scaled(&style_spec, scale)
+                            .map_err(runtime)
+                    })
+                    .collect::<PyResult<Vec<_>>>()?;
+                c.data.host_work.finish("native_styles", styles_started);
+                self.style_specs = specs.clone();
+            }
+            self.last_stamp = Some(current_stamp);
             self.last_revision = c.data.revision;
             self.rendered_selection = self.selected.clone();
+            self.rendered_snap_guides = snap_guides;
             self.last_scale = scale;
             self.last_pool_generation = c.renderer.pool().generation();
             self.last_panel = Some(panel);
         }
-        let specs = c.gpu_series(&c.data.series);
         let series = specs
             .iter()
             .zip(&self.styles)
             .map(|(config, style)| renderer::Series { config, style })
             .collect::<Vec<_>>();
+        let prepare_started = c.data.host_work.start();
         let prepared = if self.settings_only {
             None
         } else {
             Some(
                 c.renderer
-                    .prepare(&[renderer::ChartDrawItem {
-                        view: self.view.as_ref().unwrap(),
-                        chart_config: &gpu::config(c.data.figure_id, &display),
+                    .prepare(&mut [renderer::ChartDrawItem {
+                        view: self.view.as_mut().unwrap(),
+                        chart: self.presented_chart.as_ref().unwrap(),
                         series: &series,
                     }])
                     .map_err(runtime)?,
             )
         };
+        c.data.host_work.finish("native_prepare", prepare_started);
+        let present_started = c.data.host_work.start();
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(f)
             | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
@@ -1414,16 +1709,7 @@ impl SurfaceWindow {
             size_in_pixels: [self.config.width, self.config.height],
             pixels_per_point: output.pixels_per_point,
         };
-        for (id, deltas) in &output.textures_delta.set {
-            for delta in deltas {
-                self.ui_renderer.update_texture(
-                    c.renderer.device(),
-                    c.renderer.queue(),
-                    *id,
-                    delta,
-                );
-            }
-        }
+
         let extra = self.ui_renderer.update_buffers(
             c.renderer.device(),
             c.renderer.queue(),
@@ -1457,7 +1743,10 @@ impl SurfaceWindow {
             .submit(extra.into_iter().chain(std::iter::once(encoder.finish())));
         c.renderer.queue().present(frame);
         c.renderer.end_gpu_frame();
-        for id in &output.textures_delta.free {
+        c.data
+            .host_work
+            .finish("native_submit_present", present_started);
+        for id in &freed_textures {
             self.ui_renderer.free_texture(id);
         }
         // egui popups use a sizing pass before their visible pass; text inputs
@@ -1471,6 +1760,11 @@ impl SurfaceWindow {
             self.last_revision = c.data.revision;
         }
         self.frames += 1;
+        if !c.renderer.frame_complete() {
+            // A first frame may omit series while their pipelines compile.
+            // Keep polling through the event loop until every series draws.
+            self.repaint_at = Some(Instant::now() + Duration::from_millis(16));
+        }
         if let Some(start) = self.last_input.take() {
             self.latency_ms = start.elapsed().as_secs_f64() * 1000.;
         }
@@ -1503,52 +1797,20 @@ impl SurfaceWindow {
                     .map(|b| {
                         (
                             name.clone(),
-                            json!([b.rect.x, b.rect.y, b.rect.width, b.rect.height]),
+                            json!([b.rect().x, b.rect().y, b.rect().width, b.rect().height]),
                         )
                     })
             })
             .collect::<serde_json::Map<_, _>>();
         let annotation_selection=self.view.as_ref().and_then(|view|{
             let index=view.annotation_selected()?;let id=view.annotation_map().find(index)?;let bounds=view.annotation_map().selection_box(id)?;
-            Some(json!({"index":index,"rect":[bounds.rect.x,bounds.rect.y,bounds.rect.width,bounds.rect.height]}))
+            Some(json!({"index":index,"rect":[bounds.rect().x,bounds.rect().y,bounds.rect().width,bounds.rect().height]}))
         });
-        *self.control.stats.lock().unwrap() = json!({"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
+        c.data.host_work.finish("native_frame", frame_started);
+        *self.control.stats.lock().unwrap() = json!({"property_catalog_builds":self.editor.property_builds,"pointer_sequence":self.pointer_sequence,"pointer_input":self.pointer_input,"layout_probe":self.editor.layout_probe,"choice_candidates":self.chooser.as_ref().map(|v|v.choices.iter().map(|v|json!({"key":v.key,"label":v.label,"detail":v.detail})).collect::<Vec<_>>()),"choice_preview":self.chooser.as_ref().and_then(|v|v.preview()).map(|v|&v.key),"focused_panel":self.panel_focus.id,"annotation_selection":annotation_selection,"host":"winit-wgpu","layout_mode":self.edit_area,"drawing_tool":self.editor.drawing.tool.name(),"window_role":if self.settings_only { "settings" } else { "chart" },"inspector_overlay":self.inspector_overlay(),"picked_values":self.editor.picked,"selection_value_readbacks":c.data.selection_value_readbacks,"error":self.editor.error,"controls":controls,"decorations":decorations,"selected":self.selected,"properties_open":self.editor.inspector_open,"chart_panel":[panel.x,panel.y,panel.width,panel.height],"gpu_context_id":c.context.id,"figure_id":c.data.figure_id,"pool_used_bytes":c.renderer.pool().used_bytes(),"surface_frames":self.frames,"last_input_to_submit_ms":self.latency_ms,"scale_factor":self.window.scale_factor(),"surface_size":[self.config.width,self.config.height],"column_uploads":c.data.uploads,"rgba_readbacks":c.data.readbacks,"png_encodes":c.data.png_encodes,"revision":c.data.revision});
         Ok(())
     }
 }
-/// Transform bounds in axis space so logarithmic and inverted axes behave like
-/// linear axes. Shift is measured as a fraction of the visible span.
-fn navigate_axis(axis: &mut renderer::config::AxisOptions, factor: f64, anchor: f64, shift: f64) {
-    let log = axis.scale == renderer::config::AxisScale::Logarithmic;
-    let (min, max) = if log {
-        (axis.min.log10(), axis.max.log10())
-    } else {
-        (axis.min, axis.max)
-    };
-    let span = max - min;
-    let anchor = if axis.inverted { 1. - anchor } else { anchor };
-    let shift = if axis.inverted { -shift } else { shift };
-    let pivot = min + span * anchor;
-    let low = pivot + (min - pivot) * factor + shift * span;
-    let high = pivot + (max - pivot) * factor + shift * span;
-    let (low, high) = if log {
-        (10_f64.powf(low), 10_f64.powf(high))
-    } else {
-        (low, high)
-    };
-    if low.is_finite()
-        && high.is_finite()
-        && low < high
-        && (!log || low > 0.)
-        && (high - low) <= f32::MAX as f64
-        && low.abs() <= f32::MAX as f64
-        && high.abs() <= f32::MAX as f64
-    {
-        axis.min = low;
-        axis.max = high;
-    }
-}
-
 struct App {
     pending: Vec<(Arc<Mutex<FigureCore>>, Arc<Control>)>,
     windows: HashMap<WindowId, SurfaceWindow>,
@@ -1650,6 +1912,17 @@ impl ApplicationHandler for App {
             w.control.close.store(true, Ordering::Release);
             return;
         }
+        if let WindowEvent::KeyboardInput { event: ref key, .. } = event {
+            let paste = key.state == ElementState::Pressed
+                && !key.repeat
+                && ((w.modifiers.control_key() || w.modifiers.super_key())
+                    && matches!(&key.logical_key,Key::Character(v) if v.eq_ignore_ascii_case("v"))
+                    || w.modifiers.shift_key() && key.logical_key == Key::Named(NamedKey::Insert));
+            if paste && w.editor.paste_review_image() {
+                w.window.request_redraw();
+                return;
+            }
+        }
         let response = w.input.on_window_event(&w.window, &event);
         let pointer = match &event {
             WindowEvent::CursorMoved { position, .. } => Some(json!({
@@ -1694,8 +1967,10 @@ impl ApplicationHandler for App {
                 w.pending_choices = None;
                 w.last_revision = u64::MAX;
                 w.modifiers = ModifiersState::empty();
+                w.finish_snap_drag();
                 w.dragging = false;
                 w.panning = false;
+                w.diagram_drag = None;
                 w.chart_pressed = false;
                 // Losing focus cancels an active gesture, not an armed tool.
                 if w.editor.drawing.gesture.is_some() {
@@ -1705,6 +1980,10 @@ impl ApplicationHandler for App {
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 w.modifiers = modifiers.state();
+                if w.dragging && w.modifiers.alt_key() {
+                    w.finish_snap_drag();
+                    w.window.request_redraw();
+                }
                 Ok(())
             }
             WindowEvent::KeyboardInput { ref event, .. }
@@ -1856,48 +2135,5 @@ fn active_coordinate_config(config: &Config) -> Config {
             config.subplot_config(i).unwrap_or_else(|| config.clone())
         }
         _ => config.clone(),
-    }
-}
-fn navigate_document_axis(
-    config: &mut Config,
-    identity: Option<&Value>,
-    dimension: &str,
-    factor: f64,
-    anchor: f64,
-    shift: f64,
-) {
-    let layer = config.active_layer();
-    let (panel, overlay) = match layer {
-        renderer::LayerRef::Subplot(i) => (Some(i), None),
-        renderer::LayerRef::SubplotOverlay(i, o) => (Some(i), Some(o)),
-        renderer::LayerRef::Overlay(o) => (None, Some(o)),
-        _ => (None, None),
-    };
-    let cfg = if let Some(i) = panel {
-        &mut config.subplots[i].config
-    } else {
-        config
-    };
-    if dimension == "y"
-        && let Some(o) = overlay
-    {
-        navigate_axis(&mut cfg.overlays[o].y_axis, factor, anchor, shift);
-        if factor != 1. && crate::tick_policy::automatic(identity, layer, "right_y") {
-            crate::tick_policy::retick(&mut cfg.overlays[o].y_axis);
-        }
-    } else if dimension == "x" {
-        for (key, axis) in [("bottom_x", &mut cfg.bottom_x), ("top_x", &mut cfg.top_x)] {
-            navigate_axis(axis, factor, anchor, shift);
-            if factor != 1. && crate::tick_policy::automatic(identity, layer, key) {
-                crate::tick_policy::retick(axis);
-            }
-        }
-    } else {
-        for (key, axis) in [("left_y", &mut cfg.left_y), ("right_y", &mut cfg.right_y)] {
-            navigate_axis(axis, factor, anchor, shift);
-            if factor != 1. && crate::tick_policy::automatic(identity, layer, key) {
-                crate::tick_policy::retick(axis);
-            }
-        }
     }
 }

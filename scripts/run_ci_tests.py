@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Run the complete pytest collection once, with past failures first."""
 import json
+import atexit
+import os
 from pathlib import Path
 import sys
+import threading
 
 import pytest
 
@@ -61,4 +64,10 @@ class PriorityFirst:
 
 
 if __name__ == '__main__':
-    raise SystemExit(pytest.main(sys.argv[1:], plugins=[PriorityFirst()]))
+    def boundary(phase, code=None):
+        print('CI PYTEST BOUNDARY '+json.dumps(dict(phase=phase,pid=os.getpid(),exit_code=code,
+            threads=[dict(name=t.name,daemon=t.daemon,alive=t.is_alive()) for t in threading.enumerate()])),flush=True)
+    atexit.register(lambda:boundary('interpreter-exit'))
+    code=pytest.main(sys.argv[1:], plugins=[PriorityFirst()])
+    boundary('pytest-returned',int(code))
+    raise SystemExit(code)

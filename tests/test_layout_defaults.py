@@ -3,6 +3,7 @@ import json
 import math
 
 import figgyplot as figgy
+import pytest
 
 
 def test_default_title_tick_separation_and_native_notebook_layout_match():
@@ -25,3 +26,16 @@ def test_default_title_tick_separation_and_native_notebook_layout_match():
         # must still exist to its right. The previous compact margins overlap.
         assert not ink_columns[separator:separator+4].any()
         assert ink_columns[separator+4:int(data[0])-8].any()
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_tight_layout_preserves_explicit_padding_on_a_fitted_chart(backend):
+    with figgy.Figure(backend=backend, dpi=72) as figure:
+        figure.axes[0].boxplot([[1, 2, 3], [2, 4, 5]])
+        figure.tight_layout()
+        before = figure.get_settings()["config"]
+        assert before["layout_state"] == "fitted"
+        figure.tight_layout(pad=1)
+        after = figure.get_settings()["config"]
+        for side in ("bottom_x", "top_x", "left_y", "right_y"):
+            assert after[side]["out_margin"] == pytest.approx(before[side]["out_margin"] + 12)

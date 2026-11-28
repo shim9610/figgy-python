@@ -25,11 +25,16 @@ def check_assets(assets):
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 NATIVE_PACKAGES = {"figgy-renderer": "crates/renderer", "figgy-model": "crates/model"}
 HOST_PATCH = "scripts/wasm-host.patch"
-HOST_PATCH_FILES = {"crates/web/src/lib.rs", "crates/web/src/bounded.rs"}
+HOST_PATCH_FILES = {
+    "crates/web/src/web/chart/frame.rs",
+    "crates/web/src/web/chart/state.rs",
+    "crates/web/src/radial.rs",
+}
+SHARED_HOST_SOURCES = ("src/view_gesture.rs", "src/tick_policy.rs")
 
 
 def host_patch_record(root):
-    """Allow only additive changes to the two unpublished WASM bridge files."""
+    """Allow only additive changes to the unpublished WASM bridge."""
     import subprocess
     import tempfile
     path = Path(root) / HOST_PATCH
@@ -51,9 +56,11 @@ def host_patch_record(root):
     if (len(entries) != len(HOST_PATCH_FILES) or any(len(entry) != 3 or not entry[0].isdigit()
             or int(entry[0]) == 0 or entry[1] != "0" for entry in entries)
             or {entry[2] for entry in entries} != HOST_PATCH_FILES):
-        raise ValueError("WASM host patch may only add code to the two unpublished bridge files")
+        raise ValueError("WASM host patch may only add code to the allowed unpublished bridge files")
     return {"path": HOST_PATCH, "sha256": hashlib.sha256(data).hexdigest(),
-            "files": sorted(HOST_PATCH_FILES)}
+            "files": sorted(HOST_PATCH_FILES),
+            "shared_sources": {source: hashlib.sha256((Path(root) / source).read_bytes()).hexdigest()
+                               for source in SHARED_HOST_SOURCES}}
 
 
 def native_registry_packages(root):
@@ -76,14 +83,20 @@ def native_registry_packages(root):
         if len(matches) != 1:
             raise ValueError("Expected exactly one native registry package: " + name)
         package = matches[0]
+        if package.get("source", "").startswith("git+https://github.com/shim9610/figgy.git?"):
+            if not re.search(r"#[0-9a-f]{40}$",package["source"]):raise ValueError("Git renderer source must pin a full commit")
+            packages[name]={key:package[key] for key in ("version","source")}
+            continue
         if package.get("source") != REGISTRY_SOURCE or not re.fullmatch(r"[0-9a-f]{64}", package.get("checksum", "")):
             raise ValueError("Native registry source/checksum is invalid: " + name)
         packages[name] = {key: package[key] for key in ("version", "source", "checksum")}
     dependency = cargo.get("dependencies", {}).get("renderer", {})
-    if (not isinstance(dependency, dict) or dependency.get("package") != "figgy-renderer"
-            or dependency.get("version") != "=" + packages["figgy-renderer"]["version"]
-            or any(key in dependency for key in ("git", "path", "registry"))):
-        raise ValueError("Native renderer dependency must exactly pin its crates.io lockfile version")
+    git_revision=dependency.get('rev')
+    if git_revision is not None:
+        if dependency.get('package')!='figgy-renderer' or dependency.get('git')!='https://github.com/shim9610/figgy.git' or not re.fullmatch(r'[0-9a-f]{40}',git_revision):raise ValueError('Git renderer dependency must pin the upstream repository and a full commit')
+        if any(not record['source'].endswith('#'+git_revision) for record in packages.values()):raise ValueError('Native model and renderer must use the same Git commit')
+    elif (not isinstance(dependency, dict) or dependency.get('package')!='figgy-renderer' or dependency.get('version')!='='+packages['figgy-renderer']['version'] or any(key in dependency for key in ('git','path','registry'))):
+        raise ValueError('Native renderer dependency must exactly pin its registry version or upstream Git commit')
     return packages
 
 

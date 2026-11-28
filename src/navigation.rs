@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Derived object navigation. IDs, geometry and styles remain in the document.
 use super::*;
 use renderer::LayerRef;
@@ -206,50 +207,59 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
             LayerRef::Base,
             None,
         );
-        let entries = if family == "radial" {
-            &owner["slices"]
-        } else {
-            &owner["series"]
-        };
-        if let Some(entries) = entries.as_array() {
-            for (i, item) in entries.iter().enumerate() {
-                let id = item["id"]
-                    .as_str()
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| format!("slice_0_{i}"));
+        if family == "radial" {
+            let mut rings = std::collections::BTreeMap::new();
+            for (group, index, path) in radial_compat::slice_paths(owner) {
+                let item = owner.pointer(&path).unwrap();
+                let id = format!("slice_{group}_{index}");
                 let label = item["label"]
                     .as_str()
-                    .filter(|s| !s.trim().is_empty())
+                    .filter(|v| !v.trim().is_empty())
                     .unwrap_or(&id);
-                data.children.push(leaf(
+                let child = leaf(
                     &format!("bounded/series/{id}"),
                     label,
                     "series",
                     LayerRef::Base,
                     id.clone(),
-                ));
-            }
-        }
-        if family == "radial" {
-            if let Some(children) = owner["split"]["children"].as_array() {
-                let mut detail = Node::new(
-                    "bounded/split".into(),
-                    "Detail slices".into(),
-                    "group",
-                    LayerRef::Base,
-                    None,
                 );
-                for (i, item) in children.iter().enumerate() {
-                    let id = format!("slice_1_{i}");
-                    detail.children.push(leaf(
-                        &format!("bounded/series/{id}"),
-                        item["label"].as_str().unwrap_or(&id),
-                        "series",
-                        LayerRef::Base,
-                        id.clone(),
-                    ));
+                if group == 0 {
+                    data.children.push(child);
+                } else {
+                    rings
+                        .entry(group)
+                        .or_insert_with(|| {
+                            Node::new(
+                                format!("bounded/ring/{group}"),
+                                if owner["split"].is_object() {
+                                    "Detail slices".into()
+                                } else {
+                                    format!("Ring {}", group + 1)
+                                },
+                                "group",
+                                LayerRef::Base,
+                                None,
+                            )
+                        })
+                        .children
+                        .push(child);
                 }
-                data.children.push(detail);
+            }
+            data.children.extend(rings.into_values());
+        } else if let Some(entries) = owner["series"].as_array() {
+            for item in entries {
+                let id = item["id"].as_str().unwrap();
+                let label = item["label"]
+                    .as_str()
+                    .filter(|v| !v.trim().is_empty())
+                    .unwrap_or(id);
+                data.children.push(leaf(
+                    &format!("bounded/series/{id}"),
+                    label,
+                    "series",
+                    LayerRef::Base,
+                    id.into(),
+                ));
             }
         }
         panel.children.push(data);
@@ -371,7 +381,7 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
         };
         series_group.children = series_nodes(layer);
         panel.children.push(series_group);
-        for (o, _) in config["overlays"]
+        for (o, model) in config["overlays"]
             .as_array()
             .into_iter()
             .flatten()
@@ -382,21 +392,34 @@ pub(super) fn nodes(settings: &Settings) -> Vec<Node> {
             } else {
                 LayerRef::SubplotOverlay(index - 1, o)
             };
+            let mut sides = Vec::new();
+            if model["link_x"] == false {
+                sides.push(("top", "X axis"));
+            }
+            if model["link_y"] != true {
+                sides.push(("right", "Y axis"));
+            }
+            let (side, name) = match sides.as_slice() {
+                [("top", _)] => ("top", "Secondary X"),
+                [("right", _)] => ("right", "Secondary Y"),
+                [..] if sides.is_empty() => ("right", "Overlay"),
+                _ => ("right", "Secondary axes"),
+            };
             let id = state["identity"]["panels"][index]["overlays"][o]
                 .as_str()
-                .unwrap_or("Secondary Y");
+                .unwrap_or(name);
             let overlay_key = format!("{key}/overlay/{id}");
             let mut overlay = leaf(
                 &overlay_key,
-                &format!("Secondary Y · {id}"),
+                &format!("{name} · {id}"),
                 "layer",
                 overlay_layer,
-                format!("{prefix}overlay_{o}:axis_right"),
+                format!("{prefix}overlay_{o}:axis_{side}"),
             );
             overlay.children.push(axes(
                 &overlay_key,
                 &format!("{prefix}overlay_{o}:"),
-                &[("right", "Y axis")],
+                &sides,
                 overlay_layer,
             ));
             overlay.children.extend(series_nodes(overlay_layer));
@@ -509,6 +532,8 @@ pub(super) fn bounded_view_json(settings: &str) -> PyResult<String> {
 
 #[derive(Default)]
 pub(super) struct Navigator {
+    pub review_enabled: bool,
+    pub comment_target: Option<Node>,
     pub filter: String,
     open: HashMap<String, bool>,
     last_selection: String,
@@ -557,13 +582,21 @@ impl Navigator {
         }
         ui.label(egui::RichText::new("OBJECTS").strong().small());
         ui.horizontal(|ui| {
-            let search = ui.add(
+            let width = (ui.available_width() - 24. - ui.spacing().item_spacing.x).max(20.);
+            let search = ui.add_sized(
+                [width, ui.spacing().interact_size.y],
                 egui::TextEdit::singleline(&mut self.filter)
-                    .hint_text("Find a panel, axis or series…")
-                    .desired_width(ui.available_width() - 30.),
+                    .hint_text("Find a panel, axis or series…"),
             );
             controls.insert("object_search".into(), search.rect);
-            if ui.small_button("×").on_hover_text("Clear search").clicked() {
+            if ui
+                .add_sized(
+                    [24., ui.spacing().interact_size.y],
+                    egui::Button::new("×").small(),
+                )
+                .on_hover_text("Clear search")
+                .clicked()
+            {
                 self.filter.clear();
                 reveal = true;
             }
@@ -572,10 +605,11 @@ impl Navigator {
         fn matches(node: &Node, query: &str) -> bool {
             query.is_empty()
                 || format!(
-                    "{} {} {}",
+                    "{} {} {} {}",
                     node.label,
                     node.kind,
-                    node.key.rsplit('/').next().unwrap_or("")
+                    node.key,
+                    node.target.as_deref().unwrap_or("")
                 )
                 .to_lowercase()
                 .contains(query)
@@ -655,6 +689,14 @@ impl Navigator {
                             }
                             if selected && reveal {
                                 response.scroll_to_me(Some(egui::Align::Center));
+                            }
+                            if self.review_enabled && node.target.is_some() {
+                                response.context_menu(|ui| {
+                                    if ui.button("Add review comment…").clicked() {
+                                        self.comment_target = Some((*node).clone());
+                                        ui.close();
+                                    }
+                                });
                             }
                             if response.clicked() {
                                 response.request_focus();

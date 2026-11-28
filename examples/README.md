@@ -18,7 +18,7 @@ python examples/edit_and_reuse.py --output output/edit-and-reuse
 vectors, reference fills, steps, secondary Y, polar/radar and annotations on both
 hosts. See the [feature guide](../docs/RENDERER_018_FEATURES.md) for APIs and guards.
 
-Every gallery script defines `make_figure()` and uses synthetic data. Random
+Each chart in the preview table has a `make_figure()` entry point and uses synthetic data. Random
 examples use a fixed seed. The checked-in images are native renderer exports,
 not mockups or upstream Rust screenshots.
 
@@ -52,7 +52,7 @@ Open a native window, edit, then close it to save the current chart:
 python examples/scatter_clusters.py --show
 ```
 
-All gallery scripts accept `--output` and `--show`. Their default exports go to
+The preview-table scripts accept `--output` and `--show`. Their default exports go to
 `output/gallery/`. Shared argument handling and title/label setup live in
 [_gallery.py](_gallery.py); the chart/data construction is in each linked script.
 Gallery examples require NumPy and the installed native package only.
@@ -90,6 +90,7 @@ is a selection of examples, not the complete API surface.
 | [Desktop editor](desktop_editor.py) | `python examples/desktop_editor.py` | Open the native editor with an adjusted layout |
 | [Multiple windows](multiple_windows.py) | `python examples/multiple_windows.py` | Independent figures on a shared main-thread event loop |
 | [Quick start](quickstart.py) | `python examples/quickstart.py` | Write `signal.png`, then open a chart window |
+| [Style profiles](style_gallery.py) | `python examples/style_gallery.py --output output/styles` | Fourteen task-specific native renders, tokens, source/contrast manifest and overview sheets (requires Pillow) |
 | [Jupyter notebook](interactive.ipynb) | `jupyter lab examples/interactive.ipynb` | Edit in the browser using WASM/WebGPU |
 | [Notebook cells](notebook.py) | Run cells in an IPython kernel | Script-form notebook example with async export |
 
@@ -97,3 +98,41 @@ For Jupyter, install `python -m pip install jupyterlab ".[notebook]"`. Native
 window creation/event processing belongs on Python's main thread. See the
 [desktop guide](../docs/DESKTOP_EDITOR.md), [host guide](../docs/HOSTS.md) and
 [demo reproduction](../docs/README_DEMO.md) for controls and lifecycle details.
+
+## Renderer 0.19
+
+[renderer_019.py](renderer_019.py) renders stem, violin, waterfall with
+connectors, and RGB images in all four built-in themes.
+[renderer_019_editing.py](renderer_019_editing.py) opens or exports one figure
+with a zoom inset, a Gantt timeline with progress and dependencies, an energy
+level diagram with wavelength labels, and a Feynman diagram.
+
+```bash
+python examples/renderer_019.py --output output/themes --formats png svg pdf
+python examples/renderer_019_editing.py --formats png svg pdf
+python examples/renderer_019_editing.py --show --theme cool-slate
+```
+
+The editing example writes `renderer-019-editing.png` under
+`output/renderer-019-editing/` by default. With `--show`, edits made in the
+native window are saved after it closes.
+
+![Figgy output showing a zoom inset, a Gantt timeline, labelled energy levels and a Feynman diagram](../docs/images/renderer-019-editing.png)
+
+In JupyterLab started from the repository root, use the same figure builder.
+
+```python
+from examples.renderer_019_editing import make_figure
+
+fig = make_figure(backend="webgpu")
+display(fig.widget())
+```
+
+Run the export in a later cell, with the widget still open.
+
+```python
+await fig.savefig_async("renderer-019-editing.pdf")
+```
+
+See the [API guide](../docs/RENDERER_019.md) for the controls, an offline NIST
+CSV recipe and Model Context Protocol (MCP) arguments.

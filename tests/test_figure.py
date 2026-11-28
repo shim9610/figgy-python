@@ -39,7 +39,7 @@ def test_exported_python_replays_layout_and_style(plot):
     artist.set_linewidth(3)
     state = fig.get_settings()
     image = fig.render_rgba().copy()
-    code = fig.to_code("restored")
+    code = fig.to_code("restored", mode='exact')
     with figgy.Figure(figsize=(6, 4), dpi=100, pool_bytes=8 * 1024**2) as restored:
         restored.axes[0].plot(x, np.sin(x), id="signal", label="Signal")
         exec(code, {"restored": restored})
@@ -238,6 +238,13 @@ def test_log_axes_fit_positive_errorbar_endpoints_with_nonpositive_centers(backe
         for key in keys:
             axis = fig.get_settings()["config"][key]
             assert (axis["min"], axis["max"]) == pytest.approx((1, 10))
+        # Replaying the original settings must recover the matching endpoints
+        # even when the kernel has already released all source snapshots.
+        fig.apply_settings(before)
+        getattr(ax, "set_" + dimension + "scale")("log")
+        for key in keys:
+            axis = fig.get_settings()["config"][key]
+            assert (axis["min"], axis["max"]) == pytest.approx((100, 200))
         np.testing.assert_array_equal(other, [1., 2.])
 
 

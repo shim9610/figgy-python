@@ -1,0 +1,986 @@
+{
+  "environment": "Linux x86_64, llvmpipe Vulkan, Xvfb/Openbox; installed release wheels",
+  "baseline_source": "4555597 plus opt-in CPU timing instrumentation; no behavior changes",
+  "timing": "Inclusive CPU wall time inside named stages; overlapping stages must not be summed. Input-driver waits excluded. Not hardware GPU timestamps or a physical-GPU FPS claim.",
+  "before_wheel": {
+    "file": "figgyplot-0.3.0-cp312-cp312-manylinux_2_39_x86_64.whl",
+    "sha256": "d63cdda0ee4f7fec4b60b02ec9f63504a2bf617446188765ce59a2cbfe88784e"
+  },
+  "after_wheel": {
+    "file": "figgyplot-0.3.0-cp312-cp312-manylinux_2_39_x86_64.whl",
+    "sha256": "215603ffceaadac458c3e34a846e91564c10be63ba8ac8b635478133f532440a"
+  },
+  "results": {
+    "before": [
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_view": {
+            "calls": 32,
+            "total_ms": 61.24479500000001,
+            "mean_ms": 1.9138998437500003
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 25.832470000000004,
+            "mean_ms": 0.8072646875000001
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 27.360379,
+            "mean_ms": 0.85501184375
+          },
+          "drag": {
+            "calls": 32,
+            "total_ms": 90.330425,
+            "mean_ms": 2.82282578125
+          },
+          "native_annotation_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_axis_refresh": {
+            "calls": 32,
+            "total_ms": 13.45272,
+            "mean_ms": 0.4203975
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1055.2045280000002,
+            "mean_ms": 10.991713833333336
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 3.985286000000002,
+            "mean_ms": 0.041513395833333355
+          },
+          "native_styles": {
+            "calls": 32,
+            "total_ms": 2.9740979999999997,
+            "mean_ms": 0.09294056249999999
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 993.1759430000002,
+            "mean_ms": 10.345582739583335
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 20.695843999999997,
+            "mean_ms": 0.21558170833333332
+          }
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_view": {
+            "calls": 32,
+            "total_ms": 103.020227,
+            "mean_ms": 3.21938209375
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 25.924212999999998,
+            "mean_ms": 0.8101316562499999
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 27.387809000000004,
+            "mean_ms": 0.8558690312500001
+          },
+          "drag": {
+            "calls": 32,
+            "total_ms": 132.30875200000003,
+            "mean_ms": 4.134648500000001
+          },
+          "native_annotation_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_axis_refresh": {
+            "calls": 32,
+            "total_ms": 24.765091,
+            "mean_ms": 0.77390909375
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1993.7865119999992,
+            "mean_ms": 20.768609499999993
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 4.018087000000002,
+            "mean_ms": 0.04185507291666669
+          },
+          "native_styles": {
+            "calls": 32,
+            "total_ms": 3.465683000000001,
+            "mean_ms": 0.10830259375000004
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 1916.2441019999985,
+            "mean_ms": 19.960876062499985
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 21.098935999999995,
+            "mean_ms": 0.21978058333333328
+          }
+        }
+      },
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Arrow",
+        "moves": 32,
+        "stages": {
+          "annotation_view": {
+            "calls": 32,
+            "total_ms": 62.150118000000006,
+            "mean_ms": 1.9421911875000002
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 21.39182999999999,
+            "mean_ms": 0.6684946874999997
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 22.668884999999992,
+            "mean_ms": 0.7084026562499998
+          },
+          "drag": {
+            "calls": 32,
+            "total_ms": 86.397568,
+            "mean_ms": 2.699924
+          },
+          "native_annotation_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_axis_refresh": {
+            "calls": 32,
+            "total_ms": 14.902797999999995,
+            "mean_ms": 0.46571243749999985
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1226.0683130000002,
+            "mean_ms": 12.771544927083335
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 3.1481630000000003,
+            "mean_ms": 0.03279336458333334
+          },
+          "native_styles": {
+            "calls": 32,
+            "total_ms": 3.085703999999999,
+            "mean_ms": 0.09642824999999997
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 1117.458478,
+            "mean_ms": 11.640192479166666
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 62.35741600000001,
+            "mean_ms": 0.6495564166666667
+          }
+        }
+      }
+    ],
+    "after": [
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 25.809513,
+            "mean_ms": 0.80654728125
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 24.254286999999994,
+            "mean_ms": 0.7579464687499998
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 25.608552,
+            "mean_ms": 0.80026725
+          },
+          "native_annotation_refresh": {
+            "calls": 32,
+            "total_ms": 17.871858,
+            "mean_ms": 0.5584955625
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 977.8893000000005,
+            "mean_ms": 10.186346875000005
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 3.1677520000000037,
+            "mean_ms": 0.0329974166666667
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 921.0539819999995,
+            "mean_ms": 9.594312312499994
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 16.670766,
+            "mean_ms": 0.1736538125
+          }
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 25.513158000000004,
+            "mean_ms": 0.7972861875000001
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 23.86983800000001,
+            "mean_ms": 0.7459324375000003
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 25.316332000000003,
+            "mean_ms": 0.7911353750000001
+          },
+          "native_annotation_refresh": {
+            "calls": 32,
+            "total_ms": 30.327722,
+            "mean_ms": 0.9477413125
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1840.9019270000001,
+            "mean_ms": 19.176061739583336
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 3.24915,
+            "mean_ms": 0.0338453125
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 1765.9576039999995,
+            "mean_ms": 18.395391708333328
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 17.872780000000002,
+            "mean_ms": 0.1861747916666667
+          }
+        }
+      },
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Arrow",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 21.775058,
+            "mean_ms": 0.6804705625
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 20.445033999999996,
+            "mean_ms": 0.6389073124999999
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 21.592997999999994,
+            "mean_ms": 0.6747811874999998
+          },
+          "native_annotation_refresh": {
+            "calls": 32,
+            "total_ms": 19.127974000000005,
+            "mean_ms": 0.5977491875000002
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1152.9711009999999,
+            "mean_ms": 12.010115635416666
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 2.9038449999999996,
+            "mean_ms": 0.030248385416666662
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 1046.5153280000002,
+            "mean_ms": 10.901201333333335
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 60.17736400000002,
+            "mean_ms": 0.6268475416666669
+          }
+        }
+      }
+    ],
+    "before_burst": [
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_view": {
+            "calls": 32,
+            "total_ms": 241.63094000000004,
+            "mean_ms": 7.550966875000001
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 19.092167999999997,
+            "mean_ms": 0.5966302499999999
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 20.125779,
+            "mean_ms": 0.62893059375
+          },
+          "drag": {
+            "calls": 32,
+            "total_ms": 263.040059,
+            "mean_ms": 8.22000184375
+          },
+          "native_annotation_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_axis_refresh": {
+            "calls": 1,
+            "total_ms": 1.2802950000000002,
+            "mean_ms": 1.2802950000000002
+          },
+          "native_frame": {
+            "calls": 3,
+            "total_ms": 453.069519,
+            "mean_ms": 151.023173
+          },
+          "native_prepare": {
+            "calls": 3,
+            "total_ms": 0.11686200000000113,
+            "mean_ms": 0.03895400000000038
+          },
+          "native_styles": {
+            "calls": 1,
+            "total_ms": 0.09756399999999998,
+            "mean_ms": 0.09756399999999998
+          },
+          "native_submit_present": {
+            "calls": 3,
+            "total_ms": 450.17523700000004,
+            "mean_ms": 150.05841233333334
+          },
+          "native_ui": {
+            "calls": 3,
+            "total_ms": 0.7124709999999999,
+            "mean_ms": 0.23749033333333328
+          }
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_view": {
+            "calls": 32,
+            "total_ms": 557.0487579999999,
+            "mean_ms": 17.407773687499997
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 22.582147000000003,
+            "mean_ms": 0.7056920937500001
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 23.833500999999995,
+            "mean_ms": 0.7447969062499998
+          },
+          "drag": {
+            "calls": 32,
+            "total_ms": 582.453085,
+            "mean_ms": 18.20165890625
+          },
+          "native_annotation_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_axis_refresh": {
+            "calls": 1,
+            "total_ms": 4.019158999999999,
+            "mean_ms": 4.019158999999999
+          },
+          "native_frame": {
+            "calls": 3,
+            "total_ms": 673.837034,
+            "mean_ms": 224.61234466666667
+          },
+          "native_prepare": {
+            "calls": 3,
+            "total_ms": 0.14272000000000018,
+            "mean_ms": 0.04757333333333339
+          },
+          "native_styles": {
+            "calls": 1,
+            "total_ms": 0.10661699999999996,
+            "mean_ms": 0.10661699999999996
+          },
+          "native_submit_present": {
+            "calls": 3,
+            "total_ms": 668.084512,
+            "mean_ms": 222.69483733333334
+          },
+          "native_ui": {
+            "calls": 3,
+            "total_ms": 0.7168160000000015,
+            "mean_ms": 0.23893866666666716
+          }
+        }
+      },
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Arrow",
+        "moves": 32,
+        "stages": {
+          "annotation_view": {
+            "calls": 32,
+            "total_ms": 79.46106099999999,
+            "mean_ms": 2.4831581562499996
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 15.329462,
+            "mean_ms": 0.4790456875
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 16.08154,
+            "mean_ms": 0.502548125
+          },
+          "drag": {
+            "calls": 32,
+            "total_ms": 96.682203,
+            "mean_ms": 3.02131884375
+          },
+          "native_annotation_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_axis_refresh": {
+            "calls": 1,
+            "total_ms": 0.7906539999999997,
+            "mean_ms": 0.7906539999999997
+          },
+          "native_frame": {
+            "calls": 3,
+            "total_ms": 102.58167799999998,
+            "mean_ms": 34.19389266666666
+          },
+          "native_prepare": {
+            "calls": 3,
+            "total_ms": 0.12329099999999993,
+            "mean_ms": 0.041096999999999974
+          },
+          "native_styles": {
+            "calls": 1,
+            "total_ms": 0.09611199999999998,
+            "mean_ms": 0.09611199999999998
+          },
+          "native_submit_present": {
+            "calls": 3,
+            "total_ms": 98.37068500000001,
+            "mean_ms": 32.79022833333334
+          },
+          "native_ui": {
+            "calls": 3,
+            "total_ms": 2.376029000000001,
+            "mean_ms": 0.792009666666667
+          }
+        }
+      }
+    ],
+    "after_burst": [
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 16.127386999999995,
+            "mean_ms": 0.5039808437499999
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 15.411095999999997,
+            "mean_ms": 0.4815967499999999
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 16.04918,
+            "mean_ms": 0.501536875
+          },
+          "native_annotation_refresh": {
+            "calls": 1,
+            "total_ms": 0.48954099999999995,
+            "mean_ms": 0.48954099999999995
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 3,
+            "total_ms": 31.49781299999998,
+            "mean_ms": 10.499270999999993
+          },
+          "native_prepare": {
+            "calls": 3,
+            "total_ms": 0.10616600000000176,
+            "mean_ms": 0.035388666666667255
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 3,
+            "total_ms": 29.06097600000001,
+            "mean_ms": 9.686992000000004
+          },
+          "native_ui": {
+            "calls": 3,
+            "total_ms": 0.5951150000000007,
+            "mean_ms": 0.19837166666666692
+          }
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 17.339455999999995,
+            "mean_ms": 0.5418579999999998
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 16.576268000000002,
+            "mean_ms": 0.5180083750000001
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 17.256738999999996,
+            "mean_ms": 0.5392730937499999
+          },
+          "native_annotation_refresh": {
+            "calls": 1,
+            "total_ms": 1.2995830000000002,
+            "mean_ms": 1.2995830000000002
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 3,
+            "total_ms": 72.86925600000001,
+            "mean_ms": 24.289752000000004
+          },
+          "native_prepare": {
+            "calls": 3,
+            "total_ms": 0.13615100000000002,
+            "mean_ms": 0.045383666666666676
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 3,
+            "total_ms": 69.73414000000002,
+            "mean_ms": 23.24471333333334
+          },
+          "native_ui": {
+            "calls": 3,
+            "total_ms": 0.7063410000000001,
+            "mean_ms": 0.23544700000000005
+          }
+        }
+      },
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Arrow",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 13.320491999999998,
+            "mean_ms": 0.41626537499999994
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 12.726700999999998,
+            "mean_ms": 0.39770940624999995
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 13.262473,
+            "mean_ms": 0.41445228125
+          },
+          "native_annotation_refresh": {
+            "calls": 1,
+            "total_ms": 0.522489,
+            "mean_ms": 0.522489
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 3,
+            "total_ms": 41.65029300000003,
+            "mean_ms": 13.88343100000001
+          },
+          "native_prepare": {
+            "calls": 3,
+            "total_ms": 0.13443700000000003,
+            "mean_ms": 0.04481233333333334
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 3,
+            "total_ms": 37.62983099999997,
+            "mean_ms": 12.54327699999999
+          },
+          "native_ui": {
+            "calls": 3,
+            "total_ms": 2.1363350000000008,
+            "mean_ms": 0.7121116666666669
+          }
+        }
+      }
+    ],
+    "after_review": [
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 28.478897999999997,
+            "mean_ms": 0.8899655624999999
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 26.92554100000001,
+            "mean_ms": 0.8414231562500003
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 28.27446799999999,
+            "mean_ms": 0.8835771249999997
+          },
+          "native_annotation_refresh": {
+            "calls": 32,
+            "total_ms": 10.258887999999999,
+            "mean_ms": 0.32059024999999997
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 700.6096989999996,
+            "mean_ms": 7.298017697916663
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 3.1857859999999993,
+            "mean_ms": 0.03318527083333333
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 649.3902029999999,
+            "mean_ms": 6.764481281249999
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 19.60493099999999,
+            "mean_ms": 0.2042180312499999
+          }
+        },
+        "durable_writes": {
+          "count": 32,
+          "total_ms": 4.296126833651215,
+          "max_ms": 0.19857200095430017
+        }
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "annotation": "Text",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 34.622457,
+            "mean_ms": 1.08195178125
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 32.56906399999999,
+            "mean_ms": 1.0177832499999997
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 34.361818,
+            "mean_ms": 1.0738068125
+          },
+          "native_annotation_refresh": {
+            "calls": 32,
+            "total_ms": 23.062213,
+            "mean_ms": 0.72069415625
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1626.1719510000005,
+            "mean_ms": 16.939291156250004
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 5.298603,
+            "mean_ms": 0.05519378125
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 1543.5574870000003,
+            "mean_ms": 16.07872382291667
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 25.574385000000007,
+            "mean_ms": 0.2663998437500001
+          }
+        },
+        "durable_writes": {
+          "count": 32,
+          "total_ms": 5.092853010864928,
+          "max_ms": 0.2254619903396815
+        }
+      },
+      {
+        "width": 960,
+        "height": 600,
+        "annotation": "Arrow",
+        "moves": 32,
+        "stages": {
+          "annotation_move": {
+            "calls": 32,
+            "total_ms": 28.010426000000006,
+            "mean_ms": 0.8753258125000002
+          },
+          "annotation_view": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "apply_settings": {
+            "calls": 32,
+            "total_ms": 26.659370999999997,
+            "mean_ms": 0.8331053437499999
+          },
+          "commit_config": {
+            "calls": 32,
+            "total_ms": 27.824853000000004,
+            "mean_ms": 0.8695266562500001
+          },
+          "native_annotation_refresh": {
+            "calls": 32,
+            "total_ms": 13.143468,
+            "mean_ms": 0.410733375
+          },
+          "native_axis_refresh": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_frame": {
+            "calls": 96,
+            "total_ms": 1078.1163240000003,
+            "mean_ms": 11.230378375000003
+          },
+          "native_prepare": {
+            "calls": 96,
+            "total_ms": 3.2247270000000006,
+            "mean_ms": 0.033590906250000004
+          },
+          "native_styles": {
+            "calls": 0,
+            "total_ms": 0.0,
+            "mean_ms": null
+          },
+          "native_submit_present": {
+            "calls": 96,
+            "total_ms": 969.6885800000002,
+            "mean_ms": 10.100922708333336
+          },
+          "native_ui": {
+            "calls": 96,
+            "total_ms": 68.16133600000003,
+            "mean_ms": 0.710013916666667
+          }
+        },
+        "durable_writes": {
+          "count": 32,
+          "total_ms": 4.57673697383143,
+          "max_ms": 0.2616760029923171
+        }
+      }
+    ]
+  },
+  "verification": "Before/after complete SSOT compared for each gesture: only the selected annotation kind coordinates changed. Timing regression test fails against the baseline wheel on annotation_view counts. Both normal and burst inputs retain total movement."
+}

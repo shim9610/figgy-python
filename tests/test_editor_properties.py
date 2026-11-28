@@ -38,8 +38,36 @@ def test_contextual_styles_have_real_commands_and_replay(backend,kind):
         assert fig.edit_history['undo_count']==count+1
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
-        exec(fig.to_code(),{'fig':fig})
+        exec(fig.to_code(mode='exact'),{'fig':fig})
         assert fig.get_settings()==after
+
+
+@pytest.mark.parametrize('backend',['native','webgpu'])
+def test_camera_properties_share_validation_history_and_code_replay(backend):
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot_surface([0, 1], [0, 1], [[0, 1], [2, 3]])
+        configured = dict(azimuth_degrees=43.5, elevation_degrees=16.5,
+                          distance=6.5, projection='Perspective', box_aspect=[1.5, 1, .75])
+        before = fig.get_settings()
+        owner = object_for(fig, 'data_area')
+        assert {field['id'].split('/', 1)[1] for field in owner['fields']
+                if field['group'] == '3D camera'} == configured.keys()
+        for key, value in configured.items():
+            edit(fig, 'data_area', f'3D camera/{key}', value)
+        accepted = fig.get_settings()
+        assert accepted['config']['view_3d'] == configured
+        revision = fig.revision
+        with pytest.raises(ValueError):
+            edit(fig, 'data_area', '3D camera/distance', 1000)
+        assert fig.get_settings() == accepted and fig.revision == revision
+        for _ in configured:
+            fig.undo()
+        assert fig.get_settings() == before
+        for _ in configured:
+            fig.redo()
+        assert fig.get_settings() == accepted
+        exec(fig.to_code(mode='exact'), {'fig': fig})
+        assert fig.get_settings() == accepted
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])
@@ -159,11 +187,11 @@ def test_annotation_coordinates_convert_using_the_actual_axis_contract(backend,k
         if kind=='cartesian':
             ax.plot([0,10],[0,20],id='signal');ax.set_xlim(0,10);ax.set_ylim(0,20);x,y=2,5;ratio=(.2,.75);owner='config'
         elif kind=='categorical':
-            ax.bar(['A','B'],[5,10]);x,y=0,5;ratio=(.25,2/3);owner=kind
+            ax.bar(['A','B'],[5,10]);ax.set_ylim(0,15);x,y=0,5;ratio=(.25,2/3);owner='config'
         else:
-            ax.boxplot([[1,2,3],[2,4,6]]);fig.configure_bounded('boxplot',value_range=[0,10]);x,y=0,5;ratio=(.25,.5);owner=kind
+            ax.boxplot([[1,2,3],[2,4,6]]);fig.configure_bounded('boxplot',value_range=[0,10]);x,y=0,5;ratio=(.25,.5);owner='config'
         ax.text(x,y,'Probe',coords='data',id='probe')
-        before=fig.get_settings();target='annotation:probe' if kind=='cartesian' else 'annotation_0'
+        before=fig.get_settings();target='annotation:probe'
         edit(fig,target,'Coordinates/anchor','Ratio')
         anchor=fig.get_settings()[owner]['annotations']['items'][0]['kind']['Text']['anchor']
         assert [anchor['Ratio'][key] for key in ('x','y')]==pytest.approx(ratio,abs=1e-7)
@@ -178,13 +206,12 @@ def test_annotation_order_tracks_stable_ids_and_restores_bounded_selection(backe
     with fg.Figure(backend=backend) as fig:
         ax=fig.axes[0];ax.boxplot([[1,2,3],[2,4,6]])
         ax.text(.2,.3,'First',coords='ratio',id='first');ax.text(.4,.5,'Second',coords='ratio',id='second')
-        state=fig.get_settings();state['boxplot']['active_layer']='Annotations';state['boxplot']['decorations']['selected']={'Annotation':0};fig.apply_settings(state)
-        before=fig.get_settings();stable=object_for(fig,'annotation_0')['id']
+        state=fig.get_settings();state['config']['active_layer']='Annotations';fig.apply_settings(state)
+        before=fig.get_settings();stable=object_for(fig,'annotation:first')['id']
         fig.edit_property(stable,'Annotation/order',2,expected_revision=fig.revision)
         after=fig.get_settings()
-        assert [v['id'] for v in after['boxplot']['annotations']['items']]==['second','first']
-        assert after['boxplot']['decorations']['selected']=={'Annotation':1}
-        assert fig.editor_properties(stable)['target']=='annotation_1'
+        assert [v['id'] for v in after['config']['annotations']['items']]==['second','first']
+        assert fig.editor_properties(stable)['target']=='annotation:first'
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
 
@@ -280,6 +307,16 @@ def test_independent_bounded_styles_can_be_enabled_and_return_to_inheritance(bac
         elif family=='categorical':ax.bar(['A','B'],[3,5])
         elif family=='boxplot':ax.boxplot([[1,2,3],[2,4,6]])
         else:ax.radar(['A','B','C'],[[2,3,4]])
+        if family != 'radial':
+            sid = fig.get_settings()['series'][0]['series_id']
+            owner = object_for(fig, sid)
+            before = fig.get_settings()
+            key, value = ('Appearance/style/line_width_px',5.) if family == 'radar' else ('Appearance/style/texture_strength',.6)
+            fig.edit_property(owner['id'],key,value,expected_revision=fig.revision)
+            body = next(iter(fig.get_settings()['series'][0]['render_type'].values()))
+            assert body['style'][key.rsplit('/',1)[-1]] == pytest.approx(value)
+            fig.undo();assert fig.get_settings()==before
+            return
         owner=next(v for v in fig.editor_properties() if v['id'].startswith('bounded/series/'))
         before=fig.get_settings()
         fig.edit_property(owner['id'],'Series style/custom',True,expected_revision=fig.revision)
@@ -310,6 +347,17 @@ def test_polar_optional_controls_and_grid_vector_colors(backend):
         assert fig.get_settings()['config']['polar']['sector']==[0,180]
         edit(fig,'data_area','Polar coordinates/limit_sector',False)
         assert fig.get_settings()['config']['polar'].get('sector') is None
+        edit(fig, 'data_area', 'Polar coordinates/fixed/radial_label_angle_degrees', True)
+        edit(fig, 'data_area', 'Polar coordinates/radial_label_angle_degrees', 45)
+        edit(fig, 'data_area', 'Polar coordinates/fixed/radius_labels_skipped', True)
+        edit(fig, 'data_area', 'Polar coordinates/radius_labels_skipped', 2)
+        polar = fig.get_settings()['config']['polar']
+        assert polar['radial_label_angle_degrees'] == 45 and polar['radius_labels_skipped'] == 2
+        edit(fig, 'data_area', 'Polar coordinates/fixed/radial_label_angle_degrees', False)
+        code = fig.to_code()
+        current = fig.get_settings()
+        exec(code, {'fig': fig})
+        assert fig.get_settings() == current
     with fg.Figure(backend=backend) as fig:
         fig.axes[0].quiver([0,1],[1,2],[[1,2],[3,4]],[[2,1],[4,3]],id='grid')
         edit(fig,'grid','Color mapping/grid_source','Horizontal component')
@@ -443,7 +491,7 @@ def test_colorbar_title_command_preserves_character_style_and_replays(backend):
         assert rich['font_size']==text['font_size']
         fig.undo();assert fig.get_settings()==before
         fig.redo();assert fig.get_settings()==after
-        exec(fig.to_code(),{'fig':fig});assert fig.get_settings()==after
+        exec(fig.to_code(mode='exact'),{'fig':fig});assert fig.get_settings()==after
 
 
 @pytest.mark.parametrize('backend',['native','webgpu'])
@@ -462,3 +510,353 @@ def test_radial_detail_slice_commands_resolve_the_selected_group(backend):
         assert after['radial']['split']['children'][0]==before['radial']['split']['children'][0]
         assert after['radial']['slices']==before['radial']['slices']
         fig.undo();fig.undo();fig.undo();assert fig.get_settings()==before
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_range_links_and_line_offsets_edit_without_column_uploads(backend):
+    with fg.Figure(backend=backend, dpi=72) as fig:
+        ax = fig.axes[0]
+        bars = ax.range_bars([0, 1], [0, 2], [1, 3], orientation='horizontal', id='tasks')
+        links = ax.range_links(bars, [], id='dependencies')
+        uploads = fig.info.get('column_uploads')
+        edit(fig, links.id, 'Appearance/links', [{'from': 0, 'to': 1}])
+        links.set(links=[{'from': 1, 'to': 0, 'exit_fraction': .5}], linewidth=3)
+        style = fig.get_settings()['series'][-1]['render_type']['RangeLinks']
+        assert style['links'] == [{'from': 1, 'to': 0, 'exit_fraction': .5}]
+        assert style['width'] == links.get_linewidth() == 3
+        assert fig.info.get('column_uploads') == uploads
+        if backend == 'native':
+            assert fig.to_png().startswith(b'\x89PNG')
+
+    with fg.Figure(backend=backend, grid=[['left', 'right']]) as fig:
+        ax = fig.subplots['right'].axes
+        first, = ax.plot([0, 1], [0, 1], id='first')
+        second, = ax.plot([0, 1], [0, 1], id='second')
+        ax.set_line_offsets([first, second], y=5)
+        owner = next(o for o in fig.editor_properties()
+                     if any(v['path'].endswith('/subplots/0/config/line_offsets') for v in o['fields']))
+        assert fig.get_settings()['config']['subplots'][0]['config']['line_offsets'] == {
+            'series': ['first', 'second'], 'step_y': 5.0,
+        }
+        ax.fit()
+        assert fig.get_settings()['config']['subplots'][0]['config']['left_y']['max'] >= 6
+        if backend == 'native':
+            assert fig.to_png().startswith(b'\x89PNG')
+        fig.edit_property(owner['id'], 'Line offsets/settings', None)
+        assert 'line_offsets' not in fig.get_settings()['config']['subplots'][0]['config']
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_calendar_steps_and_labels_are_editable_in_the_typed_catalog(backend):
+    with fg.Figure(backend=backend) as fig:
+        fig.axes[0].plot([0, 86400], [1, 2])
+        target = 'tick_labels_bottom'
+        field = 'Layout and appearance/format'
+        edit(fig, target, field, 'Timestamp')
+
+        def change(key, value):
+            return edit(fig, target, field + '/Timestamp/' + key, value)
+
+        def timestamp():
+            return fig.get_settings()['config']['bottom_x']['label_style']['format']['Timestamp']
+
+        change('step/mode', 'Week')
+        change('step/Week/start', 'Sunday')
+        change('period_labels', True)
+        change('label/mode', 'Relative')
+        change('label/Relative/prefix', 'Week ')
+        assert timestamp()['step'] == {'Week': {'start': 'Sunday'}}
+        assert timestamp()['label']['Relative']['prefix'] == 'Week '
+        assert timestamp()['period_labels'] is True
+        change('label/mode', 'Custom')
+        change('label/Custom/labels', ['First', 'Second'])
+        change('label/Custom/labels', ['Edited'])
+        assert timestamp()['label']['Custom']['labels'] == ['Edited']
+        change('step/mode', 'None')
+        assert timestamp().get('step') is None
+        assert not timestamp().get('period_labels')
+        assert timestamp().get('label', 'Auto') == 'Auto'
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_range_link_validation_and_appearance_replay_preserve_destination_topology(backend):
+    def setup(fig, links):
+        ax = fig.axes[0]
+        ax.range_bars([0, 1, 2], [0, 3, 5], [2, 4, 7], orientation='horizontal', id='tasks')
+        return ax, ax.range_links('tasks', links, id='deps')
+
+    def rows(fig):
+        return fig.get_settings()['series'][-1]['render_type']['RangeLinks']['links']
+
+    with fg.Figure(backend=backend, dpi=72) as source, fg.Figure(backend=backend, dpi=72) as destination:
+        setup(source, [{'from': 0, 'to': 1, 'exit_fraction': .25}, (1, 0)])
+        ax, links = setup(destination, [(1, 2), (0, 1)])
+        before = destination.get_settings()
+        with pytest.raises(ValueError, match='outside series tasks'):
+            ax.range_links('tasks', [(0, 42)], id='invalid')
+        with pytest.raises(ValueError, match='outside series tasks'):
+            links.set(links=[(42, 0)])
+        with pytest.raises(ValueError, match='outside series tasks'):
+            edit(destination, 'deps', 'Appearance/links', [{'from': 0, 'to': 42}])
+        assert destination.get_settings() == before
+        exec(source.to_code(), {'fig': destination})
+        assert rows(destination) == [{'from': 1, 'to': 2}, {'from': 0, 'to': 1, 'exit_fraction': .25}]
+        old = source.get_settings()
+        old_rows = old['series'][-1]['render_type']['RangeLinks']['links']
+        old_rows[0].pop('exit_fraction')
+        old_rows[0]['exit_offset'] = 24
+        old_rows.append({'from': 99, 'to': 98, 'exit_offset': 24})
+        destination.apply_settings(old, preserve_data=True)
+        assert rows(destination)[0] == {'from': 1, 'to': 2}
+        assert 0 < rows(destination)[1]['exit_fraction'] < 1
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_anchored_inset_can_share_a_grid_and_follow_parent_edits(backend):
+    with fg.Figure(backend=backend, figsize=(12, 7), grid=[['a', 'b']]) as fig:
+        ax = fig.subplots['a'].axes
+        ax.plot([0, 1], [0, 1])
+        inset = ax.inset_axes([.35, .15, .55, .55], id='zoom')
+        inset.plot([0, 1], [0, 1])
+        inset.subplot.set_text_scale('fixed').set_inset_marker(linewidth=2)
+        owner = 'panel/zoom'
+        fig.edit_property(owner, 'Inset marker/window', [[.1, .8], [.2, .8]])
+        fig.edit_property(owner, 'Inset marker/connectors', False)
+
+        def model():
+            return fig.get_settings()['config']['subplots'][-1]
+
+        before = model()
+        assert before['text_scale'] == 'Fixed'
+        assert before['marker']['window'] == [[.1, .8], [.2, .8]]
+        assert not before['marker']['connectors']
+        left, bottom, width, height = ax.get_position().bounds
+        ax.set_position([left + .015, bottom, width - .03, height])
+        assert model()['anchor'] == before['anchor']
+        assert model()['config']['chart_area'] != before['config']['chart_area']
+        previously = model()['config']['chart_area']
+        fig.set_layout([['a', 'b']], column_weights=[3, 2])
+        assert model()['config']['chart_area'] != previously
+        assert fig.subplots.placement == {'a': 'a', 'b': 'b'}
+        current = model()
+        moved_x = current["config"]["chart_area"]["x"] - 14
+        fig.edit_property(owner, "Panel geometry/x", moved_x)
+        assert model()["config"]["chart_area"]["x"] == moved_x
+        assert model()["anchor"]["frame"] != current["anchor"]["frame"]
+        if backend == 'native':
+            assert fig.to_png().startswith(b'\x89PNG')
+
+
+def test_native_nested_inset_marker_is_drawn_on_its_parent():
+    import numpy as np
+
+    with fg.Figure(backend='native', figsize=(12, 7), grid=[['left', 'right']]) as fig:
+        for panel in ('left', 'right'):
+            fig.subplots[panel].axes.plot([0, 1], [0, 1])
+        right = fig.subplots['right'].axes
+        inset = right.inset_axes([.4, .28, .52, .6], id='zoom')
+        inset.plot([0, 1], [0, 1])
+        inset.set_xlim(.05, .3)
+        inset.set_ylim(.08, .4)
+        inset.subplot.set_inset_marker(color='#ff00ff', linewidth=3)
+        image = np.asarray(fig.render_rgba())
+        ink = (image[:, :, 0] > 225) & (image[:, :, 1] < 35) & (image[:, :, 2] > 225)
+        assert ink[:, image.shape[1] // 2:].sum() > 40
+        assert not ink[:, :image.shape[1] // 2].any()
+
+
+def test_native_rose_fits_optional_radius_labels_and_preserves_explicit_format():
+    with fg.Figure(backend='native') as fig:
+        ax = fig.axes[0]
+        ax.rose(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+                [[.10, .02, .01, .02, .02, .01, .03, .09],
+                 [.08, .01, .02, .03, .01, .02, .02, .07]], mode='stacked')
+        ax.set_polar_options(zero=90, clockwise=True)
+        ax.configure(left_y={'label_style': {'format': 'Percent'}})
+        fig.fit()
+        config = fig.get_settings()['config']
+        assert config['left_y']['label_style']['format'] == 'Percent'
+        assert {'radial_label_angle_degrees', 'radius_labels_skipped'} <= config['polar'].keys()
+        ax.set_polar_options(zero=90, clockwise=True, label_angle=30, labels_skipped=1)
+        fig.tight_layout()
+        polar = fig.get_settings()['config']['polar']
+        assert polar['radial_label_angle_degrees'] == 30
+        assert polar['radius_labels_skipped'] == 1
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+def test_transition_color_and_wavelength_controls_start_disabled(backend):
+    with fg.Figure(backend=backend) as fig:
+        diagram = fig.axes[0].energy_levels(
+            [{'id': 'g', 'column': 'S', 'energy': 0}, {'id': 'e', 'column': 'P', 'energy': 3}],
+            transitions=[{'id': 't', 'lower': 'g', 'upper': 'e', 'wavelength': 530}],
+            id='spectra',
+        )
+        transition = diagram.transition('t')
+        transition.set_color('red')
+        assert transition.get()['color']['r'] == 1
+        transition.reset_style()
+        assert 'color' not in transition.get()
+        diagram.set_wavelength_colors('angstrom')
+        body = fig.get_settings()['series'][0]['render_type']['EnergyLevels']
+        assert body['style']['transition']['color_by_wavelength']['unit'] == 'Angstrom'
+        diagram.set_wavelength_colors(None)
+        edit(fig, 'spectra', 'Appearance/style/transition/color_by_wavelength/enabled', True)
+        edit(fig, 'spectra', 'Appearance/style/transition/color_by_wavelength/unit', 'Um')
+        edit(fig, 'spectra', 'Appearance/transitions/0/color/enabled', True)
+        assert transition.get()['color']['a'] == 1
+        edit(fig, 'spectra', 'Appearance/transitions/0/color/enabled', False)
+        assert 'color' not in transition.get()
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_wavelength_label_format_is_editable_and_keeps_transition_data(backend):
+    levels = [{"id": "g", "column": "S", "energy": 0}, {"id": "e", "column": "P", "energy": 3}]
+    transitions = [{"id": "t", "lower": "g", "upper": "e", "wavelength": 530.25}]
+    with fg.Figure(backend=backend) as fig:
+        artist = fig.axes[0].energy_levels(levels, transitions=transitions, id="spectra",
+                                          wavelength_labels={"unit": "nm", "decimals": 1})
+
+        def style():
+            return fig.get_settings()["series"][0]["render_type"]["EnergyLevels"]["style"]
+
+        assert style()["wavelength_labels"]["format"]["decimals"] == 1
+        artist.set_wavelength_labels(fontsize=12, trim_zeros=True)
+        assert style()["wavelength_labels"]["unit"] == "nm"
+        assert style()["wavelength_labels"]["format"]["trim_zeros"]
+        artist.set_style(wavelength_labels=False)
+        base = fig.get_settings()
+        edit(fig, "spectra", "Wavelength labels/enabled", True)
+        edit(fig, "spectra", "Wavelength labels/unit", "nm")
+        edit(fig, "spectra", "Wavelength labels/fixed", True)
+        edit(fig, "spectra", "Wavelength labels/decimals", 3)
+        assert style()["wavelength_labels"]["format"]["decimals"] == 3
+        assert artist.transition("t").get()["wavelength"] == 530.25
+        if backend == "native":
+            with_labels = fig.to_png()
+        for _ in range(4):
+            fig.undo()
+        assert fig.get_settings() == base
+        if backend == "native":
+            assert with_labels != fig.to_png()
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_timeline_progress_and_category_controls_are_atomic(backend):
+    import numpy as np
+
+    with fg.Figure(backend=backend) as fig:
+        ax = fig.axes[0]
+        bars = ax.range_bars([0, 1], [0, 2], [1, 4], labels=["A", "B"],
+                            timeline=True, progress=np.array([.25, .75], dtype=np.float32), id="tasks")
+        axis = fig.get_settings()["config"]["left_y"]
+        assert axis["inverted"] and axis["category_bands"]["every"] == "Alternate"
+        assert bars.data.progress.name == "tasks/progress"
+        start = fig.get_settings()
+        if backend == "native":
+            with_progress = fig.to_png()
+        else:
+            assert fig._native.columns[bars.data.progress.name][0] == "float32"
+        with pytest.raises(ValueError):
+            bars.set(progress=[.2, .3], nonexistent_style=5)
+        assert fig.get_settings() == start and "tasks/progress/1" not in fig.data.keys()
+        with pytest.raises(ValueError, match="per bar"):
+            bars.set_progress([.5])
+        bars.set_progress([.75, .25], remaining_opacity=.5)
+        assert bars.data.progress.name == "tasks/progress/1"
+        fig.undo()
+        assert fig.get_settings() == start
+        fig.data.add("short-progress", [.5])
+        if backend == "webgpu":
+            fig._native.payload()
+            fig._native.acknowledged()
+        with pytest.raises(ValueError, match="per bar"):
+            edit(fig, "tasks", "Progress/source", "short-progress")
+        assert fig.get_settings() == start
+        edit(fig, "tasks", "Progress/source", "")
+        if backend == "native":
+            assert with_progress != fig.to_png()
+        edit(fig, "tasks", "Progress/source", "tasks/progress")
+        edit(fig, "tasks", "Progress/remaining_opacity", .25)
+        assert bars.data.progress.name == "tasks/progress"
+        edit(fig, "axis_left", "Category window/enabled", True)
+        edit(fig, "axis_left", "Category window/bounds", [-.5, .5])
+        assert fig.get_settings()["config"]["left_y"]["category_window"] == [-.5, .5]
+        ax.yaxis.set_category_window()
+        assert "category_window" not in fig.get_settings()["config"]["left_y"]
+        ax.yaxis.set_category_bands(None)
+        edit(fig, "axis_left", "Category bands/enabled", True)
+        assert fig.get_settings()["config"]["left_y"]["category_bands"]["every"] == "Alternate"
+
+
+@pytest.mark.parametrize("backend", ["native", "webgpu"])
+def test_waterfall_connector_and_panel_inset_action(backend):
+    with fg.Figure(backend=backend, dpi=72) as fig:
+        bars = fig.axes[0].waterfall(["A", "B", "C"], [2, 1, -1], id="steps",
+                                      connector_color="red", connector_width=2)
+        before = fig.get_settings()
+        connector = before["series"][0]["render_type"]["RangeBars"]["connector"]
+        assert connector["width"] == 2 and connector["color"]["r"] == 1
+        bars.set_connector(False)
+        assert "connector" not in fig.get_settings()["series"][0]["render_type"]["RangeBars"]
+        edit(fig, "steps", "Connector/enabled", True)
+        assert fig.get_settings()["series"][0]["render_type"]["RangeBars"]["connector"]["width"] == 1
+        before = fig.get_settings()
+        fig.edit_property("panel/main", "Inset/add", True)
+        accepted = fig.get_settings()
+        assert len(fig.subplots) == 2
+        assert accepted["config"]["subplots"][0]["anchor"]["parent"] == "Parent"
+        assert accepted["series"] == before["series"]
+        fig.undo()
+        assert fig.get_settings() == before
+        fig.redo()
+        assert fig.get_settings() == accepted
+
+
+def test_radar_exposes_category_window_without_ineffective_bands():
+    with fg.Figure(backend="webgpu") as fig:
+        ax = fig.axes[0]
+        ax.radar(["A", "B", "C"], [2, 3, 4])
+        fields = {field["id"] for field in object_for(fig, "axis_bottom")["fields"]}
+        assert "Category window/enabled" in fields
+        assert "Category bands/enabled" not in fields
+        with pytest.raises(ValueError, match="rectangular chart"):
+            ax.xaxis.set_category_bands()
+
+
+@pytest.mark.parametrize('backend', ['native', 'webgpu'])
+@pytest.mark.parametrize('method', ['fit', 'tight_layout'])
+def test_range_exits_migrate_fit_and_round_trip_after_source_transfer(backend, method):
+    import json
+
+    with fg.Figure(backend=backend, dpi=72) as fig:
+        ax = fig.axes[0]
+        ax.range_bars([0, 1, 2], [0, 3, 6], [2, 5, 8], orientation='horizontal', id='tasks')
+        ax.range_links('tasks', [(0, 1), (1, 2)], id='deps')
+        ax.set_xlim(0, 10)
+        ax.set_ylim(-1, 3)
+        if backend == 'webgpu':
+            fig._native.payload()
+            fig._native.acknowledged()
+            assert fig.info['transfer_snapshot_bytes'] == 0
+            assert fig.info['range_endpoint_bytes'] == 48
+
+        def rows():
+            return fig.get_settings()['series'][-1]['render_type']['RangeLinks']['links']
+
+        old = fig.get_settings()
+        old['series'][-1]['render_type']['RangeLinks']['links'][0]['exit_offset'] = 24
+        plot_width = ax.get_position().bounds[2] * old['config']['chart_area']['width']
+        expected = 24 / (plot_width * .2)
+        fig.apply_settings(old)
+        assert 'exit_offset' not in rows()[0]
+        fraction = rows()[0]['exit_fraction']
+        assert fraction == pytest.approx(expected, rel=0.01)
+        assert 'exit_fraction' not in rows()[1]
+        getattr(fig, method)()
+        assert rows()[0]['exit_fraction'] == fraction
+        assert 0 <= rows()[1]['exit_fraction'] <= 1
+        saved = json.loads(json.dumps(fig.get_settings()))
+        ax.set_xlim(-1, 9)
+        fig.apply_settings(saved)
+        assert rows() == saved['series'][-1]['render_type']['RangeLinks']['links']

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Controls for upstream radial materials and global Cartesian draw styles.
 use super::*;
 use renderer::radial::*;
@@ -169,7 +170,7 @@ impl Editor {
                         let code = c.settings_json().and_then(|settings| {
                             Python::attach(|py| {
                                 py.import("figgyplot._codegen")?
-                                    .getattr("settings_to_code")?
+                                    .getattr("editor_settings_to_code")?
                                     .call1((
                                         settings,
                                         serde_json::to_string(&c.data.default_config)
@@ -187,27 +188,38 @@ impl Editor {
                             Err(e) => self.error = e.to_string(),
                         }
                     }
-                    let save = toolbar_icon(
-                        ui,
-                        Icon::Save,
-                        false,
-                        "Save PNG",
-                        "Export the current chart",
-                    );
+                    self.theme_layout_controls(ui, c);
+                    let save =
+                        toolbar_icon(ui, Icon::Save, false, "Export", "Export the current chart");
                     self.controls.insert("save".into(), save.rect);
                     egui::Popup::menu(&save).show(|ui| {
+                        ui.horizontal(|ui| {
+                            for format in ["png", "svg", "pdf"] {
+                                if ui.button(format.to_uppercase()).clicked() {
+                                    self.save_path = std::path::Path::new(&self.save_path)
+                                        .with_extension(format)
+                                        .to_string_lossy()
+                                        .into_owned();
+                                }
+                            }
+                        });
+                        ui.add(egui::Slider::new(&mut self.export_scale, 0.5..=4.).text("Scale"));
                         ui.label("File path");
                         let path = ui.text_edit_singleline(&mut self.save_path);
                         self.controls.insert("save_path".into(), path.rect);
                         let confirm = ui.button("Save image");
                         self.controls.insert("save_confirm".into(), confirm.rect);
                         if confirm.clicked() {
-                            let result = c
-                                .render(1.)
-                                .and_then(|image| encode_png(&image).map_err(runtime))
-                                .and_then(|bytes| {
-                                    std::fs::write(&self.save_path, bytes).map_err(runtime)
-                                });
+                            let format = std::path::Path::new(&self.save_path)
+                                .extension()
+                                .and_then(|v| v.to_str())
+                                .unwrap_or("png")
+                                .to_ascii_lowercase();
+                            let result =
+                                c.export_format(&format, self.export_scale)
+                                    .and_then(|bytes| {
+                                        std::fs::write(&self.save_path, bytes).map_err(runtime)
+                                    });
                             match result {
                                 Ok(()) => {
                                     c.data.png_encodes += 1;
@@ -229,11 +241,30 @@ impl Editor {
         });
         if self.inspector_open && !overlay {
             egui::Panel::right("radial_properties")
-                .exact_size(INSPECTOR_WIDTH)
+                .exact_size(self.inspector_width)
                 .show(root, |ui| {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                    let edge = egui::Rect::from_min_size(
+                        ui.max_rect().min - egui::vec2(4., 0.),
+                        egui::vec2(7., ui.available_height()),
+                    );
+                    let grip = ui
+                        .interact(
+                            edge,
+                            egui::Id::new("bounded_inspector_resize"),
+                            egui::Sense::drag(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+                    self.controls.insert("inspector_resize".into(), grip.rect);
+                    if grip.dragged() {
+                        self.inspector_width = (self.inspector_width
+                            - ui.input(|i| i.pointer.delta().x))
+                        .clamp(280., 640.);
+                    }
                     self.bounded_navigator(ui, c);
                     let form = egui::ScrollArea::vertical()
                         .id_salt("bounded_properties")
+                        .auto_shrink([false, false])
                         .show(ui, |ui| self.radial_properties(ui, c));
                     self.controls
                         .insert("properties_viewport".into(), form.inner_rect);
@@ -249,9 +280,12 @@ impl Editor {
             egui::Window::new("Properties")
                 .id(egui::Id::new("radial_overlay"))
                 .anchor(egui::Align2::RIGHT_TOP, [-16., 70.])
-                .default_width(INSPECTOR_WIDTH)
-                .resizable(false)
+                .default_width(self.inspector_width)
+                .min_width(280.)
+                .max_width(640.)
+                .resizable(true)
                 .show(root.ctx(), |ui| {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                     self.bounded_navigator(ui, c);
                     let form = egui::ScrollArea::vertical()
                         .id_salt("bounded_properties")
@@ -280,6 +314,10 @@ impl Editor {
                         .map(|i| format!("slice_{}_{i}", selected["group"].as_u64().unwrap_or(0)))
                 })
         };
+        self.navigator.review_enabled = self
+            .review
+            .as_ref()
+            .is_some_and(|v| v.lock().unwrap().is_object());
         let nodes = navigation::nodes(&c.snapshot());
         if let Some(node) = self.navigator.show(
             ui,
@@ -342,6 +380,7 @@ impl Editor {
                 self.error = error.to_string();
             }
         }
+        self.take_tree_review_target();
     }
 
     fn bounded_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
@@ -516,14 +555,17 @@ impl Editor {
                     self.error = error.to_string();
                 }
             }
-            ui.small("Wheel over plot: zoom values · Fit: automatic range");
+            ui.small(if view["axis"] == "radius" {
+                "Set the radial range explicitly; wheel zoom is disabled."
+            } else {
+                "Wheel over plot: zoom values · Fit: automatic range"
+            });
             ui.separator();
         }
         false
     }
 
     fn radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
-        self.basic_radial_properties(ui, c);
         let chart = &c.data.document.as_ref().unwrap().chart;
         let target = if self.figure_properties {
             "figure".into()
@@ -546,6 +588,19 @@ impl Editor {
                         .unwrap_or_else(|| "data_area".into())
                 })
         };
+        let explicit_plot = chart
+            .decorations()
+            .selected
+            .as_ref()
+            .is_some_and(|v| v.element_id() == "data_area");
+        if target == "figure" || target == "data_area" && (self.edit_area || explicit_plot) {
+            self.catalog_properties(ui, c, &target, true);
+            if target == "data_area" {
+                self.bounded_context_properties(ui, c);
+            }
+            return;
+        }
+        self.basic_radial_properties(ui, c);
         self.catalog_properties(ui, c, &target, false);
     }
     fn basic_radial_properties(&mut self, ui: &mut egui::Ui, c: &mut FigureAccess<'_>) {
@@ -574,11 +629,16 @@ impl Editor {
             changed = true;
         }
         ui.label("Title");
-        let title = ui.text_edit_singleline(&mut chart.title);
+        let mut title_text = chart
+            .chart_title
+            .as_ref()
+            .map(|v| v.text.segments.iter().map(|s| s.text).collect::<String>())
+            .unwrap_or_default();
+        let title = ui.text_edit_singleline(&mut title_text);
         self.controls.insert("radial_title".into(), title.rect);
         if title.changed() {
             if let Some(option) = chart.chart_title.as_mut() {
-                option.text.segments = renderer::text::rich_segments_from_text(&chart.title);
+                option.text.segments = renderer::text::rich_segments_from_label(&title_text);
             }
             changed = true;
         }
@@ -601,17 +661,17 @@ impl Editor {
             .selected_text(format!("{:?}", chart.style.material))
             .show_ui(ui, |ui| {
                 for value in [
-                    RadialMaterial::Flat,
-                    RadialMaterial::Matte,
-                    RadialMaterial::Ceramic,
-                    RadialMaterial::BrushedMetal,
-                    RadialMaterial::Paper,
-                    RadialMaterial::Wood,
-                    RadialMaterial::SatinMetal,
-                    RadialMaterial::Toon,
-                    RadialMaterial::Enamel,
-                    RadialMaterial::Hatch,
-                    RadialMaterial::Pearl,
+                    renderer::Material::Flat,
+                    renderer::Material::Matte,
+                    renderer::Material::Ceramic,
+                    renderer::Material::BrushedMetal,
+                    renderer::Material::Paper,
+                    renderer::Material::Wood,
+                    renderer::Material::SatinMetal,
+                    renderer::Material::Toon,
+                    renderer::Material::Enamel,
+                    renderer::Material::Hatch,
+                    renderer::Material::Pearl,
                 ] {
                     let response =
                         ui.selectable_value(&mut chart.style.material, value, format!("{value:?}"));

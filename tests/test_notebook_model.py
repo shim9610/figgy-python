@@ -112,3 +112,51 @@ def test_widget_created_before_async_loop_recovers_across_separate_loops():
         assert asyncio.run(fig.prepare_async()) == expected
     finally:
         fig.close()
+
+
+def test_empty_subplots_can_fit_and_copy_snap_settings():
+    fig, axes = subplots(1, 2, backend="webgpu")
+    target, target_axes = subplots(1, 2, backend="webgpu")
+    with fig, target:
+        axes[0].plot([0, 1], [2, 3], id="line")
+        target_axes[0].plot([0, 1], [4, 5], id="line")
+        assert fig.fit().tight_layout() is fig
+        fig.configure(config={"snap_to_guides": False})
+        exec(fig.to_code(), {"fig": target})
+        assert target.get_settings()["config"]["snap_to_guides"] is False
+
+
+def test_radar_value_range_preserves_float32_transfer():
+    fig, ax = subplots(backend="webgpu")
+    with fig:
+        ax.radar(["N", "E", "S"], np.asarray([1, 2, 3], dtype=np.float32), value_range=(0, 10))
+        assert ax.get_ylim() == (0, 10)
+        assert [(column["dtype"], column["bytes"]) for column in fig.widget().manifest] == [
+            ("float32", 12), ("float32", 12),
+        ]
+
+
+def test_widget_seals_at_display_and_isolates_failed_views():
+    async def check():
+        fig, ax = subplots(backend="webgpu")
+        with fig:
+            ax.plot([0, 1], [1, 0])
+            widget = fig.widget()
+            ax.plot([0, 1], [2, 3])
+            assert len(widget.manifest) == 4
+            widget._repr_mimebundle_()
+            with pytest.raises(RuntimeError, match="sealed after display"):
+                ax.plot([0, 1], [0, 1])
+            for action, client in [("mounted", "first"), ("ready", "first"),
+                                   ("mounted", "second"), ("failed", "second")]:
+                widget._command(widget, {"action": action, "client": client, "error": "view failed"}, [])
+            assert widget.status == "ready"
+
+            def send(message, **kwargs):
+                assert message["client"] == "first"
+                widget._command(widget, {"action": "result", "id": message["id"]}, [])
+
+            widget.send = send
+            assert await fig.sync() == fig.get_settings()
+
+    asyncio.run(check())
