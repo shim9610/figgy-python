@@ -182,8 +182,18 @@ pub fn local_selection(figure: u64, reference: &mut renderer::config::PickedData
     }
 }
 
+fn map_legend_series(legend: &mut renderer::legend::Legend, map: impl Fn(&str) -> String) {
+    for segment in &mut legend.content.segments {
+        if let Some(id) = &mut segment.series_id {
+            *id = map(id);
+        }
+    }
+}
+
 pub fn config(figure: u64, input: &Config) -> Config {
     let mut result = input.clone();
+    let namespace = |id: &str| column_id(figure, id);
+    map_legend_series(&mut result.legend, namespace);
     if let Some(offsets) = &mut result.line_offsets {
         for id in &mut offsets.series {
             *id = column_id(figure, id);
@@ -198,6 +208,9 @@ pub fn config(figure: u64, input: &Config) -> Config {
     for overlay in &mut result.overlays {
         for id in &mut overlay.series {
             *id = column_id(figure, id);
+        }
+        if let Some(legend) = &mut overlay.legend {
+            map_legend_series(legend, namespace);
         }
     }
     for subplot in &mut result.subplots {
@@ -274,6 +287,8 @@ pub fn series(figure: u64, input: &[SeriesConfig]) -> Vec<SeriesConfig> {
 pub fn local_config(figure: u64, input: &Config) -> Config {
     let mut result = input.clone();
     let prefix = format!("figgy/{figure}/");
+    let local = |id: &str| id.strip_prefix(&prefix).unwrap_or(id).to_owned();
+    map_legend_series(&mut result.legend, local);
     if let Some(offsets) = &mut result.line_offsets {
         for id in &mut offsets.series {
             if let Some(local) = id.strip_prefix(&prefix) {
@@ -291,6 +306,9 @@ pub fn local_config(figure: u64, input: &Config) -> Config {
             if let Some(v) = id.strip_prefix(&prefix) {
                 *id = v.into();
             }
+        }
+        if let Some(legend) = &mut o.legend {
+            map_legend_series(legend, local);
         }
     }
     for p in &mut result.subplots {

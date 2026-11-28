@@ -227,6 +227,28 @@ def test_tick_substitution_warns_once_per_change(plot):
     assert not [w for w in caught if issubclass(w.category, figgy.RenderWarning)], "reported once"
 
 
+def test_native_legend_warnings_use_public_series_ids(plot):
+    fig, ax = plot
+    box = ax.boxplot([[1, 2, 3], [2, 4, 5]], legend=True)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", figgy.RenderWarning)
+        fig.render_rgba()
+        fig.render_rgba()
+
+    state = fig.get_settings()
+    segments = state["config"]["legend"]["content"]["segments"]
+    symbol = next(segment for segment in segments if segment.get("series_id"))
+    assert symbol["series_id"] == box.id
+    symbol["series_id"] = "missing"
+    fig.apply_settings(state)
+    with pytest.warns(figgy.RenderWarning, match='names series "missing"'):
+        fig.render_rgba()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", figgy.RenderWarning)
+        fig.render_rgba()
+
+
 def test_to_code_replays_an_injected_title_margin(plot):
     fig, ax = plot
     ax.plot(np.arange(10.0), np.arange(10.0), id="a")

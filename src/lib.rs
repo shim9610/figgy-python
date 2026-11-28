@@ -242,9 +242,8 @@ struct FigureCore {
     preparation: Option<Value>,
     target: Option<RenderTarget>,
     document: Option<bounded::BoundedDocument>,
-    /// Tick-guard warnings of the last rebuilt axis raster, and the messages
-    /// not yet handed to Python. The renderer re-derives them only when the
-    /// raster is rebuilt; a changed list is reported once.
+    /// Warnings from the last raster preparation, and the messages not yet
+    /// handed to Python. A changed list is reported once.
     render_warnings: Vec<renderer::RenderWarning>,
     pending_warnings: Vec<String>,
     /// Document revision the warnings above were derived for.
@@ -331,13 +330,19 @@ impl FigureAccess<'_> {
         }
         rendered
     }
-    /// Record the tick warnings of the current revision's raster; a changed
-    /// list is queued for Python once.
-    fn note_render_warnings(&mut self, warnings: &[renderer::RenderWarning]) {
+    fn note_render_warnings(&mut self, mut warnings: Vec<renderer::RenderWarning>) {
         self.data.warnings_revision = Some(self.data.revision);
-        if warnings != self.data.render_warnings.as_slice() {
+        let prefix = gpu::column_id(self.data.figure_id, "");
+        for warning in &mut warnings {
+            if let renderer::RenderWarning::LegendSymbolMismatch { series_id, .. } = warning
+                && let Some(id) = series_id.strip_prefix(&prefix)
+            {
+                *series_id = id.to_owned();
+            }
+        }
+        if warnings != self.data.render_warnings {
             self.data.pending_warnings = warnings.iter().map(ToString::to_string).collect();
-            self.data.render_warnings = warnings.to_vec();
+            self.data.render_warnings = warnings;
         }
     }
     fn render_inner(&mut self, scale: f32) -> PyResult<renderer::RasterImage> {
@@ -371,7 +376,7 @@ impl FigureAccess<'_> {
                     .renderer
                     .create_chart_view(&chart, chart.config().chart_area.0)
                     .map_err(runtime)?;
-                self.note_render_warnings(view.render_warnings());
+                self.note_render_warnings(view.render_warnings().to_vec());
             }
             return pollster::block_on(
                 self.renderer.export_rgba(
@@ -477,18 +482,6 @@ impl FigureAccess<'_> {
                 .map_err(runtime)?;
             target.revision = self.data.revision;
         }
-        // Same bookkeeping as note_render_warnings, on disjoint fields while
-        // `target` is still borrowed.
-        self.data.warnings_revision = Some(self.data.revision);
-        if target.view.render_warnings() != self.data.render_warnings.as_slice() {
-            self.data.render_warnings = target.view.render_warnings().to_vec();
-            self.data.pending_warnings = self
-                .data
-                .render_warnings
-                .iter()
-                .map(ToString::to_string)
-                .collect();
-        }
         let drawn = specs
             .iter()
             .zip(&target.styles)
@@ -573,11 +566,14 @@ impl FigureAccess<'_> {
         target.readback.unmap();
         drop(prepared);
         self.renderer.end_gpu_frame();
-        Ok(renderer::RasterImage {
+        let image = renderer::RasterImage {
             width: target.width,
             height: target.height,
             rgba,
-        })
+        };
+        let warnings = target.view.render_warnings().to_vec();
+        self.note_render_warnings(warnings);
+        Ok(image)
     }
     fn upload<T: Number>(&mut self, id: &str, values: &[T], allow_missing: bool) -> PyResult<()> {
         if self.data.columns.contains_key(id) {
