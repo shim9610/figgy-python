@@ -4,8 +4,8 @@ This development integration awaits the official upstream 0.19 release and final
 package pinning. See the [migration validation](RENDERER_019_AUDIT.md).
 
 The native extension and bundled WebAssembly module use the same upstream
-[integration revision](https://github.com/shim9610/figgy/commit/81bf14f938d937a0d00607002a3fec6fb1e4b0b9)
-for renderer `0.19.0-beta.2` and model `0.13.0-beta.2`. Settings identify this
+[beta.3 release commit](https://github.com/shim9610/figgy/commit/8c955cd62fa4fec660c55033e058b4eb0dadaaf6)
+for renderer `0.19.0-beta.3` and model `0.13.0-beta.3`. Settings identify this
 integration as `0.19.0`. Rebuild the browser module with `scripts/build-wasm.sh`
 when changing the pin.
 

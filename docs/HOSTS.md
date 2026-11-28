@@ -1,7 +1,7 @@
 # Native surface / notebook WebGPU hosts
 
-The figgyplot 0.4.0 integration uses `figgy-renderer 0.19.0-beta.2` and
-`figgy-model 0.13.0-beta.2`. The native extension and bundled WebAssembly
+The figgyplot 0.4.0 integration uses `figgy-renderer 0.19.0-beta.3` and
+`figgy-model 0.13.0-beta.3`. The native extension and bundled WebAssembly
 (WASM) use the same upstream revision. Figgy provides chart layout, drawing,
 hit testing and drag behavior. See the [renderer 0.19 guide](RENDERER_019.md).
 

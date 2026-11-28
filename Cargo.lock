@@ -939,16 +939,16 @@ checksum = "b97b65636e5b9ef369943878ac74335ba1c55c1cb6adbf1e2c293c624248d693"
 
 [[package]]
 name = "figgy-model"
-version = "0.13.0-beta.2"
-source = "git+https://github.com/shim9610/figgy.git?rev=c06d91c2ae9a6012d143d7840aa41a028856d7bc#c06d91c2ae9a6012d143d7840aa41a028856d7bc"
+version = "0.13.0-beta.3"
+source = "git+https://github.com/shim9610/figgy.git?rev=8c955cd62fa4fec660c55033e058b4eb0dadaaf6#8c955cd62fa4fec660c55033e058b4eb0dadaaf6"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "figgy-renderer"
-version = "0.19.0-beta.2"
-source = "git+https://github.com/shim9610/figgy.git?rev=c06d91c2ae9a6012d143d7840aa41a028856d7bc#c06d91c2ae9a6012d143d7840aa41a028856d7bc"
+version = "0.19.0-beta.3"
+source = "git+https://github.com/shim9610/figgy.git?rev=8c955cd62fa4fec660c55033e058b4eb0dadaaf6#8c955cd62fa4fec660c55033e058b4eb0dadaaf6"
 dependencies = [
  "arc-swap",
  "bytemuck",

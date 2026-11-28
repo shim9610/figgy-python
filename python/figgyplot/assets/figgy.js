@@ -850,6 +850,28 @@ export class FiggyBoundedChart {
             throw takeFromExternrefTable0(ret[0]);
         }
     }
+    /**
+     * Start a drag gesture (#440, #465): until [`Self::end_drag`], a
+     * [`Self::drag`] of a decoration (the title or a slice label) or a
+     * [`Self::drag_annotation`] of a text box or arrow snaps the drawn box,
+     * within 6 px, to the centres of the canvas and the plot area and to
+     * the edges and centres of the other decorations (or annotations), and
+     * `frame` draws thin guides with the selection box while the drag
+     * lasts. Call it on pointer down, before the first move. Handle drags
+     * (resizes, polygon vertices) do not snap. A drag outside a gesture
+     * moves by the pointer delta, as before. Guides are never stored in
+     * the document and never exported.
+     *
+     * JS: `chart.begin_drag(); chart.drag(id, dx, dy, null); … chart.end_drag();`
+     */
+    begin_drag() {
+        wasm.figgyboundedchart_begin_drag(this.__wbg_ptr);
+    }
+    /**
+     * Clear the decoration and data selections. The guides of a drag in
+     * progress go with them (#440): they belong to the element they were
+     * shown for.
+     */
     clear_selection() {
         wasm.figgyboundedchart_clear_selection(this.__wbg_ptr);
     }
@@ -969,6 +991,14 @@ export class FiggyBoundedChart {
             throw takeFromExternrefTable0(ret[1]);
         }
         return ret[0] !== 0;
+    }
+    /**
+     * End the drag gesture [`Self::begin_drag`] started: the guides go,
+     * and later drags move by the pointer delta until the next gesture.
+     * The next `frame` draws without guides.
+     */
+    end_drag() {
+        wasm.figgyboundedchart_end_drag(this.__wbg_ptr);
     }
     /**
      * [`Self::export_svg`] as one-page PDF bytes.
@@ -1346,6 +1376,18 @@ export class FiggyBoundedChart {
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
+    }
+    /**
+     * Hold or release the snap modifier (Alt / Option, #440): while it is
+     * held, a drag follows the pointer exactly and shows no guide;
+     * released, the gesture in progress snaps again. A host calls it from
+     * its key or pointer events (`event.altKey`).
+     *
+     * JS: `chart.set_snap_modifier(event.altKey);`
+     * @param {boolean} held
+     */
+    set_snap_modifier(held) {
+        wasm.figgyboundedchart_set_snap_modifier(this.__wbg_ptr, held);
     }
     /**
      * @param {boolean} backwards
@@ -1838,7 +1880,13 @@ export class FiggyChart {
      * for point-bearing modes, and enabled error endpoints. The reduction
      * is compiled on first fit (`createComputePipelineAsync` on wasm),
      * and the renderer reuses a series' extent while its columns are
-     * unchanged (`begin_auto_fit_all`). Matrix-backed series use the same
+     * unchanged (`begin_auto_fit_all`). Category bars fit their value
+     * axis: grouped bars and percent stacks from their columns' statistics
+     * (`0..=100` for percent stacks), and a stacked group to its actual
+     * per-category stacks (#466), the largest positive and the smallest
+     * negative sum, which a GPU reduction over the resident columns
+     * measures for every fit and reads back as two values; its pipeline
+     * compiles on the first such fit. Matrix-backed series use the same
      * engine to return the
      * exact cell/sample-lattice bounds; only histograms remain a metadata
      * union because their uploaded edge column already is their geometry.
@@ -2380,9 +2428,10 @@ export class FiggyChart {
         return ret[0] !== 0;
     }
     /**
-     * Compile the drawable-series fit-bound engine without drawing. On wasm
-     * this uses `createComputePipelineAsync`. Series registration does
-     * not do this; `auto_fit_all` does.
+     * Compile the drawable-series fit-bound engine without drawing, and
+     * the stacked category-bar reduction when the chart draws a stacked
+     * group (#466). On wasm this uses `createComputePipelineAsync`. Series
+     * registration and drawing do not do this; `auto_fit_all` does.
      * @returns {Promise<void>}
      */
     ensure_extent_engine() {
@@ -2659,7 +2708,11 @@ export class FiggyChart {
      * stored series say how long the arrows draw. Then each range link
      * without an exit gets the one the layout chooses (#357), written by
      * the frame that finds its GPU gather complete. A streamed source and a
-     * monotonic chart are refused, and a refusal changes nothing.
+     * monotonic chart are refused, and a refusal changes nothing. A
+     * browser cannot wait for a readback here, so a stacked category-bar
+     * group keeps the bound of its columns' statistics (the sum of each
+     * series' extremes); `auto_fit_all` fits it to the actual stacks
+     * (#466).
      * `auto_fit_all(padding)` instead measures the active layer's drawn
      * extents (error bar ends included) on the GPU.
      * JS: `chart.fit_ranges()`
@@ -3878,7 +3931,9 @@ export class FiggyChart {
      * Unregister a column. Series referencing it are removed too so the
      * chart can never point at freed data. Auto-managed legends remove
      * the corresponding rows; freely edited legends preserve their text
-     * and only synchronize recognized series symbols.
+     * and only synchronize recognized series symbols. The shown chart's
+     * document is edited, a monotonic chart's through its editor (#468);
+     * the hidden general chart's legend follows its own cascade.
      * Returns `true` when the column existed.
      * @param {string} id
      * @returns {boolean}
@@ -3932,7 +3987,11 @@ export class FiggyChart {
      * and `LogDecadeStepAdjusted` (`axis`, `requested`, `used`; a
      * replaced spacing also has `reason` and, for `TooManyTicks`,
      * `limit`), `MinorCountClamped` (`axis`, `requested`, `used`) and
-     * `AnnotationSkipped` (`index`, `reason`). `axis` is the `Config`
+     * `AnnotationSkipped` (`index`, `reason`) and `LegendSymbolMismatch`
+     * (#483: `legend`, the legend's `Config` path such as `"legend"` or
+     * `"overlays[0].legend"`; `entry`; `series_id`; `reason`, one of
+     * `UnknownSeries`, `ColorDiffers` and `MarkDiffers`), a legend
+     * symbol that names a series but does not draw its mark. `axis` is the `Config`
      * field path (`"bottom_x"`, `"overlays[0].y_axis"`,
      * `"subplots[1].config.left_y"`), a non-finite number is `null`, and
      * `message` is one line naming the setting and both values. A later
@@ -4392,8 +4451,9 @@ export class FiggyChart {
     }
     /**
      * Set the WebGPU surface clear color used behind the chart panel.
-     * Components are linear 0..1 RGBA floats. This is host/app state:
-     * it does not change the chart Config JSON.
+     * Components are linear 0..1 RGBA floats, each clamped to 0..1; a
+     * non-finite component (NaN, ±Infinity) is read as 0. This is
+     * host/app state: it does not change the chart Config JSON.
      * @param {number} r
      * @param {number} g
      * @param {number} b
@@ -4563,6 +4623,11 @@ export class FiggyChart {
      * that would move them. Its monotonic series draw nothing until their
      * group's first `set_monotonic`. A previous monotonic chart is
      * replaced; `clear_monotonic_document` shows the general chart again.
+     * The document keeps the general chart's `chart_area`: the surface owns
+     * it, and `resize_monotonic` alone changes it. A Feynman series is
+     * refused (`MonotonicFeynman`), here and by `set_series` while the
+     * chart is shown. Streamed calls and `load_demo` refuse the chart
+     * while it is shown (#468).
      * @param {string} config_json
      * @param {string} series_json
      */
@@ -6183,6 +6248,10 @@ function __wbg_get_imports() {
             const ret = arg0.features;
             return ret;
         },
+        __wbg_features_dec7bd2fd3d91bd6: function(arg0) {
+            const ret = arg0.features;
+            return ret;
+        },
         __wbg_figgyboundedchart_new: function(arg0) {
             const ret = FiggyBoundedChart.__wrap(arg0);
             return ret;
@@ -6389,6 +6458,10 @@ function __wbg_get_imports() {
         },
         __wbg_isArray_e15a2ff68ffdbef2: function(arg0) {
             const ret = Array.isArray(arg0);
+            return ret;
+        },
+        __wbg_isView_87b70d94ddaa60d3: function(arg0) {
+            const ret = ArrayBuffer.isView(arg0);
             return ret;
         },
         __wbg_keys_440be172f17c0265: function(arg0) {
@@ -7432,38 +7505,38 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1050, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1272, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1765, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1756, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1713, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 1704, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 1718, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 1709, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1718, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__305);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1709, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__308);
             return ret;
         },
         __wbindgen_generic_0000000000000006: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1713, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__306);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 1704, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__309);
             return ret;
         },
         __wbindgen_generic_0000000000000007: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1713, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__307);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 1704, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__310);
             return ret;
         },
         __wbindgen_generic_0000000000000008: function(arg0) {
@@ -7505,8 +7578,8 @@ function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385
     wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_(arg0, arg1, arg2);
 }
 
-function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__305(arg0, arg1, arg2) {
-    wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__305(arg0, arg1, arg2);
+function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__308(arg0, arg1, arg2) {
+    wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true__308(arg0, arg1, arg2);
 }
 
 function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true_(arg0, arg1, arg2) {
@@ -7523,15 +7596,15 @@ function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__306(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__306(arg0, arg1, arg2);
+function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__309(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__309(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__307(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__307(arg0, arg1, arg2);
+function wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__310(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_54fefb75fc756602___convert__closures_____invoke___wasm_bindgen_54fefb75fc756602___sys__JsNullable_wgpu_385621373fd3597f___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_54fefb75fc756602___JsError___true__310(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }

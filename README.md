@@ -512,8 +512,8 @@ rates are reported separately; they are not monitor FPS measurements.
 
 ## Renderer and documentation
 
-This source checkout pins **figgy-renderer 0.19.0-beta.2** and
-**figgy-model 0.13.0-beta.2**. The native extension and packaged browser kernel
+This source checkout pins **figgy-renderer 0.19.0-beta.3** and
+**figgy-model 0.13.0-beta.3**. The native extension and packaged browser kernel
 use the same Figgy revision. The [integration guide](docs/RENDERER_019.md)
 records the pin and rebuild command. Rust owns layout, rendering, picking and
 drag behavior. This repository provides the Python and NumPy API, desktop host,
